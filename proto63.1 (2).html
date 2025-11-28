@@ -101,7 +101,6 @@
     </div>
 
     <div id="screen-queue" class="screen">
-        <h1>Processing Queue</h1>
         <div class="item-card" style="text-align:center; background:var(--surface-highlight); border:none;">
             <div style="font-size:2rem; margin-bottom:10px;">⚡</div>
             <div class="item-title">AI Processor</div>
@@ -150,12 +149,12 @@
 
     window.onload = () => {
         applyTheme(currentTheme);
-        if (!CONFIG.url || !CONFIG.key) document.getElementById('configModal').style.display = 'flex';
-        else nav('sources');
+        // Do not force config modal on load
+        nav('sources'); // Default to sources
     };
 
     function saveConfig() {
-        let url = document.getElementById('sbUrl').value.replace(/\/$/, "");
+        let url = document.getElementById('sbUrl').value.replace( /\/$/, "");
         const key = document.getElementById('sbKey').value;
         if(url && key) { localStorage.setItem('sbUrl', url); localStorage.setItem('sbKey', key); location.reload(); }
     }
@@ -461,7 +460,9 @@
 
         let f="", b="", h= (c.type || "basic").toUpperCase();
         if(c.type === 'basic') { f=c.front; b=c.back; }
-        else if(c.type === 'cloze') { f=(c.text || c.front || '').replace(/\{\{c1::(.*?)\}\}/g, "___"); b=(c.text || c.front || '').replace(/\{\{c1::(.*?)\}\}/g, "<b style='color:var(--success)'>$1</b>"); }
+        else if(c.type === 'cloze') { f=(c.text || c.front || '').replace(/\{\{c1::(.*?)\}\}
+/g, "___"); b=(c.text || c.front || '').replace(/\{\{c1::(.*?)\}\}
+/g, "<b style='color:var(--success)'>$1</b>"); }
         else if(c.type === 'list') { f=c.question || c.front; b=`<ul style="text-align:left; padding-left:20px;">${(c.items||c.back||[]).map(i=>`<li>${i}</li>`).join('')}</ul>`; }
         else { f=c.front || "Unknown"; b=c.back || "No answer"; }
 
