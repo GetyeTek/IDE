@@ -12,30 +12,15 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            margin: 0;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        body.light-theme {
             background-color: #f0f0f0;
-            color: #333;
-        }
-        body.dark-theme {
-            background-color: #282c34;
-            color: #f8f8f2;
+            margin: 0;
         }
         .game-container {
+            border: 2px solid #333;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
-            transition: background-color 0.3s, border-color 0.3s;
-        }
-        body.light-theme .game-container {
-            border: 2px solid #ccc;
             background-color: #fff;
-        }
-        body.dark-theme .game-container {
-            border: 2px solid #555;
-            background-color: #3c404a;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         #game-board {
             display: grid;
@@ -47,6 +32,7 @@
         .card {
             width: 100px;
             height: 100px;
+            background-color: #4CAF50;
             border-radius: 5px;
             display: flex;
             align-items: center;
@@ -57,20 +43,9 @@
             transform-style: preserve-3d;
             position: relative;
         }
-        body.light-theme .card {
-            background-color: #4CAF50; /* Green for unflipped light */
-        }
-        body.dark-theme .card {
-            background-color: #61afef; /* Blue for unflipped dark */
-        }
         .card.flipped {
+            background-color: #ddd;
             transform: rotateY(180deg);
-        }
-        body.light-theme .card.flipped {
-            background-color: #ddd; /* Flipped light */
-        }
-        body.dark-theme .card.flipped {
-            background-color: #4b5263; /* Flipped dark */
         }
         .card .front, .card .back {
             position: absolute;
@@ -78,30 +53,15 @@
         }
         .card .front {
             transform: rotateY(180deg);
-        }
-        body.light-theme .card .front {
             color: #333;
         }
-        body.dark-theme .card .front {
-            color: #f8f8f2;
-        }
         .card .back {
+            color: white;
             font-weight: bold;
         }
-        body.light-theme .card .back {
-            color: white; /* Question mark color light */
-        }
-        body.dark-theme .card .back {
-            color: #f8f8f2; /* Question mark color dark */
-        }
         .card.matched {
+            background-color: #bbb;
             cursor: default;
-        }
-        body.light-theme .card.matched {
-            background-color: #bbb; /* Matched light */
-        }
-        body.dark-theme .card.matched {
-            background-color: #7f8497; /* Matched dark */
         }
         .controls {
             display: flex;
@@ -112,45 +72,27 @@
             padding: 10px 20px;
             font-size: 1em;
             cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        body.light-theme button {
             background-color: #007bff;
             color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
         }
-        body.light-theme button:hover {
+        button:hover {
             background-color: #0056b3;
-        }
-        body.dark-theme button {
-            background-color: #56b6c2;
-            color: #282c34;
-        }
-        body.dark-theme button:hover {
-            background-color: #45a0ac;
         }
         #message {
             margin-top: 10px;
             font-size: 1.2em;
             font-weight: bold;
-        }
-        body.light-theme #message {
             color: #333;
-        }
-        body.dark-theme #message {
-            color: #e06c75;
         }
         .stats {
             margin-top: 10px;
             font-size: 1.1em;
-        }
-        body.light-theme .stats {
             color: #555;
         }
-        body.dark-theme .stats {
-            color: #abb2bf;
-        }
+    </style>
 </head>
 <body>
     <div class="game-container">
@@ -163,7 +105,8 @@
         <div id="message"></div>
         <div class="controls">
             <button id="restart-button">Restart Game</button>
-        </div>
+            <button id="restart-button">Restart Game</button>
+            <button id="theme-toggle">Toggle Theme</button>
     </div>
 
     <script>
@@ -172,6 +115,38 @@
         const timeSpan = document.getElementById('time');
         const messageDiv = document.getElementById('message');
         const restartButton = document.getElementById('restart-button');
+        const themeToggleButton = document.getElementById('theme-toggle');
+        const body = document.body;
+
+        // Theme logic
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                body.classList.add('dark-theme');
+                body.classList.remove('light-theme');
+            } else {
+                body.classList.add('light-theme');
+                body.classList.remove('dark-theme');
+            }
+            localStorage.setItem('memoryGameTheme', theme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = body.classList.contains('dark-theme') ? 'dark' : 'light';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            applyTheme(newTheme);
+        }
+
+        // Load theme from localStorage or default to dark
+        const savedTheme = localStorage.getItem('memoryGameTheme');
+        if (savedTheme) {
+            applyTheme(savedTheme);
+        } else {
+            applyTheme('dark'); // Default to dark theme
+        }
+
+        themeToggleButton.addEventListener('click', toggleTheme);
+
+        const symbols = ['ðŸ Ž', 'ðŸ Œ', 'ðŸ ’', 'ðŸ ‡', 'ðŸ ‹', 'ðŸ “', 'ðŸ  ', 'ðŸ ‰'];
 
         const symbols = ['ð', 'ð', 'ð', 'ð', 'ð', 'ð', 'ð', 'ð'];
         let cards = [];
