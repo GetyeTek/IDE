@@ -88,8 +88,8 @@
     <div id="screen-sources" class="screen active">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <h1>Library</h1>
-            <button class="btn btn-outline" style="width:auto; padding:5px 10px; margin-right: 10px;" onclick="toggleTheme()"><span>💡</span> Theme</button>
-            <button class="btn btn-outline" style="width:auto; padding:5px 10px;" onclick="refreshSources()">↻ Sync</button>
+            <button class="btn btn-outline" style="width:auto; padding:5px 10px; margin-right: 10px;" onclick="toggleTheme()"><span>ð¡</span> Theme</button>
+            <button class="btn btn-outline" style="width:auto; padding:5px 10px;" onclick="refreshSources()">â» Sync</button>
         </div>
         <div id="breadcrumb" style="color:var(--primary); font-family:monospace; margin-bottom:10px;">books/</div>
         <div id="source-list" class="list-group"></div>
@@ -102,7 +102,7 @@
 
     <div id="screen-queue" class="screen">
         <div class="item-card" style="text-align:center; background:var(--surface-highlight); border:none;">
-            <div style="font-size:2rem; margin-bottom:10px;">⚡</div>
+            <div style="font-size:2rem; margin-bottom:10px;">â¡</div>
             <div class="item-title">AI Processor</div>
             <button class="btn btn-primary" style="margin-top:15px; width:100%;" onclick="triggerLoop()">Manually Trigger Worker</button>
             <div id="loop-log" style="margin-top:10px; font-family:monospace; font-size:0.8rem; color:var(--success); min-height:20px;">Ready</div>
@@ -112,7 +112,7 @@
     </div>
 
     <div id="screen-viewer" class="screen">
-        <button class="btn btn-outline" onclick="nav('results')" style="margin-bottom:15px;">← Back to Decks</button>
+        <button class="btn btn-outline" onclick="nav('results')" style="margin-bottom:15px;">â Back to Decks</button>
         <h1 id="view-title" style="font-size:1.2rem; margin-bottom:5px;">Deck Title</h1>
         <div id="flashcard-area"></div>
         <div class="action-row">
@@ -128,16 +128,16 @@
         </div>
         <div class="item-card" style="margin-top:20px;">
             <h2>Appearance</h2>
-            <button class="btn btn-outline" style="width:100%; margin-top:10px;" onclick="toggleTheme()"><span>💡</span> Toggle Theme</button>
+            <button class="btn btn-outline" style="width:100%; margin-top:10px;" onclick="toggleTheme()"><span>ð¡</span> Toggle Theme</button>
         </div>
     </div>
 
     <div class="nav-bar">
     <div class="nav-bar">
-        <div class="nav-item active" onclick="nav('sources')" id="nav-sources"><span class="nav-icon">📚</span>Source</div>
-        <div class="nav-item" onclick="nav('results')" id="nav-results"><span class="nav-icon">🎓</span>Learn</div>
-        <div class="nav-item" onclick="nav('queue')" id="nav-queue"><span class="nav-icon">⚡</span>Queue</div>
-        <div class="nav-item" onclick="nav('settings')" id="nav-settings"><span class="nav-icon">⚙️</span>Settings</div>
+        <div class="nav-item active" onclick="nav('sources')" id="nav-sources"><span class="nav-icon">ð</span>Source</div>
+        <div class="nav-item" onclick="nav('results')" id="nav-results"><span class="nav-icon">ð</span>Learn</div>
+        <div class="nav-item" onclick="nav('queue')" id="nav-queue"><span class="nav-icon">â¡</span>Queue</div>
+        <div class="nav-item" onclick="nav('settings')" id="nav-settings"><span class="nav-icon">âï¸</span>Settings</div>
     </div>
 
 <script>
@@ -223,7 +223,7 @@
 
             if(currentPath !== 'books') {
                 const up = currentPath.substring(0, currentPath.lastIndexOf('/')) || 'books';
-                list.innerHTML += `<div class="item-card" onclick="currentPath='${up}'; refreshSources();" style="text-align:center; padding:10px; cursor:pointer;">⬆ Back</div>`;
+                list.innerHTML += `<div class="item-card" onclick="currentPath='${up}'; refreshSources();" style="text-align:center; padding:10px; cursor:pointer;">â¬ Back</div>`;
             }
             document.getElementById('breadcrumb').innerText = currentPath + '/';
 
@@ -243,7 +243,7 @@
                                 ${isReg ? '<span class="badge success">Registered</span>' : ''}
                             </div>
                             <div class="actions">
-                                ${isFolder ? `<button class="btn btn-outline" style="width:auto; padding:4px 8px; font-size:0.7rem;" onclick="openPromptEditor('${item.name}')">📝 Config</button>` : ''}
+                                ${isFolder ? `<button class="btn btn-outline" style="width:auto; padding:4px 8px; font-size:0.7rem;" onclick="openPromptEditor('${item.name}')">ð Config</button>` : ''}
                                 ${isFolder ? `<button class="btn btn-primary" style="width:auto; padding:4px 8px; font-size:0.7rem;" onclick="regFolder('${item.path}')">Add All</button>` : ''}
                             </div>
                         </div>
@@ -473,8 +473,7 @@
     }
     function nextCard() { if(cardIndex < currentDeck.length-1) { cardIndex++; renderCard(); } }
     function prevCard() { if(cardIndex > 0) { cardIndex--; renderCard(); } }
-    function nextCard() { if(cardIndex < currentDeck.length-1) { cardIndex++; renderCard(); } }
-    function prevCard() { if(cardIndex > 0) { cardIndex--; renderCard(); } }
+
 </script>
     <script src="//cdn.jsdelivr.net/npm/eruda"></script>
     <script>eruda.init();</script>
