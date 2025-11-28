@@ -142,6 +142,17 @@
         if(url && key) { localStorage.setItem('sbUrl', url); localStorage.setItem('sbKey', key); location.reload(); }
     }
 
+    function applyTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        currentTheme = theme;
+    }
+
+    function toggleTheme() {
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
+    }
+
     function nav(screen) {
         document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
         document.getElementById('screen-' + screen).classList.add('active');
