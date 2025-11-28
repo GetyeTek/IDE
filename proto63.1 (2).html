@@ -121,37 +121,13 @@
             <button class="btn btn-primary" onclick="nextCard()">Next Card</button>
         </div>
     </div>
-    <div id="screen-settings" class="screen">
-        <h1>Settings</h1>
-        <h2>App Configuration</h2>
-        <div class="list-group">
-            <div class="item-card">
-                <div class="card-header">
-                    <div class="item-title">Supabase Connection</div>
-                    <div class="actions">
-                        <button class="btn btn-outline" style="width:auto; padding:4px 8px; font-size:0.7rem;" onclick="document.getElementById('configModal').style.display='flex'">Edit</button>
-                    </div>
-                </div>
-                <div class="item-sub" style="margin-top:10px;">URL: <span id="display-sb-url">Not Set</span></div>
-                <div class="item-sub">Key: <span id="display-sb-key">Not Set</span></div>
-            </div>
-            <div class="item-card" onclick="toggleTheme()">
-                <div class="card-header">
-                    <div class="item-title">Theme</div>
-                    <div class="actions">
-                        <span id="theme-display" class="badge folder" style="cursor:pointer;">Dark</span>
-                    </div>
-                </div>
-                <div class="item-sub" style="margin-top:10px;">Toggle between dark and light mode.</div>
-            </div>
-        </div>
-        
-        <h2>Advanced</h2>
-        <div class="action-row">
-            <button class="btn btn-danger" onclick="clearAllData()">Clear All Local Data</button>
-        </div>
-    </div>
 
+    <div class="nav-bar">
+        <div class="nav-item active" onclick="nav('sources')" id="nav-sources"><span class="nav-icon">📚</span>Source</div>
+        <div class="nav-item" onclick="nav('results')" id="nav-results"><span class="nav-icon">🎓</span>Learn</div>
+        <div class="nav-item" onclick="nav('queue')" id="nav-queue"><span class="nav-icon">⚡</span>Queue</div>
+        <div class="nav-item" onclick="nav('settings')" id="nav-settings"><span class="nav-icon">⚙️</span>Settings</div>
+    </div>
     <div class="nav-bar">
         <div class="nav-item active" onclick="nav('sources')" id="nav-sources"><span class="nav-icon">📚</span>Source</div>
         <div class="nav-item" onclick="nav('results')" id="nav-results"><span class="nav-icon">🎓</span>Learn</div>
@@ -159,12 +135,11 @@
     </div>
 
 <script>
-    <div class="nav-bar">
-        <div class="nav-item active" onclick="nav('sources')" id="nav-sources"><span class="nav-icon">📚</span>Source</div>
-        <div class="nav-item" onclick="nav('results')" id="nav-results"><span class="nav-icon">🎓</span>Learn</div>
-        <div class="nav-item" onclick="nav('queue')" id="nav-queue"><span class="nav-icon">⚡</span>Queue</div>
-        <div class="nav-item" onclick="nav('settings')" id="nav-settings"><span class="nav-icon">⚙️</span>Settings</div>
-    </div>
+    let currentPath = 'books';
+    let currentDeck = [];
+    let cardIndex = 0;
+    const CONFIG = { url: localStorage.getItem('sbUrl'), key: localStorage.getItem('sbKey') };
+    let currentTheme = localStorage.getItem('theme') || 'dark';
 
     window.onload = () => {
         applyTheme(currentTheme);
@@ -172,15 +147,12 @@
         else nav('sources');
     };
 
-    window.onload = () => {
-        applyTheme(currentTheme);
-        if (!CONFIG.url || !CONFIG.key) {
-            document.getElementById('configModal').style.display = 'flex';
-        } else {
-            nav('sources');
-            renderSettings();
-        }
-    };
+    function saveConfig() {
+        let url = document.getElementById('sbUrl').value.replace(/\/$/, "");
+        const key = document.getElementById('sbKey').value;
+        if(url && key) { localStorage.setItem('sbUrl', url); localStorage.setItem('sbKey', key); location.reload(); }
+    }
+
     function applyTheme(theme) {
         document.body.setAttribute('data-theme', theme);
         localStorage.setItem('theme', theme);
@@ -188,19 +160,10 @@
     }
 
     function toggleTheme() {
-    function applyTheme(theme) {
-        document.body.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-        currentTheme = theme;
-        const themeDisplay = document.getElementById('theme-display');
-        if (themeDisplay) themeDisplay.innerText = theme.charAt(0).toUpperCase() + theme.slice(1);
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
     }
-        document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-        document.getElementById('screen-' + screen).classList.add('active');
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        if(document.getElementById('nav-'+screen)) document.getElementById('nav-'+screen).classList.add('active');
-        
-        if(screen === 'sources') refreshSources();
+
     function nav(screen) {
         document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
         document.getElementById('screen-' + screen).classList.add('active');
@@ -210,8 +173,14 @@
         if(screen === 'sources') refreshSources();
         if(screen === 'results') loadDecks();
         if(screen === 'queue') loadJobs();
-        if(screen === 'settings') renderSettings();
     }
+
+    function toast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg; t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
     async function sbFetch(path, options = {}) {
         const res = await fetch(`${CONFIG.url}${path}`, {
             ...options,
@@ -501,16 +470,3 @@
 </script>
 </body>
 </html>
-    function renderSettings() {
-        document.getElementById('display-sb-url').innerText = CONFIG.url ? CONFIG.url.split('//')[1].split('.')[0] + '...' : 'Not Set';
-        document.getElementById('display-sb-key').innerText = CONFIG.key ? '************' : 'Not Set';
-        const themeDisplay = document.getElementById('theme-display');
-        if (themeDisplay) themeDisplay.innerText = currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1);
-    }
-
-    function clearAllData() {
-        if (confirm("Are you sure you want to clear all local data? This will reset your Supabase connection and theme settings.")) {
-            localStorage.clear();
-            location.reload();
-        }
-    }
