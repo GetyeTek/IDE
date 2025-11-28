@@ -326,8 +326,7 @@
             const text = await navigator.clipboard.readText();
             document.getElementById('promptJsonText').value = text;
             toast("Pasted from clipboard!");
-        } catch (err) { toast('Error: Failed to read clipboard contents.'); }
-
+        } catch (err) { alert('Failed to read clipboard contents.'); }
     }
     
     // --- *** PROMPT SAVE (CORRECTED) *** ---
@@ -339,7 +338,8 @@
         
         let config;
         try { config = JSON.parse(textarea.value); } 
-        catch (e) { alert("Error: Invalid JSON format."); return; }
+        catch (e) { toast("Error: Invalid JSON format."); return; }
+
 
         config.book_title = bookName.replace(/_/g, ' ');
         const finalContent = JSON.stringify(config, null, 2);
@@ -365,8 +365,10 @@
             toast("Config saved to GitHub!");
             modal.style.display = 'none';
         } catch (e) {
-            alert(`Failed to save to GitHub: ${e.message}`);
+        } catch (e) {
+            toast(`Error: Failed to save to GitHub: ${e.message}`);
         }
+
     }
 
     async function loadJobs() {
