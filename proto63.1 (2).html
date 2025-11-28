@@ -271,8 +271,7 @@
             await sbFetch('/rest/v1/chapter_processing_jobs', { method: 'POST', body: JSON.stringify({ book_title: book, chapter_title: chap, storage_path: path, status: 'pending' }) });
             toast("Registered!"); refreshSources();
         } catch(e) { alert(e.message); }
-        } catch(e) { toast("Error: " + e.message); }
-
+    }
 
     async function regFolder(path) {
         if(!confirm("Register all unregistered chapters in this folder?")) return;
@@ -291,7 +290,8 @@
             await sbFetch('/rest/v1/chapter_processing_jobs', { method: 'POST', body: JSON.stringify(jobs) });
             toast(`Added ${jobs.length} Jobs`); refreshSources();
         } catch(e) { alert(e.message); }
-    }
+        } catch(e) { toast("Error: " + e.message); }
+
 
     async function openPromptEditor(bookName) {
         const modal = document.getElementById('promptModal');
