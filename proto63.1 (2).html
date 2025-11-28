@@ -128,10 +128,8 @@
     let currentDeck = [];
     let cardIndex = 0;
     const CONFIG = { url: localStorage.getItem('sbUrl'), key: localStorage.getItem('sbKey') };
-    let currentTheme = localStorage.getItem('theme') || 'dark';
 
     window.onload = () => {
-        applyTheme(currentTheme);
         if (!CONFIG.url || !CONFIG.key) document.getElementById('configModal').style.display = 'flex';
         else nav('sources');
     };
