@@ -121,17 +121,24 @@
             <button class="btn btn-primary" onclick="nextCard()">Next Card</button>
         </div>
     </div>
+    <div id="screen-settings" class="screen">
+        <h1>Settings</h1>
+        <div class="item-card">
+            <h2>Configuration</h2>
+            <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="document.getElementById('configModal').style.display = 'flex'">Edit Connection</button>
+        </div>
+        <div class="item-card" style="margin-top:20px;">
+            <h2>Appearance</h2>
+            <button class="btn btn-outline" style="width:100%; margin-top:10px;" onclick="toggleTheme()"><span>💡</span> Toggle Theme</button>
+        </div>
+    </div>
 
+    <div class="nav-bar">
     <div class="nav-bar">
         <div class="nav-item active" onclick="nav('sources')" id="nav-sources"><span class="nav-icon">📚</span>Source</div>
         <div class="nav-item" onclick="nav('results')" id="nav-results"><span class="nav-icon">🎓</span>Learn</div>
         <div class="nav-item" onclick="nav('queue')" id="nav-queue"><span class="nav-icon">⚡</span>Queue</div>
         <div class="nav-item" onclick="nav('settings')" id="nav-settings"><span class="nav-icon">⚙️</span>Settings</div>
-    </div>
-    <div class="nav-bar">
-        <div class="nav-item active" onclick="nav('sources')" id="nav-sources"><span class="nav-icon">📚</span>Source</div>
-        <div class="nav-item" onclick="nav('results')" id="nav-results"><span class="nav-icon">🎓</span>Learn</div>
-        <div class="nav-item" onclick="nav('queue')" id="nav-queue"><span class="nav-icon">⚙️</span>Queue</div>
     </div>
 
 <script>
