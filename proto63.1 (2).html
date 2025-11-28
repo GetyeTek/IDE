@@ -460,8 +460,7 @@
 
         let f="", b="", h= (c.type || "basic").toUpperCase();
         if(c.type === 'basic') { f=c.front; b=c.back; }
-        else if(c.type === 'cloze') { f=(c.text || c.front || '').replace(/\{\{c1::(.*?)\}\}
-/g, "___"); b=(c.text || c.front || '').replace(/\{\{c1::(.*?)\}\}
+        else if(c.type === 'cloze') { f=(c.text || c.front || '').replace(/\{\{c1::(.*?)\}\}/g, "___"); b=(c.text || c.front || '').replace(/\{\{c1::(.*?)\}\}/g, "<b style=\'color:var(--success)\'>$1</b>"); }
 /g, "<b style='color:var(--success)'>$1</b>"); }
         else if(c.type === 'list') { f=c.question || c.front; b=`<ul style="text-align:left; padding-left:20px;">${(c.items||c.back||[]).map(i=>`<li>${i}</li>`).join('')}</ul>`; }
         else { f=c.front || "Unknown"; b=c.back || "No answer"; }
