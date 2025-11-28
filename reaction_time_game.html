@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reaction Time Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #222;
+            color: #eee;
+            font-family: Arial, sans-serif;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+
+        #game-area {
+            width: 90%;
+            max-width: 500px;
+            height: 400px;
+            border: 2px solid #555;
+            background-color: #333;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            text-align: center;
+            user-select: none;
+            border-radius: 10px;
+        }
+
+        #target {
+            width: 80px;
+            height: 80px;
+            background-color: #00bcd4; /* Cyan */
+            border-radius: 50%;
+            position: absolute;
+            display: none; /* Hidden until game starts */
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 188, 212, 0.7);
+        }
+
+        #message {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #ccc;
+        }
+
+        #result {
+            margin-top: 10px;
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #4CAF50; /* Green for success */
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1.1em;
+            margin-top: 30px;
+            background-color: #6200ea; /* Deep Purple */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #7c4dff;
+        }
+    </style>
+</head>
+<body>
+    <h1>Reaction Time Game</h1>
+    <div id="game-area">
+        <div id="target"></div>
+        <p id="instruction">Tap anywhere to start!</p>
+    </div>
+    <div id="message"></div>
+    <div id="result"></div>
+    <button id="resetButton" style="display:none;">Play Again</button>
+
+    <script>
+        const gameArea = document.getElementById('game-area');
+        const target = document.getElementById('target');
+        const instruction = document.getElementById('instruction');
+        const message = document.getElementById('message');
+        const result = document.getElementById('result');
+        const resetButton = document.getElementById('resetButton');
+
+        let startTime;
+        let timeoutId;
+        let isWaitingForClick = false;
+
+        function startGame() {
+            resetButton.style.display = 'none';
+            message.textContent = '';
+            result.textContent = '';
+            instruction.textContent = 'Wait for the square to appear...';
+            target.style.display = 'none';
+            gameArea.style.backgroundColor = '#333';
+            isWaitingForClick = true;
+
+            const delay = Math.random() * 3000 + 1000; // Random delay between 1 and 4 seconds
+            timeoutId = setTimeout(showTarget, delay);
+        }
+
+        function showTarget() {
+            instruction.textContent = '';
+            gameArea.style.backgroundColor = '#2ecc71'; /* Green background indicates go */
+            
+            // Random position within game area
+            const gameAreaRect = gameArea.getBoundingClientRect();
+            const targetSize = target.offsetWidth;
+
+            const maxX = gameAreaRect.width - targetSize;
+            const maxY = gameAreaRect.height - targetSize;
+
+            const randomX = Math.random() * maxX;
+            const randomY = Math.random() * maxY;
+
+            target.style.left = `${randomX}px`;
+            target.style.top = `${randomY}px`;
+            target.style.display = 'block';
+            
+            startTime = new Date().getTime();
+            isWaitingForClick = false;
+        }
+
+        function recordReaction(event) {
+            if (!isWaitingForClick && target.style.display === 'block') {
+                const endTime = new Date().getTime();
+                const reactionTime = endTime - startTime;
+                message.textContent = 'Your reaction time:';
+                result.textContent = `${reactionTime} ms`;
+                target.style.display = 'none';
+                gameArea.style.backgroundColor = '#333'; // Reset background
+                resetButton.style.display = 'block';
+            } else if (isWaitingForClick) {
+                clearTimeout(timeoutId); // Stop the timer for showing the target
+                message.textContent = 'Too soon!';
+                result.textContent = 'Wait for the green light.';
+                resetButton.style.display = 'block';
+                isWaitingForClick = false; // Prevent further premature clicks
+            }
+        }
+
+        gameArea.addEventListener('touchstart', recordReaction); // For touch devices
+        gameArea.addEventListener('mousedown', recordReaction); // For mouse clicks
+
+        resetButton.addEventListener('click', startGame);
+
+        startGame(); // Initialize game on load
+    </script>
+</body>
+</html>
