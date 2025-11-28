@@ -354,7 +354,8 @@
 
         // Event Listeners
         document.addEventListener('keydown', (e) => {
-            if (gameOver) return;
+            console.log(e.key); // Debugging line
+
             switch (e.key) {
                 case 'ArrowUp':
                     move('up');
