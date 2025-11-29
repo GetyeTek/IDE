@@ -1,8 +1,3 @@
-import { greet } from './greeting.js';
+import { greet } from './module.js';
 
-document.addEventListener('DOMContentLoaded', () => {
-    const appDiv = document.getElementById('app');
-    if (appDiv) {
-        appDiv.textContent = greet();
-    }
-});
+document.getElementById('app').innerHTML = greet();
