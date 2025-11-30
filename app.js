@@ -1,5 +1,5 @@
 
-import { selectNextWord, processReview, createNewSrsWord } from './srs.js';
+import * as srs from './srs.js';
 import * as api from './api.js';
 import * as movie from './movie.js';
 import * as quiz from './quiz.js';
@@ -713,7 +713,7 @@ function selectPrioritizedWordsForQuiz(deck, count = 10) {
     let tempDeck = { ...deck }; // shallow copy
 
     for (let i = 0; i < count; i++) {
-        const nextWord = selectNextWord(tempDeck);
+        const nextWord = srs.selectNextWord(tempDeck);
         if (nextWord) {
             words.push(nextWord.text);
             // Exclude this word from the next selection
@@ -1427,7 +1427,7 @@ async function populateWordData(apiModule, currentApiKeys, wordObject, deck, max
             getState: () => ({ decks, supabaseUrl, supabaseAnonKey, automationSettings }),
             actions: {
                 ui,
-                createNewSrsWord,
+                srs.createNewSrsWord,
                 saveDecksToStorage,
             },
             api
