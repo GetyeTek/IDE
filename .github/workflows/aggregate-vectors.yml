@@ -5,8 +5,16 @@ on:
   schedule:
     - cron: '0 * * * *'
   
-  # Allow running this action manually from the Actions tab
+  # Allow running this action manually FROM THE GITHUB UI
   workflow_dispatch:
+    inputs:
+      triggered_by:
+        description: 'Who triggered this workflow?'
+        required: false
+        default: 'schedule'
+      message:
+        description: 'Optional message from trigger'
+        required: false
 
 jobs:
   aggregate:
@@ -21,12 +29,15 @@ jobs:
         with:
           deno-version: v1.x
 
+      - name: Log Trigger Info (Optional)
+        run: |
+          echo "Workflow triggered by: ${{ github.event.inputs.triggered_by || 'schedule' }}"
+          echo "Message: ${{ github.event.inputs.message || 'No message' }}"
+
       - name: Run Aggregation Script
-        # These secrets must be set in your repository's settings
-        # Go to Settings -> Secrets and variables -> Actions -> New repository secret
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-          PINECONE_INDEX_HOST: ${{ secrets.PINECONE_INDEX_HOST }} # e.g., your-index-xxxx.svc.us-west1-gcp.pinecone.io
+          PINECONE_INDEX_HOST: ${{ secrets.PINECONE_INDEX_HOST }}
         run: deno run --allow-net --allow-env source/aggregate.ts
