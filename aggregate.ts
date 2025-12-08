@@ -1,3 +1,5 @@
+// --- START OF FILE IDE-main/aggregate.ts ---
+
 // --- START OF FILE source/aggregate.ts ---
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -61,24 +63,24 @@ async function main() {
     console.log(`\n--- Processing source namespace: ${ns} ---`);
     let allSourceVectorIds: string[] = [];
     
-    const MATCH_ALL_FILTER = { "university_id": { "$ne": "non_existent_uuid_for_match_all" } };
+    // REMOVED THE MATCH_ALL_FILTER - we will query without a filter to get all IDs
                                                                             
     try {
         let fetchedCount = 0;
         
         do {
-            // Added explicit logging of namespace and filter before query
-            console.log(`[Pinecone] Querying namespace: "${ns}" with filter: ${JSON.stringify(MATCH_ALL_FILTER)} and topK: ${QUERY_TOP_K}`);
+            // Updated log message to reflect no filter
+            console.log(`[Pinecone] Querying namespace: "${ns}" with topK: ${QUERY_TOP_K}`);
             const queryRes = await pineconeIndex.namespace(ns).query({
                 vector: Array(768).fill(0), // Dummy vector
                 topK: QUERY_TOP_K, // Fetch up to QUERY_TOP_K IDs
-                filter: MATCH_ALL_FILTER,
+                // REMOVED THE FILTER PROPERTY
                 includeMetadata: false,
                 includeValues: false,
             });
             
             if (!queryRes.matches || queryRes.matches.length === 0) {
-                console.log(`  No matches found for namespace ${ns} using the 'match all' filter.`);
+                console.log(`  No matches found for namespace ${ns}.`);
                 break;
             }
 
