@@ -17,13 +17,14 @@ console.log("Initializing clients...");
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const PINECONE_API_KEY = Deno.env.get('PINECONE_API_KEY');
-const PINECONE_INDEX_HOST = Deno.env.get('PINECONE_INDEX_HOST');
+// IMPORTANT CHANGE HERE: We will now use PINECONE_INDEX_NAME for consistency
+const PINECONE_INDEX_NAME = Deno.env.get('PINECONE_INDEX_NAME'); 
 
 console.log(`[Env Check] SUPABASE_URL present: ${!!SUPABASE_URL}`);
 console.log(`[Env Check] SUPABASE_SERVICE_ROLE_KEY present: ${!!SUPABASE_SERVICE_ROLE_KEY}`);
-// IMPORTANT: DO NOT log the full API key or service role key! Just check if present.
 console.log(`[Env Check] PINECONE_API_KEY present: ${!!PINECONE_API_KEY}`);
-console.log(`[Env Check] PINECONE_INDEX_HOST: ${PINECONE_INDEX_HOST}`); // Log the host URL to verify it's correct
+// Log the index name now
+console.log(`[Env Check] PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME}`); 
 
 const supabaseAdmin = createClient(
   SUPABASE_URL!,
@@ -34,8 +35,8 @@ const pc = new Pinecone({
   apiKey: PINECONE_API_KEY!
 });
 
-// NOTE: Use the full index host URL for the Pinecone client here
-const pineconeIndex: Index = pc.Index(PINECONE_INDEX_HOST!);
+// CRITICAL CHANGE: Use PINECONE_INDEX_NAME here, consistent with source/index.ts
+const pineconeIndex: Index = pc.Index(PINECONE_INDEX_NAME!); 
 console.log("Clients initialized.");
 
 async function main() {
@@ -54,24 +55,11 @@ async function main() {
         console.log(`Target namespace "${TARGET_NAMESPACE}" does not exist or has no vectors (this is expected if it's new).`);
     }
 
-    // Optional: Log if any of the source namespaces exist
-    // This is more comprehensive but can be verbose if many namespaces.
-    // For initial debug, focusing on overall connectivity is usually enough.
-    // if (indexStats.namespaces) {
-    //     for (const ns of sourceNamespaces) {
-    //         if (indexStats.namespaces[ns]) {
-    //             console.log(`Source namespace "${ns}" exists with ${indexStats.namespaces[ns].vectorCount} vectors.`);
-    //         } else {
-    //             console.log(`Source namespace "${ns}" does NOT exist.`);
-    //         }
-    //     }
-    // }
-
   } catch (e: any) {
     console.error(`\n--- FATAL PINECONE CONNECTION ERROR ---`);
     console.error(`Failed to connect to Pinecone or describe index stats. Please check:`);
     console.error(`1. Your PINECONE_API_KEY environment variable is correct.`);
-    console.error(`2. Your PINECONE_INDEX_HOST environment variable is the FULL host URL (e.g., https://your-index-name-xxxx.svc.your-environment.pinecone.io).`);
+    console.error(`2. Your PINECONE_INDEX_NAME environment variable is the CORRECT INDEX NAME (e.g., 'my-awesome-index').`);
     console.error(`3. Your API key and index are in the same Pinecone environment/region.`);
     console.error(`Original error: ${e.message}`);
     Deno.exit(1); // Exit if we cannot establish basic connectivity to Pinecone
@@ -110,12 +98,10 @@ async function main() {
         let fetchedCount = 0;
         
         do {
-            // Updated log message to reflect no filter
             console.log(`[Pinecone] Querying namespace: "${ns}" with topK: ${QUERY_TOP_K}`);
             const queryRes = await pineconeIndex.namespace(ns).query({
                 vector: Array(768).fill(0), // Dummy vector
                 topK: QUERY_TOP_K, // Fetch up to QUERY_TOP_K IDs
-                // REMOVED THE FILTER PROPERTY as it's not needed for "get all" in a dedicated namespace
                 includeMetadata: false,
                 includeValues: false,
             });
@@ -138,7 +124,7 @@ async function main() {
 
     } catch (queryError: any) { 
         if (queryError.message && queryError.message.includes('HTTP status 404')) {
-            console.warn(`  Namespace "${ns}" not found in Pinecone Index "${PINECONE_INDEX_HOST}". Skipping this namespace.`);
+            console.warn(`  Namespace "${ns}" not found in Pinecone Index (Name: "${PINECONE_INDEX_NAME}"). Skipping this namespace.`);
             continue; 
         } else {
             console.error(`  Unhandled error querying IDs from namespace "${ns}": ${queryError.message}`);
