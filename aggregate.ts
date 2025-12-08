@@ -10,16 +10,30 @@ const QUERY_TOP_K = 10000; // Pinecone's max topK is 10,000 for query()
 
 // --- SETUP CLIENTS ---
 console.log("Initializing clients...");
+
+// Log environment variables before use
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const PINECONE_API_KEY = Deno.env.get('PINECONE_API_KEY');
+const PINECONE_INDEX_HOST = Deno.env.get('PINECONE_INDEX_HOST');
+
+console.log(`[Env Check] SUPABASE_URL present: ${!!SUPABASE_URL}`);
+console.log(`[Env Check] SUPABASE_SERVICE_ROLE_KEY present: ${!!SUPABASE_SERVICE_ROLE_KEY}`);
+// IMPORTANT: DO NOT log the full API key or service role key! Just check if present.
+console.log(`[Env Check] PINECONE_API_KEY present: ${!!PINECONE_API_KEY}`);
+console.log(`[Env Check] PINECONE_INDEX_HOST: ${PINECONE_INDEX_HOST}`); // Log the host URL to verify it's correct
+
 const supabaseAdmin = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  SUPABASE_URL!,
+  SUPABASE_SERVICE_ROLE_KEY!
 );
 
 const pc = new Pinecone({
-  apiKey: Deno.env.get('PINECONE_API_KEY')!
+  apiKey: PINECONE_API_KEY!
 });
 
-const pineconeIndex: Index = pc.Index(Deno.env.get('PINECONE_INDEX_HOST')!);
+// NOTE: Use the full index host URL for the Pinecone client here
+const pineconeIndex: Index = pc.Index(PINECONE_INDEX_HOST!);
 console.log("Clients initialized.");
 
 async function main() {
@@ -27,17 +41,19 @@ async function main() {
 
   // 1. Get all university IDs (which are our source namespaces)
   const { data: universities, error: uniError } = await supabaseAdmin.from('universities').select('id');
-  if (uniError) throw new Error(`Failed to fetch universities: ${uniError.message}`);
+  if (uniError) throw new Error(`Failed to fetch universities from Supabase: ${uniError.message}`);
   const sourceNamespaces = universities.map(u => u.id);
-  console.log(`Found ${sourceNamespaces.length} source namespaces to process.`);
+  console.log(`Found ${sourceNamespaces.length} source namespaces to potentially process.`);
 
   // 2. Clear out the old data in the target namespace to avoid duplicates
   try {
     console.log(`Deleting all vectors in target namespace: "${TARGET_NAMESPACE}"...`);
+    // Added explicit logging of namespace being deleted
+    console.log(`[Pinecone] Deleting from namespace: ${TARGET_NAMESPACE}`);
     await pineconeIndex.namespace(TARGET_NAMESPACE).deleteAll();
     console.log("Target namespace cleared successfully.");
-  } catch (e) {
-    console.warn(`Could not delete vectors from target namespace (this is okay if namespace is new): ${e.message}`);
+  } catch (e: any) {
+    console.warn(`Could not delete vectors from target namespace (this is okay if namespace is new or 404): ${e.message}`);
   }
 
   // 3. Loop through each source namespace and transfer its vectors
@@ -45,13 +61,14 @@ async function main() {
     console.log(`\n--- Processing source namespace: ${ns} ---`);
     let allSourceVectorIds: string[] = [];
     
-    // *** UPDATED: Use 'university_id' for the match-all filter ***
     const MATCH_ALL_FILTER = { "university_id": { "$ne": "non_existent_uuid_for_match_all" } };
                                                                             
     try {
         let fetchedCount = 0;
         
         do {
+            // Added explicit logging of namespace and filter before query
+            console.log(`[Pinecone] Querying namespace: "${ns}" with filter: ${JSON.stringify(MATCH_ALL_FILTER)} and topK: ${QUERY_TOP_K}`);
             const queryRes = await pineconeIndex.namespace(ns).query({
                 vector: Array(768).fill(0), // Dummy vector
                 topK: QUERY_TOP_K, // Fetch up to QUERY_TOP_K IDs
@@ -61,6 +78,7 @@ async function main() {
             });
             
             if (!queryRes.matches || queryRes.matches.length === 0) {
+                console.log(`  No matches found for namespace ${ns} using the 'match all' filter.`);
                 break;
             }
 
@@ -68,51 +86,63 @@ async function main() {
             allSourceVectorIds.push(...currentBatchIds);
             fetchedCount += currentBatchIds.length;
 
-            console.log(`  Queried ${fetchedCount} IDs from namespace ${ns}...`);
+            console.log(`  Queried ${fetchedCount} IDs from namespace ${ns}... (last batch size: ${currentBatchIds.length})`);
 
-            // If the number of matches is less than QUERY_TOP_K, we've likely found all.
-            // Note: This relies on TopK being large enough to cover all vectors in a namespace.
-            // For namespaces with >10,000 vectors, true pagination would be more complex.
             if (currentBatchIds.length < QUERY_TOP_K) {
                 break;
             }
         } while (true); 
 
-    } catch (queryError) {
-        console.error(`  Error querying IDs from namespace ${ns}: ${queryError.message}`);
-        continue;
+    } catch (queryError: any) { 
+        if (queryError.message && queryError.message.includes('HTTP status 404')) {
+            console.warn(`  Namespace "${ns}" not found in Pinecone Index "${PINECONE_INDEX_HOST}". Skipping this namespace.`);
+            continue; 
+        } else {
+            console.error(`  Unhandled error querying IDs from namespace "${ns}": ${queryError.message}`);
+            continue;
+        }
     }
 
     if (allSourceVectorIds.length === 0) {
-      console.log(`  No vectors found in namespace ${ns}. Skipping.`);
+      console.log(`  No vectors found in namespace "${ns}". Skipping fetch and upsert.`);
       continue;
     }
 
-    console.log(`  Collected ${allSourceVectorIds.length} unique vector IDs from namespace ${ns}.`);
+    console.log(`  Collected ${allSourceVectorIds.length} unique vector IDs from namespace "${ns}".`);
 
     // 4. Fetch the full vector data for the collected IDs in batches
     let vectorsToUpsert = [];
-    console.log(`  Fetching full vector data for ${allSourceVectorIds.length} IDs...`);
+    console.log(`  Fetching full vector data for ${allSourceVectorIds.length} IDs from namespace "${ns}"...`);
     for (let i = 0; i < allSourceVectorIds.length; i += BATCH_SIZE) {
         const batchIds = allSourceVectorIds.slice(i, i + BATCH_SIZE);
-        const fetchRes = await pineconeIndex.namespace(ns).fetch(batchIds);
-        
-        const fetchedVectors = Object.values(fetchRes.vectors || {});
-        vectorsToUpsert.push(...fetchedVectors);
-        console.log(`    Fetched batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(allSourceVectorIds.length / BATCH_SIZE)}.`);
+        try {
+            console.log(`[Pinecone] Fetching batch from namespace: "${ns}", IDs: ${batchIds.length}`);
+            const fetchRes = await pineconeIndex.namespace(ns).fetch(batchIds);
+            
+            const fetchedVectors = Object.values(fetchRes.vectors || {});
+            vectorsToUpsert.push(...fetchedVectors);
+            console.log(`    Fetched batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(allSourceVectorIds.length / BATCH_SIZE)}. (Fetched ${fetchedVectors.length} vectors)`);
+        } catch (fetchError: any) {
+            console.error(`  Error fetching vectors for namespace "${ns}", batch starting at index ${i}: ${fetchError.message}. Skipping this batch.`);
+        }
     }
 
     if (vectorsToUpsert.length === 0) {
-        console.log(`  No vectors fetched for namespace ${ns}. Skipping upsert.`);
+        console.log(`  No vectors successfully fetched for namespace "${ns}". Skipping upsert.`);
         continue;
     }
 
     // 5. Upsert the collected vectors into the target namespace in batches
-    console.log(`  Starting upsert of ${vectorsToUpsert.length} vectors to "${TARGET_NAMESPACE}"...`);
+    console.log(`  Starting upsert of ${vectorsToUpsert.length} vectors to target namespace "${TARGET_NAMESPACE}"...`);
     for (let i = 0; i < vectorsToUpsert.length; i += BATCH_SIZE) {
         const batch = vectorsToUpsert.slice(i, i + BATCH_SIZE);
-        await pineconeIndex.namespace(TARGET_NAMESPACE).upsert(batch);
-        console.log(`    Upserted batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(vectorsToUpsert.length / BATCH_SIZE)} into ${TARGET_NAMESPACE}.`);
+        try {
+            console.log(`[Pinecone] Upserting batch into target namespace: "${TARGET_NAMESPACE}", vectors: ${batch.length}`);
+            await pineconeIndex.namespace(TARGET_NAMESPACE).upsert(batch);
+            console.log(`    Upserted batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(vectorsToUpsert.length / BATCH_SIZE)} into ${TARGET_NAMESPACE}.`);
+        } catch (upsertError: any) {
+            console.error(`  Error upserting vectors into target namespace "${TARGET_NAMESPACE}", batch starting at index ${i}: ${upsertError.message}. Skipping this batch.`);
+        }
     }
     console.log(`--- Finished processing ${ns} ---`);
   }
