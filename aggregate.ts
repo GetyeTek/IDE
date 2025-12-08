@@ -17,14 +17,13 @@ console.log("Initializing clients...");
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const PINECONE_API_KEY = Deno.env.get('PINECONE_API_KEY');
-// IMPORTANT CHANGE HERE: We will now use PINECONE_INDEX_NAME for consistency
-const PINECONE_INDEX_NAME = Deno.env.get('PINECONE_INDEX_NAME'); 
+const PINECONE_INDEX_HOST = Deno.env.get('PINECONE_INDEX_HOST');
 
 console.log(`[Env Check] SUPABASE_URL present: ${!!SUPABASE_URL}`);
 console.log(`[Env Check] SUPABASE_SERVICE_ROLE_KEY present: ${!!SUPABASE_SERVICE_ROLE_KEY}`);
+// IMPORTANT: DO NOT log the full API key or service role key! Just check if present.
 console.log(`[Env Check] PINECONE_API_KEY present: ${!!PINECONE_API_KEY}`);
-// Log the index name now
-console.log(`[Env Check] PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME}`); 
+console.log(`[Env Check] PINECONE_INDEX_HOST: ${PINECONE_INDEX_HOST}`); // Log the host URL to verify it's correct
 
 const supabaseAdmin = createClient(
   SUPABASE_URL!,
@@ -35,36 +34,12 @@ const pc = new Pinecone({
   apiKey: PINECONE_API_KEY!
 });
 
-// CRITICAL CHANGE: Use PINECONE_INDEX_NAME here, consistent with source/index.ts
-const pineconeIndex: Index = pc.Index(PINECONE_INDEX_NAME!); 
+// NOTE: Use the full index host URL for the Pinecone client here
+const pineconeIndex: Index = pc.Index(PINECONE_INDEX_HOST!);
 console.log("Clients initialized.");
 
 async function main() {
   console.log("Starting vector aggregation process...");
-
-  // --- PINECONE CONNECTION DEBUG START ---
-  try {
-    console.log("Attempting to describe Pinecone index stats to verify connectivity...");
-    const indexStats = await pineconeIndex.describeIndexStats();
-    console.log("Successfully described Pinecone index stats:", JSON.stringify(indexStats, null, 2));
-    
-    // Optional: Log information about the target namespace if it exists
-    if (indexStats.namespaces && indexStats.namespaces[TARGET_NAMESPACE]) {
-        console.log(`Target namespace "${TARGET_NAMESPACE}" exists and has ${indexStats.namespaces[TARGET_NAMESPACE].vectorCount} vectors.`);
-    } else {
-        console.log(`Target namespace "${TARGET_NAMESPACE}" does not exist or has no vectors (this is expected if it's new).`);
-    }
-
-  } catch (e: any) {
-    console.error(`\n--- FATAL PINECONE CONNECTION ERROR ---`);
-    console.error(`Failed to connect to Pinecone or describe index stats. Please check:`);
-    console.error(`1. Your PINECONE_API_KEY environment variable is correct.`);
-    console.error(`2. Your PINECONE_INDEX_NAME environment variable is the CORRECT INDEX NAME (e.g., 'my-awesome-index').`);
-    console.error(`3. Your API key and index are in the same Pinecone environment/region.`);
-    console.error(`Original error: ${e.message}`);
-    Deno.exit(1); // Exit if we cannot establish basic connectivity to Pinecone
-  }
-  // --- PINECONE CONNECTION DEBUG END ---
 
   // 1. Get all university IDs (which are our source namespaces)
   const { data: universities, error: uniError } = await supabaseAdmin.from('universities').select('id');
@@ -80,13 +55,7 @@ async function main() {
     await pineconeIndex.namespace(TARGET_NAMESPACE).deleteAll();
     console.log("Target namespace cleared successfully.");
   } catch (e: any) {
-    // Log 404 specifically as a warning, otherwise re-throw or log full error
-    if (e.message && e.message.includes('HTTP status 404')) {
-        console.warn(`Could not delete vectors from target namespace "${TARGET_NAMESPACE}" (this is okay if namespace is new or 404): ${e.message}`);
-    } else {
-        console.error(`Error deleting vectors from target namespace "${TARGET_NAMESPACE}": ${e.message}`);
-        // Consider whether you want to exit here or just warn and proceed
-    }
+    console.warn(`Could not delete vectors from target namespace (this is okay if namespace is new or 404): ${e.message}`);
   }
 
   // 3. Loop through each source namespace and transfer its vectors
@@ -94,14 +63,18 @@ async function main() {
     console.log(`\n--- Processing source namespace: ${ns} ---`);
     let allSourceVectorIds: string[] = [];
     
+    // REMOVED THE MATCH_ALL_FILTER - we will query without a filter to get all IDs
+                                                                            
     try {
         let fetchedCount = 0;
         
         do {
+            // Updated log message to reflect no filter
             console.log(`[Pinecone] Querying namespace: "${ns}" with topK: ${QUERY_TOP_K}`);
             const queryRes = await pineconeIndex.namespace(ns).query({
                 vector: Array(768).fill(0), // Dummy vector
                 topK: QUERY_TOP_K, // Fetch up to QUERY_TOP_K IDs
+                // REMOVED THE FILTER PROPERTY
                 includeMetadata: false,
                 includeValues: false,
             });
@@ -124,7 +97,7 @@ async function main() {
 
     } catch (queryError: any) { 
         if (queryError.message && queryError.message.includes('HTTP status 404')) {
-            console.warn(`  Namespace "${ns}" not found in Pinecone Index (Name: "${PINECONE_INDEX_NAME}"). Skipping this namespace.`);
+            console.warn(`  Namespace "${ns}" not found in Pinecone Index "${PINECONE_INDEX_HOST}". Skipping this namespace.`);
             continue; 
         } else {
             console.error(`  Unhandled error querying IDs from namespace "${ns}": ${queryError.message}`);
