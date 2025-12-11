@@ -714,7 +714,10 @@
 
         function addToHistory(title, type, meta) {
             const history = JSON.parse(localStorage.getItem('conduit_history') || '[]');
-            history.unshift({ title, type, meta, time: new Date().toLocaleString() });
+            history.unshift({
+                title, type, meta, ops, sha, note: '',
+                
+time: new Date().toLocaleString() });
             localStorage.setItem('conduit_history', JSON.stringify(history.slice(0, 20)));
             renderHistory();
         }
