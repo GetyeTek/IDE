@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Conduit Commander</title>
+    <title>Conduit IDE v6</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #050505;
-            --card-bg: #151517;
+            --card-bg: #111113;
             --input-bg: #0a0a0a;
             --primary: #3b82f6;
+            --primary-dim: rgba(59, 130, 246, 0.1);
             --dev: #eab308;
             --prod: #22c55e;
             --danger: #ef4444;
@@ -20,19 +21,21 @@
             --nav-height: 80px;
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
         
         body {
             margin: 0; padding: 0; height: 100vh;
             background-color: var(--bg); color: var(--text-main);
             font-family: 'Inter', sans-serif;
             display: flex; flex-direction: column;
+            overflow: hidden;
         }
 
         /* --- Layout --- */
         .main-view {
             flex: 1; overflow-y: auto; padding: 20px;
             padding-bottom: calc(var(--nav-height) + 20px);
+            max-width: 800px; margin: 0 auto; width: 100%;
         }
         
         .tab-content { display: none; animation: fadeUp 0.2s ease-out; }
@@ -40,128 +43,115 @@
         @keyframes fadeUp { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         /* --- Components --- */
-        .header { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+        .header { font-size: 20px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; letter-spacing: -0.5px; }
         
         .card {
             background: var(--card-bg); border: 1px solid var(--border);
             border-radius: 16px; padding: 16px; margin-bottom: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .btn {
-            width: 100%; padding: 16px; border-radius: 12px; border: none;
-            font-weight: 600; font-size: 16px; cursor: pointer;
+            width: 100%; padding: 14px; border-radius: 10px; border: none;
+            font-weight: 600; font-size: 15px; cursor: pointer;
             display: flex; align-items: center; justify-content: center; gap: 8px;
-            color: white; transition: opacity 0.2s;
+            color: white; transition: all 0.2s;
         }
-        .btn:active { opacity: 0.7; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
         .btn-primary { background: var(--primary); }
-        .btn-dev { background: var(--dev); color: black; }
-        .btn-prod { background: var(--prod); }
+        .btn-dev { background: var(--dev); color: #000; }
+        .btn-prod { background: var(--prod); color: #000; }
         .btn-danger { background: var(--danger); }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); width: auto; padding: 8px 12px; font-size: 13px; }
+        .btn-outline:active { background: var(--border); color: white; }
 
         .input-group { margin-bottom: 16px; }
-        .input-label { display: block; color: var(--text-muted); font-size: 12px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .input-label { display: block; color: var(--text-muted); font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
         .input-field {
             width: 100%; background: var(--input-bg); border: 1px solid var(--border);
-            color: var(--text-main); padding: 14px; border-radius: 10px;
-            font-family: 'JetBrains Mono', monospace; font-size: 14px;
+            color: var(--text-main); padding: 12px; border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+            transition: border-color 0.2s;
         }
-        .input-field:focus { outline: 2px solid var(--primary); border-color: transparent; }
+        .input-field:focus { border-color: var(--primary); }
 
-        /* --- Specific Tabs --- */
-        
-        /* Context */
-        .file-list { display: flex; flex-direction: column; gap: 8px; }
+        /* --- Context Tab --- */
+        .context-toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .file-list { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
         .file-item {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 12px; border-bottom: 1px solid var(--border);
+            padding: 12px 4px; border-bottom: 1px solid var(--border);
         }
         .file-item:last-child { border-bottom: none; }
-.match-score { font-size: 10px; color: var(--primary); background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
-/* Fullscreen Preview */
-        body.fs-mode .nav-bar, body.fs-mode .header { display: none !important; }
-        body.fs-mode .main-view { padding: 0; height: 100vh; overflow: hidden; }
-        body.fs-mode #tab-preview { display: block; height: 100%; }
-        body.fs-mode .preview-container { height: 100% !important; border: none; border-radius: 0; }
-        .fs-back-btn { display: none; position: fixed; top: 16px; left: 16px; z-index: 999; background: rgba(0,0,0,0.8); color: white; border-radius: 50%; width: 40px; height: 40px; align-items: center; justify-content: center; border: none; cursor: pointer; }
-        body.fs-mode .fs-back-btn { display: flex; }
+        .match-score { font-size: 10px; color: var(--primary); background: var(--primary-dim); padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
 
-        /* Editor Toolbar */
-        .editor-wrapper { position: relative; }
+        /* --- Patcher Tab --- */
         .editor-toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
-        .icon-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px; }
-        .icon-btn:active { background: var(--border); }
+        .editor-wrapper { position: relative; }
         .clear-input { position: absolute; right: 12px; top: 12px; color: var(--danger); cursor: pointer; font-weight: bold; font-size: 18px; z-index: 10; opacity: 0.6; }
-        .clear-input:hover { opacity: 1; }
-        
-        /* Patcher */
         .json-editor {
-            width: 100%; min-height: 200px; background: var(--input-bg);
+            width: 100%; min-height: 250px; background: var(--input-bg);
             border: 1px solid var(--border); color: #d4d4d4;
-            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.5;
             padding: 12px; border-radius: 12px; resize: none; margin-bottom: 16px;
         }
         .patch-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         
-        /* Terminal Output */
-        .terminal-logs {
-            background: #000; color: #00ff00; font-family: 'JetBrains Mono', monospace;
-            font-size: 11px; padding: 12px; border-radius: 12px;
-            height: 120px; overflow-y: auto; margin-top: 16px;
-            border: 1px solid #333; white-space: pre-wrap;
+        /* --- Smart Terminal --- */
+        .terminal-container {
+            background: #09090b; border: 1px solid #27272a; border-radius: 12px;
+            margin-top: 20px; overflow: hidden; display: flex; flex-direction: column;
         }
+        .terminal-header {
+            background: #18181b; padding: 8px 12px; font-size: 11px; color: #a1a1aa;
+            border-bottom: 1px solid #27272a; display: flex; justify-content: space-between;
+        }
+        .terminal-logs {
+            height: 150px; overflow-y: auto; padding: 12px;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: #d4d4d4; white-space: pre-wrap;
+        }
+        .log-entry { margin-bottom: 6px; display: block; }
+        .log-success { color: #4ade80; } /* Green */
+        .log-error { color: #f87171; }   /* Red */
+        .log-info { color: #60a5fa; }    /* Blue */
+        .log-warn { color: #fbbf24; }    /* Yellow */
 
-        /* Preview (Iframe) */
+        /* --- Preview Tab --- */
         .preview-container {
             height: calc(100vh - var(--nav-height) - 140px);
             border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
             background: white; position: relative;
         }
         iframe { width: 100%; height: 100%; border: none; }
-        .refresh-btn { position: absolute; bottom: 16px; right: 16px; background: rgba(0,0,0,0.8); color: white; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; }
+        .refresh-btn { position: absolute; bottom: 16px; right: 16px; background: rgba(0,0,0,0.8); color: white; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: transform 0.2s; }
+        .refresh-btn:active { transform: rotate(180deg); }
 
-        /* History */
-        .version-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 0; border-bottom: 1px solid var(--border);
-        }
-        .version-item:last-child { border-bottom: none; }
-        .v-info strong { display: block; font-size: 15px; }
-        .v-info small { color: var(--text-muted); font-size: 12px; }
-        .v-badge { padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
-        .badge-dev { background: rgba(234, 179, 8, 0.2); color: var(--dev); }
-        .badge-prod { background: rgba(34, 197, 94, 0.2); color: var(--prod); }
-
-        /* Settings */
-        .settings-footer { margin-top: 30px; text-align: center; color: var(--text-muted); font-size: 12px; }
-
-        /* --- Navigation --- */
-        .nav-bar {
-            position: fixed; bottom: 0; width: 100%; height: var(--nav-height);
-            background: rgba(21, 21, 23, 0.9); backdrop-filter: blur(10px);
-            border-top: 1px solid var(--border);
-            display: flex; justify-content: space-around; align-items: center;
-            padding-bottom: 15px; /* Safe area */
-            z-index: 100;
-        }
-        .nav-item {
-            background: none; border: none; color: var(--text-muted);
-            display: flex; flex-direction: column; align-items: center; gap: 4px;
-            font-size: 10px; font-weight: 500; cursor: pointer;
-        }
-        .nav-item svg { width: 24px; height: 24px; }
-        .nav-item.active { color: var(--primary); }
-            /* Fullscreen Mode Styles */
+        /* Fullscreen Mode */
         body.fs-mode .nav-bar, body.fs-mode .header, body.fs-mode .main-view > p { display: none !important; }
-        body.fs-mode .main-view { padding: 0 !important; height: 100vh; width: 100vw; overflow: hidden; }
+        body.fs-mode .main-view { padding: 0 !important; max-width: 100%; height: 100vh; overflow: hidden; }
         body.fs-mode #tab-preview { display: block; height: 100%; }
         body.fs-mode .preview-container { height: 100% !important; border: none; border-radius: 0; }
         
         .fs-back-btn { display: none; position: fixed; top: 20px; left: 20px; z-index: 9999; background: rgba(0,0,0,0.8); color: white; border-radius: 50%; width: 44px; height: 44px; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; backdrop-filter: blur(4px); }
         body.fs-mode .fs-back-btn { display: flex; animation: fadeUp 0.3s ease-out; }
-</style>
+
+        /* --- Navigation --- */
+        .nav-bar {
+            position: fixed; bottom: 0; width: 100%; height: var(--nav-height);
+            background: rgba(21, 21, 23, 0.95); backdrop-filter: blur(12px);
+            border-top: 1px solid var(--border);
+            display: flex; justify-content: space-around; align-items: center;
+            padding-bottom: 15px; z-index: 100;
+        }
+        .nav-item {
+            background: none; border: none; color: var(--text-muted);
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            font-size: 10px; font-weight: 500; cursor: pointer; transition: color 0.2s;
+        }
+        .nav-item svg { width: 24px; height: 24px; stroke-width: 2; }
+        .nav-item.active { color: var(--primary); }
+    </style>
 </head>
 <body>
 
@@ -171,42 +161,33 @@
         <div id="tab-context" class="tab-content active">
             <div class="header">
                 Context
-<div class="header">
-                Context
-                <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px;" onclick="fetchFileList()">Refresh</button>
+                <button class="btn-outline" onclick="fetchFileList()">Refresh List</button>
             </div>
             
-            <!-- Briefing Toolbar -->
-            <div class="context-controls" style="margin-bottom: 16px;">
-                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                    <button class="btn btn-primary" onclick="handleBriefing('copy')">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                        Copy Briefing
-                    </button>
-                    <button class="btn btn-outline" onclick="handleBriefing('download')">
-                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        Download
-                    </button>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn-outline" style="width: auto; padding: 6px 10px; font-size: 11px; border-color: var(--danger); color: var(--danger);" onclick="resetSession()">
-                        ↺ Reset Session Log
-                    </button>
-                    <label style="font-size: 12px; color: var(--primary); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <div class="context-toolbar">
+                <button class="btn btn-primary" style="flex:1" onclick="handleBriefing('copy')">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                    Copy Briefing
+                </button>
+                <button class="btn btn-outline" style="width: auto;" onclick="handleBriefing('download')">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
+                <button class="btn btn-outline" style="width: auto; color: var(--danger); border-color: var(--danger);" onclick="resetSession()">
+                    Reset
+                </button>
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                     <input type="text" id="file-search" class="input-field" style="padding:8px; font-size:12px; width:65%;" placeholder="Fuzzy search files..." onkeyup="filterFiles(this.value)">
+                     <label style="font-size: 11px; color: var(--primary); display: flex; align-items: center; gap: 6px; cursor: pointer;">
                         <input type="checkbox" onchange="toggleAllFiles(this)" checked style="accent-color: var(--primary);"> Select All
                     </label>
                 </div>
-            </div>
-            
-            <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 10px 0;">Select files to include in the briefing.</p>
-            
-<p style="color: var(--text-muted); font-size: 13px; margin: 16px 0;">Select files to include in the prompt structure.</p>
-            
-            <div class="card">
-                <input type="text" id="file-search" class="input-field" placeholder="Type to fuzzy search files..." style="margin-bottom: 12px; font-size: 13px; padding: 10px;" onkeyup="filterFiles(this.value)">
-<div id="file-list-container" class="file-list">
-                    <div style="text-align:center; padding:20px; color:var(--text-muted);">
-                        Click "Refresh" to load repo files.
+                
+                <div id="file-list-container" class="file-list">
+                    <div style="padding:20px; text-align:center; color:var(--text-muted); font-size:13px;">
+                        Waiting for file list...<br>Click 'Refresh' above.
                     </div>
                 </div>
             </div>
@@ -215,10 +196,12 @@
         <!-- TAB 2: PATCHER -->
         <div id="tab-patcher" class="tab-content">
             <div class="header">Patcher</div>
+            
             <div class="editor-toolbar">
-                <button class="icon-btn" onclick="editorUndo()"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg> Undo</button>
-                <button class="icon-btn" onclick="editorRedo()">Redo <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10H11a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"></path></svg></button>
+                <button class="btn-outline" onclick="editorUndo()">Undo</button>
+                <button class="btn-outline" onclick="editorRedo()">Redo</button>
             </div>
+
             <div class="editor-wrapper">
                 <span class="clear-input" onclick="clearEditor()">×</span>
                 <textarea id="json-input" class="json-editor" placeholder="Paste JSON patch here..." spellcheck="false" oninput="saveState()"></textarea>
@@ -226,54 +209,54 @@
             
             <div class="patch-actions">
                 <button class="btn btn-dev" onclick="runPatch('patch')">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     Test (Dev)
                 </button>
                 <button class="btn btn-prod" onclick="runPatch('commit_prod')">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"></path></svg>
-                    Commit Main
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"></path></svg>
+                    Commit
                 </button>
             </div>
 
-            <!-- Terminal Output -->
-            <div id="terminal-output" class="terminal-logs">> Ready for commands...</div>
-
-            <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px; text-align: center;">
-                'Test' pushes to <code>conduit-dev</code>. 'Commit' merges to <code>main</code>.
-            </p>
+            <!-- Smart Terminal -->
+            <div class="terminal-container">
+                <div class="terminal-header">
+                    <span>TERMINAL OUTPUT</span>
+                    <span id="term-status" style="color:var(--dev)">IDLE</span>
+                </div>
+                <div id="terminal-output" class="terminal-logs">> Ready...</div>
+            </div>
         </div>
 
         <!-- TAB 3: PREVIEW -->
-<!-- TAB 3: PREVIEW -->
         <div id="tab-preview" class="tab-content">
             <button class="fs-back-btn" onclick="toggleFullscreen(false)">
-                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"></path></svg>
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"></path></svg>
             </button>
 
             <div class="header">
                 Preview
-                <button class="btn-outline" style="width:auto; padding:6px 12px; font-size:12px; display:flex; align-items:center;" onclick="toggleFullscreen(true)">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right:6px;"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg> Expand
+                <button class="btn-outline" style="display:flex; align-items:center;" onclick="toggleFullscreen(true)">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right:6px;"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg> Expand
                 </button>
             </div>
+            
             <div class="preview-container">
                 <iframe src="" id="preview-frame"></iframe>
                 <button class="refresh-btn" onclick="refreshPreview()">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 </button>
             </div>
             <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px;">URL not set</p>
         </div>
 
-
-<!-- TAB 4: HISTORY -->
+        <!-- TAB 4: HISTORY -->
         <div id="tab-history" class="tab-content">
             <div class="header">
-                Local History
-                <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:10px;" onclick="clearHistory()">Clear</button>
+                History
+                <button class="btn-outline" onclick="clearHistory()">Clear</button>
             </div>
             <div class="card" id="history-container">
-                <!-- History items injected here -->
                 <div style="padding:10px; text-align:center; color:var(--text-muted);">No logs yet.</div>
             </div>
         </div>
@@ -292,9 +275,8 @@
                 </div>
                 <button class="btn btn-primary" onclick="saveSettings()">Save Configuration</button>
             </div>
-            <div class="settings-footer">
-                Repo: GetyeTek / IDE<br>
-                Conduit Mobile v4.0
+            <div class="settings-footer" style="text-align:center; color:var(--text-muted); font-size:11px; margin-top:20px;">
+                Conduit IDE Mobile v6.0<br>Connected to GitHub
             </div>
         </div>
 
@@ -303,185 +285,63 @@
     <!-- NAVIGATION -->
     <nav class="nav-bar">
         <button class="nav-item active" onclick="switchTab('tab-context', this)">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
             Context
         </button>
         <button class="nav-item" onclick="switchTab('tab-patcher', this)">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 20l4-16m4 4l-4 4-4-4 4-4"></path></svg>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 20l4-16m4 4l-4 4-4-4 4-4"></path></svg>
             Patcher
         </button>
         <button class="nav-item" onclick="switchTab('tab-preview', this)">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
             Preview
         </button>
         <button class="nav-item" onclick="switchTab('tab-history', this)">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             History
         </button>
         <button class="nav-item" onclick="switchTab('tab-settings', this)">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             Settings
         </button>
     </nav>
 
     <script>
-        // --- STATE & CONFIG ---
+        // --- STATE ---
         const CONFIG = {
             funcUrl: localStorage.getItem('conduit_funcUrl') || '',
             previewUrl: localStorage.getItem('conduit_previewUrl') || ''
         };
+        let sessionLogs = [];
+        let editHistory = [];
+        let historyIndex = -1;
 
         // --- INIT ---
         window.onload = () => {
-            // Load settings into inputs
             document.getElementById('setting-func-url').value = CONFIG.funcUrl;
             document.getElementById('setting-preview-url').value = CONFIG.previewUrl;
             
-            // Load Auto-saved JSON
-            const savedJson = localStorage.getItem('conduit_autosave');
-            if(savedJson) {
-                document.getElementById('json-input').value = savedJson;
-                // Init history
-                editHistory.push(savedJson);
-                historyIndex = 0;
-            }
-            
-            // Set preview iframe
             if(CONFIG.previewUrl) {
                 document.getElementById('preview-frame').src = CONFIG.previewUrl;
                 document.getElementById('preview-url-display').textContent = CONFIG.previewUrl;
             }
 
-            // Load History
             renderHistory();
 
-            // Check if setup is needed
+            const savedJson = localStorage.getItem('conduit_autosave');
+            if(savedJson) {
+                document.getElementById('json-input').value = savedJson;
+                editHistory.push(savedJson);
+                historyIndex = 0;
+            }
+
             if(!CONFIG.funcUrl) {
                 switchTab('tab-settings', document.querySelectorAll('.nav-item')[4]);
-                log("Please configure Supabase Function URL in Settings.", "error");
+                log("⚠️ Please configure Supabase Function URL.", "warn");
             }
         };
 
-                // --- EDITOR STATE & UNDO/REDO ---
-        let editHistory = [];
-        let historyIndex = -1;
-
-        function saveState() {
-            const val = document.getElementById('json-input').value;
-            // Auto-save to local storage
-            localStorage.setItem('conduit_autosave', val);
-            
-            // History logic (debounce slightly in real app, simplified here)
-            if (historyIndex === -1 || editHistory[historyIndex] !== val) {
-                // Cut off future if we were back in time
-                editHistory = editHistory.slice(0, historyIndex + 1);
-                editHistory.push(val);
-                historyIndex++;
-            }
-        }
-
-        function editorUndo() {
-            if (historyIndex > 0) {
-                historyIndex--;
-                document.getElementById('json-input').value = editHistory[historyIndex];
-                localStorage.setItem('conduit_autosave', editHistory[historyIndex]);
-            }
-        }
-
-        function editorRedo() {
-            if (historyIndex < editHistory.length - 1) {
-                historyIndex++;
-                document.getElementById('json-input').value = editHistory[historyIndex];
-                localStorage.setItem('conduit_autosave', editHistory[historyIndex]);
-            }
-        }
-
-        function clearEditor() {
-            if(confirm('Clear JSON editor?')) {
-                document.getElementById('json-input').value = '';
-                saveState();
-            }
-        }
-
-        function toggleFullscreen(active) {
-            if(active) document.body.classList.add('fs-mode');
-            else document.body.classList.remove('fs-mode');
-        }
-        // --- FULLSCREEN LOGIC ---
-        function toggleFullscreen(active) {
-            if(active) {
-                document.body.classList.add('fs-mode');
-            } else {
-                document.body.classList.remove('fs-mode');
-            }
-        }
-
-        // --- SESSION & BRIEFING LOGIC ---
-        let sessionLogs = [];
-
-        function resetSession() {
-            if(confirm("Start fresh? This clears the local session log.")) {
-                sessionLogs = [];
-                alert("Session log cleared.");
-            }
-        }
-
-        function toggleAllFiles(source) {
-            document.querySelectorAll('.file-check').forEach(cb => cb.checked = source.checked);
-        }
-
-        function generateBriefingContent() {
-            const date = new Date().toLocaleString();
-            const checkedFiles = Array.from(document.querySelectorAll('.file-check:checked')).map(cb => cb.value);
-            
-            let report = "# Session Briefing Report\n**Generated:** " + date + "\n\n";
-            
-            // Section 1: Changelog
-            report += "## 1. Session Changelog\n";
-            if(sessionLogs.length === 0) {
-                report += "(No changes recorded in this session yet.)\n";
-            } else {
-                sessionLogs.forEach((log, i) => {
-                    report += "### [" + log.time + "] Action: " + log.type + "\n";
-                    if(log.ops) {
-                        log.ops.forEach(op => {
-                           report += "- " + op.action + " on `" + op.file_path + "`\n";
-                        });
-                    }
-                    report += "\n";
-                });
-            }
-
-            // Section 2: Context
-            report += "\n## 2. Current File Context\n";
-            if(checkedFiles.length === 0) {
-                report += "(No files selected)\n";
-            } else {
-                report += "The following files are relevant to the current task:\n";
-                checkedFiles.forEach(f => report += "- " + f + "\n");
-            }
-
-            return report;
-        }
-
-        function handleBriefing(mode) {
-            const content = generateBriefingContent();
-            
-            if(mode === 'copy') {
-                navigator.clipboard.writeText(content).then(() => alert("Briefing copied to clipboard!"));
-            } else if (mode === 'download') {
-                const blob = new Blob([content], { type: 'text/markdown' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = "briefing-" + new Date().toISOString().slice(0,10) + ".md";
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }
-        }
-
-// --- NAVIGATION ---
+        // --- CORE LOGIC ---
         function switchTab(tabId, btn) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -489,25 +349,111 @@
             if(btn) btn.classList.add('active');
         }
 
-        // --- SETTINGS ---
-        function saveSettings() {
-            const funcUrl = document.getElementById('setting-func-url').value.trim();
-            const previewUrl = document.getElementById('setting-preview-url').value.trim();
+        async function runPatch(actionType) {
+            if(!CONFIG.funcUrl) return alert("Configure Edge Function URL first!");
+            const inputVal = document.getElementById('json-input').value;
+            let payload;
 
-            if(!funcUrl) return alert("Function URL is required");
+            // 1. Validation
+            try {
+                const parsed = JSON.parse(inputVal);
+                if(actionType === 'patch') {
+                    payload = parsed.operations ? parsed.operations : (Array.isArray(parsed) ? parsed : [parsed]);
+                }
+            } catch (e) {
+                log(`❌ JSON Syntax Error: ${e.message}`, "error");
+                return;
+            }
 
-            localStorage.setItem('conduit_funcUrl', funcUrl);
-            localStorage.setItem('conduit_previewUrl', previewUrl);
+            // 2. Prep & Send
+            const reqBody = { action: actionType };
+            if(actionType === 'patch') reqBody.operations = payload;
             
-            CONFIG.funcUrl = funcUrl;
-            CONFIG.previewUrl = previewUrl;
+            log(actionType === 'patch' ? `> Sending ${payload.length} ops to Dev...` : `> Merging Dev to Main...`, "info");
+            document.getElementById('term-status').textContent = "BUSY";
 
-            alert("Settings Saved!");
-            location.reload(); // Reload to apply changes cleanly
+            try {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(reqBody)
+                });
+
+                const data = await res.json();
+                
+                if(data.error) throw new Error(data.error);
+
+                // 3. Handle Response (Smart Terminal)
+                if(actionType === 'patch') {
+                    log("✅ Batch Request Completed.", "success");
+                    
+                    if(data.results && Array.isArray(data.results)) {
+                        data.results.forEach(fileResult => {
+                            if(fileResult.status === 'failed') {
+                                log(`❌ FILE: ${fileResult.file} (Failed)`, "error");
+                            } else {
+                                log(`📂 FILE: ${fileResult.file}`, "info");
+                            }
+                            
+                            // Iterate operations
+                            if(fileResult.operations) {
+                                fileResult.operations.forEach(op => {
+                                    const scoreBadge = op.score ? `[${op.score}%]` : '';
+                                    if(op.success) {
+                                        log(`   ✔ ${op.type} ${scoreBadge}`, "success");
+                                    } else {
+                                        log(`   ✖ ${op.type}: ${op.message}`, "error");
+                                    }
+                                });
+                            }
+                        });
+                    }
+
+                    // Log to Session
+                    sessionLogs.push({ time: new Date().toLocaleTimeString(), type: actionType, ops: payload });
+                    addToHistory("Patch Applied", "Dev", `${payload.length} ops`);
+                    setTimeout(refreshPreview, 1500);
+
+                } else {
+                    log("🚀 Deployment to Main Successful!", "success");
+                    addToHistory("Merged to Main", "Prod", "Stable Release");
+                }
+
+            } catch (e) {
+                log(`❌ System Error: ${e.message}`, "error");
+            } finally {
+                document.getElementById('term-status').textContent = "IDLE";
+            }
         }
 
-        // --- CONTEXT (GITHUB FETCH) ---
-                // --- SEARCH ALGORITHMS ---
+        function log(msg, type) {
+            const term = document.getElementById('terminal-output');
+            const colorClass = type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : type === 'warn' ? 'log-warn' : 'log-info';
+            term.innerHTML += `<span class="log-entry ${colorClass}">${msg}</span>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        // --- CONTEXT & FILES ---
+        async function fetchFileList() {
+            if(!CONFIG.funcUrl) return alert("Configure URL");
+            const listContainer = document.getElementById('file-list-container');
+            listContainer.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">Fetching...</div>';
+
+            try {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action: 'fetch' })
+                });
+                const data = await res.json();
+                window.repoFiles = data.files || [];
+                renderFileList(window.repoFiles);
+            } catch (e) {
+                listContainer.innerHTML = `<div style="color:var(--danger); padding:10px;">Error: ${e.message}</div>`;
+            }
+        }
+
+        // Fuzzy Logic
         function levenshtein(a, b) {
             const matrix = [];
             for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
@@ -524,30 +470,17 @@
             return matrix[b.length][a.length];
         }
 
-        function getSimilarity(str, query) {
-            if (!query) return 0;
-            const distance = levenshtein(str.toLowerCase(), query.toLowerCase());
-            const maxLength = Math.max(str.length, query.length);
-            return Math.round((1 - distance / maxLength) * 100);
-        }
-
         function filterFiles(query) {
             if (!window.repoFiles) return;
-            
-            if (!query) {
-                renderFileList(window.repoFiles);
-                return;
-            }
+            if (!query) return renderFileList(window.repoFiles);
 
             const scored = window.repoFiles.map(file => {
                 const name = file.path.split('/').pop();
-                // Give higher weight to filename matches vs full path
-                const scoreName = getSimilarity(name, query);
-                const scorePath = getSimilarity(file.path, query);
-                return { ...file, score: Math.max(scoreName, scorePath) };
+                const dist = levenshtein(name.toLowerCase(), query.toLowerCase());
+                const score = Math.max(0, 100 - (dist * 10)); // Rough score
+                return { ...file, score };
             });
 
-            // Filter > 10% match and sort by score
             const filtered = scored.filter(f => f.score > 10).sort((a, b) => b.score - a.score);
             renderFileList(filtered, true);
         }
@@ -555,186 +488,122 @@
         function renderFileList(files, showScore = false) {
             const container = document.getElementById('file-list-container');
             container.innerHTML = '';
-            if (files.length === 0) {
-                container.innerHTML = '<div style="padding:10px; text-align:center; color:var(--text-muted);">No matches found.</div>';
-                return;
-            }
             files.forEach(file => {
                 const div = document.createElement('div');
                 div.className = 'file-item';
-                const scoreHtml = showScore ? `<span class="match-score">${file.score}% match</span>` : '';
+                const scoreHtml = showScore ? `<span class="match-score">${file.score}%</span>` : '';
                 div.innerHTML = `
-                    <div class="v-info">
-                        <strong>${file.path.split('/').pop()} ${scoreHtml}</strong>
-                        <small>${file.path}</small>
-                    </div>
+                    <div style="font-size:13px;"><strong>${file.path.split('/').pop()}</strong> ${scoreHtml}<br><span style="font-size:10px; color:var(--text-muted);">${file.path}</span></div>
                     <input type="checkbox" class="file-check" value="${file.path}" checked style="accent-color: var(--primary);">
                 `;
                 container.appendChild(div);
             });
         }
-async function fetchFileList() {
-            if(!CONFIG.funcUrl) return alert("Configure API URL first");
-            
-            const listContainer = document.getElementById('file-list-container');
-            listContainer.innerHTML = '<div style="padding:10px; text-align:center;">Loading file tree...</div>';
 
-            try {
-                const res = await fetch(CONFIG.funcUrl, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ action: 'fetch' })
-                });
-                
-                if(!res.ok) throw new Error("API Error");
-                const data = await res.json();
-                
-                listContainer.innerHTML = ''; // Clear loading
-                
-                // Store file list in window for Copy Context
-                window.repoFiles = data.files || [];
-
-                if(window.repoFiles.length === 0) {
-                     listContainer.innerHTML = '<div style="padding:10px;">No files found (or repo empty).</div>';
-                     return;
-                }
-
-                renderFileList(window.repoFiles);
-
-            } catch (e) {
-                listContainer.innerHTML = `<div style="color:var(--danger); padding:10px;">Error: ${e.message}</div>`;
-            }
+        function toggleAllFiles(source) {
+            document.querySelectorAll('.file-check').forEach(cb => cb.checked = source.checked);
         }
 
-        function copyContext() {
+        // --- BRIEFING ---
+        function handleBriefing(mode) {
             const checked = Array.from(document.querySelectorAll('.file-check:checked')).map(cb => cb.value);
-            if(checked.length === 0) return alert("No files selected");
-
-            const text = `Current Project Structure (Repo: GetyeTek/IDE):\n\nFiles included in context:\n${checked.map(f => `- ${f}`).join('\n')}\n\nPlease generate a JSON patch based on this structure.`;
+            let report = "# Session Briefing\n\n## Changelog\n";
             
-            navigator.clipboard.writeText(text).then(() => {
-                alert(`Copied structure of ${checked.length} files to clipboard!`);
+            if(sessionLogs.length === 0) report += "(No changes)\n";
+            else sessionLogs.forEach(l => {
+                report += `### [${l.time}] ${l.type}\n`;
+                if(l.ops) l.ops.forEach(op => report += `- ${op.action} on ${op.file_path}\n`);
             });
-        }
 
-        // --- PATCHER ---
-        async function runPatch(actionType) {
-            if(!CONFIG.funcUrl) return alert("Go to Settings and add Edge Function URL");
+            report += "\n## Context\n";
+            checked.forEach(f => report += `- ${f}\n`);
 
-            const inputVal = document.getElementById('json-input').value;
-            let payload;
-
-            // 1. JSON Validation
-            try {
-                // Allow simple JSON object or full object with logic
-                const parsed = JSON.parse(inputVal);
-                if(actionType === 'patch') {
-                    // Normalize: If user pasted just an object, wrap it or use it
-                    payload = parsed.operations ? parsed.operations : [parsed]; 
-                    // Handle case where user pasted array directly
-                    if(Array.isArray(parsed)) payload = parsed;
-                }
-            } catch (e) {
-                log("JSON Syntax Error: " + e.message, "error");
-                return;
-            }
-
-            // 2. Prepare Request
-            const reqBody = {
-                action: actionType
-            };
-
-            if(actionType === 'patch') {
-                reqBody.operations = payload;
-                log(`Sending ${payload.length} operations to Dev Branch...`);
+            if(mode === 'copy') {
+                navigator.clipboard.writeText(report).then(() => alert("Briefing copied!"));
             } else {
-                if(!confirm("Are you sure you want to merge Dev into Main?")) return;
-                log("Initiating Merge to Production...");
+                const blob = new Blob([report], { type: 'text/markdown' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `briefing-${Date.now()}.md`;
+                a.click();
             }
-
-            // 3. Send
-            try {
-                const res = await fetch(CONFIG.funcUrl, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(reqBody)
-                });
-
-                const data = await res.json();
-                
-                if(data.error) throw new Error(data.error);
-
-                // 4. Handle Success
-                if(actionType === 'patch') {
-                    log("â Patch Successful!", "success");
-                    log(JSON.stringify(data.results, null, 2));
-                    addToHistory("Patch Applied", "Dev", `${payload.length} ops`);
-                    
-                    // Trigger preview refresh automatically
-                    setTimeout(refreshPreview, 1000);
-                } else {
-                    log("ð Deployment Complete!", "success");
-                    addToHistory("Merged to Main", "Prod", "Stable Release");
-                }
-
-            } catch (e) {
-                log(`â Error: ${e.message}`, "error");
+        }
+        
+        function resetSession() {
+            if(confirm("Reset session logs?")) {
+                sessionLogs = [];
+                log("Session log cleared.", "warn");
             }
         }
 
-        function log(msg, type) {
-            const term = document.getElementById('terminal-output');
-            const timestamp = new Date().toLocaleTimeString();
-            let color = '#00ff00';
-            if(type === 'error') color = '#ef4444';
-            if(type === 'success') color = '#22c55e';
-
-            term.innerHTML += `\n<span style="color:${color}">[${timestamp}]</span> ${msg}`;
-            term.scrollTop = term.scrollHeight;
+        // --- EDITOR & PREVIEW ---
+        function saveState() {
+            const val = document.getElementById('json-input').value;
+            localStorage.setItem('conduit_autosave', val);
+            
+            // Simple History debounce
+            if (historyIndex === -1 || editHistory[historyIndex] !== val) {
+                editHistory = editHistory.slice(0, historyIndex + 1);
+                editHistory.push(val);
+                historyIndex++;
+            }
         }
-
-        // --- PREVIEW ---
+        function editorUndo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                document.getElementById('json-input').value = editHistory[historyIndex];
+            }
+        }
+        function editorRedo() {
+            if (historyIndex < editHistory.length - 1) {
+                historyIndex++;
+                document.getElementById('json-input').value = editHistory[historyIndex];
+            }
+        }
+        function clearEditor() {
+            if(confirm("Clear editor?")) {
+                document.getElementById('json-input').value = "";
+                saveState();
+            }
+        }
+        
+        function toggleFullscreen(active) {
+            if(active) document.body.classList.add('fs-mode');
+            else document.body.classList.remove('fs-mode');
+        }
         function refreshPreview() {
             if(!CONFIG.previewUrl) return;
             const iframe = document.getElementById('preview-frame');
-            // Add timestamp to force reload
-            const url = new URL(CONFIG.previewUrl);
-            url.searchParams.set('t', Date.now());
-            iframe.src = url.toString();
+            iframe.src = CONFIG.previewUrl + '?t=' + Date.now();
         }
 
-        // --- HISTORY (Local Storage) ---
+        // --- HISTORY & SETTINGS ---
         function addToHistory(title, type, meta) {
             const history = JSON.parse(localStorage.getItem('conduit_history') || '[]');
-            const entry = { title, type, meta, time: new Date().toLocaleString() };
-            history.unshift(entry); // Add to top
-            localStorage.setItem('conduit_history', JSON.stringify(history.slice(0, 20))); // Keep last 20
+            history.unshift({ title, type, meta, time: new Date().toLocaleString() });
+            localStorage.setItem('conduit_history', JSON.stringify(history.slice(0, 20)));
             renderHistory();
         }
-
         function renderHistory() {
             const history = JSON.parse(localStorage.getItem('conduit_history') || '[]');
             const container = document.getElementById('history-container');
-            
-            if(history.length === 0) {
-                container.innerHTML = '<div style="padding:10px; text-align:center; color:var(--text-muted);">No logs yet.</div>';
-                return;
-            }
-
-            container.innerHTML = history.map(h => `
-                <div class="version-item">
-                    <div class="v-info">
-                        <strong>${h.title}</strong>
-                        <small>${h.time} â¢ ${h.meta}</small>
-                    </div>
-                    <span class="v-badge ${h.type === 'Prod' ? 'badge-prod' : 'badge-dev'}">${h.type}</span>
-                </div>
-            `).join('');
+            container.innerHTML = history.length ? history.map(h => `
+                <div class="file-item">
+                    <div><strong>${h.title}</strong><br><small style="color:var(--text-muted)">${h.time} • ${h.meta}</small></div>
+                    <span style="font-size:10px; padding:2px 6px; border-radius:4px; background:${h.type==='Prod'?'rgba(34,197,94,0.2)':'rgba(234,179,8,0.2)'}; color:${h.type==='Prod'?'var(--prod)':'var(--dev)'}">${h.type}</span>
+                </div>`).join('') : '<div style="padding:10px; text-align:center; color:var(--text-muted);">No logs.</div>';
         }
-
         function clearHistory() {
             localStorage.removeItem('conduit_history');
             renderHistory();
+        }
+        function saveSettings() {
+            CONFIG.funcUrl = document.getElementById('setting-func-url').value;
+            CONFIG.previewUrl = document.getElementById('setting-preview-url').value;
+            localStorage.setItem('conduit_funcUrl', CONFIG.funcUrl);
+            localStorage.setItem('conduit_previewUrl', CONFIG.previewUrl);
+            alert("Saved!");
+            location.reload();
         }
     </script>
 </body>
