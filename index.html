@@ -107,10 +107,37 @@
             border-bottom: 1px solid #27272a; display: flex; justify-content: space-between;
         }
         .terminal-logs {
-            height: 150px; overflow-y: auto; padding: 12px;
-            font-family: 'JetBrains Mono', monospace; font-size: 11px;
-            color: #d4d4d4; white-space: pre-wrap;
+            height: 350px; overflow-y: auto; padding: 10px;
+            font-family: 'Inter', sans-serif; /* UI Font for headers */
         }
+        /* Batch Items */
+        .log-batch { background: #121214; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; transition: border-color 0.2s; }
+        .log-batch:hover { border-color: var(--border); }
+        .log-batch.failed { border-color: rgba(239, 68, 68, 0.4); }
+        
+        /* Header */
+        .batch-header { padding: 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; background: rgba(255,255,255,0.02); }
+        .batch-header:active { background: rgba(255,255,255,0.05); }
+        .batch-left { display: flex; align-items: center; gap: 10px; }
+        .batch-status-icon { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
+        .bs-success { background: rgba(34, 197, 94, 0.2); color: var(--prod); }
+        .bs-fail { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .batch-title { font-size: 13px; font-weight: 600; color: #eee; }
+        .batch-meta { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+        
+        /* Actions */
+        .batch-actions { display: flex; align-items: center; gap: 8px; }
+        .action-icon { padding: 4px; color: var(--text-muted); border-radius: 4px; transition: all 0.2s; }
+        .action-icon:hover { background: rgba(255,255,255,0.1); color: white; }
+        .chevron { transition: transform 0.2s; }
+        .log-batch.open .chevron { transform: rotate(180deg); }
+
+        /* Details (Expanded) */
+        .batch-details { display: none; padding: 12px; border-top: 1px solid var(--border); background: #080808; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #a1a1aa; line-height: 1.6; }
+        .log-batch.open .batch-details { display: block; animation: fadeUp 0.15s ease-out; }
+        .detail-file { color: var(--primary); font-weight: 600; margin-top: 8px; display: block; }
+        .detail-op { padding-left: 12px; border-left: 2px solid #333; margin-left: 4px; display: flex; justify-content: space-between; }
+        .op-score { font-size: 9px; padding: 1px 4px; border-radius: 3px; background: #222; margin-left: 8px; }
         .log-entry { margin-bottom: 6px; display: block; }
         .log-success { color: #4ade80; } /* Green */
         .log-error { color: #f87171; }   /* Red */
@@ -224,7 +251,7 @@
                     <span>TERMINAL OUTPUT</span>
                     <span id="term-status" style="color:var(--dev)">IDLE</span>
                 </div>
-                <div id="terminal-output" class="terminal-logs">> Ready...</div>
+                <div id="terminal-output" class="terminal-logs"></div>
             </div>
         </div>
 
@@ -369,7 +396,7 @@
             const reqBody = { action: actionType };
             if(actionType === 'patch') reqBody.operations = payload;
             
-            log(actionType === 'patch' ? `> Sending ${payload.length} ops to Dev...` : `> Merging Dev to Main...`, "info");
+            logSimple(actionType === 'patch' ? `Sending ${payload.length} ops to Dev...` : `Merging Dev to Main...`);
             document.getElementById('term-status').textContent = "BUSY";
 
             try {
@@ -384,14 +411,52 @@
                 if(data.error) throw new Error(data.error);
 
                 // 3. Handle Response (Smart Terminal)
+                // 3. Handle Response (Collapsible UI)
                 if(actionType === 'patch') {
-                    log("✅ Batch Request Completed.", "success");
+                    let totalOps = 0;
+                    let failedOps = 0;
+                    let detailsHTML = '';
                     
                     if(data.results && Array.isArray(data.results)) {
                         data.results.forEach(fileResult => {
-                            if(fileResult.status === 'failed') {
-                                log(`❌ FILE: ${fileResult.file} (Failed)`, "error");
-                            } else {
+                            const fileIcon = fileResult.status === 'failed' ? '❌' : '📂';
+                            detailsHTML += `<span class="detail-file">${fileIcon} ${fileResult.file}</span>`;
+                            
+                            if(fileResult.operations) {
+                                fileResult.operations.forEach(op => {
+                                    totalOps++;
+                                    const isOpSuccess = op.success;
+                                    if(!isOpSuccess) failedOps++;
+                                    
+                                    const opColor = isOpSuccess ? '#4ade80' : '#f87171';
+                                    const opIcon = isOpSuccess ? '✔' : '✖';
+                                    // Human readable action
+                                    const readableAction = op.type.replace(/_/g, ' ').toUpperCase();
+                                    const scoreTxt = op.score ? `match: ${op.score}%` : '';
+                                    const msg = op.message || '';
+
+                                    detailsHTML += `
+                                    <div class="detail-op" style="color:${opColor}">
+                                        <span>${opIcon} ${readableAction}</span>
+                                        <span>${scoreTxt}</span>
+                                    </div>
+                                    <div style="padding-left:18px; color:#666; margin-bottom:4px;">${msg}</div>`;
+                                });
+                            }
+                        });
+                    }
+
+                    const statusTitle = failedOps > 0 ? 'Patch Completed with Errors' : 'Patch Successful';
+                    const statusType = failedOps > 0 ? 'error' : 'success';
+                    const summary = `${totalOps - failedOps}/${totalOps} operations successful`;
+                    
+                    logBatch(statusTitle, statusType, summary, detailsHTML);
+
+                    // Log to Session & History
+                    sessionLogs.push({ time: new Date().toLocaleTimeString(), type: actionType, ops: payload });
+                    addToHistory("Patch Applied", "Dev", `${totalOps} ops`);
+                    setTimeout(refreshPreview, 1500);
+} else {
                                 log(`📂 FILE: ${fileResult.file}`, "info");
                             }
                             
@@ -415,21 +480,65 @@
                     setTimeout(refreshPreview, 1500);
 
                 } else {
-                    log("🚀 Deployment to Main Successful!", "success");
+                    logBatch("Deployment Complete", "success", "Merged Dev branch into Main", "No details available for merge commits.");
                     addToHistory("Merged to Main", "Prod", "Stable Release");
                 }
 
             } catch (e) {
-                log(`❌ System Error: ${e.message}`, "error");
+                logBatch("System Error", "error", "Network or API Failure", e.message);
             } finally {
                 document.getElementById('term-status').textContent = "IDLE";
             }
         }
 
-        function log(msg, type) {
+                // --- NEW TERMINAL UI ---
+        function logBatch(title, type, summary, detailsHTML) {
             const term = document.getElementById('terminal-output');
-            const colorClass = type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : type === 'warn' ? 'log-warn' : 'log-info';
-            term.innerHTML += `<span class="log-entry ${colorClass}">${msg}</span>`;
+            const id = 'batch-' + Date.now();
+            const isFail = type === 'error';
+            const icon = isFail ? '✕' : '✔';
+            const iconClass = isFail ? 'bs-fail' : 'bs-success';
+            const batchClass = isFail ? 'failed' : '';
+
+            const html = `
+            <div class="log-batch ${batchClass}" id="${id}">
+                <div class="batch-header" onclick="toggleBatch('${id}')">
+                    <div class="batch-left">
+                        <div class="batch-status-icon ${iconClass}">${icon}</div>
+                        <div>
+                            <span class="batch-title">${title}</span>
+                            <span class="batch-meta">${summary}</span>
+                        </div>
+                    </div>
+                    <div class="batch-actions">
+                        <div class="action-icon" onclick="copyBatch(event, '${id}')" title="Copy Log">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                        </div>
+                        <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+                <div class="batch-details">${detailsHTML}</div>
+            </div>`;
+            
+            term.insertAdjacentHTML('beforeend', html);
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function toggleBatch(id) {
+            document.getElementById(id).classList.toggle('open');
+        }
+
+        function copyBatch(e, id) {
+            e.stopPropagation();
+            const text = document.querySelector(`#${id} .batch-details`).innerText;
+            navigator.clipboard.writeText(text).then(() => alert("Log copied!"));
+        }
+
+        function logSimple(msg, type='info') {
+             // Fallback for simple status messages
+            const term = document.getElementById('terminal-output');
+            const color = type === 'error' ? '#ef4444' : '#a1a1aa';
+            term.innerHTML += `<div style="padding:4px 8px; font-size:10px; color:${color}; font-family:'JetBrains Mono'">> ${msg}</div>`;
             term.scrollTop = term.scrollHeight;
         }
 
