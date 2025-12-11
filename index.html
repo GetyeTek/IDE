@@ -568,6 +568,150 @@
                 if(data.success) {
                     sessionLogs.push({ time: new Date().toLocaleTimeString(), type: actionType, data: data });
                     
+                    // SAVE HISTORY WITH PAYLOAD & SHA
+                    if(actionType === 'patch') {
+                        // Updated call to include data.commit_sha
+                        addToHistory("Patch Applied", "Dev", `${payload.length} ops`, payload, data.commit_sha);
+                        setTimeout(refreshPreview, 1500);
+                    } else {
+                        addToHistory("Production Deployment", "Prod", "Merged Dev -> Main", null, null);
+                    }
+                }
+            
+} catch (e) {
+                listContainer.innerHTML = `<div style="color:var(--danger); padding:20px;">Error: ${e.message}</div>`;
+            }
+        }
+
+        // Levenshtein / Fuzzy
+        function levenshtein(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+            for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) == a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
+                    else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function filterFiles(query) {
+            if (!window.repoFiles) return;
+            if (!query) return renderFileList(window.repoFiles);
+
+            const scored = window.repoFiles.map(file => {
+                const name = file.path.split('/').pop();
+                const dist = levenshtein(name.toLowerCase(), query.toLowerCase());
+                const maxLen = Math.max(name.length, query.length);
+                const score = Math.round((1 - dist / maxLen) * 100);
+                return { ...file, score: score };
+            });
+
+            // Filter > 20% match and sort
+            const filtered = scored.filter(f => f.score > 20).sort((a, b) => b.score - a.score);
+            renderFileList(filtered, true);
+        }
+
+        function renderFileList(files, showScore = false) {
+            const container = document.getElementById('file-list-container');
+            container.innerHTML = '';
+            if (files.length === 0) return container.innerHTML = '<div style="padding:20px; text-align:center;">No files found.</div>';
+            
+            files.forEach(file => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                const scoreHtml = showScore ? `<span class="match-score">${file.score}%</span>` : '';
+                div.innerHTML = `
+                    <div class="v-info">
+                        <strong>${file.path.split('/').pop()} ${scoreHtml}</strong>
+                        <small>${file.path}</small>
+                    </div>
+                    <input type="checkbox" class="file-check" value="${file.path}" checked style="accent-color: var(--primary);">
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        function toggleAllFiles(source) {
+            document.querySelectorAll('.file-check').forEach(cb => cb.checked = source.checked);
+        }
+
+        // --- BRIEFING ---
+        function resetSession() {
+            if(confirm("Clear local session log?")) {
+                sessionLogs = [];
+                alert("Session log cleared.");
+            }
+        }
+
+        function handleBriefing(mode) {
+            const checkedFiles = Array.from(document.querySelectorAll('.file-check:checked')).map(cb => cb.value);
+            const date = new Date().toLocaleString();
+            let report = "# Session Briefing\n**Date:** " + date + "\n\n## 1. Changelog\n";
+            
+            if(sessionLogs.length === 0) report += "(No changes yet)\n";
+            else sessionLogs.forEach(log => {
+                report += `### [${log.time}] ${log.type}\n`;
+                if(log.data && log.data.results) {
+                    log.data.results.forEach(res => {
+                         report += `- File: ${res.file} (${res.status})\n`;
+                         if(res.operations) {
+                             res.operations.forEach(op => report += `  - ${op.type}: ${op.message}\n`);
+                         }
+                    });
+                }
+                report += "\n";
+            });
+
+            report += "\n## 2. Context Files\n";
+            checkedFiles.forEach(f => report += `- ${f}\n`);
+
+            if(mode === 'copy') navigator.clipboard.writeText(report).then(() => alert("Copied!"));
+            else {
+                const blob = new Blob([report], { type: 'text/markdown' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = "briefing.md";
+                a.click();
+            }
+        }
+
+        // --- CORE PATCHER & TERMINAL UI ---
+        async function runPatch(actionType) {
+            if(!CONFIG.funcUrl) return alert("Setup URL in Settings");
+            const inputVal = document.getElementById('json-input').value;
+            let payload;
+            try {
+                const parsed = JSON.parse(inputVal);
+                // Support both { operations: [] } and straight []
+                payload = parsed.operations ? parsed.operations : (Array.isArray(parsed) ? parsed : [parsed]);
+            } catch (e) {
+                return addTerminalCard(null, { error: "Invalid JSON Syntax: " + e.message });
+            }
+
+            // Create loading card
+            const tempId = addTerminalCard(null, { loading: true });
+
+            try {
+                const reqBody = { action: actionType };
+                if(actionType === 'patch') reqBody.operations = payload;
+
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(reqBody)
+                });
+                
+                const data = await res.json();
+                
+                // Update terminal with real data
+                updateTerminalCard(tempId, data, payload);
+
+                if(data.success) {
+                    sessionLogs.push({ time: new Date().toLocaleTimeString(), type: actionType, data: data });
+                    
                     if(actionType === 'patch') setTimeout(refreshPreview, 1500);
                     else addToHistory("Production Deployment", "Prod", "Merged Dev -> Main");
                 }
