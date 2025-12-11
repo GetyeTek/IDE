@@ -79,6 +79,7 @@
             padding: 12px; border-bottom: 1px solid var(--border);
         }
         .file-item:last-child { border-bottom: none; }
+.match-score { font-size: 10px; color: var(--primary); background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
         
         /* Patcher */
         .json-editor {
@@ -157,7 +158,8 @@
             <p style="color: var(--text-muted); font-size: 13px; margin: 16px 0;">Select files to include in the prompt structure.</p>
             
             <div class="card">
-                <div id="file-list-container" class="file-list">
+                <input type="text" id="file-search" class="input-field" placeholder="Type to fuzzy search files..." style="margin-bottom: 12px; font-size: 13px; padding: 10px;" onkeyup="filterFiles(this.value)">
+<div id="file-list-container" class="file-list">
                     <div style="text-align:center; padding:20px; color:var(--text-muted);">
                         Click "Refresh" to load repo files.
                     </div>
@@ -327,7 +329,73 @@
         }
 
         // --- CONTEXT (GITHUB FETCH) ---
-        async function fetchFileList() {
+                // --- SEARCH ALGORITHMS ---
+        function levenshtein(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+            for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) == a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function getSimilarity(str, query) {
+            if (!query) return 0;
+            const distance = levenshtein(str.toLowerCase(), query.toLowerCase());
+            const maxLength = Math.max(str.length, query.length);
+            return Math.round((1 - distance / maxLength) * 100);
+        }
+
+        function filterFiles(query) {
+            if (!window.repoFiles) return;
+            
+            if (!query) {
+                renderFileList(window.repoFiles);
+                return;
+            }
+
+            const scored = window.repoFiles.map(file => {
+                const name = file.path.split('/').pop();
+                // Give higher weight to filename matches vs full path
+                const scoreName = getSimilarity(name, query);
+                const scorePath = getSimilarity(file.path, query);
+                return { ...file, score: Math.max(scoreName, scorePath) };
+            });
+
+            // Filter > 10% match and sort by score
+            const filtered = scored.filter(f => f.score > 10).sort((a, b) => b.score - a.score);
+            renderFileList(filtered, true);
+        }
+
+        function renderFileList(files, showScore = false) {
+            const container = document.getElementById('file-list-container');
+            container.innerHTML = '';
+            if (files.length === 0) {
+                container.innerHTML = '<div style="padding:10px; text-align:center; color:var(--text-muted);">No matches found.</div>';
+                return;
+            }
+            files.forEach(file => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                const scoreHtml = showScore ? `<span class="match-score">${file.score}% match</span>` : '';
+                div.innerHTML = `
+                    <div class="v-info">
+                        <strong>${file.path.split('/').pop()} ${scoreHtml}</strong>
+                        <small>${file.path}</small>
+                    </div>
+                    <input type="checkbox" class="file-check" value="${file.path}" checked style="accent-color: var(--primary);">
+                `;
+                container.appendChild(div);
+            });
+        }
+async function fetchFileList() {
             if(!CONFIG.funcUrl) return alert("Configure API URL first");
             
             const listContainer = document.getElementById('file-list-container');
@@ -353,15 +421,7 @@
                      return;
                 }
 
-                window.repoFiles.forEach(file => {
-                    const div = document.createElement('div');
-                    div.className = 'file-item';
-                    div.innerHTML = `
-                        <div class="v-info"><strong>${file.path.split('/').pop()}</strong><small>${file.path}</small></div>
-                        <input type="checkbox" class="file-check" value="${file.path}" checked style="accent-color: var(--primary);">
-                    `;
-                    listContainer.appendChild(div);
-                });
+                renderFileList(window.repoFiles);
 
             } catch (e) {
                 listContainer.innerHTML = `<div style="color:var(--danger); padding:10px;">Error: ${e.message}</div>`;
