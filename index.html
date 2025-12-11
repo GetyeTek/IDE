@@ -153,7 +153,15 @@
         }
         .nav-item svg { width: 24px; height: 24px; }
         .nav-item.active { color: var(--primary); }
-    </style>
+            /* Fullscreen Mode Styles */
+        body.fs-mode .nav-bar, body.fs-mode .header, body.fs-mode .main-view > p { display: none !important; }
+        body.fs-mode .main-view { padding: 0 !important; height: 100vh; width: 100vw; overflow: hidden; }
+        body.fs-mode #tab-preview { display: block; height: 100%; }
+        body.fs-mode .preview-container { height: 100% !important; border: none; border-radius: 0; }
+        
+        .fs-back-btn { display: none; position: fixed; top: 20px; left: 20px; z-index: 9999; background: rgba(0,0,0,0.8); color: white; border-radius: 50%; width: 44px; height: 44px; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; backdrop-filter: blur(4px); }
+        body.fs-mode .fs-back-btn { display: flex; animation: fadeUp 0.3s ease-out; }
+</style>
 </head>
 <body>
 
@@ -190,7 +198,7 @@
                 <button class="icon-btn" onclick="editorRedo()">Redo <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10H11a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"></path></svg></button>
             </div>
             <div class="editor-wrapper">
-                <span class="clear-input" onclick="clearEditor()">�</span>
+                <span class="clear-input" onclick="clearEditor()">×</span>
                 <textarea id="json-input" class="json-editor" placeholder="Paste JSON patch here..." spellcheck="false" oninput="saveState()"></textarea>
             </div>
             
@@ -214,10 +222,17 @@
         </div>
 
         <!-- TAB 3: PREVIEW -->
+<!-- TAB 3: PREVIEW -->
         <div id="tab-preview" class="tab-content">
+            <button class="fs-back-btn" onclick="toggleFullscreen(false)">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+
             <div class="header">
                 Preview
-                <span style="font-size: 12px; font-weight: 400; color: var(--dev);">● Live</span>
+                <button class="btn-outline" style="width:auto; padding:6px 12px; font-size:12px; display:flex; align-items:center;" onclick="toggleFullscreen(true)">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right:6px;"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg> Expand
+                </button>
             </div>
             <div class="preview-container">
                 <iframe src="" id="preview-frame"></iframe>
@@ -228,7 +243,8 @@
             <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px;">URL not set</p>
         </div>
 
-        <!-- TAB 4: HISTORY -->
+
+<!-- TAB 4: HISTORY -->
         <div id="tab-history" class="tab-content">
             <div class="header">
                 Local History
@@ -369,6 +385,15 @@
             if(active) document.body.classList.add('fs-mode');
             else document.body.classList.remove('fs-mode');
         }
+        // --- FULLSCREEN LOGIC ---
+        function toggleFullscreen(active) {
+            if(active) {
+                document.body.classList.add('fs-mode');
+            } else {
+                document.body.classList.remove('fs-mode');
+            }
+        }
+
 // --- NAVIGATION ---
         function switchTab(tabId, btn) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -554,19 +579,19 @@ async function fetchFileList() {
 
                 // 4. Handle Success
                 if(actionType === 'patch') {
-                    log("✅ Patch Successful!", "success");
+                    log("â Patch Successful!", "success");
                     log(JSON.stringify(data.results, null, 2));
                     addToHistory("Patch Applied", "Dev", `${payload.length} ops`);
                     
                     // Trigger preview refresh automatically
                     setTimeout(refreshPreview, 1000);
                 } else {
-                    log("🚀 Deployment Complete!", "success");
+                    log("ð Deployment Complete!", "success");
                     addToHistory("Merged to Main", "Prod", "Stable Release");
                 }
 
             } catch (e) {
-                log(`❌ Error: ${e.message}`, "error");
+                log(`â Error: ${e.message}`, "error");
             }
         }
 
@@ -613,7 +638,7 @@ async function fetchFileList() {
                 <div class="version-item">
                     <div class="v-info">
                         <strong>${h.title}</strong>
-                        <small>${h.time} • ${h.meta}</small>
+                        <small>${h.time} â¢ ${h.meta}</small>
                     </div>
                     <span class="v-badge ${h.type === 'Prod' ? 'badge-prod' : 'badge-dev'}">${h.type}</span>
                 </div>
