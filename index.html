@@ -171,14 +171,36 @@
         <div id="tab-context" class="tab-content active">
             <div class="header">
                 Context
+<div class="header">
+                Context
                 <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px;" onclick="fetchFileList()">Refresh</button>
             </div>
             
-            <button class="btn btn-primary" onclick="copyContext()">
-                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                Copy File Structure
-            </button>
-            <p style="color: var(--text-muted); font-size: 13px; margin: 16px 0;">Select files to include in the prompt structure.</p>
+            <!-- Briefing Toolbar -->
+            <div class="context-controls" style="margin-bottom: 16px;">
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <button class="btn btn-primary" onclick="handleBriefing('copy')">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                        Copy Briefing
+                    </button>
+                    <button class="btn btn-outline" onclick="handleBriefing('download')">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Download
+                    </button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button class="btn-outline" style="width: auto; padding: 6px 10px; font-size: 11px; border-color: var(--danger); color: var(--danger);" onclick="resetSession()">
+                        ↺ Reset Session Log
+                    </button>
+                    <label style="font-size: 12px; color: var(--primary); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="checkbox" onchange="toggleAllFiles(this)" checked style="accent-color: var(--primary);"> Select All
+                    </label>
+                </div>
+            </div>
+            
+            <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 10px 0;">Select files to include in the briefing.</p>
+            
+<p style="color: var(--text-muted); font-size: 13px; margin: 16px 0;">Select files to include in the prompt structure.</p>
             
             <div class="card">
                 <input type="text" id="file-search" class="input-field" placeholder="Type to fuzzy search files..." style="margin-bottom: 12px; font-size: 13px; padding: 10px;" onkeyup="filterFiles(this.value)">
@@ -391,6 +413,71 @@
                 document.body.classList.add('fs-mode');
             } else {
                 document.body.classList.remove('fs-mode');
+            }
+        }
+
+        // --- SESSION & BRIEFING LOGIC ---
+        let sessionLogs = [];
+
+        function resetSession() {
+            if(confirm("Start fresh? This clears the local session log.")) {
+                sessionLogs = [];
+                alert("Session log cleared.");
+            }
+        }
+
+        function toggleAllFiles(source) {
+            document.querySelectorAll('.file-check').forEach(cb => cb.checked = source.checked);
+        }
+
+        function generateBriefingContent() {
+            const date = new Date().toLocaleString();
+            const checkedFiles = Array.from(document.querySelectorAll('.file-check:checked')).map(cb => cb.value);
+            
+            let report = "# Session Briefing Report\n**Generated:** " + date + "\n\n";
+            
+            // Section 1: Changelog
+            report += "## 1. Session Changelog\n";
+            if(sessionLogs.length === 0) {
+                report += "(No changes recorded in this session yet.)\n";
+            } else {
+                sessionLogs.forEach((log, i) => {
+                    report += "### [" + log.time + "] Action: " + log.type + "\n";
+                    if(log.ops) {
+                        log.ops.forEach(op => {
+                           report += "- " + op.action + " on `" + op.file_path + "`\n";
+                        });
+                    }
+                    report += "\n";
+                });
+            }
+
+            // Section 2: Context
+            report += "\n## 2. Current File Context\n";
+            if(checkedFiles.length === 0) {
+                report += "(No files selected)\n";
+            } else {
+                report += "The following files are relevant to the current task:\n";
+                checkedFiles.forEach(f => report += "- " + f + "\n");
+            }
+
+            return report;
+        }
+
+        function handleBriefing(mode) {
+            const content = generateBriefingContent();
+            
+            if(mode === 'copy') {
+                navigator.clipboard.writeText(content).then(() => alert("Briefing copied to clipboard!"));
+            } else if (mode === 'download') {
+                const blob = new Blob([content], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "briefing-" + new Date().toISOString().slice(0,10) + ".md";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             }
         }
 
