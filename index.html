@@ -170,7 +170,14 @@
         }
         .nav-item svg { width: 24px; height: 24px; }
         .nav-item.active { color: var(--primary); }
-    </style>
+            /* DEMO: Pulse Animation for Commit Button */
+        .btn-pulse { animation: pulse-green 2s infinite; }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+</style>
 </head>
 <body>
 
@@ -236,7 +243,7 @@
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     Test Patch
                 </button>
-                <button class="btn btn-prod" onclick="runPatch('commit_prod')">
+                <button class="btn btn-prod btn-pulse" onclick="runPatch('commit_prod')">
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"></path></svg>
                     Commit
                 </button>
