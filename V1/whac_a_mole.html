@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whac-A-Mole!</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .score-board {
+            display: flex;
+            justify-content: space-around;
+            width: 300px;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .game-container {
+            width: 450px;
+            height: 450px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 10px;
+            background-color: #775e47;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+        }
+        .hole {
+            width: 100%;
+            height: 100%;
+            background-color: #5b4636;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Moles pop up from the bottom */
+            overflow: hidden;
+            position: relative;
+            border: 5px solid #4a382d;
+            box-sizing: border-box;
+        }
+        .mole {
+            position: absolute;
+            width: 90%;
+            height: 90%;
+            background-color: #9c6c4c;
+            border-radius: 50%;
+            bottom: -100%; /* Start hidden below the hole */
+            transition: bottom 0.2s ease-out;
+            cursor: pointer;
+            border: 3px solid #6b4a32;
+            box-sizing: border-box;
+        }
+        .hole.up .mole {
+            bottom: 0; /* Mole is up */
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1.1em;
+            margin-top: 20px;
+            cursor: pointer;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>Whac-A-Mole!</h1>
+
+    <div class="score-board">
+        <div>Score: <span id="score">0</span></div>
+        <div>Time Left: <span id="timeLeft">30</span></div>
+    </div>
+
+    <div class="game-container" id="gameContainer">
+        <!-- Holes will be generated here by JavaScript -->
+    </div>
+
+    <button id="startButton">Start Game</button>
+
+    <script>
+        const gameContainer = document.getElementById('gameContainer');
+        const scoreDisplay = document.getElementById('score');
+        const timeLeftDisplay = document.getElementById('timeLeft');
+        const startButton = document.getElementById('startButton');
+
+        let score = 0;
+        let timeLeft = 30;
+        let activeHole;
+        let timerId;
+        let moleUpTimerId;
+        let isGameRunning = false;
+        const gameDuration = 30; // seconds
+
+        // Create holes dynamically
+        for (let i = 0; i < 9; i++) {
+            const hole = document.createElement('div');
+            hole.classList.add('hole');
+            hole.dataset.id = i;
+            const mole = document.createElement('div');
+            mole.classList.add('mole');
+            mole.addEventListener('click', whackMole); // Add click listener to mole
+            hole.appendChild(mole);
+            gameContainer.appendChild(hole);
+        }
+
+        const holes = document.querySelectorAll('.hole');
+        const moles = document.querySelectorAll('.mole');
+
+        function getRandomHole() {
+            holes.forEach(hole => {
+                hole.classList.remove('up');
+            });
+            const randomIndex = Math.floor(Math.random() * holes.length);
+            const randomHole = holes[randomIndex];
+            randomHole.classList.add('up');
+            activeHole = randomHole; // Keep track of the currently active hole
+            return randomHole;
+        }
+
+        function whackMole(event) {
+            if (!isGameRunning) return;
+            if (event.target.parentElement === activeHole) {
+                score++;
+                scoreDisplay.textContent = score;
+                // Immediately hide the mole after whacking
+                activeHole.classList.remove('up');
+                activeHole = null; // No active mole until next one pops up
+            }
+        }
+
+        function moveMole() {
+            moleUpTimerId = setInterval(() => {
+                if (activeHole) {
+                    activeHole.classList.remove('up'); // Hide the previous mole
+                }
+                getRandomHole();
+            }, 700); // Moles appear every 0.7 seconds
+        }
+
+        function countdown() {
+            timeLeft--;
+            timeLeftDisplay.textContent = timeLeft;
+
+            if (timeLeft === 0) {
+                clearInterval(timerId);
+                clearInterval(moleUpTimerId);
+                isGameRunning = false;
+                startButton.textContent = 'Restart Game';
+                startButton.disabled = false;
+                alert('Game Over! Your final score is: ' + score);
+                holes.forEach(hole => hole.classList.remove('up')); // Hide any remaining moles
+            }
+        }
+
+        function startGame() {
+            score = 0;
+            timeLeft = gameDuration;
+            scoreDisplay.textContent = score;
+            timeLeftDisplay.textContent = timeLeft;
+            startButton.disabled = true;
+            startButton.textContent = 'Game In Progress...';
+            isGameRunning = true;
+            activeHole = null; // Reset active hole
+
+            clearInterval(timerId); // Clear any existing timers
+            clearInterval(moleUpTimerId);
+
+            timerId = setInterval(countdown, 1000);
+            moveMole();
+        }
+
+        startButton.addEventListener('click', startGame);
+
+    </script>
+</body>
+</html>
