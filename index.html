@@ -414,34 +414,48 @@
 
     <script>
         // --- CONFIG ---
-        const CONFIG = {
-            funcUrl: localStorage.getItem('conduit_funcUrl') || '',
-            previewUrl: localStorage.getItem('conduit_previewUrl') || ''
-        };
+// --- CONFIG ---
+        // URL IS NOW HARDCODED OR PROMPTED ONCE, THEN LOADED FROM DB
+        let FUNC_URL = localStorage.getItem('conduit_funcUrl') || ''; 
+        let APP_CONFIG = {};
         let sessionLogs = [];
+        let historyData = [];
 
         // --- INIT ---
-        window.onload = () => {
+        window.onload = async () => {
+window.onload = () => {
             document.getElementById('setting-func-url').value = CONFIG.funcUrl;
-            document.getElementById('setting-preview-url').value = CONFIG.previewUrl;
-            if(CONFIG.previewUrl) {
-                document.getElementById('preview-frame').src = CONFIG.previewUrl;
-                document.getElementById('preview-url-display').textContent = CONFIG.previewUrl;
+if(!FUNC_URL) {
+                FUNC_URL = prompt("Enter Supabase Edge Function URL to connect:");
+                localStorage.setItem('conduit_funcUrl', FUNC_URL);
             }
-            renderHistory();
-renderHistory();
+            document.getElementById('setting-func-url').value = FUNC_URL;
             
-            // 1. Initialize empty history state for Undo to zero
-            editHistory.push("");
-            historyIndex = 0;
-
-            const savedJson = localStorage.getItem('conduit_autosave');
-            if(savedJson) {
-                document.getElementById('json-input').value = savedJson;
-                // 2. Add saved state as next step
-                saveState();
+            // Fetch DB State
+            try {
+                const res = await fetch(FUNC_URL, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action: 'init' })
+                });
+                const data = await res.json();
+                
+                if(data.config) {
+                    APP_CONFIG = data.config;
+                    document.getElementById('setting-preview-url').value = APP_CONFIG.preview_url || '';
+                    document.getElementById('json-input').value = APP_CONFIG.editor_content || '';
+                    if(APP_CONFIG.preview_url) {
+                        document.getElementById('preview-frame').src = APP_CONFIG.preview_url;
+                    }
+                }
+                if(data.history) {
+                    historyData = data.history;
+                    renderHistory();
+                }
+            } catch(e) {
+                console.error("DB Connection failed", e);
+                alert("Failed to load from DB. Check console.");
             }
-            
 if(!CONFIG.funcUrl) switchTab('tab-settings', document.querySelectorAll('.nav-item')[4]);
         };
 
@@ -470,11 +484,11 @@ if(!CONFIG.funcUrl) switchTab('tab-settings', document.querySelectorAll('.nav-it
 
         // --- FILE CONTEXT ---
         async function fetchFileList() {
-            if(!CONFIG.funcUrl) return alert("Configure API URL first");
+            if(!FUNC_URL) return alert("Configure API URL first");
             const listContainer = document.getElementById('file-list-container');
             listContainer.innerHTML = '<div style="padding:20px; text-align:center;">Fetching repo...</div>';
             try {
-                const res = await fetch(CONFIG.funcUrl, {
+                const res = await fetch(FUNC_URL, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ action: 'fetch' })
@@ -539,7 +553,7 @@ if(!CONFIG.funcUrl) switchTab('tab-settings', document.querySelectorAll('.nav-it
 
         // --- HISTORY & ACTIONS ---
         function renderHistory() {
-             const history = JSON.parse(localStorage.getItem('conduit_history') || '[]');
+             const history = historyData;
              const container = document.getElementById('history-container');
              if(history.length === 0) return container.innerHTML = '<div style="padding:10px; text-align:center; color:var(--text-muted);">No logs yet.</div>';
              
@@ -593,7 +607,7 @@ if(!CONFIG.funcUrl) switchTab('tab-settings', document.querySelectorAll('.nav-it
                 title, type, meta, ops, sha, note: '',
                 time: new Date().toLocaleString() 
             });
-            localStorage.setItem('conduit_history', JSON.stringify(history.slice(0, 30)));
+            // History is saved by server now
             renderHistory();
         }
 
@@ -651,7 +665,7 @@ if(!CONFIG.funcUrl) switchTab('tab-settings', document.querySelectorAll('.nav-it
             const newNote = prompt("Add a note to this version:", current);
             if(newNote !== null) {
                 history[index].note = newNote;
-                localStorage.setItem('conduit_history', JSON.stringify(history));
+                // History is saved by server now
                 renderHistory();
             }
         }
@@ -825,15 +839,31 @@ if(!CONFIG.funcUrl) switchTab('tab-settings', document.querySelectorAll('.nav-it
         }
         
         // Editor State
-        let editHistory = []; let historyIndex = -1;
+// Editor State & Sync
+        let syncTimer;
         function saveState() {
             const val = document.getElementById('json-input').value;
-            localStorage.setItem('conduit_autosave', val);
-            if (historyIndex === -1 || editHistory[historyIndex] !== val) { editHistory = editHistory.slice(0, historyIndex + 1); editHistory.push(val); historyIndex++; }
+            // Debounce DB sync
+            clearTimeout(syncTimer);
+            syncTimer = setTimeout(async () => {
+                if(!FUNC_URL) return;
+                await fetch(FUNC_URL, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        action: 'sync_state',
+                        func_url: FUNC_URL,
+                        preview_url: document.getElementById('setting-preview-url').value,
+                        editor_content: val
+                    })
+                });
+            }, 2000);
         }
-        function editorUndo() { if (historyIndex > 0) { historyIndex--; document.getElementById('json-input').value = editHistory[historyIndex]; localStorage.setItem('conduit_autosave', editHistory[historyIndex]); } }
-        function editorRedo() { if (historyIndex < editHistory.length - 1) { historyIndex++; document.getElementById('json-input').value = editHistory[historyIndex]; localStorage.setItem('conduit_autosave', editHistory[historyIndex]); } }
-        function clearEditor() { if(confirm('Clear editor?')) { document.getElementById('json-input').value = ''; saveState(); } }
+        
+        function editorUndo() { document.execCommand('undo'); } // Native undo is better for now
+        function editorRedo() { document.execCommand('redo'); }
+        function clearEditor() {
+function clearEditor() { if(confirm('Clear editor?')) { document.getElementById('json-input').value = ''; saveState(); } }
         function refreshPreview() { if(!CONFIG.previewUrl) return; const iframe = document.getElementById('preview-frame'); const url = new URL(CONFIG.previewUrl); url.searchParams.set('t', Date.now()); iframe.src = url.toString(); }
     </script>
 </body>
