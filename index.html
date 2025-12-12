@@ -258,6 +258,70 @@
             <textarea id="json-input" class="json-editor" placeholder="Paste JSON patch here..." spellcheck="false" oninput="saveState()"></textarea>
             
             <div class="flex-gap" style="margin-bottom: 20px;">
+<div class="flex-gap" style="margin-bottom: 20px;">
+                <button class="btn btn-dev" onclick="runPatch('patch')">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    Test Patch
+                </button>
+                <button class="btn btn-outline" style="width:auto; border-color:var(--danger); color:var(--danger);" onclick="rollbackLastPatch()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                </button>
+                <button class="btn btn-prod" onclick="runPatch('commit_prod')">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"></path></svg>
+                    Commit
+                </button>
+            </div>
+</div>
+            
+            <div class="card">
+                <div class="flex-gap" style="margin-bottom: 12px;">
+                    <button class="btn btn-primary" onclick="handleBriefing('copy')">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                        Copy Brief
+                    </button>
+                    <button class="btn btn-outline" onclick="handleBriefing('download')">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Download
+                    </button>
+                </div>
+                <div class="flex-between">
+                    <button class="btn-outline" style="width: auto; padding: 6px 10px; font-size: 11px; border-color: var(--border); color: var(--danger);" onclick="resetSession()">
+                        ↺ Reset Log
+                    </button>
+                    <label style="font-size: 12px; color: var(--primary); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <input type="checkbox" onchange="toggleAllFiles(this)" checked style="accent-color: var(--primary);"> Select All
+                    </label>
+                </div>
+            </div>
+
+            <input type="text" class="input-field" placeholder="Fuzzy search files..." style="margin-bottom: 12px;" onkeyup="filterFiles(this.value)">
+            
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div id="file-list-container" class="file-list">
+                    <div style="padding:20px; text-align:center; color:var(--text-muted); font-size: 13px;">
+                        Connect to repo to see files.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: PATCHER -->
+        <div id="tab-patcher" class="tab-content">
+            <div class="header">Patcher</div>
+            
+            <div class="editor-toolbar">
+                <button class="icon-btn" onclick="editorUndo()">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg> Undo
+                </button>
+                <button class="icon-btn" onclick="editorRedo()">
+                     Redo <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10H11a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"></path></svg>
+                </button>
+                <button class="icon-btn" style="color:var(--danger)" onclick="clearEditor()">Clear</button>
+            </div>
+            
+            <textarea id="json-input" class="json-editor" placeholder="Paste JSON patch here..." spellcheck="false" oninput="saveState()"></textarea>
+            
+            <div class="flex-gap" style="margin-bottom: 20px;">
                 <button class="btn btn-dev" onclick="runPatch('patch')">
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     Test Patch
@@ -651,7 +715,52 @@
             }
         }
 
-        // --- TERMINAL RENDERER ---
+                // --- ROLLBACK LOGIC ---
+        async function rollbackLastPatch() {
+            const history = JSON.parse(localStorage.getItem('conduit_history') || '[]');
+            // Need at least 2 entries: Current (0) and Previous (1)
+            if(history.length < 2) return alert("No previous version to rollback to.");
+            
+            const target = history[1]; // The version BEFORE the current one
+            if(!target.sha) return alert("Previous version has no Commit SHA. Cannot rollback.");
+            
+            if(!confirm(`⚠️ DANGER: Revert server code to '${target.title}'?`)) return;
+
+            const tempId = addTerminalCard(null, { loading: true });
+
+            try {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        action: 'rollback',
+                        ref_sha: target.sha
+                    })
+                });
+                const data = await res.json();
+                
+                if(data.success) {
+                    updateTerminalCard(tempId, { message: "✅ Rollback Successful" }, []);
+                    // Load the 'failed' JSON back into editor so user can fix it
+                    const currentOps = history[0].ops;
+                    if(currentOps) {
+                        document.getElementById('json-input').value = JSON.stringify({ operations: currentOps }, null, 2);
+                        alert("Server reverted. Your last patch JSON is in the editor so you can fix it.");
+                    }
+                    setTimeout(refreshPreview, 1500);
+                    // Remove the 'bad' history entry
+                    history.shift();
+                    localStorage.setItem('conduit_history', JSON.stringify(history));
+                    renderHistory();
+                } else {
+                    throw new Error(data.error || "Rollback failed");
+                }
+            } catch(e) {
+                updateTerminalCard(tempId, { error: e.message });
+            }
+        }
+
+// --- TERMINAL RENDERER ---
         function addTerminalCard(data, options = {}) {
             const container = document.getElementById('terminal-list');
             const id = 'term-' + Date.now();
