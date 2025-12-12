@@ -429,14 +429,20 @@
                 document.getElementById('preview-url-display').textContent = CONFIG.previewUrl;
             }
             renderHistory();
+renderHistory();
             
+            // 1. Initialize empty history state for Undo to zero
+            editHistory.push("");
+            historyIndex = 0;
+
             const savedJson = localStorage.getItem('conduit_autosave');
             if(savedJson) {
                 document.getElementById('json-input').value = savedJson;
-                editHistory.push(savedJson);
-                historyIndex = 0;
+                // 2. Add saved state as next step
+                saveState();
             }
-            if(!CONFIG.funcUrl) switchTab('tab-settings', document.querySelectorAll('.nav-item')[4]);
+            
+if(!CONFIG.funcUrl) switchTab('tab-settings', document.querySelectorAll('.nav-item')[4]);
         };
 
         // --- UI UTILS ---
