@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guess the Number Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        .game-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            color: #555;
+            margin-bottom: 20px;
+        }
+        input[type="number"] {
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+            text-align: center;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #message {
+            margin-top: 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .restart-button {
+            margin-top: 20px;
+            background-color: #28a745;
+        }
+        .restart-button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Guess the Number!</h1>
+        <p>I have picked a random number between 1 and 100. Can you guess it?</p>
+        <input type="number" id="guessInput" min="1" max="100">
+        <button id="submitGuess">Submit Guess</button>
+        <p id="message"></p>
+        <button id="restartButton" class="restart-button" style="display: none;">Play Again</button>
+    </div>
+
+    <script>
+        let randomNumber;
+        let attempts = 0;
+        const guessInput = document.getElementById('guessInput');
+        const submitGuessButton = document.getElementById('submitGuess');
+        const messageDisplay = document.getElementById('message');
+        const restartButton = document.getElementById('restartButton');
+
+        function initializeGame() {
+            randomNumber = Math.floor(Math.random() * 100) + 1;
+            attempts = 0;
+            messageDisplay.textContent = '';
+            guessInput.value = '';
+            guessInput.disabled = false;
+            submitGuessButton.disabled = false;
+            restartButton.style.display = 'none';
+            console.log('Random number (for debugging):', randomNumber);
+        }
+
+        function checkGuess() {
+            const userGuess = parseInt(guessInput.value);
+
+            if (isNaN(userGuess) || userGuess < 1 || userGuess > 100) {
+                messageDisplay.textContent = 'Please enter a valid number between 1 and 100.';
+                return;
+            }
+
+            attempts++;
+
+            if (userGuess === randomNumber) {
+                messageDisplay.textContent = `Congratulations! You guessed the number ${randomNumber} in ${attempts} attempts!`;
+                messageDisplay.style.color = 'green';
+                guessInput.disabled = true;
+                submitGuessButton.disabled = true;
+                restartButton.style.display = 'block';
+            } else if (userGuess < randomNumber) {
+                messageDisplay.textContent = 'Too low! Try again.';
+                messageDisplay.style.color = 'red';
+            } else {
+                messageDisplay.textContent = 'Too high! Try again.';
+                messageDisplay.style.color = 'red';
+            }
+            guessInput.value = ''; // Clear input for next guess
+            guessInput.focus(); // Keep focus on input
+        }
+
+        submitGuessButton.addEventListener('click', checkGuess);
+        guessInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                checkGuess();
+            }
+        });
+        restartButton.addEventListener('click', initializeGame);
+
+        // Initialize the game when the page loads
+        initializeGame();
+    </script>
+</body>
+</html>
