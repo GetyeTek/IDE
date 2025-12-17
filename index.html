@@ -3,6 +3,7 @@
 <head>
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
     <script>eruda.init();</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Conduit IDE v6.4</title>
@@ -468,6 +469,7 @@
                 if(!res.ok) throw new Error("API Error");
                 const data = await res.json();
                 window.repoFiles = data.files || [];
+let FILE_OP_MAP = {};
                 renderFileList(window.repoFiles);
             } catch (e) {
                 listContainer.innerHTML = `<div style="color:var(--danger); padding:20px;">Error: ${e.message}</div>`;
@@ -697,6 +699,8 @@
 
         // --- CORE PATCHER ---
         async function runPatch(actionType) {
+FILE_OP_MAP = {};
+if(fileRes.file) FILE_OP_MAP[fileRes.file] = opId;
             if(!CONFIG.funcUrl) return alert("Setup URL in Settings");
             const inputVal = document.getElementById('json-input').value;
             let payload;
@@ -744,6 +748,8 @@
 
         // --- TERMINAL RENDERER ---
         function addTerminalCard(data, options = {}) {
+function checkSyntaxErrors(code, filePath) { if (!code) return null; if (!filePath.endsWith('.js') && !filePath.endsWith('.mjs')) return null; try { acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' }); return null; } catch (e) { return { message: e.message, line: e.loc ? e.loc.line : 0 }; } }
+let syntaxErrorFound = false; Object.keys(fileCache).forEach(path => { if (fileCache[path].mime === 'text/javascript') { const error = checkSyntaxErrors(fileCache[path].content, path); if (error) { syntaxErrorFound = true; const culpritOpId = FILE_OP_MAP[path]; if (culpritOpId) { const rows = Array.from(document.querySelectorAll('.op-row')); const opRow = rows.find(r => r.getAttribute('onclick') && r.getAttribute('onclick').includes(culpritOpId)); if (opRow) { opRow.style.borderLeft = '4px solid var(--danger)'; opRow.style.background = 'rgba(239, 68, 68, 0.1)'; const details = opRow.querySelector('.op-details'); if(details) details.innerHTML = `<strong style='color:var(--danger)'>⚠️ SYNTAX ERROR: ${error.message} (Line ${error.line})</strong>\n` + details.innerHTML; const logBody = opRow.closest('.log-body'); if(logBody) logBody.classList.add('open'); const logHeader = logBody.previousElementSibling; if(logHeader) logHeader.classList.add('expanded'); } } alert(`Syntax Error in ${path}\nLine: ${error.line}\n${error.message}`); } } }); if(syntaxErrorFound) { document.getElementById('preview-url-display').innerHTML = '<span style="color:var(--danger)">Bundle Aborted: Syntax Errors Detected</span>'; return; }
             const container = document.getElementById('terminal-list');
             const id = 'term-' + Date.now();
             const div = document.createElement('div');
