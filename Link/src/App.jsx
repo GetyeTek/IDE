@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 // Placeholder imports for views we will create in the next session
-import Home from './views/Home';
-import Discover from './views/Discover';
-import Study from './views/Study';
-import Connect from './views/Connect';
-import Profile from './views/Profile';
+import Home from './views/Home.jsx';
+import Discover from './views/Discover.jsx';
+import Study from './views/Study.jsx';
+import Connect from './views/Connect.jsx';
+import Profile from './views/Profile.jsx';
 
 const App = () => {
   console.log("App Component Rendering...");
