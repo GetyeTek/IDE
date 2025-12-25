@@ -55,12 +55,17 @@
         /* --- LAYOUT & MAIN APP STYLES (MERGED) --- */
         .app-container {
             height: 100%;
-            max-width: 500px;
+            width: 100%;
             margin: 0 auto;
             position: relative;
             display: flex;
             flex-direction: column;
             background-color: var(--bg-dark);
+            transition: all 0.3s ease;
+        }
+        /* Only restrict width on mobile */
+        @media (max-width: 899px) {
+            .app-container { max-width: 500px; border-right: 1px solid var(--border-color); border-left: 1px solid var(--border-color); }
         }
         .main-content {
             flex-grow: 1;
@@ -418,6 +423,178 @@
         .navigation-magic .text { position: absolute; color: var(--accent-teal); font-weight: bold; font-size: 0.8em; letter-spacing: 0.05em; transition: 0.5s; opacity: 0; transform: translateY(20px); }
         .navigation-magic li.active .text { opacity: 1; transform: translateY(12px); }
         .indicator { position: absolute; top: -22.5px; width: 45px; height: 45px; background: transparent; border: 4px solid var(--bg-dark); border-radius: 50%; transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); z-index: 1; box-shadow: 0px 5px 15px rgba(0,0,0,0.2), 0px 0px 0px 3px var(--accent-teal); }
+        /* --- DESKTOP / PC ADAPTATION (FIXED) --- */
+        @media (min-width: 900px) {
+            /* 1. LAYOUT & SIDEBAR Z-INDEX FIX */
+            .app-container {
+                flex-direction: row;
+                max-width: none;
+                overflow: hidden;
+            }
+            .navigation-magic {
+                order: -1;
+                width: 260px;
+                height: 100%;
+                background: rgba(12, 12, 12, 0.98);
+                border-right: 1px solid var(--border-color);
+                border-radius: 0;
+                display: flex;
+                flex-direction: column;
+                padding-top: 2rem;
+                overflow-y: auto;
+                z-index: 500; /* High z-index to ensure clickability */
+                position: relative;
+            }
+            .navigation-magic nav {
+                flex-direction: column;
+                height: auto;
+                gap: 0.5rem;
+                padding: 0 1rem;
+            }
+            .navigation-magic li {
+                width: 100%;
+                height: 55px;
+                flex: 0 0 auto;
+                cursor: pointer; /* Ensure pointer cursor */
+            }
+            .navigation-magic a {
+                flex-direction: row;
+                justify-content: flex-start;
+                padding-left: 1.5rem;
+                border-radius: 12px;
+                pointer-events: none; /* Let parent li handle click or bubble correctly */
+            }
+            .navigation-magic li a { pointer-events: auto; } /* Re-enable on anchor */
+            
+            .navigation-magic .icon {
+                transform: none !important;
+                line-height: normal;
+                margin-right: 1rem;
+                font-size: 1.2rem;
+            }
+            .navigation-magic .text {
+                position: static;
+                transform: none !important;
+                opacity: 1;
+                font-size: 1rem;
+            }
+            .navigation-magic li.active a {
+                background: rgba(66, 215, 184, 0.15);
+            }
+            .navigation-magic .indicator { display: none; }
+
+            /* 2. MAIN CONTENT & SCROLL FIXES */
+            .main-content {
+                flex-grow: 1;
+                height: 100%;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                background: radial-gradient(circle at top right, #1e1e1e, #0c0c0c);
+                z-index: 1;
+            }
+            .tab-content.active {
+                display: flex;
+                width: 100%;
+                height: 100%;
+                overflow-y: auto; /* Ensure content scrolls */
+                scroll-behavior: smooth;
+            }
+            .page-content, .scrollable-content {
+                height: auto;
+                overflow: visible;
+            }
+
+            /* 3. HOME TAB GRID */
+            #home-content .page-content {
+                display: grid;
+                grid-template-columns: repeat(12, 1fr);
+                grid-template-rows: auto auto;
+                gap: 2rem;
+                max-width: 1400px;
+                margin: 0 auto;
+                width: 100%;
+                padding-bottom: 4rem;
+            }
+            .hero-wrapper { max-width: 1400px; margin: 0 auto; width: 100%; padding: 2rem 2rem 0; }
+            .welcome-hero { height: 260px; border-radius: 24px; }
+            .priority-section { grid-column: span 8; margin: 0; }
+            .priority-scroll-wrapper { overflow: visible; }
+            .priority-track { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; padding: 0; }
+            .priority-card { width: 100%; min-height: 160px; }
+            .whats-next-section { grid-column: span 4; }
+            .next-task-container { height: 100%; min-height: 160px; }
+
+            /* 4. STUDY TAB & LIBRARY OVERLAY FIX */
+            #study-content .study-hub-content {
+                display: grid;
+                grid-template-columns: repeat(12, 1fr);
+                gap: 2rem;
+                padding: 2rem;
+                max-width: 1400px;
+                margin: 0 auto;
+                overflow: visible;
+            }
+            .study-header { flex-shrink: 0; padding: 1rem 2rem; max-width: 1400px; margin: 0 auto; width: 100%; }
+            .library-preview-wrapper {
+                grid-column: span 5;
+                min-height: 400px;
+                cursor: pointer;
+                z-index: 10; /* Ensure it's clickable above backgrounds */
+            }
+            .library-preview-wrapper .vignette-bg { height: 100%; border-radius: 24px; }
+            .study-section { display: contents; }
+            .compact-trigger { grid-column: span 7; margin: 0; }
+            .guidance-path { grid-column: span 7; margin-top: 1rem; }
+            .observatory-widget { grid-column: span 5; margin-top: 2rem; }
+
+            /* 5. CONNECT & PROFILE TABS */
+            #connect-content .content-panel {
+                overflow-y: auto;
+                height: 100%;
+                padding: 2rem;
+            }
+            #connect-content .interactive-header { max-width: 1200px; margin: 0 auto; width: 100%; }
+            .messages-list { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto; }
+            
+            #profile-content .scrollable-content { overflow-y: auto; height: 100%; }
+            .profile-hero { height: 300px; display: flex; align-items: flex-end; padding-bottom: 2rem; }
+            .portal-cards-container { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+            .settings-group { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; padding-bottom: 4rem; }
+
+            /* 6. OVERLAYS (MODALS) - ULTIMATE FIX */
+            .fullscreen-overlay, .library-fullscreen {
+                display: flex !important;
+                align-items: center;
+                justify-content: center;
+                background-color: rgba(0, 0, 0, 0.85);
+                clip-path: none !important;
+                z-index: 9999 !important; /* Above EVERYTHING */
+                position: fixed;
+                inset: 0;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.3s ease;
+            }
+            .fullscreen-overlay.is-active, .library-fullscreen.is-expanded {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .overlay-content, #library-fullscreen > div {
+                width: 900px;
+                height: 85vh;
+                background: var(--bg-dark);
+                border-radius: 24px;
+                border: 1px solid var(--border-color);
+                box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+            #library-fullscreen > div { background: var(--bg-dark); }
+            .overlay-header { flex-shrink: 0; }
+            .overlay-inner-content { overflow-y: auto; }
+        }
     </style>
 </head>
 <body>
