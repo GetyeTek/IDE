@@ -414,9 +414,26 @@ body.library-open { overflow: hidden; }
     display: flex;
 }
 .navigation-magic nav { display: flex; width: 100%; position: relative; height: 100%; }
-.navigation-magic li { position: relative; list-style: none; flex: 1; z-index: 2; height: 100%; }
+.navigation-magic li {
+    position: relative;
+    list-style: none;
+    width: 20%; /* Force exact math match with indicator */
+    flex: 0 0 20%;
+    z-index: 2;
+    height: 100%;
+}
 .navigation-magic a { position: relative; display: flex; justify-content: center; align-items: center; flex-direction: column; width: 100%; text-align: center; font-weight: 500; cursor: pointer; height: 100%; }
-.navigation-magic .icon { position: relative; display: block; line-height: 75px; font-size: 1.2em; text-align: center; transition: 0.5s; color: var(--text-secondary-dark); }
+.navigation-magic .icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 75px;
+    width: 100%;
+    font-size: 1.2em;
+    transition: 0.5s;
+    color: var(--text-secondary-dark);
+}
 .navigation-magic li.active .icon { transform: translateY(-35px); color: var(--accent-teal); }
 .navigation-magic .text { position: absolute; color: var(--accent-teal); font-weight: bold; font-size: 0.8em; letter-spacing: 0.05em; transition: 0.5s; opacity: 0; transform: translateY(20px); }
 .navigation-magic li.active .text { opacity: 1; transform: translateY(12px); }
