@@ -8,6 +8,7 @@ import Connect from './views/Connect';
 import Profile from './views/Profile';
 
 const App = () => {
+  console.log("App Component Rendering...");
   const [activeTab, setActiveTab] = useState('home');
   
   // Maps tab IDs to their index for the mobile indicator animation
