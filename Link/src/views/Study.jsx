@@ -186,32 +186,39 @@ const Study = () => {
                     </header>
                     <div className="flex-grow overflow-y-auto py-4 vignette-bg" style={{ flexGrow: 1, overflowY: 'auto', padding: '1rem', position: 'relative' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '220px' }} className="bookshelf-perspective">
-                                <div className="book-container">
-                                    {books.map((book, i) => (
-                                        <div className="book-group" key={i}>
-                                            <div 
-                                                className="book-immersive" 
-                                                style={{ 
-                                                    backgroundImage: book.cover_url ? `url("${book.cover_url}")` : getBookColor(book.title),
-                                                    backgroundSize: 'cover',
-                                                    backgroundPosition: 'center',
-                                                    backgroundRepeat: 'no-repeat',
-                                                    display: 'flex', 
-                                                    alignItems: 'flex-end', 
-                                                    padding: '1rem' 
-                                                }}
-                                                onClick={() => alert(`Opening ${book.title}... (Reader View coming soon)`)}
-                                            >
-                                                <div className="info-overlay">
-                                                    <h3 className="title">{book.title}</h3>
-                                                    <div className="progress-bar"><div className="progress" style={{ width: '0%' }}></div></div>
-                                                </div>
+                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'auto', paddingBottom: '2rem' }} className="bookshelf-perspective">
+{(() => {
+                                    const rows = [];
+                                    for (let i = 0; i < books.length; i += 3) rows.push(books.slice(i, i + 3));
+                                    if(rows.length === 0) return <div style={{color:'rgba(255,255,255,0.3)', textAlign:'center', padding:'2rem'}}>Library Empty</div>;
+                                    
+                                    return rows.map((row, rowIndex) => (
+                                        <div key={rowIndex} style={{ marginBottom: '1.5rem' }}>
+                                            <div className="book-container">
+                                                {row.map((book, i) => (
+                                                    <div className="book-group" key={i}>
+                                                        <div 
+                                                            className="book-immersive" 
+                                                            style={{ 
+                                                                backgroundImage: book.cover_url ? `url("${book.cover_url}")` : getBookColor(book.title),
+                                                                backgroundSize: 'cover',
+                                                                backgroundPosition: 'center',
+                                                                backgroundRepeat: 'no-repeat'
+                                                            }}
+                                                            onClick={() => alert(`Opening ${book.title}... (Reader View coming soon)`)}
+                                                        >
+                                                            <div className="info-overlay">
+                                                                <h3 className="title">{book.title}</h3>
+                                                                <div className="progress-bar"><div className="progress" style={{ width: '0%' }}></div></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
+                                            <div className="shelf-wood"></div>
                                         </div>
-                                    ))}
-                                </div>
-                                <div className="shelf-wood"></div>
+                                    ));
+                                })()}
                             </div>
                         </div>
                     </div>
