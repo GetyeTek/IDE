@@ -44,7 +44,7 @@ const App = () => {
             className="indicator" 
             style={{ 
               transform: `translateX(${tabIndex[activeTab] * 100}%)`, 
-              left: '2.5%' /* Adjustment for centering within the 20% slice if needed, or rely on CSS centering */
+              left: '0' 
             }}
           ></div>
 
