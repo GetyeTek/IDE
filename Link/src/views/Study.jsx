@@ -81,7 +81,10 @@ const Study = () => {
                                         books.slice(0, 3).map((book, i) => (
                                             <div className="book-group" key={i}>
                                                 <div className="book-immersive" style={{ 
-                                                    background: book.cover_url ? `url("${book.cover_url}") center/cover no-repeat` : getBookColor(book.title), 
+                                                    backgroundImage: book.cover_url ? `url("${book.cover_url}")` : getBookColor(book.title),
+                                                    backgroundSize: 'cover',
+                                                    backgroundPosition: 'center',
+                                                    backgroundRepeat: 'no-repeat',
                                                     display: 'flex', 
                                                     alignItems: 'flex-end', 
                                                     padding: '10px' 
@@ -190,7 +193,10 @@ const Study = () => {
                                             <div 
                                                 className="book-immersive" 
                                                 style={{ 
-                                                    background: book.cover_url ? `url("${book.cover_url}") center/cover no-repeat` : getBookColor(book.title), 
+                                                    backgroundImage: book.cover_url ? `url("${book.cover_url}")` : getBookColor(book.title),
+                                                    backgroundSize: 'cover',
+                                                    backgroundPosition: 'center',
+                                                    backgroundRepeat: 'no-repeat',
                                                     display: 'flex', 
                                                     alignItems: 'flex-end', 
                                                     padding: '1rem' 
