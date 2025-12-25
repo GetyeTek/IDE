@@ -3,7 +3,25 @@ import React, { useState, useEffect, useRef } from 'react';
 const Study = () => {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
+    const [books, setBooks] = useState([]);
     const wavePathRef = useRef(null);
+
+    useEffect(() => {
+        fetch('https://vlzgfaqrnyiqfxxxvtas.supabase.co/functions/v1/book-reader', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'list_books' })
+        })
+        .then(res => res.json())
+        .then(data => { if(data.books) setBooks(data.books); })
+        .catch(err => console.error(err));
+    }, []);
+
+    const getBookColor = (title) => {
+        let hash = 0;
+        for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
+        return `linear-gradient(135deg, hsl(${Math.abs(hash) % 360}, 50%, 30%), hsl(${(Math.abs(hash) + 40) % 360}, 60%, 15%))`;
+    };
 
     // Wave Animation Logic for the Observatory Widget
     useEffect(() => {
@@ -57,9 +75,19 @@ const Study = () => {
                         <div className="vignette-bg pt-4">
                             <div style={{ height: '220px', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} className="bookshelf-perspective">
                                 <div className="book-container">
-                                    <div className="book-group"><div className="book-immersive" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBSKoJ7w7cQ6PI2oFyC3j_mg9MfHEKfo8lWA_jJOigDE_jQkJsy4fgKWzzf6lCJgyR0GsTHLLv1BI7cdiWwx8KfnImDjXMLug-L3A02iTgpEGvOIiQNzOhevipS1X6I7Sko3GXXUipwN61Y6FaaHm8hTGmRSY9azBRR-dMA8s6EuRbmlSiijstFvLxbGbu8brkFZbVz1K_pF-1wh4Q7e-wXyLshoiIULo80IS1igIWDIFv5gW073G7Vp7HiZRDpfCE8gaiQbtspksEV")' }}></div></div>
-                                    <div className="book-group"><div className="book-immersive" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCbbdjlKmxZ8oiLNL7YVukcTPZkJOwldbDQic8VEMy_g0iDA4A-r96ZHGr32FBcr6RUvs9anN8h39biqDPhCbVptH94SQe2-ri0L_Hu6XMsqfQkA77koJTf8LJGnBJ8rOV8P9ijUY9LtMhw2dGiOsRR6ehDcvKOI5Z12VToMs401ZsNCK8KG4hnWWJkEqZLp1brwAHkpq5YNdgDqdQNYdzYtmi3rdwU4_Prjf1QieIQBoPJidokDdKh2Oj5JGdNK1fjOby5Nd2SEG5F")' }}></div></div>
-                                    <div className="book-group"><div className="book-immersive" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBGqSbDG0JQAHz2DmzmoHHQifAAo2AmSDV1X-T9V-6SAAdjhOgLR9yxVH61j4-jNqP3Kjw-fACv0NDHC6Fd0LKxFsPTfIxHsW1ML9UWh8dxnAH00c915S6HVP2qSbb_aZbyrH7DS2-M8amMQidaRI4YQq8xGqcguHvIZ26bXykLlGQ06KtzMeVNqTjstVM0qg6RpyYVnb04ge9zkXANflTDFvZEBTq6N0ZRIt4Quj5R54vhPfzctWVCxyiutPR-Wss6LKeYT9Jjtyqu")' }}></div></div>
+                                    {books.length === 0 ? (
+                                        <div style={{color:'rgba(255,255,255,0.5)', gridColumn:'span 3', textAlign:'center', paddingTop:'2rem'}}>Loading...</div>
+                                    ) : (
+                                        books.slice(0, 3).map((book, i) => (
+                                            <div className="book-group" key={i}>
+                                                <div className="book-immersive" style={{ background: getBookColor(book.title), display: 'flex', alignItems: 'flex-end', padding: '10px' }}>
+                                                    <div className="info-overlay" style={{opacity: 1, transform: 'none', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)'}}>
+                                                        <h3 className="title" style={{fontSize:'0.7rem', whiteSpace:'normal', lineHeight:'1.2'}}>{book.title}</h3>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                                 <div className="shelf-wood"></div>
                             </div>
@@ -152,21 +180,25 @@ const Study = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '220px' }} className="bookshelf-perspective">
                                 <div className="book-container">
-                                    <div className="book-group">
-                                        <div className="book-immersive" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBSKoJ7w7cQ6PI2oFyC3j_mg9MfHEKfo8lWA_jJOigDE_jQkJsy4fgKWzzf6lCJgyR0GsTHLLv1BI7cdiWwx8KfnImDjXMLug-L3A02iTgpEGvOIiQNzOhevipS1X6I7Sko3GXXUipwN61Y6FaaHm8hTGmRSY9azBRR-dMA8s6EuRbmlSiijstFvLxbGbu8brkFZbVz1K_pF-1wh4Q7e-wXyLshoiIULo80IS1igIWDIFv5gW073G7Vp7HiZRDpfCE8gaiQbtspksEV")' }}>
-                                            <div className="info-overlay"><h3 className="title">Fantasy Novel</h3><div className="progress-bar"><div className="progress" style={{ width: '75%' }}></div></div></div>
+                                    {books.map((book, i) => (
+                                        <div className="book-group" key={i}>
+                                            <div 
+                                                className="book-immersive" 
+                                                style={{ 
+                                                    background: getBookColor(book.title), 
+                                                    display: 'flex', 
+                                                    alignItems: 'flex-end', 
+                                                    padding: '1rem' 
+                                                }}
+                                                onClick={() => alert(`Opening ${book.title}... (Reader View coming soon)`)}
+                                            >
+                                                <div className="info-overlay">
+                                                    <h3 className="title">{book.title}</h3>
+                                                    <div className="progress-bar"><div className="progress" style={{ width: '0%' }}></div></div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="book-group">
-                                        <div className="book-immersive" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCbbdjlKmxZ8oiLNL7YVukcTPZkJOwldbDQic8VEMy_g0iDA4A-r96ZHGr32FBcr6RUvs9anN8h39biqDPhCbVptH94SQe2-ri0L_Hu6XMsqfQkA77koJTf8LJGnBJ8rOV8P9ijUY9LtMhw2dGiOsRR6ehDcvKOI5Z12VToMs401ZsNCK8KG4hnWWJkEqZLp1brwAHkpq5YNdgDqdQNYdzYtmi3rdwU4_Prjf1QieIQBoPJidokDdKh2Oj5JGdNK1fjOby5Nd2SEG5F")' }}>
-                                            <div className="info-overlay"><h3 className="title">Classic Literature</h3><div className="progress-bar"><div className="progress" style={{ width: '25%' }}></div></div></div>
-                                        </div>
-                                    </div>
-                                    <div className="book-group">
-                                        <div className="book-immersive" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBGqSbDG0JQAHz2DmzmoHHQifAAo2AmSDV1X-T9V-6SAAdjhOgLR9yxVH61j4-jNqP3Kjw-fACv0NDHC6Fd0LKxFsPTfIxHsW1ML9UWh8dxnAH00c915S6HVP2qSbb_aZbyrH7DS2-M8amMQidaRI4YQq8xGqcguHvIZ26bXykLlGQ06KtzMeVNqTjstVM0qg6RpyYVnb04ge9zkXANflTDFvZEBTq6N0ZRIt4Quj5R54vhPfzctWVCxyiutPR-Wss6LKeYT9Jjtyqu")' }}>
-                                            <div className="info-overlay"><h3 className="title">Modern Poetry</h3><div className="progress-bar"><div className="progress" style={{ width: '90%' }}></div></div></div>
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
                                 <div className="shelf-wood"></div>
                             </div>
