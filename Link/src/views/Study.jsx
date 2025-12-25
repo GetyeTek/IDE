@@ -80,7 +80,12 @@ const Study = () => {
                                     ) : (
                                         books.slice(0, 3).map((book, i) => (
                                             <div className="book-group" key={i}>
-                                                <div className="book-immersive" style={{ background: getBookColor(book.title), display: 'flex', alignItems: 'flex-end', padding: '10px' }}>
+                                                <div className="book-immersive" style={{ 
+                                                    background: book.cover_url ? `url("${book.cover_url}") center/cover no-repeat` : getBookColor(book.title), 
+                                                    display: 'flex', 
+                                                    alignItems: 'flex-end', 
+                                                    padding: '10px' 
+                                                }}>
                                                     <div className="info-overlay" style={{opacity: 1, transform: 'none', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)'}}>
                                                         <h3 className="title" style={{fontSize:'0.7rem', whiteSpace:'normal', lineHeight:'1.2'}}>{book.title}</h3>
                                                     </div>
@@ -185,7 +190,7 @@ const Study = () => {
                                             <div 
                                                 className="book-immersive" 
                                                 style={{ 
-                                                    background: getBookColor(book.title), 
+                                                    background: book.cover_url ? `url("${book.cover_url}") center/cover no-repeat` : getBookColor(book.title), 
                                                     display: 'flex', 
                                                     alignItems: 'flex-end', 
                                                     padding: '1rem' 
