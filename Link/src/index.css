@@ -24,7 +24,7 @@
     font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
 }
-html, body {
+html, body, #root {
     height: 100%;
     overflow: hidden;
     background-color: var(--bg-dark);
