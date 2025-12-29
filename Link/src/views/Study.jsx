@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import BookReader from './BookReader.jsx';
 
 const Study = () => {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
+    const [activeBook, setActiveBook] = useState(null);
     const [books, setBooks] = useState([]);
     const wavePathRef = useRef(null);
 
@@ -205,7 +207,7 @@ const Study = () => {
                                                                 backgroundPosition: 'center',
                                                                 backgroundRepeat: 'no-repeat'
                                                             }}
-                                                            onClick={() => alert(`Opening ${book.title}... (Reader View coming soon)`)}
+                                                            onClick={() => setActiveBook(book)}
                                                         >
                                                             <div className="info-overlay">
                                                                 <h3 className="title">{book.title}</h3>
@@ -224,6 +226,7 @@ const Study = () => {
                     </div>
                 </div>
             </div>
+            {activeBook && <BookReader book={activeBook} onClose={() => setActiveBook(null)} />}
         </div>
     );
 };
