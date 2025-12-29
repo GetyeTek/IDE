@@ -81,9 +81,10 @@
 }
 
 .reader-header {
-    height: 44px;
+    /* Ultra-Slim Header */
+    height: 34px;
     justify-content: space-between;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
     transform: translateY(0);
     transition: transform 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
@@ -105,13 +106,13 @@
 /* --- FOOTER --- */
 .reader-footer {
     justify-content: space-between;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    padding: 0 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 0 8px;
     transform: translateY(0);
     transition: transform 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
-    /* Compact Height */
-    padding-bottom: env(safe-area-inset-bottom, 10px);
-    height: calc(44px + env(safe-area-inset-bottom, 10px));
+    /* Ultra-Slim Footer */
+    padding-bottom: env(safe-area-inset-bottom, 5px);
+    height: calc(34px + env(safe-area-inset-bottom, 5px));
 }
 #ui-layer.hidden .reader-footer { transform: translateY(100%); }
 
@@ -148,10 +149,10 @@ input[type=range]:focus { outline: none; }
 
 input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    height: 16px; width: 16px;
+    height: 12px; width: 12px;
     border-radius: 50%;
     background: #ffffff;
-    margin-top: -7px;
+    margin-top: -5px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     transform: scale(1);
     transition: transform 0.1s;
@@ -250,7 +251,8 @@ input[type=range]::-webkit-slider-thumb {
 .fab-container.active .fab-mini:hover::after { opacity: 1; }
 
 .icon-btn {
-    width: 44px; height: 44px;
+    /* Scaled Down Buttons */
+    width: 32px; height: 32px;
     display: flex; align-items: center; justify-content: center;
     border-radius: 50%;
     cursor: pointer;
@@ -258,7 +260,7 @@ input[type=range]::-webkit-slider-thumb {
     transition: background 0.2s;
 }
 .icon-btn:active { background-color: rgba(255,255,255,0.1); color: white; }
-.reader-svg { width: 24px; height: 24px; fill: currentColor; }
+.reader-svg { width: 18px; height: 18px; fill: currentColor; }
 .fab-mini .reader-svg { width: 20px; height: 20px; }
 
 .loading-spinner {
