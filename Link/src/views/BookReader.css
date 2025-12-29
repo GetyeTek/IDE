@@ -81,8 +81,8 @@
 }
 
 .reader-header {
-    /* Ultra-Slim Header */
-    height: 34px;
+    /* Standard Touch Height */
+    height: 44px;
     justify-content: space-between;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     transform: translateY(0);
@@ -107,12 +107,12 @@
 .reader-footer {
     justify-content: space-between;
     border-top: 1px solid rgba(255,255,255,0.05);
-    padding: 0 8px;
+    padding: 0 12px;
     transform: translateY(0);
     transition: transform 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
-    /* Ultra-Slim Footer */
-    padding-bottom: env(safe-area-inset-bottom, 5px);
-    height: calc(34px + env(safe-area-inset-bottom, 5px));
+    /* Standard Touch Height */
+    padding-bottom: env(safe-area-inset-bottom, 10px);
+    height: calc(44px + env(safe-area-inset-bottom, 10px));
 }
 #ui-layer.hidden .reader-footer { transform: translateY(100%); }
 
@@ -149,10 +149,10 @@ input[type=range]:focus { outline: none; }
 
 input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    height: 12px; width: 12px;
+    height: 16px; width: 16px;
     border-radius: 50%;
     background: #ffffff;
-    margin-top: -5px;
+    margin-top: -7px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     transform: scale(1);
     transition: transform 0.1s;
@@ -251,18 +251,17 @@ input[type=range]::-webkit-slider-thumb {
 .fab-container.active .fab-mini:hover::after { opacity: 1; }
 
 .icon-btn {
-    /* Scaled Down Buttons */
-    width: 32px; height: 32px;
+    /* Comfortable Touch Target */
+    width: 40px; height: 40px;
     display: flex; align-items: center; justify-content: center;
     border-radius: 50%;
     cursor: pointer;
     color: #ccc;
     transition: background 0.2s;
 }
-.icon-btn:active { background-color: rgba(255,255,255,0.1); color: white; }
-.reader-svg { width: 18px; height: 18px; fill: currentColor; }
+.reader-svg { width: 22px; height: 22px; fill: currentColor; }
 .fab-mini .reader-svg { width: 20px; height: 20px; }
-
+.fab-main .reader-svg { width: 24px; height: 24px; }
 .loading-spinner {
     position: absolute;
     top: 50%; left: 50%;
