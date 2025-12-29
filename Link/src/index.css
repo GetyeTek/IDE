@@ -12,7 +12,7 @@
     --linkoin-gold: #FFD700;
     --linkoin-gold-glow: rgba(255, 215, 0, 0.4);
     --radius-main: 20px;
-    --nav-height: 70px;
+    --nav-height: 55px; /* Slimmer height */
     --cyber-gold: #b1d34b;
     --progress-percentage: 76%;
     --warning-glow: #ffab40;
@@ -405,7 +405,8 @@ body.library-open { overflow: hidden; }
     background: var(--surface-dark);
     height: auto;
     min-height: var(--nav-height);
-    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    /* Removed extra 20px padding, kept only small buffer + safe area */
+    padding-bottom: calc(5px + env(safe-area-inset-bottom));
     border-radius: 10px 10px 0 0;
 }
 
@@ -429,20 +430,22 @@ body.library-open { overflow: hidden; }
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 75px;
+    height: 60px; /* Reduced from 75px */
     width: 100%;
-    font-size: 1.2em;
+    font-size: 1.1em;
     transition: 0.5s;
     color: var(--text-secondary-dark);
 }
-.navigation-magic li.active .icon { transform: translateY(-35px); color: var(--accent-teal); }
-.navigation-magic .text { position: absolute; color: var(--accent-teal); font-weight: bold; font-size: 0.8em; letter-spacing: 0.05em; transition: 0.5s; opacity: 0; transform: translateY(20px); }
-.navigation-magic li.active .text { opacity: 1; transform: translateY(12px); }
+/* Adjusted jump height for slimmer bar */
+.navigation-magic li.active .icon { transform: translateY(-28px); color: var(--accent-teal); }
+.navigation-magic .text { position: absolute; color: var(--accent-teal); font-weight: bold; font-size: 0.75em; letter-spacing: 0.05em; transition: 0.5s; opacity: 0; transform: translateY(15px); }
+.navigation-magic li.active .text { opacity: 1; transform: translateY(8px); }
 .indicator {
     position: absolute;
-    top: -22.5px;
+    /* Re-calculated for 40px circle (half is 20px) */
+    top: -20px;
     width: 20%;
-    height: 45px;
+    height: 40px;
     background: transparent;
     display: flex;
     justify-content: center;
@@ -453,8 +456,9 @@ body.library-open { overflow: hidden; }
 .indicator::before {
     content: '';
     position: absolute;
-    width: 45px;
-    height: 45px;
+    /* Scaled down circle */
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     border: 4px solid var(--bg-dark);
     box-shadow: 0px 5px 15px rgba(0,0,0,0.2), 0px 0px 0px 3px var(--accent-teal);
