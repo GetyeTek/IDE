@@ -158,24 +158,29 @@ const BookReader = ({ book, onClose }) => {
 
         // 4. Update UI (Slider & Pages)
         if (sliderRef.current && pageCountRef.current && contentDims.current.height > 0) {
-            const vh = window.innerHeight;
-            const visualH = contentDims.current.height * state.current.scale;
-            const minY = vh - visualH;
+            // Use Unscaled values for stability across Zoom levels
+            const unscaledTotalH = contentDims.current.height;
+            const unscaledY = Math.abs(state.current.y) / state.current.scale;
+            const viewHeight = window.innerHeight / state.current.scale;
             
-            // Update Slider (Sync logic)
+            // Slider Progress (0-100%)
+            // We compare unscaled position against the maximum possible unscaled scroll
+            const maxScroll = Math.max(1, unscaledTotalH - viewHeight);
+            
             if (!input.current.isSliderDragging) {
-                let progress = 0;
-                if (minY < 0) {
-                    progress = (state.current.y / minY) * 100;
-                    progress = Math.max(0, Math.min(100, progress));
-                }
-                sliderRef.current.value = progress;
+                const progress = (unscaledY / maxScroll) * 100;
+                sliderRef.current.value = Math.max(0, Math.min(100, progress));
             }
 
-            // Update Page Count (Virtual Pages based on Viewport)
-            const totalPages = Math.max(1, Math.ceil(visualH / vh));
-            // Calculate current page based on center point of view
-            const currentPage = Math.min(totalPages, Math.max(1, Math.floor((-state.current.y + vh * 0.5) / vh) + 1));
+            // Page Count Logic (Standard Book Ratio 1.3)
+            // This calculates pages based on content dimensions (like an ebook), not screen height.
+            // It ensures the count is stable (doesn't change with zoom) and more accurate (higher count on mobile).
+            const bookPageHeight = contentDims.current.width * 1.3;
+            const totalPages = Math.max(1, Math.ceil(unscaledTotalH / bookPageHeight));
+            
+            // Calculate current page based on the top visible edge
+            const currentPage = Math.min(totalPages, Math.max(1, Math.floor((unscaledY + (bookPageHeight * 0.3)) / bookPageHeight) + 1));
+            
             pageCountRef.current.innerText = `${currentPage}/${totalPages}`;
         }
 
@@ -185,15 +190,16 @@ const BookReader = ({ book, onClose }) => {
 
     const onSliderInput = (e) => {
         const val = parseFloat(e.target.value);
-        const vh = window.innerHeight;
-        const visualH = contentDims.current.height * state.current.scale;
-        const minY = vh - visualH;
+        // We reverse the math: calculate Y based on unscaled percentage
+        const unscaledTotalH = contentDims.current.height;
+        const viewHeight = window.innerHeight / state.current.scale;
+        const maxScroll = Math.max(1, unscaledTotalH - viewHeight);
         
-        if (minY < 0) {
-            // Map slider % to Y coordinate
-            state.current.y = (val / 100) * minY;
-            velocity.current = { x: 0, y: 0 }; // Stop momentum while scrubbing
-        }
+        const targetUnscaledY = (val / 100) * maxScroll;
+        
+        // Apply back to state (negate because Y is negative for scrolling down)
+        state.current.y = -(targetUnscaledY * state.current.scale);
+        velocity.current = { x: 0, y: 0 }; // Stop momentum
     };
 
     // Event Handlers
