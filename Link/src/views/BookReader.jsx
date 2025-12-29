@@ -98,8 +98,9 @@ const BookReader = ({ book, onClose }) => {
         }
     };
 
-    // Physics Loop
-    const renderFrame = () => {
+    // --- OPTIMIZED PHYSICS ENGINE ---
+
+    const applyConstraints = () => {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         const { width, height } = contentDims.current;
@@ -109,7 +110,7 @@ const BookReader = ({ book, onClose }) => {
         const visualW = width * s.scale;
         const visualH = height * s.scale;
 
-        // Clamp X
+        // X Constraint
         if (visualW < vw) {
             s.x = (vw - visualW) / 2;
             v.x = 0;
@@ -118,7 +119,7 @@ const BookReader = ({ book, onClose }) => {
             if (s.x < vw - visualW) { s.x = vw - visualW; v.x = 0; }
         }
 
-        // Clamp Y
+        // Y Constraint
         if (visualH < vh) {
             s.y = (vh - visualH) / 2;
             v.y = 0;
@@ -126,22 +127,34 @@ const BookReader = ({ book, onClose }) => {
             if (s.y > 0) { s.y = 0; v.y = 0; }
             if (s.y < vh - visualH) { s.y = vh - visualH; v.y = 0; }
         }
-
-        if (layerRef.current) {
-            layerRef.current.style.transform = `translate3d(${s.x}px, ${s.y}px, 0) scale(${s.scale})`;
-        }
     };
 
-    const step = () => {
-        const v = velocity.current;
-        if (Math.abs(v.x) > 0.1 || Math.abs(v.y) > 0.1) {
-            v.x *= CONFIG.friction;
-            v.y *= CONFIG.friction;
-            state.current.x += v.x;
-            state.current.y += v.y;
-            renderFrame();
-            requestRef.current = requestAnimationFrame(step);
+    // The Single Render Loop
+    // Decouples input frequency from screen refresh rate for buttery smooth motion
+    const loop = () => {
+        // 1. Apply Physics if not dragging
+        if (!input.current.isDragging) {
+            const v = velocity.current;
+            if (Math.abs(v.x) > 0.1 || Math.abs(v.y) > 0.1) {
+                v.x *= CONFIG.friction;
+                v.y *= CONFIG.friction;
+                state.current.x += v.x;
+                state.current.y += v.y;
+            }
         }
+
+        // 2. Apply Constraints (Borders)
+        applyConstraints();
+
+        // 3. Render to DOM
+        if (layerRef.current) {
+            const { x, y, scale } = state.current;
+            // Using transform3d for hardware acceleration
+            layerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+        }
+
+        // 4. Continue Loop
+        requestRef.current = requestAnimationFrame(loop);
     };
 
     // Event Handlers
@@ -149,11 +162,13 @@ const BookReader = ({ book, onClose }) => {
         const viewport = viewportRef.current;
         if (!viewport) return;
 
+        // Start the render loop on mount
+        requestRef.current = requestAnimationFrame(loop);
+
         const onTouchStart = (e) => {
             if (e.target.closest('#ui-layer') || e.target.closest('.fab-container')) return;
             e.preventDefault();
             
-            if (requestRef.current) cancelAnimationFrame(requestRef.current);
             velocity.current = { x: 0, y: 0 };
             input.current.dragTotalDistance = 0;
             input.current.touchStartTime = Date.now();
@@ -179,15 +194,21 @@ const BookReader = ({ book, onClose }) => {
             if (e.target.closest('#ui-layer')) return;
             e.preventDefault();
 
+            // NOTE: We do NOT call render() here. We only update data.
+            // The loop() running on RAF will pick this up automatically.
+
             if (input.current.isDragging && e.touches.length === 1) {
                 const x = e.touches[0].clientX;
                 const y = e.touches[0].clientY;
                 const dt = Date.now() - input.current.lastTime;
                 
                 input.current.dragTotalDistance += Math.hypot(x - input.current.lastX, y - input.current.lastY);
+                
+                // Direct update of position state (Loop will render it)
                 state.current.x = x - input.current.startX;
                 state.current.y = y - input.current.startY;
 
+                // Calculate velocity for throw effect later
                 if (dt > 0) {
                     velocity.current.x = (x - input.current.lastX) * CONFIG.velocityMult;
                     velocity.current.y = (y - input.current.lastY) * CONFIG.velocityMult;
@@ -196,8 +217,8 @@ const BookReader = ({ book, onClose }) => {
                 input.current.lastX = x;
                 input.current.lastY = y;
                 input.current.lastTime = Date.now();
-                renderFrame();
-            } else if (e.touches.length === 2) {
+            } 
+            else if (e.touches.length === 2) {
                 input.current.dragTotalDistance += 100;
                 const dist = Math.hypot(
                     e.touches[0].pageX - e.touches[1].pageX,
@@ -216,24 +237,25 @@ const BookReader = ({ book, onClose }) => {
                 state.current.x = cx - (contentX * newScale);
                 state.current.y = cy - (contentY * newScale);
                 state.current.scale = newScale;
-                renderFrame();
             }
         };
 
         const onTouchEnd = (e) => {
             if (e.target.closest('#ui-layer')) return;
             const duration = Date.now() - input.current.touchStartTime;
+            
             if (input.current.isDragging && duration < 300 && input.current.dragTotalDistance < 10) {
                 setIsUiVisible(prev => !prev);
                 setIsFabActive(false);
             }
+            
             if (input.current.isDragging && e.touches.length === 0) {
                 input.current.isDragging = false;
-                step();
+                // Loop continues automatically and will now pick up velocity
             }
         };
 
-        // Mouse Fallbacks
+        // Mouse Fallbacks (Simplified for brevity, logic remains same)
         const onMouseDown = (e) => {
             if(e.target.closest('#ui-layer')) return;
             input.current.isDragging = true;
@@ -243,7 +265,6 @@ const BookReader = ({ book, onClose }) => {
             input.current.startY = e.clientY - state.current.y;
             input.current.lastX = e.clientX;
             input.current.lastY = e.clientY;
-            if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
 
         const onMouseMove = (e) => {
@@ -254,7 +275,6 @@ const BookReader = ({ book, onClose }) => {
                 input.current.lastY = e.clientY;
                 state.current.x = e.clientX - input.current.startX;
                 state.current.y = e.clientY - input.current.startY;
-                renderFrame();
             }
         };
 
@@ -275,7 +295,6 @@ const BookReader = ({ book, onClose }) => {
                 state.current.y -= e.deltaY;
                 state.current.x -= e.deltaX;
             }
-            renderFrame();
         };
 
         viewport.addEventListener('touchstart', onTouchStart, { passive: false });
