@@ -30,7 +30,13 @@
     transform-origin: 0 0;
     background-color: white;
     width: 0; height: 0;
+    /* --- PERFORMANCE OPTIMIZATIONS --- */
     will-change: transform;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    perspective: 1000px;
     box-shadow: 0 0 50px rgba(0,0,0,0.5);
 }
 
