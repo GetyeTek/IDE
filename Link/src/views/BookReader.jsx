@@ -12,6 +12,8 @@ const BookReader = ({ book, onClose }) => {
     const viewportRef = useRef(null);
     const layerRef = useRef(null);
     const requestRef = useRef(null);
+    const sliderRef = useRef(null);
+    const pageCountRef = useRef(null);
     
     // Physics State
     const state = useRef({ x: 0, y: 0, scale: 1 });
@@ -21,6 +23,7 @@ const BookReader = ({ book, onClose }) => {
     
     // Input State
     const input = useRef({
+        isSliderDragging: false,
         isDragging: false,
         startX: 0, startY: 0,
         lastX: 0, lastY: 0,
@@ -153,8 +156,44 @@ const BookReader = ({ book, onClose }) => {
             layerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
         }
 
-        // 4. Continue Loop
+        // 4. Update UI (Slider & Pages)
+        if (sliderRef.current && pageCountRef.current && contentDims.current.height > 0) {
+            const vh = window.innerHeight;
+            const visualH = contentDims.current.height * state.current.scale;
+            const minY = vh - visualH;
+            
+            // Update Slider (Sync logic)
+            if (!input.current.isSliderDragging) {
+                let progress = 0;
+                if (minY < 0) {
+                    progress = (state.current.y / minY) * 100;
+                    progress = Math.max(0, Math.min(100, progress));
+                }
+                sliderRef.current.value = progress;
+            }
+
+            // Update Page Count (Virtual Pages based on Viewport)
+            const totalPages = Math.max(1, Math.ceil(visualH / vh));
+            // Calculate current page based on center point of view
+            const currentPage = Math.min(totalPages, Math.max(1, Math.floor((-state.current.y + vh * 0.5) / vh) + 1));
+            pageCountRef.current.innerText = `${currentPage}/${totalPages}`;
+        }
+
+        // 5. Continue Loop
         requestRef.current = requestAnimationFrame(loop);
+    };
+
+    const onSliderInput = (e) => {
+        const val = parseFloat(e.target.value);
+        const vh = window.innerHeight;
+        const visualH = contentDims.current.height * state.current.scale;
+        const minY = vh - visualH;
+        
+        if (minY < 0) {
+            // Map slider % to Y coordinate
+            state.current.y = (val / 100) * minY;
+            velocity.current = { x: 0, y: 0 }; // Stop momentum while scrubbing
+        }
     };
 
     // Event Handlers
@@ -371,9 +410,21 @@ const BookReader = ({ book, onClose }) => {
                     </div>
                     <div className="slider-container">
                         <div className="track-bg"></div>
-                        <input type="range" min="1" max="100" defaultValue="1" />
+                        <input 
+                            ref={sliderRef}
+                            type="range" 
+                            min="0" 
+                            max="100" 
+                            step="0.1"
+                            defaultValue="0"
+                            onInput={onSliderInput}
+                            onTouchStart={() => input.current.isSliderDragging = true}
+                            onTouchEnd={() => input.current.isSliderDragging = false}
+                            onMouseDown={() => input.current.isSliderDragging = true}
+                            onMouseUp={() => input.current.isSliderDragging = false}
+                        />
                     </div>
-                    <span className="page-count">1/--</span>
+                    <span className="page-count" ref={pageCountRef}>1/--</span>
                     <div className="icon-btn">
                         <svg className="reader-svg" viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
                     </div>
