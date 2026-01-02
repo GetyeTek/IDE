@@ -1813,6 +1813,9 @@ function updateTerminalCard(id, response, originalPayload, isLive = false) {
                         <span style="color:#ccc;">${job.name}</span>
                         <div class="flex-gap">
                             ${isFail ? `<button class="btn-outline" style="padding:2px 8px; font-size:10px; color:#d946ef; border-color:#333; display:flex; gap:4px; align-items:center;" onclick="explainJobFailure(${job.id}, '${job.name}', event)">🧠 Explain</button>` : ''}
+                            <button class="btn-outline" style="padding:2px 6px; font-size:10px; border-color:#333; color:#aaa; margin-right:4px;" onclick="downloadJobLogs(${job.id}, '${job.name}')" title="Download Log">
+                                ⬇
+                            </button>
                             <button class="btn-outline" style="padding:2px 8px; font-size:10px; color:${statusColor}; border-color:#333;" onclick="viewJobLogs(${job.id}, '${job.name}')">
                                 View Logs
                             </button>
@@ -1863,6 +1866,30 @@ function updateTerminalCard(id, response, originalPayload, isLive = false) {
             toast.innerText = "Error: " + err.message;
             setTimeout(() => toast.remove(), 3000);
         }
+    }
+
+    async function downloadJobLogs(jobId, jobName) {
+        const btn = event.currentTarget;
+        const originalText = btn.innerText;
+        btn.innerText = "...";
+        btn.disabled = true;
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'fetch_job_logs', job_id: jobId })
+            });
+            const data = await res.json();
+            if(data.logs) {
+                const blob = new Blob([data.logs], {type: 'text/plain'});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `${jobName.replace(/[^a-z0-9]/gi, '_')}.log`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else { alert("Log is empty."); }
+        } catch(e) { alert("Error: " + e.message); }
+        finally { btn.innerText = originalText; btn.disabled = false; }
     }
 
 async function viewJobLogs(jobId, jobName) {
