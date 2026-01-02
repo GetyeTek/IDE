@@ -631,23 +631,19 @@ ${user_prompt}
       const apiKey = await getGeminiKey();
       if (!apiKey) throw new Error("No AI Key");
       
-      const snippet = logs.length > 20000 ? logs.slice(-20000) : logs;
-
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
       const prompt = `
 Analyze this GitHub Action Failure Log.
 
-LOG SNIPPET:
-${snippet}
+LOG DATA:
+${logs}
 
 TASK:
-Extract ONLY the specific error message and the exact file/line number causing it.
-Do not explain "why" or "how to fix".
-Do not add markdown headers like "## Analysis".
-
-OUTPUT FORMAT:
-**Error:** <The specific error message>
-**Location:** <File path>:<Line number>
+Identify the failure clearly.
+1. State the specific error message.
+2. Identify the file and line number if present.
+3. Quote the relevant lines from the log that demonstrate the crash.
+4. Provide a brief, direct summary of the failure context (what went wrong).
 `;
 
       const aiRes = await fetch(url, {
