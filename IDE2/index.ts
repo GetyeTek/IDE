@@ -616,6 +616,48 @@ ${user_prompt}
         return new Response(JSON.stringify({ operations: rawText }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // --- CI/CD LOG ANALYZER ---
+    if (action === "analyze_log") {
+      const { job_id } = payload;
+      if (!job_id) throw new Error("Missing job_id");
+      
+      // 1. Fetch Logs
+      const logUrl = `https://api.github.com/repos/${GITHUB_USER}/${TARGET_REPO}/actions/jobs/${job_id}/logs`;
+      const logRes = await fetch(logUrl, { headers: { ...getHeaders() }, redirect: "follow" });
+      if(!logRes.ok) throw new Error("Log fetch failed");
+      const logs = await logRes.text();
+
+      // 2. Prep AI (Truncate to last 20k chars to capture error context)
+      const apiKey = await getGeminiKey();
+      if (!apiKey) throw new Error("No AI Key");
+      
+      const snippet = logs.length > 20000 ? logs.slice(-20000) : logs;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+      const prompt = `
+Analyze this GitHub Action Failure Log.
+
+LOG SNIPPET:
+${snippet}
+
+TASK:
+1. Identify the specific error.
+2. Explain the root cause clearly.
+3. Suggest the exact fix or code change.
+
+Output concise Markdown.
+`;
+
+      const aiRes = await fetch(url, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
+      });
+      const aiData = await aiRes.json();
+      const analysis = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "Could not analyze logs.";
+
+      return new Response(JSON.stringify({ analysis }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
 // --- 5. THE INTELLIGENT PATCHER ---
     if (action === "patch" && operations) {
       const scopePath = payload.project_path || "";
