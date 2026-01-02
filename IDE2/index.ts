@@ -641,11 +641,13 @@ LOG SNIPPET:
 ${snippet}
 
 TASK:
-1. Identify the specific error.
-2. Explain the root cause clearly.
-3. Suggest the exact fix or code change.
+Extract ONLY the specific error message and the exact file/line number causing it.
+Do not explain "why" or "how to fix".
+Do not add markdown headers like "## Analysis".
 
-Output concise Markdown.
+OUTPUT FORMAT:
+**Error:** <The specific error message>
+**Location:** <File path>:<Line number>
 `;
 
       const aiRes = await fetch(url, {
