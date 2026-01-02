@@ -560,7 +560,63 @@ serve(async (req) => {
     }
 
 
-    // --- 5. THE INTELLIGENT PATCHER ---
+        // --- AI OPERATION GENERATOR ---
+    if (action === "generate_ops") {
+        const { user_prompt, context_files } = payload;
+        if (!user_prompt) throw new Error("Prompt required");
+
+        const apiKey = await getGeminiKey();
+        if (!apiKey) throw new Error("No AI Key");
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+
+        const fileContext = context_files.map((f: any) => 
+            `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content).substring(0, 3000) : "(Content omitted)"}\n`
+        ).join("\n---\n");
+
+        const systemPrompt = `
+You are a JSON Patch Generator for a specific IDE engine.
+Your goal: Convert the user's Natural Language Request into a JSON Array of Operations.
+
+**AVAILABLE OPERATIONS:**
+1. { "file_path": "path/to/file.ext", "action": "replace_block", "find_block": "exact code to replace", "replace_with": "new code" }
+2. { "file_path": "...", "action": "insert_after", "anchor": "exact line to insert after", "content": "new code" }
+3. { "file_path": "...", "action": "create_file", "content": "full content" }
+4. { "file_path": "...", "action": "delete_file" }
+
+**RULES:**
+- Return ONLY the raw JSON array. No markdown, no explanations.
+- "find_block" and "anchor" must be UNIQUE strings found in the file context.
+- Do not use regex. Use exact string matching.
+- If the user asks to edit a file not provided in context, guess the path but warn in a comment field.
+`;
+
+        const finalPrompt = `
+${systemPrompt}
+
+=== CONTEXT FILES ===
+${fileContext}
+
+=== USER REQUEST ===
+${user_prompt}
+`;
+
+        const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: finalPrompt }] }]
+            })
+        });
+
+        const data = await res.json();
+        let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+        rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+        return new Response(JSON.stringify({ operations: rawText }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+// --- 5. THE INTELLIGENT PATCHER ---
     if (action === "patch" && operations) {
       const scopePath = payload.project_path || "";
       if (scopePath) {
