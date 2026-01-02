@@ -281,7 +281,15 @@
 .ansi-blue { color: #58a6ff; }
 .ansi-bold { font-weight: bold; }
 .log-err { border-left: 3px solid #ff7b72; background: rgba(255,123,114,0.1); }
-    </style>
+    
+/* AI Magic Bar Styles */
+.ai-prompt-container { background: linear-gradient(135deg, #1e1e24 0%, #151517 100%); border: 1px solid #333; border-radius: 12px; padding: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden; }
+.ai-prompt-container::before { content: ''; position: absolute; top:0; left:0; width:4px; height:100%; background: #d946ef; }
+.ai-input { background: #0a0a0a; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 13px; resize: none; outline: none; min-height: 42px; }
+.ai-input:focus { border-color: #d946ef; }
+.ai-controls { display: flex; justify-content: space-between; align-items: center; }
+.ai-hint { font-size: 10px; color: #666; display: flex; align-items: center; gap:4px; }
+</style>
 </head>
 <body onclick="closeAllMenus(event)">
 
@@ -316,6 +324,19 @@
         <!-- PATCHER TAB -->
         <div id="tab-patcher" class="tab-content">
             <div class="header">Patcher</div>
+            <!-- NEW: AI PROMPT AREA -->
+            <div class="ai-prompt-container">
+                <textarea id="ai-prompt-input" class="ai-input" placeholder="Describe changes (e.g., 'Add a dark mode toggle to the nav bar')..." onkeydown="if(event.ctrlKey && event.key === 'Enter') generateAiPatch()"></textarea>
+                <div class="ai-controls">
+                    <div class="ai-hint">
+                        <svg width="12" height="12" fill="none" stroke="#d946ef" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span>Uses selected files from Context tab</span>
+                    </div>
+                    <button class="btn-dev" style="width:auto; padding:6px 16px; font-size:11px; background:#d946ef; color:white; border:none;" onclick="generateAiPatch()">
+                        ✨ Generate JSON
+                    </button>
+                </div>
+            </div>
             <div class="editor-toolbar">
                 <button class="icon-btn" onclick="editorUndo()">Undo</button>
                 <button class="icon-btn" onclick="editorRedo()">Redo</button>
@@ -1078,7 +1099,55 @@
     }
 
     // --- ACTIONS ---
-    async function runPatch(actionType) {
+        async function generateAiPatch() {
+        const prompt = document.getElementById('ai-prompt-input').value.trim();
+        if(!prompt) return alert("Please enter a prompt.");
+
+        const checkedBoxes = document.querySelectorAll('#file-list-container .file-check:checked');
+        if(checkedBoxes.length === 0) return alert("Please select at least one file in the Context tab to modify.");
+        
+        const filePaths = Array.from(checkedBoxes).map(cb => cb.value);
+        const btn = document.querySelector('.ai-controls button');
+        const originalText = btn.innerText;
+        btn.innerText = "Thinking...";
+        btn.disabled = true;
+
+        try {
+            const contextPayload = [];
+            for (const path of filePaths) {
+                if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path]) {
+                    contextPayload.push({ path: path, content: btoa(window.CURRENT_FILE_CACHE[path].content) });
+                } else {
+                    const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
+                    const data = await res.json();
+                    contextPayload.push({ path: path, content: data.content });
+                }
+            }
+
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'generate_ops', user_prompt: prompt, context_files: contextPayload })
+            });
+
+            const data = await res.json();
+
+            if(data.operations) {
+                document.getElementById('json-input').value = data.operations;
+                saveState();
+                const editor = document.getElementById('json-input');
+                editor.style.outline = "2px solid #d946ef";
+                setTimeout(() => editor.style.outline = "none", 500);
+            }
+        } catch (e) {
+            alert("AI Error: " + e.message);
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
+
+async function runPatch(actionType) {
         // RESET STATE: Clear blame map and remove previous red highlights from terminal
         FILE_OP_MAP = {}; 
         document.querySelectorAll('.op-row').forEach(el => {
