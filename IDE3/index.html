@@ -1864,6 +1864,7 @@ async function downloadArtifact(runId) {
                         <div class="v-info" style="flex:1; min-width:0;">
                             <strong style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
                                 <span class="status-pill" style="background:var(--primary-dim); color:var(--primary); font-size:10px; padding: 2px 5px; border-radius: 5px; vertical-align: middle; margin-right: 6px;">#${h.conduit_id}</span>
+                                ${h.type === 'AI-Fix' ? '<span class="status-pill" style="background:rgba(217,70,239,0.2); color:#d946ef; font-size:9px; padding:1px 4px; margin-right:4px; border:1px solid rgba(217,70,239,0.3);">🤖 AI</span>' : ''}
                                 ${h.title}
                             </strong>
                             <small>${new Date(h.created_at).toLocaleString()}</small>
