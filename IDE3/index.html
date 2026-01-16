@@ -1891,12 +1891,14 @@ function traceHistoryToRun(sha) {
             switchTab('tab-cicd', document.querySelectorAll('.nav-item')[4]);
             targetRun.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-            targetRun.style.transition = 'background-color 0.3s, box-shadow 0.3s';
-            targetRun.style.backgroundColor = 'var(--primary-dim)';
-            targetRun.style.boxShadow = '0 0 15px var(--primary-dim)';
+            targetRun.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
+            targetRun.style.backgroundColor = 'rgba(217, 70, 239, 0.2)';
+            targetRun.style.boxShadow = '0 0 30px rgba(217, 70, 239, 0.6)';
+            targetRun.style.border = '1px solid #d946ef';
             setTimeout(() => {
                 targetRun.style.backgroundColor = '';
                 targetRun.style.boxShadow = '';
+                targetRun.style.border = '';
             }, 2500);
 
             const headerEl = targetRun.querySelector('div[onclick]');
@@ -1922,13 +1924,15 @@ function traceRunToHistory(sha) {
             switchTab('tab-history', document.querySelectorAll('.nav-item')[3]);
             targetHistoryItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-            targetHistoryItem.style.transition = 'background-color 0.3s, box-shadow 0.3s';
-            targetHistoryItem.style.backgroundColor = 'var(--primary-dim)';
-            targetHistoryItem.style.boxShadow = '0 0 15px var(--primary-dim)';
+            targetHistoryItem.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
+            targetHistoryItem.style.backgroundColor = 'rgba(217, 70, 239, 0.2)';
+            targetHistoryItem.style.boxShadow = '0 0 30px rgba(217, 70, 239, 0.6)';
+            targetHistoryItem.style.border = '1px solid #d946ef';
             
             setTimeout(() => {
                 targetHistoryItem.style.backgroundColor = '';
                 targetHistoryItem.style.boxShadow = '';
+                targetHistoryItem.style.border = '';
             }, 2500);
         } else {
             // Not Found: Toast only
@@ -1944,9 +1948,9 @@ function traceRunToHistory(sha) {
             switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
             targetLog.scrollIntoView({ behavior: 'smooth', block: 'center' });
             targetLog.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
-            targetLog.style.backgroundColor = 'var(--primary-dim)';
-            targetLog.style.boxShadow = '0 0 15px var(--primary-dim)';
-            targetLog.style.border = '1px solid var(--primary)';
+            targetLog.style.backgroundColor = 'rgba(217, 70, 239, 0.2)';
+            targetLog.style.boxShadow = '0 0 30px rgba(217, 70, 239, 0.6)';
+            targetLog.style.border = '1px solid #d946ef';
             setTimeout(() => {
                 targetLog.style.backgroundColor = '';
                 targetLog.style.boxShadow = '';
@@ -1969,9 +1973,9 @@ function traceHistoryToLog(sha) {
             targetLog.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
             targetLog.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
-            targetLog.style.backgroundColor = 'var(--primary-dim)';
-            targetLog.style.boxShadow = '0 0 15px var(--primary-dim)';
-            targetLog.style.border = '1px solid var(--primary)';
+            targetLog.style.backgroundColor = 'rgba(217, 70, 239, 0.2)';
+            targetLog.style.boxShadow = '0 0 30px rgba(217, 70, 239, 0.6)';
+            targetLog.style.border = '1px solid #d946ef';
             
             setTimeout(() => {
                 targetLog.style.backgroundColor = '';
@@ -1991,12 +1995,14 @@ function traceHistoryToLog(sha) {
         if (targetHistoryItem) {
             switchTab('tab-history', document.querySelectorAll('.nav-item')[3]);
             targetHistoryItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            targetHistoryItem.style.transition = 'background-color 0.3s, box-shadow 0.3s';
-            targetHistoryItem.style.backgroundColor = 'var(--primary-dim)';
-            targetHistoryItem.style.boxShadow = '0 0 15px var(--primary-dim)';
+            targetHistoryItem.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
+            targetHistoryItem.style.backgroundColor = 'rgba(217, 70, 239, 0.2)';
+            targetHistoryItem.style.boxShadow = '0 0 30px rgba(217, 70, 239, 0.6)';
+            targetHistoryItem.style.border = '1px solid #d946ef';
             setTimeout(() => {
                 targetHistoryItem.style.backgroundColor = '';
                 targetHistoryItem.style.boxShadow = '';
+                targetHistoryItem.style.border = '';
             }, 2500);
         } else {
             showGlobalToast("Could not find matching entry in History.");
@@ -2011,12 +2017,14 @@ function traceHistoryToLog(sha) {
         if (targetRun) {
             switchTab('tab-cicd', document.querySelectorAll('.nav-item')[4]);
             targetRun.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            targetRun.style.transition = 'background-color 0.3s, box-shadow 0.3s';
-            targetRun.style.backgroundColor = 'var(--primary-dim)';
-            targetRun.style.boxShadow = '0 0 15px var(--primary-dim)';
+            targetRun.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
+            targetRun.style.backgroundColor = 'rgba(217, 70, 239, 0.2)';
+            targetRun.style.boxShadow = '0 0 30px rgba(217, 70, 239, 0.6)';
+            targetRun.style.border = '1px solid #d946ef';
             setTimeout(() => {
                 targetRun.style.backgroundColor = '';
                 targetRun.style.boxShadow = '';
+                targetRun.style.border = '';
             }, 2500);
         } else {
             showGlobalToast("Could not find matching build run in CI/CD.");
