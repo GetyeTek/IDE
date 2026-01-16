@@ -1481,23 +1481,29 @@
                 const fixedKey = 'conduit_fixed_' + latest.id;
                 
                 if (latest.conclusion === 'failure' && !localStorage.getItem(fixedKey)) {
-                    const toast = document.createElement('div');
-                    toast.innerHTML = `<span style="animation:pulse 1s infinite">🤖 Auto-Fixing Run #${latest.run_number}...</span>`;
-                    toast.style.cssText = "position:fixed; bottom:150px; left:50%; transform:translateX(-50%); background:#eab308; color:black; padding:10px 20px; border-radius:30px; z-index:9999; font-weight:bold;";
-                    document.body.appendChild(toast);
-                    
-                    localStorage.setItem(fixedKey, 'true');
+                    // LOOP GUARD: Stop if the failing commit was already an AI fix
+                    if (latest.head_commit && latest.head_commit.message.includes("🤖 AI Fix")) {
+                        console.log("Auto-Fix Loop Detected: Giving up.");
+                        localStorage.setItem(fixedKey, 'loop_stopped');
+                    } else {
+                        const toast = document.createElement('div');
+                        toast.innerHTML = `<span style="animation:pulse 1s infinite">🤖 Auto-Fixing Run #${latest.run_number}...</span>`;
+                        toast.style.cssText = "position:fixed; bottom:150px; left:50%; transform:translateX(-50%); background:#eab308; color:black; padding:10px 20px; border-radius:30px; z-index:9999; font-weight:bold;";
+                        document.body.appendChild(toast);
+                        
+                        localStorage.setItem(fixedKey, 'true');
 
-                    fetch(CONFIG.funcUrl, {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: apiBody({ action: 'auto_fix_build', run_id: latest.id, auto_sanity: CONFIG.autoSanity })
-                    }).then(r => r.json()).then(d => {
-                        toast.remove();
-                        if(d.success) {
-                            alert(`🤖 Auto-Fix Applied!\n\nAI successfully generated and committed a patch.`);
-                            loadWorkflows(); 
-                        }
-                    });
+                        fetch(CONFIG.funcUrl, {
+                            method: 'POST', headers: {'Content-Type': 'application/json'},
+                            body: apiBody({ action: 'auto_fix_build', run_id: latest.id, auto_sanity: CONFIG.autoSanity })
+                        }).then(r => r.json()).then(d => {
+                            toast.remove();
+                            if(d.success) {
+                                alert(`🤖 Auto-Fix Applied!\n\nAI successfully generated and committed a patch.`);
+                                loadWorkflows(); 
+                            }
+                        });
+                    }
                 }
             }
 
