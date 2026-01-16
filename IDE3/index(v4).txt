@@ -868,7 +868,9 @@ serve(async (req) => {
         if (ops.length === 0) return new Response(JSON.stringify({ success: false, message: "AI could not determine a fix." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
         // 5. Apply Patch
-        const patchResult = await processOperations(TARGET_REPO, ops, "", true, "AI-Fix");
+        // Use auto_sanity from payload, default to true if undefined for safety in auto-fixes
+        const useSanity = auto_sanity !== undefined ? auto_sanity : true;
+        const patchResult = await processOperations(TARGET_REPO, ops, "", useSanity, "AI-Fix");
 
         // 6. Trigger Re-Build (Explicitly required for bot commits)
         let triggerMsg = "No trigger attempted";
