@@ -1427,7 +1427,7 @@
 
         fetch(CONFIG.funcUrl, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: apiBody({ action: 'auto_fix_build', run_id: runId })
+            body: apiBody({ action: 'auto_fix_build', run_id: runId, auto_sanity: CONFIG.autoSanity })
         }).then(r => r.json()).then(d => {
             toast.remove();
             if(d.success) {
@@ -1490,7 +1490,7 @@
 
                     fetch(CONFIG.funcUrl, {
                         method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: apiBody({ action: 'auto_fix_build', run_id: latest.id })
+                        body: apiBody({ action: 'auto_fix_build', run_id: latest.id, auto_sanity: CONFIG.autoSanity })
                     }).then(r => r.json()).then(d => {
                         toast.remove();
                         if(d.success) {
