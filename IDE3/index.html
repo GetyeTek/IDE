@@ -477,7 +477,34 @@
                     <input type="checkbox" id="setting-show-preview" style="accent-color:var(--primary); transform:scale(1.2);">
                 </label>
 
-                <button class="btn btn-primary" onclick="saveSettings()">Save & Sync Config</button>
+                <div class="card" style="border:1px solid var(--ai-accent); margin-top:20px; background: rgba(217, 70, 239, 0.05);">
+                    <div class="header" style="font-size:14px; margin-bottom:10px; color:var(--ai-accent);">⚡ Edge Function Manager</div>
+                    
+                    <div class="input-group">
+                        <label class="input-label">Available Functions</label>
+                        <div id="ef-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+                            <button class="btn-outline" style="width:auto; padding:4px 10px; font-size:11px;" onclick="fetchEdgeFunctions()">Scan Repo</button>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">Function Name</label>
+                        <input type="text" id="ef-name" class="input-field" placeholder="e.g. hello-world">
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">Function Logic (index.ts)</label>
+                        <textarea id="ef-code" class="json-editor" style="min-height:150px; font-size:12px;" placeholder="Paste function code here... (Leave empty to deploy repo version)"></textarea>
+                    </div>
+
+                    <div class="flex-gap">
+                        <button class="btn btn-primary" style="background:var(--ai-accent);" onclick="deployEdgeFunction()">🚀 Deploy to Supabase</button>
+                        <button class="btn btn-outline" onclick="createBareboneFunction()">🦴 Create Barebone</button>
+                    </div>
+                    <p id="ef-status" style="font-size:10px; color:var(--text-muted); margin-top:8px; text-align:center;">Requires deploy.yml workflow</p>
+                </div>
+
+                <button class="btn btn-primary" style="margin-top:20px;" onclick="saveSettings()">Save & Sync Config</button>
             </div>
         </div>
 
@@ -737,6 +764,140 @@
         if (!CONFIG.showPreview && previewTabContent && previewTabContent.classList.contains('active')) {
             switchTab('tab-context', document.querySelectorAll('.nav-item')[0]);
         }
+    }
+
+    async function fetchEdgeFunctions() {
+        const container = document.getElementById('ef-list');
+        if (!window.repoFiles || window.repoFiles.length === 0) {
+            alert("Please refresh the file list in the Context tab first.");
+            return;
+        }
+        
+        const functions = new Set();
+        window.repoFiles.forEach(f => {
+            if (f.path.startsWith('supabase/functions/')) {
+                const parts = f.path.split('/');
+                if (parts.length > 3) functions.add(parts[2]);
+            }
+        });
+
+        container.innerHTML = '';
+        if (functions.size === 0) {
+            container.innerHTML = '<span style="font-size:11px; color:#666;">No functions found in /supabase/functions/</span>';
+        } else {
+            functions.forEach(name => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-outline';
+                btn.style.cssText = 'width:auto; padding:4px 10px; font-size:11px; border-color:var(--ai-accent); color:white;';
+                btn.innerText = name;
+                btn.onclick = () => {
+                    document.getElementById('ef-name').value = name;
+                    loadEdgeFunctionCode(name);
+                };
+                container.appendChild(btn);
+            });
+        }
+    }
+
+    async function loadEdgeFunctionCode(name) {
+        const path = `supabase/functions/${name}/index.ts`;
+        const status = document.getElementById('ef-status');
+        status.innerText = `Reading ${name}...`;
+        try {
+            const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
+            const data = await res.json();
+            if (data.content) {
+                document.getElementById('ef-code').value = b64DecodeUnicode(data.content);
+                status.innerText = "Code loaded.";
+            } else {
+                status.innerText = "File empty or missing.";
+            }
+        } catch (e) { status.innerText = "Error loading code."; }
+    }
+
+    async function deployEdgeFunction() {
+        const name = document.getElementById('ef-name').value.trim();
+        const code = document.getElementById('ef-code').value.trim();
+        const status = document.getElementById('ef-status');
+
+        if (!name) return alert("Enter a function name.");
+
+        status.innerText = "⏳ Initiating deployment...";
+
+        // Step 1: Commit code if textarea is not empty
+        if (code) {
+            status.innerText = "💾 Committing changes to repo...";
+            const patchPayload = [{
+                action: "comment",
+                text: `[Edge Function] Update ${name}`
+            }, {
+                file_path: `supabase/functions/${name}/index.ts`,
+                action: "replace_block",
+                find_block: "", // Placeholder for create/overwrite logic
+                replace_with: code
+            }];
+
+            // Since we use replace_block solely, we'll try a standard create logic via patcher
+            // Actually, we use the IDE's runPatch logic for safety
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'patch', operations: [{
+                    file_path: `supabase/functions/${name}/index.ts`,
+                    action: "create_file",
+                    content: code
+                }]})
+            });
+            const data = await res.json();
+            if (!data.success && !data.results?.[0]?.message?.includes("already exists")) {
+                // If create_file fails because it exists, we use replace_block via a full overwrite
+                // (IDE architecture usually prefers replace_block, but for functions create_file is safer initialization)
+                const { content: old } = await (await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: `supabase/functions/${name}/index.ts` }) })).json();
+                await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'patch', operations: [{
+                        file_path: `supabase/functions/${name}/index.ts`,
+                        action: "replace_block",
+                        find_block: b64DecodeUnicode(old),
+                        replace_with: code
+                    }]})
+                });
+            }
+        }
+
+        // Step 2: Trigger the Workflow
+        status.innerText = "🚀 Triggering GitHub Action (deploy.yml)...";
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'trigger_build', 
+                    workflow_id: 'deploy.yml', 
+                    branch: 'conduit-dev',
+                    inputs: { function_name: name }
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                status.innerText = "✅ Deployment workflow dispatched!";
+                status.style.color = "var(--prod)";
+                setTimeout(() => { switchTab('tab-cicd', document.querySelectorAll('.nav-item')[4]); loadWorkflows(); }, 1500);
+            } else {
+                throw new Error(data.error || "Workflow trigger failed");
+            }
+        } catch (e) {
+            status.innerText = "❌ Error: " + e.message;
+            status.style.color = "var(--danger)";
+        }
+    }
+
+    async function createBareboneFunction() {
+        const name = prompt("Function Name:", "hello-world");
+        if (!name) return;
+        const template = `import { serve } from "https://deno.land/std@0.168.0/http/server.ts"\n\nserve(async (req) => {\n  const { name } = await req.json()\n  const data = {\n    message: \`Hello \${name}!\`,\n  }\n\n  return new Response(\n    JSON.stringify(data),\n    { headers: { "Content-Type": "application/json" } },\n  )\n})\n`;
+        
+        document.getElementById('ef-name').value = name;
+        document.getElementById('ef-code').value = template;
+        document.getElementById('ef-status').innerText = "Template created. Hit Deploy to save and push.";
     }
 
     async function saveSettings() {
