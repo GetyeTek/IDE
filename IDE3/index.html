@@ -984,17 +984,21 @@
         document.body.appendChild(toast);
         
         try {
-            await fetch(CONFIG.funcUrl, {
+            const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: apiBody({ action: 'create_checkpoint', note: note })
             });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || "Checkpoint failed");
+
             toast.innerText = "Checkpoint Saved!";
             setTimeout(() => toast.remove(), 2000);
-            fetchState(true); // Sync history to show the new checkpoint
+            fetchState(true);
         } catch(e) {
+            toast.style.background = "var(--danger)";
             toast.innerText = "Error: " + e.message;
-            setTimeout(() => toast.remove(), 2000);
+            setTimeout(() => toast.remove(), 4000);
         }
     }
 
