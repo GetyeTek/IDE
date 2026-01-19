@@ -62,6 +62,7 @@ function getNumberedContent(content: string): string {
 const getHeaders = () => ({
   "Authorization": `token ${Deno.env.get("GITHUB_PAT")}`,
   "Accept": "application/vnd.github.v3+json",
+  "Content-Type": "application/json",
   "User-Agent": "Conduit-IDE-Agent",
 });
 
@@ -672,13 +673,17 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { action, operations, file_path, ref_sha, version_name, repo_name, code_block, error_message, messages, context_files, auto_sanity, ...payload } = await req.json();
+    const { 
+      action, operations, file_path, ref_sha, version_name, repo_name, 
+      code_block, error_message, messages, context_files, auto_sanity, 
+      workflow_id, branch, inputs, run_id, project_path, chat_id, title, user_prompt, ...payload 
+    } = await req.json();
     const TARGET_REPO = repo_name || DEFAULT_REPO;
     await ensureBranchExists(TARGET_REPO);
 
     // 1. INIT
     if (action === "init") {
-        const scope = payload.project_path || "";
+        const scope = project_path || "";
         const { data: history } = await supabase.from('conduit_history').select('*, conduit_id').eq('repo_name', TARGET_REPO).order('conduit_id', { ascending: false }).limit(50);
         const { data: logs } = await supabase.from('conduit_logs').select('*').eq('repo_name', TARGET_REPO).order('created_at', { ascending: false }).limit(50);
         return new Response(JSON.stringify({ history: (history || []).filter((h:any)=>isRecordInScope(h, scope)), logs: (logs || []).filter((l:any)=>isRecordInScope(l, scope)) }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -715,7 +720,6 @@ serve(async (req) => {
 
     // --- REFINED GENERATE OPS (PROMPT UPGRADE) ---
     if (action === "generate_ops") {
-        const { user_prompt, context_files } = payload;
         if (!user_prompt) throw new Error("Prompt required");
         const apiKey = await getAIKey();
         if (!apiKey) throw new Error("No AI Key");
@@ -771,15 +775,15 @@ serve(async (req) => {
 
     // --- AUTO FIX BUILD (UPDATED LOGIC) ---
     if (action === "auto_fix_build") {
-        if (!payload.run_id) throw new Error("run_id required");
+        if (!run_id) throw new Error("run_id required");
 
         // 1. Get Log Text
-        const jobsData = await githubFetch(TARGET_REPO, `/actions/runs/${payload.run_id}/jobs`);
+        const jobsData = await githubFetch(TARGET_REPO, `/actions/runs/${run_id}/jobs`);
         const failedJob = jobsData.jobs.find((j: any) => j.conclusion === "failure");
         if (!failedJob) return new Response(JSON.stringify({ success: false, message: "No failed job found." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
         // Get the commit SHA that triggered the failed run
-        const runData = jobsData.workflow_runs?.find((r:any) => r.id === payload.run_id) || jobsData.workflow_runs?.[0]; // Fallback
+        const runData = jobsData.workflow_runs?.find((r:any) => r.id === run_id) || jobsData.workflow_runs?.[0]; // Fallback
         const failedSha = runData?.head_sha || failedJob.head_sha; 
         if (!failedSha) throw new Error("Could not determine commit SHA for failed run.");
 
@@ -905,7 +909,7 @@ serve(async (req) => {
     }
 
     if (action === "patch" && operations) {
-        const result = await processOperations(TARGET_REPO, operations, payload.project_path, !!auto_sanity);
+        const result = await processOperations(TARGET_REPO, operations, project_path, !!auto_sanity);
         return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -939,53 +943,23 @@ serve(async (req) => {
     }
 
     if (action === "trigger_build") {
-        const { workflow_id, branch, inputs } = payload;
-        const safeInputs = inputs || {};
         const targetBranch = branch || DEV_BRANCH;
-        
-        const debugInfo = { 
-            workflow_id, 
-            branch: targetBranch, 
-            inputs_received: safeInputs, 
-            timestamp: new Date().toISOString() 
-        };
-
-        // 1. Log INTENT (Audit Trail)
-        await supabase.from('conduit_logs').insert({ 
-            repo_name: TARGET_REPO, 
-            type: 'dispatch_debug', 
-            data: { step: 'attempt', ...debugInfo } 
-        });
-
         try {
             if (workflow_id) {
-                await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, safeInputs);
+                await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, inputs || {});
             } else {
                 await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
             }
-            
-            // 2. Log SUCCESS
             await supabase.from('conduit_logs').insert({ 
-                repo_name: TARGET_REPO, 
-                type: 'dispatch', 
-                data: { success: true, message: `Triggered ${workflow_id || 'generic build'}`, debug: debugInfo } 
+                repo_name: TARGET_REPO, type: 'dispatch', 
+                data: { success: true, workflow_id, branch: targetBranch } 
             });
             return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
         } catch (e: any) {
-            // 3. Log FAILURE
-            console.error("[Trigger Fail]", e);
             await supabase.from('conduit_logs').insert({ 
-                repo_name: TARGET_REPO, 
-                type: 'dispatch_error', 
-                data: { 
-                    success: false, 
-                    workflow_id, 
-                    error_msg: e.message, 
-                    failed_payload: debugInfo 
-                } 
+                repo_name: TARGET_REPO, type: 'dispatch_error', 
+                data: { error: e.message, workflow_id } 
             });
-            // Return 500 so frontend knows it failed
             return new Response(JSON.stringify({ success: false, error: e.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
     }
@@ -1034,7 +1008,7 @@ serve(async (req) => {
     }
 
     if (action === "commit_prod") {
-        const scopePath = payload.project_path || "";
+        const scopePath = project_path || "";
         const tree = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
         const files = tree.tree.filter((f: any) => f.type === "blob" && f.path.startsWith(scopePath));
         let copiedCount = 0;
@@ -1087,9 +1061,8 @@ serve(async (req) => {
     }
 
     if (action === "save_chat") {
-        const { chat_id, title } = payload; 
-        // FIX: Defensively get messages from top-scope OR payload, ensure it's an array
-        const chatMsgs = Array.isArray(messages) ? messages : (Array.isArray(payload.messages) ? payload.messages : []);
+        // Defensively ensure messages is an array
+        const chatMsgs = Array.isArray(messages) ? messages : [];
         
         // Robust Title Generation
         let chatTitle = title || "New Chat";
