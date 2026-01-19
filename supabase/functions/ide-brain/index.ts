@@ -45,11 +45,19 @@ function escapeRegExp(string: string) {
 
 function isRecordInScope(record: any, scopePath: string): boolean {
     if (!scopePath || scopePath === "/" || scopePath === "") return true;
+    // Allow if matches scope OR is an Edge Function operation
     if (record.ops && Array.isArray(record.ops)) {
-        return record.ops.some((op: any) => op.file_path && op.file_path.startsWith(scopePath));
+        return record.ops.some((op: any) => 
+            (op.file_path && op.file_path.startsWith(scopePath)) || 
+            op.is_resolved_ef ||
+            (op.file_path && op.file_path.includes("supabase/functions/"))
+        );
     }
     if (record.data && record.data.results && Array.isArray(record.data.results)) {
-        return record.data.results.some((res: any) => res.file && res.file.startsWith(scopePath));
+        return record.data.results.some((res: any) => 
+            (res.file && res.file.startsWith(scopePath)) ||
+            (res.file && res.file.includes("supabase/functions/"))
+        );
     }
     return true;
 }
