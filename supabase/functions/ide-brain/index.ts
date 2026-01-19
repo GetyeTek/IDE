@@ -113,10 +113,13 @@ async function dispatchWorkflow(repo: string, eventType: string, payload: any = 
   return true;
 }
 
-async function triggerWorkflowFile(repo: string, workflowId: string, ref: string) {
+async function triggerWorkflowFile(repo: string, workflowId: string, ref: string, inputs: any = {}) {
+  // Debug log to console (viewable in Supabase Edge Function logs)
+  console.log(`[GitHub Dispatch] Target: ${workflowId}, Ref: ${ref}, Inputs:`, JSON.stringify(inputs));
+  
   await githubFetch(repo, `/actions/workflows/${workflowId}/dispatches`, {
     method: "POST",
-    body: JSON.stringify({ ref: ref }),
+    body: JSON.stringify({ ref: ref, inputs: inputs }),
   });
   return true;
 }
@@ -936,11 +939,55 @@ serve(async (req) => {
     }
 
     if (action === "trigger_build") {
-        const { workflow_id, branch } = payload;
-        if (workflow_id) await triggerWorkflowFile(TARGET_REPO, workflow_id, branch || DEV_BRANCH);
-        else await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
-        await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'dispatch', data: { message: `Triggered ${workflow_id || 'generic build'}` } });
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { workflow_id, branch, inputs } = payload;
+        const safeInputs = inputs || {};
+        const targetBranch = branch || DEV_BRANCH;
+        
+        const debugInfo = { 
+            workflow_id, 
+            branch: targetBranch, 
+            inputs_received: safeInputs, 
+            timestamp: new Date().toISOString() 
+        };
+
+        // 1. Log INTENT (Audit Trail)
+        await supabase.from('conduit_logs').insert({ 
+            repo_name: TARGET_REPO, 
+            type: 'dispatch_debug', 
+            data: { step: 'attempt', ...debugInfo } 
+        });
+
+        try {
+            if (workflow_id) {
+                await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, safeInputs);
+            } else {
+                await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
+            }
+            
+            // 2. Log SUCCESS
+            await supabase.from('conduit_logs').insert({ 
+                repo_name: TARGET_REPO, 
+                type: 'dispatch', 
+                data: { success: true, message: `Triggered ${workflow_id || 'generic build'}`, debug: debugInfo } 
+            });
+            return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+        } catch (e: any) {
+            // 3. Log FAILURE
+            console.error("[Trigger Fail]", e);
+            await supabase.from('conduit_logs').insert({ 
+                repo_name: TARGET_REPO, 
+                type: 'dispatch_error', 
+                data: { 
+                    success: false, 
+                    workflow_id, 
+                    error_msg: e.message, 
+                    failed_payload: debugInfo 
+                } 
+            });
+            // Return 500 so frontend knows it failed
+            return new Response(JSON.stringify({ success: false, error: e.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
     }
 
     if (action === "fetch_workflows") {
