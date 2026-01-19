@@ -1033,30 +1033,24 @@ serve(async (req) => {
       const { data: cached } = await supabase.from('conduit_logs').select('data').eq('type', 'job_analysis').eq('repo_name', TARGET_REPO).filter('data->>job_id', 'eq', String(job_id)).maybeSingle();
       if (cached) return new Response(JSON.stringify({ analysis: cached.data.analysis, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       
-      const logUrl = `https://api.github.com/repos/${GITHUB_USER}/${TARGET_REPO}/actions/jobs/${job_id}/logs`;
+      const cleanRepo = TARGET_REPO.includes('/') ? TARGET_REPO : `${GITHUB_USER}/${TARGET_REPO}`;
+      const logUrl = `https://api.github.com/repos/${cleanRepo}/actions/jobs/${job_id}/logs`;
       const logRes = await fetch(logUrl, { headers: { ...getHeaders() }, redirect: "follow" });
       if(!logRes.ok) throw new Error("Log fetch failed");
       const logs = await logRes.text();
       
-      const apiKey = await getAIKey();
       const prompt = `Analyze Log:\n${logs.slice(-20000)}\nOUTPUT: specific error, file/line, brief summary.`;
       
-      const aiRes = await fetch(OPENROUTER_URL, { 
-          method: "POST", 
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, 
-          body: JSON.stringify({ 
-              model: AI_MODEL,
-              messages: [{ role: "user", content: prompt }]
-          }) 
-      });
-      const aiData = await aiRes.json();
-      const analysis = aiData.choices?.[0]?.message?.content || "Failed.";
+      const result = await genericRequestAI('analyst', [{ role: "user", content: prompt }], ai_config);
+      const analysis = result.content || "Failed to analyze.";
+      
       await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'job_analysis', data: { job_id: String(job_id), analysis } });
       return new Response(JSON.stringify({ analysis }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "fetch_job_logs") {
-      const url = `https://api.github.com/repos/${GITHUB_USER}/${TARGET_REPO}/actions/jobs/${payload.job_id}/logs`;
+      const cleanRepo = TARGET_REPO.includes('/') ? TARGET_REPO : `${GITHUB_USER}/${TARGET_REPO}`;
+      const url = `https://api.github.com/repos/${cleanRepo}/actions/jobs/${payload.job_id}/logs`;
       const res = await fetch(url, { headers: { ...getHeaders() }, redirect: "follow" });
       return new Response(JSON.stringify({ logs: await res.text() }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
