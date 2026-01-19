@@ -880,11 +880,17 @@
     }
 
     async function deployEdgeFunction() {
+        console.group("🚀 Edge Function Deployment");
         const name = document.getElementById('ef-name').value.trim();
         const code = document.getElementById('ef-code').value.trim();
         const status = document.getElementById('ef-status-msg');
 
-        if (!name) return alert("Enter a function name.");
+        console.log("Target Function:", name);
+        if (!name) {
+            console.error("Deployment aborted: Missing function name.");
+            console.groupEnd();
+            return alert("Enter a function name.");
+        }
         if (!code) return alert("Enter function code.");
 
         status.innerText = "⏳ Deploying...";
@@ -918,6 +924,7 @@
 
             // Step 2: Trigger Workflow
             status.innerText = "🚀 Triggering deploy.yml...";
+            console.log("Dispatching workflow_dispatch for deploy.yml on branch conduit-dev...");
             const buildRes = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: apiBody({ 
@@ -928,8 +935,11 @@
                 })
             });
             const buildData = await buildRes.json();
+            console.log("Workflow Trigger Result:", buildData);
             
             if (buildData.success) {
+                console.log("✅ Deployment successful.");
+                console.groupEnd();
                 status.innerText = "✅ Dispatched! Redirecting...";
                 status.style.color = "var(--prod)";
                 setTimeout(() => { 
@@ -939,6 +949,8 @@
                 }, 1500);
             } else throw new Error("Workflow trigger failed.");
         } catch (e) {
+            console.error("❌ Deployment failed:", e);
+            console.groupEnd();
             status.innerText = "❌ " + e.message;
             status.style.color = "var(--danger)";
         }
