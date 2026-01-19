@@ -243,17 +243,15 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
 
   // ADAPTER: Google Native
   if (provider.type === 'google') {
-    // Convert OpenAI messages to Gemini parts roughly
     const promptText = messages.map(m => `[${m.role.toUpperCase()}]: ${m.content}`).join('\n');
     const url = `${provider.baseUrl}?key=${apiKey}`;
     const payload = { contents: [{ parts: [{ text: promptText }] }] };
     
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const data = await res.json();
+    
+    if (data.error) throw new Error(`Google AI Error: ${data.error.message || JSON.stringify(data.error)}`);
+    
     return { 
       raw: data, 
       content: data.candidates?.[0]?.content?.parts?.[0]?.text || ""
@@ -271,13 +269,17 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
 
   const res = await fetch(provider.baseUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify(body)
   });
+  
   const data = await res.json();
+  
+  if (!res.ok || data.error) {
+      const errMsg = data.error ? (data.error.message || JSON.stringify(data.error)) : `HTTP ${res.status} ${res.statusText}`;
+      throw new Error(`Provider Error (${provider.name}): ${errMsg}`);
+  }
+
   return {
     raw: data,
     content: data.choices?.[0]?.message?.content || "",
@@ -748,7 +750,10 @@ serve(async (req) => {
 
     // 2. AI CHAT
     if (action === "ai_chat") {
-        const ctx = context_files && context_files.length > 0 ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content).substring(0, 5000) : "(omitted)"}\n`).join("\n---\n") : "No files selected.";
+        const ctx = context_files && context_files.length > 0 
+            ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content).substring(0, 5000) : "(omitted)"}\n`).join("\n---\n") 
+            : "No files selected.";
+            
         const sysPrompt = `You are "Conduit", an AI coding assistant. If user needs code changes, output a JSON Array in \`\`\`json [ ... ] \`\`\`. Rules: "find_block" must be EXACT. "comment" op is allowed first.`;
         
         const openAIMessages = messages.map((m: any) => ({
@@ -756,12 +761,12 @@ serve(async (req) => {
             content: m.text
         }));
 
-        // Inject System Prompt and Context into the last message or as a system message
+        // Inject System Prompt and Context into the last message to avoid shifting role history
         const lastMsg = openAIMessages[openAIMessages.length - 1];
         if (lastMsg) lastMsg.content = `${sysPrompt}\n\n=== CONTEXT ===\n${ctx}\n\n=== USER ===\n${lastMsg.content}`;
 
         const result = await genericRequestAI('chat', openAIMessages, ai_config);
-        return new Response(JSON.stringify({ reply: result.content || "Error" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ reply: result.content || "(Empty Response from AI)" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // --- REFINED GENERATE OPS (PROMPT UPGRADE) ---
