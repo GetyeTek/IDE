@@ -6,9 +6,58 @@ const GITHUB_USER = "GetyeTek";
 const DEFAULT_REPO = "IDE"; 
 const MAIN_BRANCH = "main";
 const DEV_BRANCH = "conduit-dev";
-// Using DeepSeek V3 via OpenRouter
-const AI_MODEL = "deepseek/deepseek-chat"; 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+// --- AI REGISTRY & ROUTING ---
+interface AIProvider {
+  name: string;
+  baseUrl: string;
+  model: string;
+  apiKeyEnv: string;
+  type: 'openai' | 'google';
+}
+
+interface AIConfig {
+  providers: Record<string, AIProvider>;
+  roles: {
+    chat: string;
+    architect: string;
+    fast_fix: string;
+    analyst: string;
+  };
+}
+
+const DEFAULT_AI_CONFIG: AIConfig = {
+  providers: {
+    'default_main': {
+      name: 'DeepSeek V3 (OpenRouter)',
+      baseUrl: 'https://openrouter.ai/api/v1/chat/completions',
+      model: 'deepseek/deepseek-chat',
+      apiKeyEnv: 'Deepseek_API',
+      type: 'openai'
+    },
+    'default_analyst': {
+       name: 'Gemini Flash (Google)',
+       baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent',
+       model: '', // Model is in URL for Google Native
+       apiKeyEnv: 'GEMINI_API_KEY',
+       type: 'google'
+    }
+  },
+  roles: {
+    chat: 'default_main',
+    architect: 'default_main',
+    fast_fix: 'default_main',
+    analyst: 'default_analyst'
+  }
+};
+
+function resolveProvider(role: keyof AIConfig['roles'], config?: AIConfig): AIProvider | null {
+  const effectiveConfig = config || DEFAULT_AI_CONFIG;
+  // Fallback to default if roles missing in custom config
+  const providerKey = effectiveConfig.roles?.[role] || DEFAULT_AI_CONFIG.roles[role];
+  const provider = effectiveConfig.providers?.[providerKey] || DEFAULT_AI_CONFIG.providers[providerKey];
+  return provider || null;
+}
 
 // Initialize Supabase
 const supabase = createClient(
@@ -185,17 +234,60 @@ async function ensureBranchExists(repo: string) {
 
 // --- AI CORE SERVICES ---
 
-async function getAIKey(): Promise<string | null> {
-  // Directly fetch the user-set secret for OpenRouter/DeepSeek
-  return Deno.env.get("Deepseek_API") || null;
+async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], config?: AIConfig, tools?: any[], responseFormat?: any): Promise<any> {
+  const provider = resolveProvider(role, config);
+  if (!provider) throw new Error(`No provider found for role: ${role}`);
+  
+  const apiKey = Deno.env.get(provider.apiKeyEnv);
+  if (!apiKey) throw new Error(`Missing API Key: ${provider.apiKeyEnv}`);
+
+  // ADAPTER: Google Native
+  if (provider.type === 'google') {
+    // Convert OpenAI messages to Gemini parts roughly
+    const promptText = messages.map(m => `[${m.role.toUpperCase()}]: ${m.content}`).join('\n');
+    const url = `${provider.baseUrl}?key=${apiKey}`;
+    const payload = { contents: [{ parts: [{ text: promptText }] }] };
+    
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    return { 
+      raw: data, 
+      content: data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+    };
+  }
+
+  // ADAPTER: OpenAI Compatible (Standard)
+  const body: any = {
+    model: provider.model,
+    messages: messages,
+  };
+  if (tools) body.tools = tools;
+  if (tools) body.tool_choice = "auto";
+  if (responseFormat) body.response_format = responseFormat;
+
+  const res = await fetch(provider.baseUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  return {
+    raw: data,
+    content: data.choices?.[0]?.message?.content || "",
+    tool_calls: data.choices?.[0]?.message?.tool_calls
+  };
 }
 
 // 1. Syntax Repair
-async function repairSyntaxWithAI(codeBlock: string, errorMessage: string): Promise<{ fixed_code: string | null; explanation: string }> {
+async function repairSyntaxWithAI(codeBlock: string, errorMessage: string, config?: AIConfig): Promise<{ fixed_code: string | null; explanation: string }> {
     console.log("--- AI REPAIR SYNTAX START ---");
-    const apiKey = await getAIKey();
-    if (!apiKey) return { fixed_code: null, explanation: "No AI API Key" };
-    
     const systemInstruction = `You are a JS/HTML/CSS Syntax Repair Agent. Fix the syntax error without changing logic. Call the 'provide_fixed_code' function.`;
     const tools = [{ 
         type: "function", 
@@ -212,24 +304,14 @@ async function repairSyntaxWithAI(codeBlock: string, errorMessage: string): Prom
 
     try {
         console.log(`[SyntaxRepair] Prompting AI. Code Len: ${codeBlock.length}, Error: ${errorMessage}`);
-        const response = await fetch(OPENROUTER_URL, { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, 
-            body: JSON.stringify({ 
-                model: AI_MODEL,
-                messages: [
-                    { role: "system", content: systemInstruction },
-                    { role: "user", content: "Code:\n" + codeBlock + "\nError:\n" + errorMessage }
-                ],
-                tools: tools,
-                tool_choice: "auto"
-            }) 
-        });
         
-        const data = await response.json();
-        console.log("[SyntaxRepair] Response:", JSON.stringify(data));
-        
-        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+        const messages = [
+            { role: "system", content: systemInstruction },
+            { role: "user", content: "Code:\n" + codeBlock + "\nError:\n" + errorMessage }
+        ];
+
+        const result = await genericRequestAI('fast_fix', messages, config, tools);
+        const toolCall = result.tool_calls?.[0];
         if (toolCall && toolCall.function.name === "provide_fixed_code") {
              const args = JSON.parse(toolCall.function.arguments);
              return { fixed_code: args.fixed_code, explanation: args.explanation };
@@ -239,10 +321,8 @@ async function repairSyntaxWithAI(codeBlock: string, errorMessage: string): Prom
 }
 
 // 2. Self-Healing (Healer)
-async function consultAI(fileContent: string, failedOp: any, failReason: string): Promise<{ fixedOp: any | null; reason: string; score: number }> {
+async function consultAI(fileContent: string, failedOp: any, failReason: string, config?: AIConfig): Promise<{ fixedOp: any | null; reason: string; score: number }> {
   console.log(`--- CONSULT AI (HEALER) START for ${failedOp?.action} ---`);
-  const apiKey = await getAIKey();
-  if (!apiKey) return { fixedOp: null, reason: "No AI keys.", score: 0 };
   
   const systemInstruction = `You are the Conduit Self-Healing Patch Engine. 
   A patch operation failed to find its target code in the file.
@@ -280,24 +360,15 @@ async function consultAI(fileContent: string, failedOp: any, failReason: string)
     const userPrompt = "File:\n" + getNumberedContent(fileContent) + "\nOp:\n" + JSON.stringify(failedOp) + "\nError:\n" + failReason;
     console.log("[Healer] Prompt Sent (Excluding File):", systemInstruction + "\nOp: " + JSON.stringify(failedOp) + "\nReason: " + failReason);
     
-    const res = await fetch(OPENROUTER_URL, { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, 
-        body: JSON.stringify({ 
-            model: AI_MODEL,
-            messages: [
-                { role: "system", content: systemInstruction },
-                { role: "user", content: userPrompt }
-            ],
-            tools: tools,
-            tool_choice: "auto"
-        }) 
-    });
-
-    const data = await res.json();
-    console.log("[Healer] Response:", JSON.stringify(data));
+    const messages = [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: userPrompt }
+    ];
     
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const result = await genericRequestAI('fast_fix', messages, config, tools);
+    console.log("[Healer] Response:", JSON.stringify(result.raw));
+    
+    const toolCall = result.tool_calls?.[0];
     if (!toolCall || toolCall.function.name !== "suggest_fix") return { fixedOp: null, reason: "No match", score: 0 };
     
     const args = JSON.parse(toolCall.function.arguments);
@@ -312,10 +383,8 @@ async function consultAI(fileContent: string, failedOp: any, failReason: string)
 }
 
 // 3. Code Sanity Checker (Context-Aware)
-async function checkCodeSanity(code: string, op: any): Promise<{ sane: boolean; issues: string }> {
+async function checkCodeSanity(code: string, op: any, config?: AIConfig): Promise<{ sane: boolean; issues: string }> {
     console.log("--- SANITY CHECK START ---");
-    const apiKey = await getAIKey();
-    if (!apiKey) return { sane: true, issues: "" };
     
     const prompt = `
     I just performed a code modification. Check if it introduced any FATAL syntax errors.
@@ -336,28 +405,19 @@ async function checkCodeSanity(code: string, op: any): Promise<{ sane: boolean; 
 
     try {
         console.log("[Sanity] Prompt Sent (Op Only):", JSON.stringify(op));
-        const res = await fetch(OPENROUTER_URL, { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, 
-            body: JSON.stringify({ 
-                model: AI_MODEL,
-                messages: [{ role: "user", content: prompt }],
-                response_format: { type: "json_object" }
-            }) 
-        });
-        const data = await res.json();
-        console.log("[Sanity] Response:", JSON.stringify(data));
-        const text = data.choices?.[0]?.message?.content || "{}";
+        
+        const result = await genericRequestAI('fast_fix', [{ role: "user", content: prompt }], config, undefined, { type: "json_object" });
+        console.log("[Sanity] Response:", JSON.stringify(result.raw));
+        
+        const text = result.content || "{}";
         const json = JSON.parse(text);
         return { sane: !!json.sane, issues: json.issues || "" };
     } catch (e) { console.error("[Sanity] Error:", e); return { sane: true, issues: "" }; }
 }
 
 // 4. STEP A: DETECTIVE (Analyze Logs & Identify Files)
-async function analyzeLogsAndIdentifyFiles(logText: string): Promise<{ summary: string, files: string[] }> {
-    console.log("--- ANALYZE LOGS START (GEMINI FLASH-LITE) ---");
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiKey) return { summary: "No GEMINI_API_KEY found", files: [] };
+async function analyzeLogsAndIdentifyFiles(logText: string, config?: AIConfig): Promise<{ summary: string, files: string[] }> {
+    console.log("--- ANALYZE LOGS START ---");
 
     const prompt = `
     You are a CI/CD Build Failure Analyzer.
@@ -384,19 +444,11 @@ async function analyzeLogsAndIdentifyFiles(logText: string): Promise<{ summary: 
     `;
 
     try {
-        console.log(`[Detective] Sending Log Analysis Prompt to Gemini...`);
+        console.log(`[Detective] Sending Log Analysis...`);
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${geminiKey}`, { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json" }, 
-            body: JSON.stringify({ 
-                contents: [{ parts: [{ text: prompt }] }]
-            }) 
-        });
-        
-        const data = await res.json();
-        console.log("[Detective] Response:", JSON.stringify(data));
-        const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        // The universal adapter handles the Google/OpenAI specific formatting
+        const result = await genericRequestAI('analyst', [{ role: "user", content: prompt }], config);
+        const rawOutput = result.content || "";
 
         let summary = rawOutput;
         let files: string[] = [];
@@ -439,10 +491,8 @@ async function analyzeLogsAndIdentifyFiles(logText: string): Promise<{ summary: 
 }
 
 // 5. STEP B: SURGEON (Generate Fix from Summary + Full Files)
-async function generateFixFromFullContext(summary: string, contextFiles: any[], changeContext: string): Promise<string> {
+async function generateFixFromFullContext(summary: string, contextFiles: any[], changeContext: string, config?: AIConfig): Promise<string> {
     console.log("--- GENERATE FIX (SURGEON) START ---");
-    const apiKey = await getAIKey();
-    if (!apiKey) return "[]";
     
     // Full Content - No Truncation as requested
     const filesStr = contextFiles.map((f:any) => 
@@ -483,18 +533,10 @@ async function generateFixFromFullContext(summary: string, contextFiles: any[], 
         console.log("Diff Context:", changeContext);
         console.log("Files included:", contextFiles.map((c:any)=>c.path));
 
-        const res = await fetch(OPENROUTER_URL, { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, 
-            body: JSON.stringify({ 
-                model: AI_MODEL,
-                messages: [{ role: "user", content: prompt }]
-            }) 
-        });
-        const data = await res.json();
-        console.log("[Surgeon] Response:", JSON.stringify(data));
+        const result = await genericRequestAI('architect', [{ role: "user", content: prompt }], config);
+        console.log("[Surgeon] Response:", JSON.stringify(result.raw));
         
-        const text = data.choices?.[0]?.message?.content || "[]";
+        const text = result.content || "[]";
         
         // Robust JSON Extraction using Regex
         const match = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
@@ -558,7 +600,7 @@ function applyOperation(content: string, op: any) {
 }
 
 // --- CORE PROCESSING LOGIC ---
-async function processOperations(TARGET_REPO: string, operations: any[], projectPath: string, autoSanity: boolean) {
+async function processOperations(TARGET_REPO: string, operations: any[], projectPath: string, autoSanity: boolean, config?: AIConfig) {
     const scopePath = projectPath || "";
     if (scopePath) {
         const invalidOps = operations.filter((op: any) => {
@@ -611,7 +653,7 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
             let result = (op.action === "create_file") ? applyOperation("", op) : applyOperation(currentContent, op);
 
             if (!result.success && op.action !== "create_file") {
-                const { fixedOp, reason, score } = await consultAI(currentContent, op, result.message);
+                const { fixedOp, reason, score } = await consultAI(currentContent, op, result.message, config);
                 if (fixedOp) {
                     fixedOp.explanation = reason; 
                     let retryResult = applyOperation(currentContent, fixedOp);
@@ -619,11 +661,11 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
                     // --- SANITY CHECK LOOP ---
                     if (retryResult.success && autoSanity) {
                          // Pass fixedOp so AI knows exactly what changed
-                         const sanity = await checkCodeSanity(retryResult.newContent, fixedOp);
+                         const sanity = await checkCodeSanity(retryResult.newContent, fixedOp, config);
                          
                          if (!sanity.sane) {
                              opLogs.push({ type: "sanity_check", success: false, message: `Sanity Failed: ${sanity.issues}` });
-                             const { fixedOp: sanityOp, reason: sanityReason } = await consultAI(currentContent, fixedOp, `The operation ${JSON.stringify(fixedOp)} caused this syntax error: ${sanity.issues}`);
+                             const { fixedOp: sanityOp, reason: sanityReason } = await consultAI(currentContent, fixedOp, `The operation ${JSON.stringify(fixedOp)} caused this syntax error: ${sanity.issues}`, config);
                              if (sanityOp) {
                                  const sanityResult = applyOperation(currentContent, sanityOp);
                                  if (sanityResult.success) { retryResult = sanityResult; fixedOp.explanation = `Auto-corrected sanity issue: ${sanityReason}`; }
@@ -691,7 +733,7 @@ serve(async (req) => {
     const { 
       action, operations, file_path, ref_sha, version_name, repo_name, 
       code_block, error_message, messages, context_files, auto_sanity, 
-      workflow_id, branch, inputs, run_id, project_path, chat_id, title, user_prompt, ...payload 
+      workflow_id, branch, inputs, run_id, project_path, chat_id, title, user_prompt, ai_config, ...payload 
     } = await req.json();
     const TARGET_REPO = repo_name || DEFAULT_REPO;
     await ensureBranchExists(TARGET_REPO);
@@ -706,9 +748,6 @@ serve(async (req) => {
 
     // 2. AI CHAT
     if (action === "ai_chat") {
-        const apiKey = await getAIKey();
-        if (!apiKey) throw new Error("No AI Key");
-        
         const ctx = context_files && context_files.length > 0 ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content).substring(0, 5000) : "(omitted)"}\n`).join("\n---\n") : "No files selected.";
         const sysPrompt = `You are "Conduit", an AI coding assistant. If user needs code changes, output a JSON Array in \`\`\`json [ ... ] \`\`\`. Rules: "find_block" must be EXACT. "comment" op is allowed first.`;
         
@@ -721,23 +760,13 @@ serve(async (req) => {
         const lastMsg = openAIMessages[openAIMessages.length - 1];
         if (lastMsg) lastMsg.content = `${sysPrompt}\n\n=== CONTEXT ===\n${ctx}\n\n=== USER ===\n${lastMsg.content}`;
 
-        const res = await fetch(OPENROUTER_URL, { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, 
-            body: JSON.stringify({ 
-                model: AI_MODEL,
-                messages: openAIMessages 
-            }) 
-        });
-        const data = await res.json();
-        return new Response(JSON.stringify({ reply: data.choices?.[0]?.message?.content || "Error" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const result = await genericRequestAI('chat', openAIMessages, ai_config);
+        return new Response(JSON.stringify({ reply: result.content || "Error" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // --- REFINED GENERATE OPS (PROMPT UPGRADE) ---
     if (action === "generate_ops") {
         if (!user_prompt) throw new Error("Prompt required");
-        const apiKey = await getAIKey();
-        if (!apiKey) throw new Error("No AI Key");
         
         const fileContext = context_files.map((f: any) => 
             `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content).substring(0, 3000) : "(Content omitted)"}\n`
@@ -761,16 +790,9 @@ serve(async (req) => {
         `;
 
         const finalPrompt = `${systemPrompt}\n=== CONTEXT ===\n${fileContext}\n=== REQUEST ===\n${user_prompt}`;
-        const res = await fetch(OPENROUTER_URL, { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` }, 
-            body: JSON.stringify({ 
-                model: AI_MODEL,
-                messages: [{ role: "user", content: finalPrompt }]
-            }) 
-        });
-        const data = await res.json();
-        const text = data.choices?.[0]?.message?.content || "[]";
+        
+        const result = await genericRequestAI('architect', [{ role: "user", content: finalPrompt }], ai_config);
+        const text = result.content || "[]";
         
         // Robust extraction
         let rawText = "[]";
@@ -816,7 +838,7 @@ serve(async (req) => {
         const logText = await jobLogRes.text();
 
         // 2. PHASE 1: Detective (Summarize & Identify Files)
-        const { summary, files } = await analyzeLogsAndIdentifyFiles(logText);
+        const { summary, files } = await analyzeLogsAndIdentifyFiles(logText, ai_config);
         
         // Log the analysis for user visibility
         await supabase.from('conduit_logs').insert({ 
@@ -884,7 +906,7 @@ serve(async (req) => {
         }
 
         // 4. PHASE 3: Surgeon (Generate Fix) - Pass the new change context
-        const opsJson = await generateFixFromFullContext(summary, contextPayload, changeContext);
+        const opsJson = await generateFixFromFullContext(summary, contextPayload, changeContext, ai_config);
         let ops = [];
         try { ops = JSON.parse(opsJson); } catch(e) { throw new Error("AI generated invalid JSON"); }
 
@@ -901,7 +923,7 @@ serve(async (req) => {
         if (ops.length === 0) return new Response(JSON.stringify({ success: false, message: "AI could not determine a fix." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
         // 5. Apply Patch
-        const patchResult = await processOperations(TARGET_REPO, ops, "", true);
+        const patchResult = await processOperations(TARGET_REPO, ops, "", true, ai_config);
 
         // 6. Trigger Re-Build (Explicitly required for bot commits)
         let triggerMsg = "No trigger attempted";
@@ -924,7 +946,7 @@ serve(async (req) => {
     }
 
     if (action === "patch" && operations) {
-        const result = await processOperations(TARGET_REPO, operations, project_path, !!auto_sanity);
+        const result = await processOperations(TARGET_REPO, operations, project_path, !!auto_sanity, ai_config);
         return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -953,7 +975,7 @@ serve(async (req) => {
     }
 
     if (action === "fix_syntax") {
-        const result = await repairSyntaxWithAI(code_block, error_message);
+        const result = await repairSyntaxWithAI(code_block, error_message, ai_config);
         return new Response(JSON.stringify({ success: !!result.fixed_code, fixed_code: result.fixed_code, explanation: result.explanation }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
