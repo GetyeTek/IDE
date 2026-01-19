@@ -113,10 +113,10 @@ async function dispatchWorkflow(repo: string, eventType: string, payload: any = 
   return true;
 }
 
-async function triggerWorkflowFile(repo: string, workflowId: string, ref: string) {
+async function triggerWorkflowFile(repo: string, workflowId: string, ref: string, inputs: any = {}) {
   await githubFetch(repo, `/actions/workflows/${workflowId}/dispatches`, {
     method: "POST",
-    body: JSON.stringify({ ref: ref }),
+    body: JSON.stringify({ ref: ref, inputs: inputs }),
   });
   return true;
 }
@@ -936,8 +936,8 @@ serve(async (req) => {
     }
 
     if (action === "trigger_build") {
-        const { workflow_id, branch } = payload;
-        if (workflow_id) await triggerWorkflowFile(TARGET_REPO, workflow_id, branch || DEV_BRANCH);
+        const { workflow_id, branch, inputs } = payload;
+        if (workflow_id) await triggerWorkflowFile(TARGET_REPO, workflow_id, branch || DEV_BRANCH, inputs || {});
         else await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
         await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'dispatch', data: { message: `Triggered ${workflow_id || 'generic build'}` } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
