@@ -671,7 +671,7 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { action, operations, file_path, ref_sha, version_name, repo_name, code_block, error_message, messages, context_files, auto_sanity, ...payload } = await req.json();
+    const { action, operations, file_path, ref_sha, version_name, repo_name, code_block, error_message, messages, context_files, auto_sanity, workflow_id, branch, inputs, ...payload } = await req.json();
     const TARGET_REPO = repo_name || DEFAULT_REPO;
     await ensureBranchExists(TARGET_REPO);
 
@@ -938,7 +938,6 @@ serve(async (req) => {
     }
 
     if (action === "trigger_build") {
-        const { workflow_id, branch, inputs } = payload;
         if (workflow_id) await triggerWorkflowFile(TARGET_REPO, workflow_id, branch || DEV_BRANCH, inputs || {});
         else await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
         await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'dispatch', data: { message: `Triggered ${workflow_id || 'generic build'}` } });
