@@ -1,0 +1,38 @@
+name: Manual Edge Function Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Name of the function to deploy (must match folder name)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Restrict deployment to your conduit-dev branch
+    if: github.ref == 'refs/heads/conduit-dev'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Extract Project Ref from URL
+        id: get_ref
+        run: |
+          # If SUPABASE_URL is 'https://abc.supabase.co', this extracts 'abc'
+          URL="${{ secrets.SUPABASE_URL }}"
+          REF=$(echo $URL | sed -e 's|^[^/]*//||' -e 's|\..*||')
+          echo "PROJECT_ID=$REF" >> $GITHUB_ENV
+
+      - name: Deploy Function
+        run: |
+          supabase functions deploy ${{ github.event.inputs.function_name }} --project-ref ${{ env.PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
