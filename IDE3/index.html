@@ -517,28 +517,13 @@
                     <button class="btn" style="background: var(--ai-accent);" onclick="openEFManager()">
                         ⚡ Manage Edge Functions
                     </button>
+                    <button class="btn btn-outline" onclick="openAIManager()">
+                        🧠 Manage AI Routing
+                    </button>
                     <button class="btn btn-outline" onclick="createCheckpoint()">
                         🚩 Create History Checkpoint
                     </button>
                     <p style="font-size: 10px; color: var(--text-muted); text-align: center; margin: 0;">Deploy Functions or mark current state without commit.</p>
-                </div>
-
-                <div id="ai-settings-container" style="border-top: 1px solid var(--border); margin-top: 20px; padding-top: 10px;">
-                    <div class="header" style="font-size:16px; margin-bottom:0;">AI Command Center</div>
-                    <p style="font-size:11px; color:#666; margin-bottom:15px;">Route logic to different providers (OpenAI, Groq, Gemini) based on task.</p>
-
-                    <div class="ai-section-title">1. Role Assignment (The Switchboard)</div>
-                    <div class="role-grid" id="ai-role-grid">
-                        <!-- Populated by JS -->
-                    </div>
-
-                    <div class="flex-between" style="margin-top:20px;">
-                        <div class="ai-section-title" style="margin:0;">2. Provider Registry</div>
-                        <button class="icon-btn" onclick="addAIProvider()">+ Add Provider</button>
-                    </div>
-                    <div id="ai-provider-list" style="margin-top:10px;">
-                        <!-- Populated by JS -->
-                    </div>
                 </div>
 
                 <button class="btn btn-primary" style="margin-top:20px;" onclick="saveSettings()">Save & Sync Config</button>
@@ -635,6 +620,33 @@
     </div>
     
     <div id="toast-msg"></div>
+
+    <!-- AI MANAGER OVERLAY -->
+    <div id="ai-manager-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span class="viewer-title">AI Command Center</span>
+            <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeAIManager()">Close</button>
+        </div>
+        <div style="padding: 20px; overflow-y: auto; max-width: 800px; margin: 0 auto; width: 100%;">
+            <div class="header" style="font-size:16px; margin-bottom:0;">Model Orchestration</div>
+            <p style="font-size:11px; color:#666; margin-bottom:15px;">Route logic to different providers (OpenAI, Groq, Gemini) based on task.</p>
+
+            <div class="ai-section-title">1. Role Assignment (The Switchboard)</div>
+            <div class="role-grid" id="ai-role-grid">
+                <!-- Populated by JS -->
+            </div>
+
+            <div class="flex-between" style="margin-top:20px;">
+                <div class="ai-section-title" style="margin:0;">2. Provider Registry</div>
+                <button class="icon-btn" onclick="addAIProvider()">+ Add Provider</button>
+            </div>
+            <div id="ai-provider-list" style="margin-top:10px;">
+                <!-- Populated by JS -->
+            </div>
+            
+            <button class="btn btn-primary" style="margin-top:30px;" onclick="saveAIConfig()">Save Configuration</button>
+        </div>
+    </div>
 
     <!-- EDGE FUNCTION MANAGER OVERLAY -->
     <div id="ef-manager-overlay" class="viewer-overlay">
@@ -2821,6 +2833,21 @@ function traceHistoryToLog(sha) {
 
     function updateAIRole(role, providerKey) {
         window.aiConfig.roles[role] = providerKey;
+    }
+
+    function openAIManager() {
+        document.getElementById('ai-manager-overlay').classList.add('active');
+        renderAIConfigUI();
+    }
+
+    function closeAIManager() {
+        document.getElementById('ai-manager-overlay').classList.remove('active');
+    }
+
+    function saveAIConfig() {
+        localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
+        alert("AI Configuration Saved!");
+        closeAIManager();
     }
 
     async function processExport(type) {
