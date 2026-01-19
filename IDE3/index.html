@@ -924,14 +924,15 @@
 
             // Step 2: Trigger Workflow
             status.innerText = "🚀 Triggering deploy.yml...";
-            console.log("Dispatching workflow_dispatch for deploy.yml on branch conduit-dev...");
+            const deployInputs = { function_name: name };
+            console.log("Dispatching deploy.yml with inputs:", deployInputs);
             const buildRes = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: apiBody({ 
                     action: 'trigger_build', 
                     workflow_id: 'deploy.yml', 
                     branch: 'conduit-dev',
-                    inputs: { function_name: name }
+                    inputs: deployInputs
                 })
             });
             const buildData = await buildRes.json();
