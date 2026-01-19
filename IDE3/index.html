@@ -1015,10 +1015,10 @@
     }
 
     // --- API & DATA ---
-    async function fetchState(force = false) {
+    async function fetchState(force = false, updateTerminal = true) {
         if(force) {
             document.getElementById('history-container').innerHTML = '<div style="padding:10px; text-align:center;">Syncing...</div>';
-            document.getElementById('terminal-list').innerHTML = '<div style="padding:10px; text-align:center; color:#666">Syncing logs...</div>';
+            if (updateTerminal) document.getElementById('terminal-list').innerHTML = '<div style="padding:10px; text-align:center; color:#666">Syncing logs...</div>';
         }
         try {
             const res = await fetch(CONFIG.funcUrl, { 
@@ -1028,28 +1028,27 @@
             const data = await res.json();
             
             if(data.history) { 
-    // FILTER: Exclude 'Chat' entries from the main history list
-    dbHistory = data.history.filter(h => h.type !== 'Chat'); 
-    renderHistory(dbHistory); 
-}
+                dbHistory = data.history.filter(h => h.type !== 'Chat'); 
+                renderHistory(dbHistory); 
+            }
 
-            const termContainer = document.getElementById('terminal-list');
-            termContainer.innerHTML = ''; 
-            if(data.logs && data.logs.length > 0) {
-                // FILTER: Hide redundant 'auto_fix_trigger' logs to prevent "ghost" twins
-                const visibleLogs = data.logs.filter(l => l.type !== 'auto_fix_trigger');
-                
-                visibleLogs.forEach(log => {
-                    const id = 'term-saved-' + log.id;
-                    const div = document.createElement('div');
-                    div.id = id; div.className = 'log-entry';
-                    termContainer.appendChild(div); 
-                    updateTerminalCard(id, log.data, log.data.ops, false);
-                    const timeEl = div.querySelector('.log-time');
-                    if(timeEl) timeEl.innerText = new Date(log.created_at).toLocaleString();
-                });
-            } else {
-                termContainer.innerHTML = '<div style="padding:10px; text-align:center; color:#444; font-size:12px;">No logs.</div>';
+            if (updateTerminal) {
+                const termContainer = document.getElementById('terminal-list');
+                termContainer.innerHTML = ''; 
+                if(data.logs && data.logs.length > 0) {
+                    const visibleLogs = data.logs.filter(l => l.type !== 'auto_fix_trigger');
+                    visibleLogs.forEach(log => {
+                        const id = 'term-saved-' + log.id;
+                        const div = document.createElement('div');
+                        div.id = id; div.className = 'log-entry';
+                        termContainer.appendChild(div); 
+                        updateTerminalCard(id, log.data, log.data.ops, false);
+                        const timeEl = div.querySelector('.log-time');
+                        if(timeEl) timeEl.innerText = new Date(log.created_at).toLocaleString();
+                    });
+                } else {
+                    termContainer.innerHTML = '<div style="padding:10px; text-align:center; color:#444; font-size:12px;">No logs.</div>';
+                }
             }
 
         } catch (e) { console.error(e); }
@@ -1267,7 +1266,8 @@
 
             if(data.success) {
                 if(actionType === 'patch') setTimeout(() => bundleAndPreview(null), 1500);
-                setTimeout(fetchState, 1000);
+                // Update history, but DO NOT wipe the terminal so the user can see the result
+                setTimeout(() => fetchState(false, false), 1000);
             }
         } catch (e) {
             updateTerminalCard(termId, { error: e.message });
