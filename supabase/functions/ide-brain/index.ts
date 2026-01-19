@@ -42,6 +42,7 @@ function escapeRegExp(string: string) {
 
 function isRecordInScope(record: any, scopePath: string): boolean {
     if (!scopePath || scopePath === "/" || scopePath === "") return true;
+    if (record.type === 'Checkpoint') return true; // Always show checkpoints
     // Allow if matches scope OR is an Edge Function operation
     if (record.ops && Array.isArray(record.ops)) {
         return record.ops.some((op: any) => 
@@ -1053,6 +1054,20 @@ serve(async (req) => {
     if (action === "delete_history") { await supabase.from('conduit_history').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "delete_log") { await supabase.from('conduit_logs').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "delete_run") { await githubFetch(TARGET_REPO, `/actions/runs/${payload.run_id}`, { method: "DELETE" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+    if (action === "create_checkpoint") {
+        const note = payload.note || "Manual Checkpoint";
+        // Get current SHA of dev branch without modifying anything
+        const ref = await githubFetch(TARGET_REPO, `/git/ref/heads/${DEV_BRANCH}`);
+        await supabase.from('conduit_history').insert({ 
+            repo_name: TARGET_REPO, 
+            title: note, 
+            type: "Checkpoint", 
+            meta: "No changes",
+            ops: [], 
+            sha: ref.object.sha 
+        });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     if (action === "fetch_chats") {
         const { data, error } = await supabase.from('conduit_history')
