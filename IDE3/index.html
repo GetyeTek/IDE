@@ -2844,7 +2844,7 @@ function traceHistoryToLog(sha) {
                 </div>
                 <div class="flex-gap">
                     <input type="text" class="input-field" value="${p.model}" placeholder="Model ID" style="flex:1" onchange="updateAIProvider('${key}', 'model', this.value)">
-                    <input type="text" class="input-field" value="${p.apiKeyEnv}" placeholder="Env Var Name" style="flex:1; color:var(--ai-accent);" onchange="updateAIProvider('${key}', 'apiKeyEnv', this.value)">
+                    <input type="password" class="input-field" value="${p.apiKeyEnv}" placeholder="Env Var or Raw Key" style="flex:1; color:var(--ai-accent);" onchange="updateAIProvider('${key}', 'apiKeyEnv', this.value)">
                 </div>
             `;
             pList.appendChild(div);
