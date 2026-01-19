@@ -1085,6 +1085,33 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true, history: newHistory }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "create_checkpoint") {
+        const devRef = await githubFetch(TARGET_REPO, `/git/ref/heads/${DEV_BRANCH}`);
+        const currentSha = devRef.object.sha;
+        const checkpointTitle = title || "Manual Checkpoint";
+        
+        const { data: newHistory, error } = await supabase.from('conduit_history')
+            .insert({
+                repo_name: TARGET_REPO,
+                title: checkpointTitle,
+                note: payload.note || "",
+                type: "Checkpoint",
+                sha: currentSha
+            })
+            .select()
+            .single();
+
+        if (error) throw new Error(`Failed to save checkpoint: ${error.message}`);
+
+        await supabase.from('conduit_logs').insert({
+            repo_name: TARGET_REPO, 
+            type: 'checkpoint', 
+            data: { sha: currentSha, title: checkpointTitle }
+        });
+
+        return new Response(JSON.stringify({ success: true, history: newHistory }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "commit_prod") {
         const scopePath = payload.project_path || "";
         const tree = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
