@@ -62,6 +62,7 @@ function getNumberedContent(content: string): string {
 const getHeaders = () => ({
   "Authorization": `token ${Deno.env.get("GITHUB_PAT")}`,
   "Accept": "application/vnd.github.v3+json",
+  "Content-Type": "application/json",
   "User-Agent": "Conduit-IDE-Agent",
 });
 
