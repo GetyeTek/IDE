@@ -2456,6 +2456,36 @@ async function downloadArtifact(runId) {
         document.getElementById('ace-search-toggle').style.display = 'flex';
     }
 
+    // --- NAVIGATION HELPER ---
+    function jumpToElement(element, tabId, navIndex) {
+        if (!element) return;
+        
+        // 1. Switch Tab
+        switchTab(tabId, document.querySelectorAll('.nav-item')[navIndex]);
+        
+        // 2. Wait for DOM/Layout to stabilize (Display: block transition)
+        setTimeout(() => {
+            // 3. Scroll
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // 4. Highlight Effect
+            element.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
+            const originalBg = element.style.backgroundColor;
+            const originalShadow = element.style.boxShadow;
+            
+            element.style.backgroundColor = 'rgba(234, 179, 8, 0.15)'; // --dev color
+            element.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.4)';
+            element.style.border = '1px solid var(--dev)';
+            
+            // 5. Cleanup
+            setTimeout(() => {
+                element.style.backgroundColor = originalBg;
+                element.style.boxShadow = originalShadow;
+                element.style.border = '';
+            }, 2000);
+        }, 150);
+    }
+
     function renderHistory(historyData) {
         const container = document.getElementById('history-container');
         if (!historyData || historyData.length === 0) return container.innerHTML = '<div style="padding:10px; text-align:center;">No history.</div>';
@@ -2493,144 +2523,85 @@ async function downloadArtifact(runId) {
         }).join('');
     }
 
-function traceHistoryToRun(sha) {
+    function traceHistoryToRun(sha) {
         if (!sha) return showGlobalToast("No SHA linked to this entry", true);
 
-        // Check for existence BEFORE switching tabs
         const targetRun = document.querySelector(`#workflow-list > div[data-commit-sha="${sha}"]`);
 
         if (targetRun) {
-            // Found: Switch, Scroll, Highlight
-            switchTab('tab-cicd', document.querySelectorAll('.nav-item')[4]);
-            targetRun.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            targetRun.style.transition = 'background-color 0.3s, box-shadow 0.3s';
-            targetRun.style.backgroundColor = 'rgba(234, 179, 8, 0.15)'; // --dev color with alpha
-            targetRun.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.4)'; // Glowing effect
+            jumpToElement(targetRun, 'tab-cicd', 4);
+            
+            // Specific logic for CI/CD: Auto-expand jobs
             setTimeout(() => {
-                targetRun.style.backgroundColor = '';
-                targetRun.style.boxShadow = '';
-            }, 2500);
-
-            const headerEl = targetRun.querySelector('div[onclick]');
-            const runId = targetRun.dataset.runId;
-            const jobsContainer = document.getElementById(`wf-jobs-${runId}`);
-            if (headerEl && jobsContainer && jobsContainer.style.display === 'none') {
-                toggleWorkflowJobs(runId, headerEl);
-            }
+                const headerEl = targetRun.querySelector('div[onclick]');
+                const runId = targetRun.dataset.runId;
+                const jobsContainer = document.getElementById(`wf-jobs-${runId}`);
+                if (headerEl && jobsContainer && jobsContainer.style.display === 'none') {
+                    toggleWorkflowJobs(runId, headerEl);
+                }
+            }, 200);
         } else {
-            // Not Found: Toast only, stay on current tab
-            showGlobalToast("Build not found in loaded workflows.");
+            showGlobalToast("Build not found in loaded workflows. Try refreshing CI/CD tab.");
         }
     }
 
-function traceRunToHistory(sha) {
+    function traceRunToHistory(sha) {
         if (!sha) return showGlobalToast("No SHA linked to this run", true);
 
-        // Check for existence BEFORE switching tabs
         const targetHistoryItem = document.querySelector(`.version-item[data-commit-sha="${sha}"]`);
 
         if (targetHistoryItem) {
-            // Found: Switch, Scroll, Highlight
-            switchTab('tab-history', document.querySelectorAll('.nav-item')[3]);
-            targetHistoryItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            targetHistoryItem.style.transition = 'background-color 0.3s, box-shadow 0.3s';
-            targetHistoryItem.style.backgroundColor = 'rgba(234, 179, 8, 0.15)';
-            targetHistoryItem.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.4)';
-            
-            setTimeout(() => {
-                targetHistoryItem.style.backgroundColor = '';
-                targetHistoryItem.style.boxShadow = '';
-            }, 2500);
+            jumpToElement(targetHistoryItem, 'tab-history', 3);
         } else {
-            // Not Found: Toast only
             showGlobalToast("History entry not found (try loading more).");
         }
     }
 
-    // NEW: Function to find a terminal log from a CI/CD run's commit SHA
     function traceRunToLog(sha) {
         if (!sha) return showGlobalToast("No commit SHA linked to this run.", true);
         const targetLog = document.querySelector(`.log-entry[data-commit-sha="${sha}"]`);
         if (targetLog) {
-            switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
-            targetLog.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            targetLog.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
-            targetLog.style.backgroundColor = 'rgba(234, 179, 8, 0.15)';
-            targetLog.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.4)';
-            targetLog.style.border = '1px solid var(--dev)';
-            setTimeout(() => {
-                targetLog.style.backgroundColor = '';
-                targetLog.style.boxShadow = '';
-                targetLog.style.border = '';
-            }, 2500);
+            jumpToElement(targetLog, 'tab-patcher', 1);
         } else {
             showGlobalToast("Could not find matching log in Terminal.");
         }
     }
 
-function traceHistoryToLog(sha) {
+    function traceHistoryToLog(sha) {
         if (!sha) return showGlobalToast("No SHA linked to this entry", true);
-
-        // Check for existence BEFORE switching tabs
         const targetLog = document.querySelector(`.log-entry[data-commit-sha="${sha}"]`);
 
         if (targetLog) {
-            // Found: Switch, Scroll, Highlight
-            switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
-            targetLog.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            targetLog.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
-            targetLog.style.backgroundColor = 'rgba(234, 179, 8, 0.15)';
-            targetLog.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.4)';
-            targetLog.style.border = '1px solid var(--dev)';
-            
-            setTimeout(() => {
-                targetLog.style.backgroundColor = '';
-                targetLog.style.boxShadow = '';
-                targetLog.style.border = '';
-            }, 2500);
+            jumpToElement(targetLog, 'tab-patcher', 1);
         } else {
-            // Not Found: Toast only
             showGlobalToast("Log entry not found in terminal.");
         }
     }
 
-    // NEW: Function to find a history item from a log's commit SHA
     function traceLogToHistory(sha) {
         if (!sha) return showGlobalToast("No commit SHA linked to this log entry.", true);
         const targetHistoryItem = document.querySelector(`.version-item[data-commit-sha="${sha}"]`);
         if (targetHistoryItem) {
-            switchTab('tab-history', document.querySelectorAll('.nav-item')[3]);
-            targetHistoryItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            targetHistoryItem.style.transition = 'background-color 0.3s, box-shadow 0.3s';
-            targetHistoryItem.style.backgroundColor = 'rgba(234, 179, 8, 0.15)';
-            targetHistoryItem.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.4)';
-            setTimeout(() => {
-                targetHistoryItem.style.backgroundColor = '';
-                targetHistoryItem.style.boxShadow = '';
-            }, 2500);
+            jumpToElement(targetHistoryItem, 'tab-history', 3);
         } else {
             showGlobalToast("Could not find matching entry in History.");
         }
     }
 
   
-    // NEW: Function to find a build run from a log's commit SHA
     function traceLogToRun(sha) {
         if (!sha) return showGlobalToast("No commit SHA linked to this log entry.", true);
         const targetRun = document.querySelector(`#workflow-list > div[data-commit-sha="${sha}"]`);
         if (targetRun) {
-            switchTab('tab-cicd', document.querySelectorAll('.nav-item')[4]);
-            targetRun.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            targetRun.style.transition = 'background-color 0.3s, box-shadow 0.3s';
-            targetRun.style.backgroundColor = 'rgba(234, 179, 8, 0.15)';
-            targetRun.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.4)';
+            jumpToElement(targetRun, 'tab-cicd', 4);
             setTimeout(() => {
-                targetRun.style.backgroundColor = '';
-                targetRun.style.boxShadow = '';
-            }, 2500);
+                const headerEl = targetRun.querySelector('div[onclick]');
+                const runId = targetRun.dataset.runId;
+                const jobsContainer = document.getElementById(`wf-jobs-${runId}`);
+                if (headerEl && jobsContainer && jobsContainer.style.display === 'none') {
+                    toggleWorkflowJobs(runId, headerEl);
+                }
+            }, 200);
         } else {
             showGlobalToast("Could not find matching build run in CI/CD.");
         }
