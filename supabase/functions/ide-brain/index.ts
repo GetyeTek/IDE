@@ -560,7 +560,13 @@ function applyOperation(content: string, op: any) {
 async function processOperations(TARGET_REPO: string, operations: any[], projectPath: string, autoSanity: boolean) {
     const scopePath = projectPath || "";
     if (scopePath) {
-        const invalidOps = operations.filter((op: any) => op.file_path && !op.file_path.startsWith(scopePath));
+        const invalidOps = operations.filter((op: any) => {
+            if (!op.file_path) return false;
+            // Security Exception: Allow if inside scope OR is an Edge Function deployment
+            const isScoped = op.file_path.startsWith(scopePath);
+            const isEf = op.is_resolved_ef === true || op.file_path.startsWith("supabase/functions/");
+            return !isScoped && !isEf;
+        });
         if (invalidOps.length > 0) throw new Error(`Security: Operation on ${invalidOps[0].file_path} is outside project scope '${scopePath}'`);
     }
     
