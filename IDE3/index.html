@@ -551,7 +551,7 @@
                 Workflows
                 <div class="flex-gap">
                     <button class="icon-btn" onclick="triggerBuild()">▶ Trigger</button>
-                    <button class="icon-btn" onclick="loadWorkflows()">Refresh</button>
+                    <button class="icon-btn" onclick="loadWorkflows(true); lastCicdRefresh=0; loadWorkflows(false)">Refresh</button>
                 </div>
             </div>
             <div class="card" style="padding:0; overflow:hidden;">
@@ -2058,13 +2058,17 @@
 
     async function loadWorkflows(silent = false) {
         const container = document.getElementById('workflow-list');
-        if (!silent) container.innerHTML = '<div style="padding:20px; text-align:center;">Fetching runs...</div>';
+        // Only show loading spinner if empty (prevent UI flicker)
+        if (!silent && container.children.length === 0) {
+            container.innerHTML = '<div style="padding:20px; text-align:center;">Fetching runs...</div>';
+        }
         
         try {
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: apiBody({ action: 'fetch_workflows' })
             });
+            lastCicdRefresh = Date.now(); // Update timestamp
             const data = await res.json();
 
             // --- SMART POLLING LOGIC ---
@@ -2712,15 +2716,22 @@ async function downloadArtifact(runId) {
         document.querySelectorAll('.file-check').forEach(cb => cb.checked = s.checked);
     }
 
+    let lastCicdRefresh = 0;
+
     function switchTab(id, btn) {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         if (btn) btn.classList.add('active');
 
-        // Initial Load for CI/CD (Polling handles itself recursively)
+        // Smart Load for CI/CD
         if (id === 'tab-cicd') {
-            loadWorkflows(false);
+            const now = Date.now();
+            const hasActiveRuns = Object.values(runStateCache).some(s => s === 'in_progress' || s === 'queued');
+            // Fetch if: Never fetched OR >60s ago OR active runs exist
+            if (lastCicdRefresh === 0 || (now - lastCicdRefresh > 60000) || hasActiveRuns) {
+                loadWorkflows(false);
+            }
         }
     }
 
