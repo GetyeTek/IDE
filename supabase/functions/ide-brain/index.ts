@@ -238,8 +238,16 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
   const provider = resolveProvider(role, config);
   if (!provider) throw new Error(`No provider found for role: ${role}`);
   
-  const apiKey = Deno.env.get(provider.apiKeyEnv);
-  if (!apiKey) throw new Error(`Missing API Key: ${provider.apiKeyEnv}`);
+  // Smart Key Resolution: Try as Env Var, fallback to Raw Value
+  let apiKey = Deno.env.get(provider.apiKeyEnv);
+  if (!apiKey) {
+      // If the value looks like a key (not just a variable name), use it directly
+      if (provider.apiKeyEnv && provider.apiKeyEnv.length > 10) {
+          apiKey = provider.apiKeyEnv;
+      } else {
+          throw new Error(`Missing API Key: ${provider.apiKeyEnv} (Not found in Env)`);
+      }
+  }
 
   // ADAPTER: Google Native
   if (provider.type === 'google') {
