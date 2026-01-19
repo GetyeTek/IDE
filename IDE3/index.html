@@ -2812,15 +2812,45 @@ async function downloadArtifact(runId) {
     }
 
     function handleBriefing(mode) {
-        const report = `BRIEFING\nRepo: ${CONFIG.repoName}\nDate: ${new Date().toLocaleString()}`;
+        if (!dbHistory || dbHistory.length === 0) return showGlobalToast("No history available to report.", true);
+        
+        const input = prompt("How many recent history entries to include?", "5");
+        if (input === null) return;
+        const count = parseInt(input) || 5;
+        
+        const selected = dbHistory.slice(0, count);
+        
+        let report = `# DEV BRIEFING: ${CONFIG.repoName}\n`;
+        report += `Generated: ${new Date().toLocaleString()}\n`;
+        report += `Scope: Last ${selected.length} entries\n\n`;
+        
+        selected.forEach((entry, idx) => {
+            report += `### ${idx + 1}. ${entry.title.replace(/\[Auto-Fix\]/g, '🤖')}\n`;
+            report += `- **Time**: ${new Date(entry.created_at).toLocaleString()}\n`;
+            if (entry.sha) report += `- **Commit**: \`${entry.sha.substring(0, 7)}\`\n`;
+            if (entry.note) report += `- **Note**: ${entry.note}\n`;
+            
+            if (entry.ops && entry.ops.length > 0) {
+                report += `- **Operations**:\n`;
+                entry.ops.forEach(op => {
+                    if (op.action === 'comment') {
+                        if (op.text) report += `  > ${op.text}\n`;
+                    } else {
+                        const icon = op.action === 'delete_file' ? '❌' : (op.action === 'create_file' ? '✨' : '📝');
+                        report += `  - ${icon} **${op.action.toUpperCase().replace('_', ' ')}**: \`${op.file_path}\`\n`;
+                    }
+                });
+            }
+            report += `\n---\n\n`;
+        });
+
         if (mode === 'copy') {
-            navigator.clipboard.writeText(report).then(() => alert("Copied!"));
+            navigator.clipboard.writeText(report).then(() => showGlobalToast("Briefing copied to clipboard!"));
         } else {
+            const blob = new Blob([report], { type: 'text/markdown' });
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([report], {
-                type: 'text/markdown'
-            }));
-            a.download = "briefing.md";
+            a.href = URL.createObjectURL(blob);
+            a.download = `briefing_${CONFIG.repoName}_${new Date().toISOString().slice(0,10)}.md`;
             a.click();
         }
     }
