@@ -971,7 +971,6 @@
         }
     }
 
-    function createBareboneFunction() {
     async function createCheckpoint() {
         const note = prompt("Checkpoint Name:", "Manual Checkpoint");
         if (!note) return;
@@ -995,6 +994,8 @@
             setTimeout(() => toast.remove(), 2000);
         }
     }
+
+    function createBareboneFunction() {
         const name = prompt("New Function Name:", "my-function");
         if (!name) return;
         document.getElementById('ef-name').value = name;
