@@ -939,10 +939,53 @@ serve(async (req) => {
     }
 
     if (action === "trigger_build") {
-        if (workflow_id) await triggerWorkflowFile(TARGET_REPO, workflow_id, branch || DEV_BRANCH, inputs || {});
-        else await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
-        await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'dispatch', data: { message: `Triggered ${workflow_id || 'generic build'}` } });
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // EXPENSIVE LOGGING: Capture intent before network call
+        const safeInputs = inputs || {};
+        const targetBranch = branch || DEV_BRANCH;
+        const debugInfo = { 
+            workflow_id, 
+            branch: targetBranch, 
+            inputs_received: safeInputs, 
+            timestamp: new Date().toISOString() 
+        };
+        
+        // 1. Log INTENT to DB (Debug Trace)
+        await supabase.from('conduit_logs').insert({ 
+            repo_name: TARGET_REPO, 
+            type: 'dispatch_debug', 
+            data: { step: 'attempt', ...debugInfo } 
+        });
+
+        try {
+            if (workflow_id) {
+                await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, safeInputs);
+            } else {
+                await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
+            }
+            
+            // 2. Log SUCCESS
+            await supabase.from('conduit_logs').insert({ 
+                repo_name: TARGET_REPO, 
+                type: 'dispatch', 
+                data: { success: true, message: `Triggered ${workflow_id || 'generic build'}`, debug: debugInfo } 
+            });
+            return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+        } catch (e: any) {
+            // 3. Log FAILURE with specific GitHub response
+            console.error("[Trigger Fail]", e);
+            await supabase.from('conduit_logs').insert({ 
+                repo_name: TARGET_REPO, 
+                type: 'dispatch_error', 
+                data: { 
+                    success: false, 
+                    workflow_id, 
+                    error_msg: e.message, 
+                    failed_payload: debugInfo 
+                } 
+            });
+            throw e; // Re-throw so frontend sees 500
+        }
     }
 
     if (action === "fetch_workflows") {
