@@ -408,9 +408,10 @@
             <div class="card">
                 <div class="flex-gap" style="margin-bottom: 12px;">
                     <button class="btn btn-primary" style="flex:1" onclick="handleBriefing('copy')">Copy Brief</button>
-                    <button class="btn btn-outline" style="flex:1" onclick="handleBriefing('download')">Save Brief</button>
+                    <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('import-file-input').click()">Upload Import</button>
                     <button class="btn btn-dev" style="flex:1; color:black;" onclick="openExportModal()">Export Files</button>
                 </div>
+                <input type="file" id="import-file-input" class="hidden" accept=".zip,.txt" onchange="handleImportFileSelect(this)">
                 <div class="flex-between">
                      <button class="btn-outline" style="width: auto; padding: 6px 10px; font-size: 11px; border-color: var(--border);" onclick="resetSession()">↺ Reset Log</button>
                     <div class="flex-gap">
@@ -561,6 +562,33 @@
     </div>
 
     <!-- MODALS & OVERLAYS -->
+
+    <!-- IMPORT MODAL -->
+    <div id="import-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:300; align-items:center; justify-content:center;">
+        <div class="card" style="width:350px; background:#1e1e20; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <div class="header" style="font-size:16px; margin-bottom:15px;">Import Options</div>
+            
+            <div class="input-group">
+                <label class="input-label">Files Found</label>
+                <div id="import-count" style="color:white; font-size:13px; font-weight:bold;">0 files</div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Target Repo Name (Optional)</label>
+                <input type="text" id="import-target-repo" class="input-field" placeholder="Default: Current Repo">
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Target Folder (Optional)</label>
+                <input type="text" id="import-target-folder" class="input-field" placeholder="e.g. imported/v1/">
+            </div>
+
+            <div class="flex-gap" style="flex-direction:column;">
+                <button class="btn btn-prod" onclick="executeBatchImport()">🚀 Start Batch Upload</button>
+                <button class="btn btn-outline" onclick="cancelImport()">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <!-- EXPORT MODAL -->
     <div id="export-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:300; align-items:center; justify-content:center;">
@@ -2928,6 +2956,128 @@ function traceHistoryToLog(sha) {
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
         alert("AI Configuration Saved!");
         closeAIManager();
+    }
+
+    // --- IMPORT LOGIC ---
+    let pendingImportFiles = [];
+
+    async function handleImportFileSelect(input) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        const toast = document.createElement('div');
+        toast.innerText = "Parsing " + file.name + "...";
+        toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:10px 20px; border-radius:30px; z-index:9999;";
+        document.body.appendChild(toast);
+
+        pendingImportFiles = [];
+
+        try {
+            if (file.name.endsWith('.zip')) {
+                const zip = await JSZip.loadAsync(file);
+                const promises = [];
+                zip.forEach((relativePath, zipEntry) => {
+                    if (!zipEntry.dir) {
+                        promises.push(zipEntry.async("string").then(content => {
+                            pendingImportFiles.push({ path: relativePath, content: content });
+                        }));
+                    }
+                });
+                await Promise.all(promises);
+            } 
+            else if (file.name.endsWith('.txt')) {
+                const text = await file.text();
+                // Parse "FILE: path\nContent" format
+                // Split by "\n\nFILE: " to handle multiple files, assuming double newline separator from export
+                const chunks = text.split(/\n\nFILE: /g);
+                
+                chunks.forEach((chunk, index) => {
+                    // Handle first chunk edge case if it starts with "FILE: "
+                    let cleanChunk = chunk;
+                    if (index === 0 && chunk.startsWith("FILE: ")) cleanChunk = chunk.substring(6);
+                    
+                    const firstLineEnd = cleanChunk.indexOf('\n');
+                    if (firstLineEnd !== -1) {
+                        const path = cleanChunk.substring(0, firstLineEnd).trim();
+                        const content = cleanChunk.substring(firstLineEnd + 1);
+                        if (path) pendingImportFiles.push({ path, content });
+                    }
+                });
+            } 
+            else {
+                throw new Error("Unsupported file format. Use .zip or .txt exported from Conduit.");
+            }
+
+            toast.remove();
+            document.getElementById('import-count').innerText = `${pendingImportFiles.length} files extracted.`;
+            document.getElementById('import-target-repo').value = CONFIG.repoName;
+            document.getElementById('import-target-folder').value = "";
+            document.getElementById('import-modal').style.display = 'flex';
+
+        } catch (e) {
+            toast.remove();
+            alert("Parse Error: " + e.message);
+        }
+        
+        input.value = ''; // Reset input
+    }
+
+    function cancelImport() {
+        pendingImportFiles = [];
+        document.getElementById('import-modal').style.display = 'none';
+    }
+
+    async function executeBatchImport() {
+        if (pendingImportFiles.length === 0) return;
+
+        const targetRepo = document.getElementById('import-target-repo').value.trim() || CONFIG.repoName;
+        let targetFolder = document.getElementById('import-target-folder').value.trim();
+        if (targetFolder && !targetFolder.endsWith('/')) targetFolder += '/';
+
+        // Generate Operations
+        const operations = pendingImportFiles.map(f => ({
+            action: "create_file",
+            file_path: targetFolder + f.path,
+            content: f.content
+        }));
+
+        // Add Summary Comment
+        operations.unshift({
+            action: "comment",
+            text: `[Import] Batch uploaded ${pendingImportFiles.length} files from dump.`
+        });
+
+        // Hide Modal & Switch to Terminal
+        document.getElementById('import-modal').style.display = 'none';
+        switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
+
+        const termId = addTerminalCard(null, { loading: true });
+
+        try {
+            // We manually construct payload to override repo_name if needed
+            const payload = {
+                action: "patch",
+                repo_name: targetRepo,
+                project_path: CONFIG.projectPath,
+                operations: operations,
+                ai_config: window.aiConfig // Maintain AI config context
+            };
+
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            
+            updateTerminalCard(termId, data, operations, true);
+
+            if(data.success && targetRepo === CONFIG.repoName) {
+                setTimeout(() => { fetchState(false, false); fetchFileList(); }, 1500);
+            }
+        } catch (e) {
+            updateTerminalCard(termId, { error: e.message });
+        }
     }
 
     async function processExport(type) {
