@@ -125,12 +125,16 @@ const getHeaders = () => ({
 });
 
 async function githubFetch(repo: string, path: string, options: RequestInit = {}) {
-  const url = `https://api.github.com/repos/${GITHUB_USER}/${repo}${path}`;
+  // Intelligent Repo Parsing: If 'owner/repo' is passed, use it directly. Otherwise prepend GITHUB_USER.
+  const cleanRepo = repo.includes('/') ? repo : `${GITHUB_USER}/${repo}`;
+  const url = `https://api.github.com/repos/${cleanRepo}${path}`;
+  
   const res = await fetch(url, { ...options, headers: { ...getHeaders(), ...options.headers } });
   
   if (!res.ok) {
-      if(res.status === 404) throw new Error("Not Found"); 
-      throw new Error(`GitHub API Error ${res.status}: ${await res.text()}`);
+      const text = await res.text();
+      // Pass through the actual GitHub error details for debugging
+      throw new Error(`GitHub API Error ${res.status} on ${url}: ${text}`);
   }
   if (res.status === 204) return {}; 
   return res.json();
