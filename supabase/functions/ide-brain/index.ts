@@ -947,7 +947,7 @@ serve(async (req) => {
         if (patchResult.success) {
              try {
                  // Fetch the run info to get the specific workflow ID
-                 const runInfo = await githubFetch(TARGET_REPO, `/actions/runs/${payload.run_id}`);
+                 const runInfo = await githubFetch(TARGET_REPO, `/actions/runs/${run_id}`);
                  if (runInfo.workflow_id) {
                      await triggerWorkflowFile(TARGET_REPO, String(runInfo.workflow_id), DEV_BRANCH);
                      triggerMsg = `Triggered workflow ${runInfo.workflow_id}`;
@@ -958,7 +958,7 @@ serve(async (req) => {
              }
         }
 
-        await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'auto_fix_trigger', data: { run_id: payload.run_id, fix_applied: patchResult.success, ops, trigger: triggerMsg } });
+        await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'auto_fix_trigger', data: { run_id: run_id, fix_applied: patchResult.success, ops, trigger: triggerMsg } });
         return new Response(JSON.stringify({ success: true, patch_result: patchResult, trigger_status: triggerMsg }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -1024,7 +1024,7 @@ serve(async (req) => {
     }
 
     if (action === "fetch_workflow_jobs") {
-      const data = await githubFetch(TARGET_REPO, `/actions/runs/${payload.run_id}/jobs`);
+      const data = await githubFetch(TARGET_REPO, `/actions/runs/${run_id}/jobs`);
       return new Response(JSON.stringify({ jobs: data.jobs }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -1092,7 +1092,7 @@ serve(async (req) => {
     if (action === "update_note") { await supabase.from('conduit_history').update({ note: payload.note }).eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "delete_history") { await supabase.from('conduit_history').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "delete_log") { await supabase.from('conduit_logs').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
-    if (action === "delete_run") { await githubFetch(TARGET_REPO, `/actions/runs/${payload.run_id}`, { method: "DELETE" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+    if (action === "delete_run") { await githubFetch(TARGET_REPO, `/actions/runs/${run_id}`, { method: "DELETE" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "create_checkpoint") {
         const note = payload.note || "Manual Checkpoint";
         const ref = await githubFetch(TARGET_REPO, `/git/ref/heads/${DEV_BRANCH}`);
