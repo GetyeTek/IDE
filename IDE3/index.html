@@ -1631,8 +1631,8 @@
         if (syntaxErrors.length > 0) {
             const errDiv = doc.createElement('div');
             errDiv.style.cssText = "background:rgba(239,68,68,0.9); color:white; padding:10px; font-family:monospace; font-size:12px; position:fixed; top:0; left:0; width:100%; z-index:9999; border-bottom:1px solid rgba(0,0,0,0.2);";
-            errDiv.innerHTML = "<strong>⚠️ Syntax Errors Detected (Check Console):</strong><ul style='margin:5px 0; padding-left:20px;'>" + 
-                syntaxErrors.map(e => `<li>${e.path} (Line ${e.line}): ${e.message}</li>`).join('') + "</ul>";
+            errDiv.innerHTML = "<div style='display:flex; justify-content:space-between; align-items:start;'><strong>⚠️ Syntax Errors Detected:</strong><button onclick='this.parentElement.parentElement.remove()' style='background:none; border:none; color:white; cursor:pointer;'>×</button></div><ul style='margin:5px 0; padding-left:20px;'>" + 
+                syntaxErrors.map(e => `<li><div style='display:flex; align-items:center; gap:10px;'><span>${e.path} (Line ${e.line}): ${e.message}</span><button onclick=\"stageDeleteFile('${e.path}')\" style='background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.3); color:white; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:10px;'>🗑 Trash File</button></div></li>`).join('') + "</ul>";
             doc.body.insertBefore(errDiv, doc.body.firstChild);
         }
 
