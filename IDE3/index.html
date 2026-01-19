@@ -202,7 +202,7 @@
         .op-row:hover { background: #1a1a1c; }
         .op-row.row-fail { border-left: 3px solid var(--danger); background: rgba(239, 68, 68, 0.05); }
         .op-title { color: #fff; font-weight: 600; display: flex; justify-content: space-between; }
-        .op-details { color: #888; white-space: pre-wrap; margin-top: 2px; }
+        .op-details { color: #888; white-space: pre-wrap; margin-top: 2px; overflow-wrap: anywhere; word-break: break-word; }
         .score-badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; border: 1px solid #444; }
         
         .op-options { display: none; padding: 8px 12px; background: #0f0f11; gap: 8px; border-bottom: 1px solid #222; animation: fadeUp 0.1s; }
@@ -1507,6 +1507,16 @@
         }
     }
 
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     function addTerminalCard(data, options = {}) {
         const container = document.getElementById('terminal-list');
         const id = 'term-' + Date.now();
@@ -1514,7 +1524,7 @@
         div.id = id; div.className = 'log-entry';
         
         if(options.loading) div.innerHTML = `<div class="log-header"><span>Processing...</span></div>`;
-        else if (options.error) div.innerHTML = `<div class="log-header" style="color:var(--danger)"><span>Error</span></div><div class="log-body open" style="padding:12px; color:var(--danger); font-size:11px;">${options.error}</div>`;
+        else if (options.error) div.innerHTML = `<div class="log-header" style="color:var(--danger)"><span>Error</span></div><div class="log-body open" style="padding:12px; color:var(--danger); font-size:11px; overflow-wrap:anywhere;">${escapeHtml(options.error)}</div>`;
         
         container.prepend(div);
         return id;
@@ -1541,7 +1551,7 @@
         }
 
         if(response.error) {
-            el.innerHTML = `<div class="log-header" style="color:var(--danger)"><span>API Error</span><span class="status-pill pill-fail">500</span></div><div class="log-body open" style="padding:12px; color:var(--danger); font-size:11px;">${response.error}</div>`;
+            el.innerHTML = `<div class="log-header" style="color:var(--danger)"><span>API Error</span><span class="status-pill pill-fail">500</span></div><div class="log-body open" style="padding:12px; color:var(--danger); font-size:11px; overflow-wrap:anywhere;">${escapeHtml(response.error)}</div>`;
             return;
         }
 
@@ -1559,7 +1569,7 @@
                  opHtml = `<div class="op-row"><div class="op-details" style="color:#666; font-style:italic; padding:12px;">No files were modified. (Check file_path and action parameters)</div></div>`;
             } else {
                 response.results.forEach(fileRes => {
-                    opHtml += `<div style="background:#111; padding:6px 12px; font-weight:bold; color:#fff; border-bottom:1px solid #222; display:flex; justify-content:space-between;"><span>📄 ${fileRes.file}</span><span style="opacity:0.5; font-size:10px">${fileRes.status}</span></div>`;
+                    opHtml += `<div style="background:#111; padding:6px 12px; font-weight:bold; color:#fff; border-bottom:1px solid #222; display:flex; justify-content:space-between;"><span>📄 ${escapeHtml(fileRes.file)}</span><span style="opacity:0.5; font-size:10px">${escapeHtml(fileRes.status)}</span></div>`;
                     if(fileRes.operations) {
                         fileRes.operations.forEach(op => {
                             if(!op.success) failCount++;
@@ -1583,10 +1593,10 @@
                             opHtml += `
                             <div class="op-row ${isFail ? 'row-fail' : ''}" onclick="toggleOpMenu('${opId}')">
                                 <div class="op-title">
-                                    <span>${op.type.replace(/_/g, ' ').toUpperCase()}</span>
-                                    <span class="score-badge" style="border:1px solid ${scoreColor}; color:${scoreColor}">${badgeText}</span>
+                                    <span>${escapeHtml(op.type.replace(/_/g, ' ').toUpperCase())}</span>
+                                    <span class="score-badge" style="border:1px solid ${scoreColor}; color:${scoreColor}">${escapeHtml(badgeText)}</span>
                                 </div>
-                                <div class="op-details">${op.message}</div>
+                                <div class="op-details">${escapeHtml(op.message)}</div>
                             </div>
                             <div id="${opId}-opts" class="op-options">
                                 <button class="op-opt-btn" onclick="openOpModal('${opId}')">Details</button>
@@ -1600,13 +1610,13 @@
             opHtml = `<div class="op-row"><div class="op-details" style="color:var(--prod)">Production Deploy: ${response.count} files synced to Main.</div></div>`;
         } else if (response.analysis) {
              // Handle Job Analysis (The Detective)
-             opHtml = `<div class="op-row"><div class="op-details" style="white-space: pre-wrap; color:#ccc; font-size:11px; line-height:1.4;">${response.analysis}</div></div>`;
+             opHtml = `<div class="op-row"><div class="op-details" style="white-space: pre-wrap; color:#ccc; font-size:11px; line-height:1.4;">${escapeHtml(response.analysis)}</div></div>`;
         } else if (response.trigger) {
              // Handle Build Trigger Logs (The Automator)
-             opHtml = `<div class="op-row"><div class="op-details" style="color:#eab308">⚡ ${response.trigger}</div></div>`;
+             opHtml = `<div class="op-row"><div class="op-details" style="color:#eab308">⚡ ${escapeHtml(response.trigger)}</div></div>`;
         } else if (response.message) {
              // Handle Generic Messages (Rollbacks, etc)
-             opHtml = `<div class="op-row"><div class="op-details" style="color:var(--prod)">${response.message}</div></div>`;
+             opHtml = `<div class="op-row"><div class="op-details" style="color:var(--prod)">${escapeHtml(response.message)}</div></div>`;
         }
 
         const isFail = failCount > 0;
@@ -1653,8 +1663,8 @@
                 </div>
             </div>
             <div class="log-body" id="${id}-body">${opHtml}</div>
-            <textarea id="${id}-response-data" class="hidden">${JSON.stringify(response, null, 2)}</textarea>
-            <textarea id="${id}-payload-data" class="hidden">${JSON.stringify(originalPayload || 'No payload data.', null, 2)}</textarea>
+            <textarea id="${id}-response-data" class="hidden">${escapeHtml(JSON.stringify(response, null, 2))}</textarea>
+            <textarea id="${id}-payload-data" class="hidden">${escapeHtml(JSON.stringify(originalPayload || 'No payload data.', null, 2))}</textarea>
         `;
     }
 
