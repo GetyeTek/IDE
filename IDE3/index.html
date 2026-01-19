@@ -486,10 +486,19 @@
                     </div>
                 </div>
                 
-                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 20px; padding-top: 10px; border-top: 1px solid var(--border);">
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
                     <span style="font-size:13px;">👁️ Show Preview Tab</span>
                     <input type="checkbox" id="setting-show-preview" style="accent-color:var(--primary); transform:scale(1.2);">
                 </label>
+
+                <div class="input-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
+                    <label class="input-label">EF Deployment Mode</label>
+                    <select id="setting-ef-mode" class="input-field" style="appearance: auto;">
+                        <option value="custom">Custom (Respect payload paths)</option>
+                        <option value="default">Default (Auto-resolve index.ts to supabase/functions/)</option>
+                    </select>
+                    <p style="font-size:10px; color:#666; margin-top:5px;">In Default mode, 'index.ts' targets are automatically routed to your Supabase directory structure.</p>
+                </div>
 
                 <div style="padding: 20px 0; border-top: 1px solid var(--border); margin-top: 10px;">
                     <button class="btn" style="background: var(--ai-accent);" onclick="openEFManager()">
@@ -691,7 +700,8 @@
         projectPath: localStorage.getItem('conduit_projectPath') || '',
         autoFix: localStorage.getItem('conduit_auto_fix') === 'true',
         autoSanity: localStorage.getItem('conduit_auto_sanity') === 'true',
-        showPreview: localStorage.getItem('conduit_showPreview') !== 'false' // Default to true
+        showPreview: localStorage.getItem('conduit_showPreview') !== 'false', // Default to true
+        efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'custom'
     };
     
     // Global State
@@ -721,6 +731,7 @@
         document.getElementById('setting-auto-fix').checked = CONFIG.autoFix;
         document.getElementById('setting-auto-sanity').checked = CONFIG.autoSanity;
         document.getElementById('setting-show-preview').checked = CONFIG.showPreview;
+        document.getElementById('setting-ef-mode').value = CONFIG.efDeploymentMode;
         
         applyPreviewTabVisibility(); // Apply visibility on load
 
@@ -974,6 +985,7 @@
         const autoFix = document.getElementById('setting-auto-fix').checked;
         const autoSanity = document.getElementById('setting-auto-sanity').checked;
         const showPreview = document.getElementById('setting-show-preview').checked;
+        const efDeploymentMode = document.getElementById('setting-ef-mode').value;
 
         if(!funcUrl) return alert("Function URL is required");
         
@@ -983,8 +995,9 @@
         localStorage.setItem('conduit_auto_fix', autoFix);
         localStorage.setItem('conduit_auto_sanity', autoSanity);
         localStorage.setItem('conduit_showPreview', showPreview);
+        localStorage.setItem('conduit_ef_mode', efDeploymentMode);
         
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, efDeploymentMode };
         
         applyPreviewTabVisibility(); // Apply change immediately
 
@@ -1142,6 +1155,27 @@
     }
 
     // --- PATCHER ---
+    async function resolveEdgeFunctionPath(originalPath) {
+        if (CONFIG.efDeploymentMode !== 'default' || originalPath !== 'index.ts') return null;
+        const functions = new Set();
+        (window.repoFiles || []).forEach(f => {
+            if (f.path.includes('supabase/functions/')) {
+                const parts = f.path.split('supabase/functions/')[1].split('/');
+                if (parts[0]) functions.add(parts[0]);
+            }
+        });
+        const names = Array.from(functions);
+        if (names.length === 0) {
+            const newName = prompt("No existing functions found. Enter name for new function:", "my-function");
+            return newName ? `supabase/functions/${newName}/index.ts` : null;
+        } else if (names.length === 1) {
+            return `supabase/functions/${names[0]}/index.ts`;
+        } else {
+            const choice = prompt(`Ambiguous target. Multiple functions found:\n${names.join(', ')}\n\nEnter the function name to patch:`, names[0]);
+            return choice ? `supabase/functions/${choice}/index.ts` : null;
+        }
+    }
+
     async function runPatch(actionType) {
         FILE_OP_MAP = {}; 
         document.querySelectorAll('.op-row').forEach(el => {
@@ -1164,13 +1198,20 @@
 
         if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.g. v1.0):") || "v1.0";
 
-        if (CONFIG.projectPath && Array.isArray(payload)) {
-            payload.forEach(op => {
-                if (op.file_path && !op.file_path.startsWith(CONFIG.projectPath)) {
+        if (Array.isArray(payload)) {
+            for (let op of payload) {
+                if (op.file_path === 'index.ts' && CONFIG.efDeploymentMode === 'default') {
+                    const resolved = await resolveEdgeFunctionPath(op.file_path);
+                    if (resolved) {
+                        op.file_path = resolved;
+                        op.is_resolved_ef = true;
+                    }
+                }
+                if (CONFIG.projectPath && op.file_path && !op.is_resolved_ef && !op.file_path.startsWith(CONFIG.projectPath)) {
                     const cleanPath = op.file_path.startsWith('/') ? op.file_path.slice(1) : op.file_path;
                     op.file_path = CONFIG.projectPath + cleanPath;
                 }
-            });
+            }
         }
 
         const termId = addTerminalCard(null, { loading: true });
