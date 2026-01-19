@@ -952,7 +952,7 @@
         } catch (e) {
             console.error("❌ Deployment failed:", e);
             console.groupEnd();
-            status.innerText = "❌ " + e.message;
+            status.innerText = "❌ " + (e.message || "Check browser console");
             status.style.color = "var(--danger)";
         }
     }
