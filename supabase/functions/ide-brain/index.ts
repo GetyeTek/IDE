@@ -1056,9 +1056,8 @@ serve(async (req) => {
     if (action === "delete_run") { await githubFetch(TARGET_REPO, `/actions/runs/${payload.run_id}`, { method: "DELETE" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "create_checkpoint") {
         const note = payload.note || "Manual Checkpoint";
-        // Get current SHA of dev branch without modifying anything
         const ref = await githubFetch(TARGET_REPO, `/git/ref/heads/${DEV_BRANCH}`);
-        await supabase.from('conduit_history').insert({ 
+        const { error } = await supabase.from('conduit_history').insert({ 
             repo_name: TARGET_REPO, 
             title: note, 
             type: "Checkpoint", 
@@ -1066,6 +1065,7 @@ serve(async (req) => {
             ops: [], 
             sha: ref.object.sha 
         });
+        if (error) throw new Error(`Database Error: ${error.message}`);
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
