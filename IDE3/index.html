@@ -258,6 +258,20 @@
         .nav-item svg { width: 24px; height: 24px; }
         .nav-item.active { color: var(--primary); }
 
+        /* EF MANAGER RESPONSIVE OVERRIDES */
+        .ef-layout { display: flex; flex: 1; overflow: hidden; }
+        .ef-sidebar { width: 220px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: #0a0a0a; flex-shrink: 0; }
+        .ef-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+        
+        @media (max-width: 768px) {
+            .ef-layout { flex-direction: column; }
+            .ef-sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+            .ef-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; white-space: nowrap; padding: 12px; height: 60px; }
+            .ef-list-item { min-width: 120px; flex-shrink: 0; }
+            .ef-stage { padding: 12px !important; }
+            .ef-controls { padding: 12px !important; flex-direction: column; align-items: stretch !important; gap: 10px; }
+        }
+
         /* CODE BLOCKS IN MODALS */
         .code-block-wrapper { position: relative; margin-bottom: 12px; }
         .code-label { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; display: block; text-transform: uppercase; }
@@ -585,31 +599,31 @@
             <span class="viewer-title">Edge Function Manager</span>
             <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeEFManager()">Close</button>
         </div>
-        <div style="flex:1; display:flex; overflow:hidden;">
-            <!-- Sidebar -->
-            <div style="width:220px; border-right:1px solid var(--border); display:flex; flex-direction:column; background:#0a0a0a;">
+        <div class="ef-layout">
+            <!-- Sidebar / Top Bar -->
+            <div class="ef-sidebar">
                 <div class="flex-between" style="padding:12px; border-bottom:1px solid var(--border);">
                     <span style="font-size:11px; color:var(--text-muted); font-weight:bold; text-transform:uppercase;">Functions</span>
-                    <button class="icon-btn" onclick="fetchEdgeFunctions(true)" title="Rescan Repo">↻</button>
+                    <div class="flex-gap">
+                        <button class="icon-btn" onclick="createBareboneFunction()" title="New">+</button>
+                        <button class="icon-btn" onclick="fetchEdgeFunctions(true)" title="Rescan Repo">↻</button>
+                    </div>
                 </div>
-                <div id="ef-list-sidebar" style="flex:1; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:4px;"></div>
-                <div style="padding:12px; border-top:1px solid var(--border);">
-                    <button class="btn btn-outline" style="font-size:11px; padding:8px;" onclick="createBareboneFunction()">+ New Function</button>
-                </div>
+                <div id="ef-list-sidebar" class="ef-list"></div>
             </div>
             <!-- Stage -->
-            <div style="flex:1; display:flex; flex-direction:column; padding:20px; gap:16px; background:var(--bg);">
-                <div class="input-group">
-                    <label class="input-label">Function Name (Folder Name)</label>
+            <div class="ef-stage" style="flex:1; display:flex; flex-direction:column; padding:20px; gap:12px; background:var(--bg); overflow: hidden;">
+                <div class="input-group" style="margin-bottom:0;">
+                    <label class="input-label">Function Name</label>
                     <input type="text" id="ef-name" class="input-field" placeholder="e.g. stripe-webhook">
                 </div>
-                <div style="flex:1; display:flex; flex-direction:column;">
+                <div style="flex:1; display:flex; flex-direction:column; overflow: hidden;">
                     <label class="input-label">index.ts</label>
                     <textarea id="ef-code" class="json-editor" style="flex:1; margin-bottom:0; font-family:'JetBrains Mono'; resize:none;" placeholder="Paste function code here..."></textarea>
                 </div>
-                <div class="flex-between" style="background:var(--card-bg); padding:16px; border-radius:12px; border:1px solid var(--border);">
-                    <div id="ef-status-msg" style="font-size:12px; color:var(--text-muted);">Select a function or create one.</div>
-                    <button class="btn btn-primary" style="width:auto; background:var(--ai-accent); padding:10px 20px;" onclick="deployEdgeFunction()">🚀 Deploy Function</button>
+                <div class="flex-between ef-controls" style="background:var(--card-bg); padding:12px; border-radius:12px; border:1px solid var(--border);">
+                    <div id="ef-status-msg" style="font-size:11px; color:var(--text-muted);">Select or create a function.</div>
+                    <button class="btn btn-primary" style="width:auto; background:var(--ai-accent); padding:10px 20px;" onclick="deployEdgeFunction()">🚀 Deploy</button>
                 </div>
             </div>
         </div>
@@ -817,11 +831,12 @@
         } else {
             functions.forEach(name => {
                 const item = document.createElement('div');
-                item.style.cssText = 'padding:10px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; font-size:12px; cursor:pointer; color:#ccc; transition:0.2s;';
+                item.className = 'ef-list-item';
+                item.style.cssText = 'padding:10px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; font-size:12px; cursor:pointer; color:#ccc; transition:0.2s; text-align:center;';
                 item.innerText = name;
-                item.onmouseover = () => item.style.borderColor = 'var(--ai-accent)';
-                item.onmouseout = () => item.style.borderColor = 'var(--border)';
                 item.onclick = () => {
+                    document.querySelectorAll('.ef-list-item').forEach(el => el.style.borderColor = 'var(--border)');
+                    item.style.borderColor = 'var(--ai-accent)';
                     document.getElementById('ef-name').value = name;
                     loadEdgeFunctionCode(name);
                 };
