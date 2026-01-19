@@ -1509,18 +1509,20 @@
 
         if(!fileCache[entryFile]) return iframe.srcdoc = `Error: ${entryFile} not found (Check Project Path settings)`;
 
-        let syntaxErrorFound = false;
+        // DEBUG: Log bundled files to help user find 'phantom' files
+        console.log("📦 Bundled Files:", Object.keys(fileCache));
+
+        let syntaxErrors = [];
         Object.keys(fileCache).forEach(path => {
             if (fileCache[path].mime === 'text/javascript') {
                 const error = checkSyntaxErrors(fileCache[path].content, path);
                 if (error) {
-                    syntaxErrorFound = true;
-                    highlightCulpritOp('unknown', error); // Try to highlight if we can guess
-                    iframe.srcdoc = `<div style="color:red; padding:20px;">Syntax Error in ${path}: line ${error.line}<br>${error.message}</div>`;
+                    // Don't block, just report
+                    syntaxErrors.push({ path, ...error });
+                    highlightCulpritOp('unknown', error);
                 }
             }
-        });
-        if (syntaxErrorFound) return; 
+        }); 
 
         // Import Rewrite Logic
         function rewriteImports(code, currentPath) {
@@ -1624,6 +1626,15 @@
         mapTag.type = "importmap";
         mapTag.textContent = JSON.stringify(importMap);
         doc.head.insertBefore(mapTag, doc.head.firstChild);
+
+        // Inject Syntax Error Warnings if any (Non-blocking)
+        if (syntaxErrors.length > 0) {
+            const errDiv = doc.createElement('div');
+            errDiv.style.cssText = "background:rgba(239,68,68,0.9); color:white; padding:10px; font-family:monospace; font-size:12px; position:fixed; top:0; left:0; width:100%; z-index:9999; border-bottom:1px solid rgba(0,0,0,0.2);";
+            errDiv.innerHTML = "<strong>⚠️ Syntax Errors Detected (Check Console):</strong><ul style='margin:5px 0; padding-left:20px;'>" + 
+                syntaxErrors.map(e => `<li>${e.path} (Line ${e.line}): ${e.message}</li>`).join('') + "</ul>";
+            doc.body.insertBefore(errDiv, doc.body.firstChild);
+        }
 
         const finalHtml = doc.documentElement.outerHTML;
         iframe.srcdoc = finalHtml;
