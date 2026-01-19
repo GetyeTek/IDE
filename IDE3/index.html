@@ -807,41 +807,55 @@
 
     async function fetchEdgeFunctions(force = false) {
         const sidebar = document.getElementById('ef-list-sidebar');
-        sidebar.innerHTML = '<div style="padding:20px; text-align:center; font-size:11px; color:#666;">Scanning...</div>';
+        const status = document.getElementById('ef-status-msg');
+        sidebar.innerHTML = '<div style="padding:20px; text-align:center; font-size:11px; color:var(--ai-accent); animation:pulse 1.5s infinite;">Scanning...</div>';
         
-        if (force) {
-            try {
-                const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch' }) });
+        try {
+            // Always fetch fresh if the sidebar is currently empty or if forced
+            if (force || !window.repoFiles || window.repoFiles.length === 0) {
+                const res = await fetch(CONFIG.funcUrl, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: apiBody({ action: 'fetch' }) 
+                });
                 const data = await res.json();
+                if (data.error) throw new Error(data.error);
                 window.repoFiles = data.files || [];
-            } catch(e) { console.error("Sync failed", e); }
-        }
-
-        const functions = new Set();
-        window.repoFiles.forEach(f => {
-            if (f.path.startsWith('supabase/functions/')) {
-                const parts = f.path.split('/');
-                if (parts.length >= 3) functions.add(parts[2]);
             }
-        });
 
-        sidebar.innerHTML = '';
-        if (functions.size === 0) {
-            sidebar.innerHTML = '<div style="padding:10px; color:#666; font-size:11px; text-align:center;">No functions found.</div>';
-        } else {
-            functions.forEach(name => {
-                const item = document.createElement('div');
-                item.className = 'ef-list-item';
-                item.style.cssText = 'padding:10px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; font-size:12px; cursor:pointer; color:#ccc; transition:0.2s; text-align:center;';
-                item.innerText = name;
-                item.onclick = () => {
-                    document.querySelectorAll('.ef-list-item').forEach(el => el.style.borderColor = 'var(--border)');
-                    item.style.borderColor = 'var(--ai-accent)';
-                    document.getElementById('ef-name').value = name;
-                    loadEdgeFunctionCode(name);
-                };
-                sidebar.appendChild(item);
+            const functions = new Set();
+            window.repoFiles.forEach(f => {
+                // Match path like: supabase/functions/my-fn/index.ts
+                if (f.path.includes('supabase/functions/')) {
+                    const parts = f.path.split('supabase/functions/')[1].split('/');
+                    if (parts[0]) functions.add(parts[0]);
+                }
             });
+
+            sidebar.innerHTML = '';
+            if (functions.size === 0) {
+                sidebar.innerHTML = '<div style="padding:20px; color:#666; font-size:11px; text-align:center;">No functions found in /supabase/functions/</div>';
+                status.innerText = "Scan complete: 0 found.";
+            } else {
+                functions.forEach(name => {
+                    const item = document.createElement('div');
+                    item.className = 'ef-list-item';
+                    item.style.cssText = 'padding:10px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; font-size:12px; cursor:pointer; color:#ccc; transition:0.2s; text-align:center;';
+                    item.innerText = name;
+                    item.onclick = () => {
+                        document.querySelectorAll('.ef-list-item').forEach(el => el.style.borderColor = 'var(--border)');
+                        item.style.borderColor = 'var(--ai-accent)';
+                        document.getElementById('ef-name').value = name;
+                        loadEdgeFunctionCode(name);
+                    };
+                    sidebar.appendChild(item);
+                });
+                status.innerText = `Scan complete: Found ${functions.size} functions.`;
+            }
+        } catch(e) {
+            sidebar.innerHTML = `<div style="padding:20px; color:var(--danger); font-size:11px; text-align:center;">Scan Error: ${e.message}</div>`;
+            status.innerText = "Scan failed. Check settings.";
+            status.style.color = "var(--danger)";
         }
     }
 
