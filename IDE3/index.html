@@ -961,6 +961,9 @@
                     closeEFManager(); 
                     switchTab('tab-cicd', document.querySelectorAll('.nav-item')[4]); 
                     loadWorkflows(); 
+                    // Sync Files (new function) and Logs (commit)
+                    fetchState(false, true); 
+                    fetchFileList();
                 }, 1500);
             } else throw new Error("Workflow trigger failed.");
         } catch (e) {
@@ -1296,8 +1299,8 @@
 
             if(data.success) {
                 if(actionType === 'patch') setTimeout(() => bundleAndPreview(null), 1500);
-                // Update history, but DO NOT wipe the terminal so the user can see the result
-                setTimeout(() => fetchState(false, false), 1000);
+                // Update history (keep term) AND update file list (in case of create/delete)
+                setTimeout(() => { fetchState(false, false); fetchFileList(); }, 1000);
             }
         } catch (e) {
             updateTerminalCard(termId, { error: e.message });
@@ -1807,6 +1810,8 @@
             if(d.success) {
                 alert(`🤖 Auto-Fix Applied!\n\nAI successfully generated and committed a patch.`);
                 loadWorkflows(); 
+                fetchState(false, true); // Sync logs
+                fetchFileList(); // Sync files (fix might have added/removed files)
             } else {
                 alert("Auto-Fix Failed: " + (d.message || "Unknown error"));
             }
@@ -1834,7 +1839,11 @@
             });
             const data = await res.json();
             toast.remove();
-            if(data.success) { alert("Workflow Dispatched!"); setTimeout(loadWorkflows, 2000); }
+            if(data.success) { 
+                alert("Workflow Dispatched!"); 
+                // Sync workflows AND logs (to see dispatch entry)
+                setTimeout(() => { loadWorkflows(); fetchState(false, true); }, 2000); 
+            }
         } catch(e) { toast.remove(); alert("Error: " + e.message); }
     }
 
@@ -3014,6 +3023,8 @@ function traceHistoryToLog(sha) {
                     el.style.padding = "0";
                     setTimeout(() => el.remove(), 300);
                 }
+                // Ensure strict sync with server
+                setTimeout(() => { loadWorkflows(); fetchState(false, false); }, 1000);
             } else {
                 alert("Failed to delete run.");
             }
