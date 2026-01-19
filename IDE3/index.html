@@ -1240,7 +1240,10 @@
                     op.is_resolved_ef = true;
                 }
                 
-                if (CONFIG.projectPath && op.file_path && !op.is_resolved_ef && !op.file_path.startsWith(CONFIG.projectPath)) {
+                // Prevent prefixing if it's already an EF resolution OR if the path explicitly targets supabase/functions/
+                const isEfPath = op.is_resolved_ef || (op.file_path && op.file_path.startsWith('supabase/functions/'));
+                
+                if (CONFIG.projectPath && op.file_path && !isEfPath && !op.file_path.startsWith(CONFIG.projectPath)) {
                     const cleanPath = op.file_path.startsWith('/') ? op.file_path.slice(1) : op.file_path;
                     op.file_path = CONFIG.projectPath + cleanPath;
                 }
