@@ -368,6 +368,19 @@
         .chat-header .flex-gap .icon-btn { border: none; background: transparent; padding: 6px; }
         .chat-header .flex-gap .icon-btn:hover { background: rgba(255,255,255,0.1); }
 
+        /* AI SETTINGS UI */
+        .ai-section-title { font-size: 12px; font-weight: 600; color: var(--ai-accent); margin: 20px 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+        .ai-provider-card { background: #1a1a1c; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px; position: relative; }
+        .ai-provider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .ai-tag { font-size: 9px; padding: 2px 6px; border-radius: 4px; background: #333; color: #aaa; text-transform: uppercase; }
+        .ai-tag.openai { background: rgba(34, 197, 94, 0.1); color: #4ade80; }
+        .ai-tag.google { background: rgba(59, 130, 246, 0.1); color: #60a5fa; }
+        
+        .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .role-card { background: #111; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+        .role-label { font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 5px; }
+        .role-select { width: 100%; background: #222; color: white; border: 1px solid #333; padding: 6px; border-radius: 4px; font-size: 12px; }
+
     </style>
 </head>
 <body onclick="closeAllMenus(event)">
@@ -508,6 +521,24 @@
                         🚩 Create History Checkpoint
                     </button>
                     <p style="font-size: 10px; color: var(--text-muted); text-align: center; margin: 0;">Deploy Functions or mark current state without commit.</p>
+                </div>
+
+                <div id="ai-settings-container" style="border-top: 1px solid var(--border); margin-top: 20px; padding-top: 10px;">
+                    <div class="header" style="font-size:16px; margin-bottom:0;">AI Command Center</div>
+                    <p style="font-size:11px; color:#666; margin-bottom:15px;">Route logic to different providers (OpenAI, Groq, Gemini) based on task.</p>
+
+                    <div class="ai-section-title">1. Role Assignment (The Switchboard)</div>
+                    <div class="role-grid" id="ai-role-grid">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="flex-between" style="margin-top:20px;">
+                        <div class="ai-section-title" style="margin:0;">2. Provider Registry</div>
+                        <button class="icon-btn" onclick="addAIProvider()">+ Add Provider</button>
+                    </div>
+                    <div id="ai-provider-list" style="margin-top:10px;">
+                        <!-- Populated by JS -->
+                    </div>
                 </div>
 
                 <button class="btn btn-primary" style="margin-top:20px;" onclick="saveSettings()">Save & Sync Config</button>
@@ -714,6 +745,35 @@
     let editHistory = []; 
     let historyIndex = -1;
     let chatHistory = []; // Stores {role, text} for AI Chat
+
+    // --- AI CONFIG STATE ---
+    const DEFAULT_AI_CONFIG = {
+      providers: {
+        'default_main': {
+          name: 'DeepSeek V3 (OpenRouter)',
+          baseUrl: 'https://openrouter.ai/api/v1/chat/completions',
+          model: 'deepseek/deepseek-chat',
+          apiKeyEnv: 'Deepseek_API',
+          type: 'openai'
+        },
+        'default_analyst': {
+           name: 'Gemini Flash (Google)',
+           baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent',
+           model: '',
+           apiKeyEnv: 'GEMINI_API_KEY',
+           type: 'google'
+        }
+      },
+      roles: {
+        chat: 'default_main',
+        architect: 'default_main',
+        fast_fix: 'default_main',
+        analyst: 'default_analyst'
+      }
+    };
+    
+    // Load from local storage or fallback to default
+    window.aiConfig = JSON.parse(localStorage.getItem('conduit_ai_config') || 'null') || DEFAULT_AI_CONFIG;
     
     // Caches
     window.OP_CACHE = {}; 
@@ -736,6 +796,7 @@
         document.getElementById('setting-show-preview').checked = CONFIG.showPreview;
         document.getElementById('setting-ef-mode').value = CONFIG.efDeploymentMode;
         
+        renderAIConfigUI(); // Render AI Settings
         applyPreviewTabVisibility(); // Apply visibility on load
 
         // Restore Editor State
@@ -770,7 +831,8 @@
     }
 
     function apiBody(obj) {
-        return JSON.stringify({ ...obj, repo_name: CONFIG.repoName });
+        // INJECT AI CONFIG INTO EVERY REQUEST
+        return JSON.stringify({ ...obj, repo_name: CONFIG.repoName, ai_config: window.aiConfig });
     }
 
     function resolvePath(base, relative) {
@@ -1031,6 +1093,9 @@
         localStorage.setItem('conduit_showPreview', showPreview);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
         
+        // Save AI Config
+        localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
+
         CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, efDeploymentMode };
         
         applyPreviewTabVisibility(); // Apply change immediately
@@ -2660,6 +2725,102 @@ function traceHistoryToLog(sha) {
             exportController = null;
         }
         document.getElementById('export-modal').style.display = 'none';
+    }
+
+    // --- AI SETTINGS LOGIC ---
+
+    function renderAIConfigUI() {
+        const pList = document.getElementById('ai-provider-list');
+        const rGrid = document.getElementById('ai-role-grid');
+        if (!pList || !rGrid) return;
+
+        // 1. Render Providers
+        pList.innerHTML = '';
+        Object.entries(window.aiConfig.providers).forEach(([key, p]) => {
+            const div = document.createElement('div');
+            div.className = 'ai-provider-card';
+            div.innerHTML = `
+                <div class="ai-provider-header">
+                    <div class="flex-gap" style="align-items:center;">
+                        <strong>${p.name}</strong>
+                        <span class="ai-tag ${p.type}">${p.type}</span>
+                    </div>
+                    <button class="menu-btn" style="color:var(--danger)" onclick="removeAIProvider('${key}')">×</button>
+                </div>
+                <div class="input-group" style="margin-bottom:8px;">
+                    <input type="text" class="input-field" value="${p.baseUrl}" placeholder="Base URL" onchange="updateAIProvider('${key}', 'baseUrl', this.value)">
+                </div>
+                <div class="flex-gap">
+                    <input type="text" class="input-field" value="${p.model}" placeholder="Model ID" style="flex:1" onchange="updateAIProvider('${key}', 'model', this.value)">
+                    <input type="text" class="input-field" value="${p.apiKeyEnv}" placeholder="Env Var Name" style="flex:1; color:var(--ai-accent);" onchange="updateAIProvider('${key}', 'apiKeyEnv', this.value)">
+                </div>
+            `;
+            pList.appendChild(div);
+        });
+
+        // 2. Render Roles
+        rGrid.innerHTML = '';
+        const roleDesc = {
+            chat: "General Chat",
+            architect: "Logic Generator (Surgeon)",
+            fast_fix: "Syntax/Hot Fix (Healer)",
+            analyst: "Log Analysis (Detective)"
+        };
+
+        Object.keys(window.aiConfig.roles).forEach(role => {
+            const currentProviderKey = window.aiConfig.roles[role];
+            const div = document.createElement('div');
+            div.className = 'role-card';
+            
+            let options = '';
+            Object.entries(window.aiConfig.providers).forEach(([key, p]) => {
+                const selected = key === currentProviderKey ? 'selected' : '';
+                options += `<option value="${key}" ${selected}>${p.name}</option>`;
+            });
+
+            div.innerHTML = `
+                <label class="role-label">${roleDesc[role] || role}</label>
+                <select class="role-select" onchange="updateAIRole('${role}', this.value)">
+                    ${options}
+                </select>
+            `;
+            rGrid.appendChild(div);
+        });
+    }
+
+    function addAIProvider() {
+        const id = 'custom_' + Date.now();
+        window.aiConfig.providers[id] = {
+            name: 'New Provider',
+            baseUrl: 'https://api.openai.com/v1/chat/completions',
+            model: 'gpt-4o',
+            apiKeyEnv: 'OPENAI_API_KEY',
+            type: 'openai'
+        };
+        renderAIConfigUI();
+    }
+
+    function removeAIProvider(id) {
+        if (Object.keys(window.aiConfig.providers).length <= 1) return alert("Must keep at least one provider.");
+        if (confirm("Remove provider?")) {
+            delete window.aiConfig.providers[id];
+            // Reset roles if they pointed to deleted provider
+            const firstAvailable = Object.keys(window.aiConfig.providers)[0];
+            Object.keys(window.aiConfig.roles).forEach(role => {
+                if (window.aiConfig.roles[role] === id) window.aiConfig.roles[role] = firstAvailable;
+            });
+            renderAIConfigUI();
+        }
+    }
+
+    function updateAIProvider(id, field, value) {
+        if (window.aiConfig.providers[id]) {
+            window.aiConfig.providers[id][field] = value;
+        }
+    }
+
+    function updateAIRole(role, providerKey) {
+        window.aiConfig.roles[role] = providerKey;
     }
 
     async function processExport(type) {
