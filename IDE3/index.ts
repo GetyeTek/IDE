@@ -114,10 +114,12 @@ async function dispatchWorkflow(repo: string, eventType: string, payload: any = 
 }
 
 async function triggerWorkflowFile(repo: string, workflowId: string, ref: string, inputs: any = {}) {
-  await githubFetch(repo, `/actions/workflows/${workflowId}/dispatches`, {
+  console.log(`[GitHub Dispatch] Target: ${workflowId}, Ref: ${ref}, Inputs:`, JSON.stringify(inputs));
+  const res = await githubFetch(repo, `/actions/workflows/${workflowId}/dispatches`, {
     method: "POST",
     body: JSON.stringify({ ref: ref, inputs: inputs }),
   });
+  console.log(`[GitHub Dispatch] Result for ${workflowId}:`, JSON.stringify(res));
   return true;
 }
 
