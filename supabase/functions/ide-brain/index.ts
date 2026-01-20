@@ -1272,27 +1272,63 @@ You have access to exactly 3 atomic operations. Do not invent others.
     if (action === "propose_syntax_fix") {
         // Specialized Architect Agent for precise block replacement of syntax errors
         const { code, error } = payload;
-        const errorContext = code.split('\n').slice(Math.max(0, error.line - 5), error.line + 5).join('\n');
+        
+        // LOGIC UPGRADE: Context Strategy based on file size
+        // If file is small (<15KB), give AI the whole thing for better closure analysis.
+        const IS_SMALL_FILE = code.length <= 15000;
+        let contextHeader = "";
+        let contextContent = "";
+        
+        if (IS_SMALL_FILE) {
+            contextHeader = "=== FULL FILE CONTENT (Small File - Global Scope Available) ===";
+            contextContent = code;
+        } else {
+            const startLine = Math.max(0, error.line - 10);
+            const endLine = error.line + 10;
+            contextHeader = `=== FOCUSED CONTEXT (Lines ${startLine} to ${endLine}) ===`;
+            contextContent = code.split('\n').slice(startLine, endLine).join('\n');
+        }
         
         const prompt = `
-        You are a Syntax Repair Engine.
-        
-        THE BROKEN CODE (Full context provided for reference):
-        ${code}
+You are the ELITE SYNTAX REPAIR ENGINE.
+Your Mission: Restore executable state to the provided code file.
 
-        THE ERROR:
-        Line ${error.line}: ${error.message}
-        
-        FOCUS AREA:
-        ${errorContext}
+=== INCIDENT REPORT ===
+ERROR LOCATION: Line ${error.line}
+ERROR MESSAGE: ${error.message}
 
-        TASK:
-        Generate a strict JSON Patch (Array) to fix this specific error.
-        Use "replace_block" action.
-        The "find_block" must match the broken code EXACTLY.
-        
-        RETURN JSON ONLY.
-        `;
+${contextHeader}
+${contextContent}
+
+=== THE PROTOCOL ===
+You must generate a JSON PATCH that surgically repairs the syntax error.
+
+RULES OF ENGAGEMENT:
+1. STRICT JSON ONLY. No conversational text. No markdown prologues outside the JSON block.
+2. "find_block" ACCURACY: Must be a cryptographic-level match. Copy the existing broken code EXACTLY (including indentation/newlines). If you change even one space in "find_block", the patch will fail.
+3. MINIMAL INVASION: Do not refactor unrelated code. Fix ONLY the syntax error (missing brace, unclosed string, bad keyword).
+4. STRATEGY: Use "replace_block". Do not use "insert_after" unless absolutely necessary.
+
+=== JSON SCHEMA ===
+\`\`\`json
+[
+  { "action": "comment", "text": "Concise technical summary of fix" },
+  { 
+    "action": "replace_block", 
+    "file_path": "current_file", 
+    "find_block": "<EXACT_COPY_OF_BROKEN_CODE>", 
+    "replace_with": "<REPAIRED_CODE>" 
+  }
+]
+\`\`\`
+
+=== THOUGHT PROCESS ===
+1. Locate the error line in the context.
+2. Identify the root cause (e.g., is a previous brace missing? is it a typo?).
+3. Select a unique block of code surrounding the error that captures the problem.
+4. Write the fixed version.
+5. GENERATE JSON.
+`;
 
         const result = await genericRequestAI('architect', [{ role: "user", content: prompt }], ai_config);
         let ops = result.content || "[]";
