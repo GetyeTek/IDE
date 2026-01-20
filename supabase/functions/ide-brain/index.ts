@@ -1377,7 +1377,7 @@ RULES OF ENGAGEMENT:
   { "action": "comment", "text": "Concise technical summary of fix" },
   { 
     "action": "replace_block", 
-    "file_path": "current_file", 
+    "file_path": "${file_path}", 
     "find_block": "<EXACT_COPY_OF_BROKEN_CODE>", 
     "replace_with": "<REPAIRED_CODE>" 
   }
