@@ -1449,18 +1449,39 @@
             el.style.borderLeft = ''; el.style.backgroundColor = '';
         });
 
-        const inputVal = document.getElementById('json-input').value;
+        let inputVal = document.getElementById('json-input').value;
         let payload = {};
+        
+        // --- SMART JSON PARSER ---
         try { 
             if(actionType === 'patch') {
                 const parsed = JSON.parse(inputVal);
                 payload = parsed.operations || parsed; 
             }
-        } catch(e) { 
-            const errorMsg = `JSON PARSE ERROR:\n${e.message}`;
-            const errId = addTerminalCard(null, { error: errorMsg });
-            document.getElementById(errId).scrollIntoView({ behavior: 'smooth' });
-            return; 
+        } catch(e) {
+            // Attempt Auto-Fix for common AI errors (Bad Escapes)
+            console.warn("JSON Parse failed, attempting auto-fix...", e);
+            try {
+                // Fix 1: Escape backslashes that aren't part of a valid escape sequence
+                // Look for \ NOT followed by ["\/bfnrtu]
+                const fixedVal = inputVal.replace(/\\(?![\"\\\/bfnrtu])/g, "\\\\");
+                
+                const parsed = JSON.parse(fixedVal);
+                payload = parsed.operations || parsed;
+                
+                // If successful, update UI and notify user
+                document.getElementById('json-input').value = fixedVal;
+                saveState();
+                showGlobalToast("✨ Auto-fixed JSON syntax (Bad Escapes)");
+                inputVal = fixedVal; // Update reference for logic below
+                
+            } catch(e2) {
+                // If it still fails, show original error
+                const errorMsg = `JSON PARSE ERROR:\n${e.message}`;
+                const errId = addTerminalCard(null, { error: errorMsg });
+                document.getElementById(errId).scrollIntoView({ behavior: 'smooth' });
+                return; 
+            }
         }
 
         if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.g. v1.0):") || "v1.0";
@@ -1529,10 +1550,25 @@
     }
 
     async function runDeepScan() {
-        const inputVal = document.getElementById('json-input').value;
+        let inputVal = document.getElementById('json-input').value;
         let ops = [];
-        try { ops = JSON.parse(inputVal); if(ops.operations) ops = ops.operations; } 
-        catch(e) { return alert("Invalid JSON payload"); }
+        try { 
+            ops = JSON.parse(inputVal); 
+            if(ops.operations) ops = ops.operations; 
+        } 
+        catch(e) {
+            // Same Auto-Fix logic for Deep Scan
+            try {
+                const fixedVal = inputVal.replace(/\\(?![\"\\\/bfnrtu])/g, "\\\\");
+                ops = JSON.parse(fixedVal);
+                if(ops.operations) ops = ops.operations;
+                document.getElementById('json-input').value = fixedVal;
+                saveState();
+                showGlobalToast("✨ Auto-fixed JSON syntax");
+            } catch(e2) {
+                return alert("Invalid JSON payload: " + e.message);
+            }
+        }
         
         if (!Array.isArray(ops)) ops = [ops];
         
