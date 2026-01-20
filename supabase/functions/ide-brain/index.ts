@@ -744,13 +744,30 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     for (const filePath of Object.keys(opsByFile)) {
         const fileOps = opsByFile[filePath];
         let { content, sha } = await getFileRaw(TARGET_REPO, filePath, DEV_BRANCH);
+
+        // --- 1. EXPLICIT FILE EXISTENCE CHECK ---
+        // If file has no SHA (doesn't exist) and we aren't running a 'create_file' op, fail early.
+        const isCreation = fileOps.some((op: any) => op.action === "create_file");
+        if (!sha && !isCreation) {
+            anyOpFailed = true;
+            fileOps.forEach((op: any) => {
+                opLogs.push({ 
+                    type: op.action, 
+                    success: false, 
+                    score: 0, 
+                    message: `File path not found: ${filePath}` 
+                });
+            });
+            fileResults.push({ file: filePath, status: "error", operations: opLogs });
+            continue; // Skip to next file
+        }
+
         let currentContent = base64ToText(content);
-        const opLogs = [];
         let anyChange = false;
 
         for (const op of fileOps) {
             if (op.action === "delete_file") {
-                if (!sha) { opLogs.push({ type: "delete_file", success: true, score: 100, message: "File not found" }); }
+                if (!sha) { opLogs.push({ type: "delete_file", success: true, score: 100, message: "File already gone" }); }
                 else {
                     try {
                         lastCommitSha = await deleteFile(TARGET_REPO, filePath, sha, DEV_BRANCH, `Conduit: Delete ${filePath}`);
@@ -763,18 +780,19 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
             let result = (op.action === "create_file") ? applyOperation("", op) : applyOperation(currentContent, op);
 
             if (!result.success && op.action !== "create_file") {
+                // --- 2. ENHANCED AI HEALER ---
                 const { fixedOp, reason, score } = await consultAI(currentContent, op, result.message, config);
+                
                 if (fixedOp) {
                     fixedOp.explanation = reason; 
                     let retryResult = applyOperation(currentContent, fixedOp);
                     
-                    // --- SANITY CHECK LOOP ---
+                    // Sanity Check Logic
                     if (retryResult.success && autoSanity) {
-                         // Pass fixedOp so AI knows exactly what changed
                          const sanity = await checkCodeSanity(retryResult.newContent, fixedOp, config);
-                         
                          if (!sanity.sane) {
                              opLogs.push({ type: "sanity_check", success: false, message: `Sanity Failed: ${sanity.issues}` });
+                             // Recursively fix sanity
                              const { fixedOp: sanityOp, reason: sanityReason } = await consultAI(currentContent, fixedOp, `The operation ${JSON.stringify(fixedOp)} caused this syntax error: ${sanity.issues}`, config);
                              if (sanityOp) {
                                  const sanityResult = applyOperation(currentContent, sanityOp);
@@ -793,16 +811,20 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
                         opLogs.push({ type: op.action, success: false, score: 0, message: `AI Fix Failed: ${retryResult.message}` });
                     }
                 } else {
+                    // --- 3. DETAILED FAILURE LOGGING ---
                     anyOpFailed = true;
-                    opLogs.push({ type: op.action, success: false, score: score, message: `${result.message} (AI: ${reason})` });
+                    const failMsg = score > 0 
+                        ? `Block not found. (Best Match: ${score}%). AI Reason: ${reason}`
+                        : `Block not found. AI could not locate target. (${reason})`;
+                        
+                    opLogs.push({ type: op.action, success: false, score: score, message: failMsg });
                 }
             } else {
                 if (result.success) { currentContent = result.newContent; anyChange = true; } else { anyOpFailed = true; }
                 opLogs.push({ type: op.action, success: result.success, score: result.score, message: result.message, ...op });
             }
         }
-
-        if (anyChange) {
+if (anyChange) {
             try { lastCommitSha = await updateFile(TARGET_REPO, filePath, currentContent, sha, DEV_BRANCH, `Conduit: ${fileOps.length} ops`); } 
             catch (e: any) { anyOpFailed = true; opLogs.push({ type: 'commit_file', success: false, message: `Commit failed: ${e.message}` }); }
         }
