@@ -1,3 +1,4 @@
+import Parser from "npm:web-tree-sitter@0.20.8";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -835,6 +836,42 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
 }
 
 
+// --- SYNTAX VALIDATION (WASM) ---
+async function validateWithTreeSitter(code: string, filePath: string) {
+  await Parser.init();
+  const parser = new Parser();
+  let langWasmUrl = "";
+  // Map extensions to Tree-sitter WASM binaries
+  if (filePath.endsWith(".java")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-java/releases/download/v0.20.2/tree-sitter-java.wasm";
+  else if (filePath.endsWith(".kt")) langWasmUrl = "https://unpkg.com/tree-sitter-kotlin@0.3.5/tree-sitter-kotlin.wasm";
+  else if (filePath.endsWith(".js") || filePath.endsWith(".ts") || filePath.endsWith(".tsx")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-javascript/releases/download/v0.20.1/tree-sitter-javascript.wasm";
+  else if (filePath.endsWith(".py")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-python/releases/download/v0.20.4/tree-sitter-python.wasm";
+  else return { supported: false, valid: true, errors: [] };
+
+  try {
+    const Lang = await Parser.Language.load(langWasmUrl);
+    parser.setLanguage(Lang);
+    const tree = parser.parse(code);
+    const errors: string[] = [];
+
+    const checkForErrors = (node: any) => {
+      if (node.type === "ERROR" || node.type === "MISSING") {
+        const start = node.startPosition;
+        const snippet = code.substring(node.startIndex, Math.min(node.startIndex + 30, code.length)).replace(/\n/g, ' ');
+        errors.push(`Line ${start.row + 1}, Col ${start.column}: Unexpected token near '${snippet}'`);
+      }
+      for (let i = 0; i < node.childCount; i++) checkForErrors(node.child(i));
+    };
+
+    checkForErrors(tree.rootNode);
+    tree.delete(); parser.delete();
+    return { supported: true, valid: errors.length === 0, errors };
+  } catch (e: any) {
+    console.error("TreeSitter Error:", e);
+    return { supported: true, valid: false, errors: ["WASM Load Failed: " + e.message] };
+  }
+}
+
 // --- MAIN REQUEST HANDLER ---
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -1089,6 +1126,24 @@ serve(async (req) => {
     if (action === "fix_syntax") {
         const result = await repairSyntaxWithAI(code_block, error_message, ai_config);
         return new Response(JSON.stringify({ success: !!result.fixed_code, fixed_code: result.fixed_code, explanation: result.explanation }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "validate_syntax_deep") {
+        const { code_block, file_path } = payload;
+        try {
+            // 1. Deterministic Check (WASM)
+            const tsResult = await validateWithTreeSitter(code_block, file_path || "file.js");
+            if (tsResult.supported) {
+                 return new Response(JSON.stringify(tsResult), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
+            // 2. Fallback: AI Analyst
+            const prompt = `Analyze code for FATAL syntax errors only. Ignore warnings. CODE (${file_path}):\n${code_block.substring(0, 5000)}\nOUTPUT JSON: { "valid": boolean, "errors": ["..."] }`;
+            const result = await genericRequestAI('analyst', [{ role: "user", content: prompt }], ai_config, undefined, { type: "json_object" });
+            const json = JSON.parse(result.content || '{"valid":true}');
+            return new Response(JSON.stringify({ ...json, supported: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        } catch (e: any) {
+            return new Response(JSON.stringify({ valid: false, errors: [e.message] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
     }
 
     if (action === "trigger_build") {
