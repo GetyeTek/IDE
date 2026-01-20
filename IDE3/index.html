@@ -2888,6 +2888,9 @@ async function downloadArtifact(runId) {
             aceEditorInstance.setOption("fontSize", "13px");
             aceEditorInstance.setReadOnly(true);
         }
+
+        // Clear stale content immediately
+        aceEditorInstance.setValue("Loading content...", -1);
         
         try {
             const res = await fetch(CONFIG.funcUrl, {
