@@ -250,14 +250,39 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
   const provider = resolveProvider(role, config);
   if (!provider) throw new Error(`No provider found for role: ${role}`);
   
-  // Smart Key Resolution: Try as Env Var, fallback to Raw Value
-  let apiKey = Deno.env.get(provider.apiKeyEnv);
+  // Advanced Rotation Logic: Fetch Least-Recently-Used key from 'api_keys' table
+  const serviceMap: Record<string, string> = { 
+      'Deepseek_API': 'deepseek', 
+      'GEMINI_API_KEY': 'gemini', 
+      'GROQ_API_KEY': 'groq' 
+  };
+  const serviceName = serviceMap[provider.apiKeyEnv];
+  let apiKey = "";
+
+  if (serviceName) {
+      const { data: keyRow } = await supabase
+          .from('api_keys')
+          .select('id, api_key')
+          .eq('service', serviceName)
+          .eq('is_active', true)
+          .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
+          .order('last_used_at', { ascending: true, nullsFirst: true })
+          .limit(1)
+          .maybeSingle();
+
+      if (keyRow) {
+          apiKey = keyRow.api_key;
+          // Mark as used immediately to move it to the end of the rotation queue
+          await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRow.id);
+      }
+  }
+
+  // Fallback to Env Var if no key found in DB or service not mapped
   if (!apiKey) {
-      // If the value looks like a key (not just a variable name), use it directly
-      if (provider.apiKeyEnv && provider.apiKeyEnv.length > 10) {
-          apiKey = provider.apiKeyEnv;
-      } else {
-          throw new Error(`Missing API Key: ${provider.apiKeyEnv} (Not found in Env)`);
+      apiKey = Deno.env.get(provider.apiKeyEnv) || "";
+      if (!apiKey) {
+          if (provider.apiKeyEnv && provider.apiKeyEnv.length > 10) apiKey = provider.apiKeyEnv;
+          else throw new Error(`Missing API Key: No active keys for '${serviceName || provider.apiKeyEnv}' in DB or Env`);
       }
   }
 
