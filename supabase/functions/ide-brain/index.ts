@@ -1299,9 +1299,12 @@ serve(async (req) => {
                             repo_name: TARGET_REPO, type: 'dispatch_aborted', 
                             data: { reason: "syntax_error", details: errorMsg } 
                         });
+                        // Return structured data for Client-Side Auto-Fix
                         return new Response(JSON.stringify({ 
                             success: false, 
                             validation_error: true, 
+                            file_path: res.path,
+                            errors: res.errors,
                             error: errorMsg 
                         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
                     }
