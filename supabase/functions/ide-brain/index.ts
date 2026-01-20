@@ -320,6 +320,11 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
     
     if (data.error) throw new Error(`Google AI Error: ${data.error.message || JSON.stringify(data.error)}`);
     
+    // --- RAW DEBUG LOG (Supabase Dashboard) ---
+    console.log(`\n=== [AI RESPONSE RECEIVED] Provider: ${provider.name} (Google) ===`);
+    console.log(JSON.stringify(data, null, 2));
+    console.log("=== [END RESPONSE] ===\n");
+
     return { 
       raw: data, 
       content: data.candidates?.[0]?.content?.parts?.[0]?.text || ""
@@ -342,6 +347,11 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
   });
   
   const data = await res.json();
+
+  // --- RAW DEBUG LOG (Supabase Dashboard) ---
+  console.log(`\n=== [AI RESPONSE RECEIVED] Provider: ${provider.name} (Standard) ===`);
+  console.log(JSON.stringify(data, null, 2));
+  console.log("=== [END RESPONSE] ===\n");
   
   if (!res.ok || data.error) {
       const errMsg = data.error ? (data.error.message || JSON.stringify(data.error)) : `HTTP ${res.status} ${res.statusText}`;
