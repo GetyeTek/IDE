@@ -3079,8 +3079,8 @@ async function downloadArtifact(runId) {
                 </div>
                 <div class="flex-gap">
                     <div style="flex:1; position:relative;">
-                        <input type="text" id="model-input-${key}" class="input-field" value="${p.model}" placeholder="Model ID" onchange="updateAIProvider('${key}', 'model', this.value)">
-                        ${p.name.includes('Groq') ? `<button class="action-mini-btn" style="position:absolute; right:5px; top:8px; background:var(--ai-accent); color:white; border-radius:4px;" onclick="fetchRemoteModels('${key}')">List</button>` : ''}
+                        <input type="text" id="model-input-${key}" class="input-field" value="${p.model}" placeholder="Model ID" 
+                            ${p.name.includes('Groq') ? `readonly onclick="fetchRemoteModels('${key}')" style="cursor:pointer; border-color:var(--ai-accent);"` : `onchange="updateAIProvider('${key}', 'model', this.value)"`}>
                     </div>
                     <input type="password" class="input-field" value="${p.apiKeyEnv}" placeholder="Env Var or Raw Key" style="flex:1; color:var(--ai-accent);" onchange="updateAIProvider('${key}', 'apiKeyEnv', this.value)">
                 </div>
@@ -3167,23 +3167,28 @@ async function downloadArtifact(runId) {
     function saveAIConfig() {
 
     async function fetchRemoteModels(key) {
-        const btn = event.target;
-        const original = btn.innerText;
-        btn.innerText = "...";
+        const input = document.getElementById(`model-input-${key}`);
+        const original = input.value;
+        input.value = "Fetching models...";
         try {
             const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch_models', role: 'chat' }) });
             const data = await res.json();
             if (data.models && data.models.length > 0) {
-                const choice = prompt("Select Model:\n" + data.models.map((m, i) => `${i+1}. ${m.id}`).join('\n'), data.models[0].id);
+                const choice = prompt("Select Model:\n" + data.models.map((m, i) => `${i+1}. ${m.id}`).join('\n'), original);
                 if (choice) {
                     const selected = data.models.find((m, i) => m.id === choice || (i+1).toString() === choice);
                     if (selected) {
-                        document.getElementById(`model-input-${key}`).value = selected.id;
+                        input.value = selected.id;
                         updateAIProvider(key, 'model', selected.id);
+                        return;
                     }
                 }
             }
-        } catch(e) { alert("Fetch failed: " + e.message); } finally { btn.innerText = original; }
+            input.value = original;
+        } catch(e) { 
+            alert("Fetch failed: " + e.message); 
+            input.value = original;
+        }
     }
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
         alert("AI Configuration Saved!");
