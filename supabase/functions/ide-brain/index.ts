@@ -1010,6 +1010,7 @@ You have access to exactly 3 atomic operations. Do not invent others.
 
 === CRITICAL LAWS ===
 - NO "insert_after", "insert_before", or "delete_file". Use "replace_block" to achieve these effects.
+- ANTI-AMBIGUITY LAW: When targeting generic code (like "}", ")", "</div>", or "return;"), your "find_block" MUST include at least 1-2 surrounding lines of code to ensure uniqueness. Never target a single symbol.
 - If you need to delete code: "find_block" = the code, "replace_with" = "".
 - If you need to insert code: "find_block" = the anchor line, "replace_with" = "anchor line\nnew code".
 - Always double-check your JSON syntax. No trailing commas.
