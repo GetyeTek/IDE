@@ -1322,115 +1322,36 @@ You have access to exactly 3 atomic operations. Do not invent others.
     if (action === "propose_syntax_fix") {
         const { code, error, file_path } = payload;
 
-        // --- STRATEGY 1: DETERMINISTIC REPAIR (WASM-Guided) ---
-        // If the validator told us EXACTLY what is missing, just apply it.
+        // STRATEGY: PURE DETERMINISTIC REPAIR (WASM-Guided)
+        // We strictly adhere to validator instructions. No AI hallucinations allowed.
         if (error && error.message && error.message.startsWith("MISSING")) {
             const missingCharMatch = error.message.match(/MISSING "(.*?)"/);
             if (missingCharMatch) {
                 const charToInsert = missingCharMatch[1];
                 const lines = code.split('\n');
-                // Tree-Sitter lines are 0-indexed internally, but usually reported 1-indexed. Check your validator.
-                // Assuming 1-based from previous context:
+                // Tree-Sitter lines are 0-indexed internally, but usually reported 1-indexed.
                 const targetLineIdx = error.line - 1;
                 
                 if (lines[targetLineIdx] !== undefined) {
                     console.log(`[DeterministicFix] Auto-inserting '${charToInsert}' at line ${error.line}`);
                     
-                    // Construct a precise patch without AI
                     const lineContent = lines[targetLineIdx];
                     const cleanOps = [
                         { "action": "comment", "text": `Auto-fix: Inserted missing ${charToInsert}` },
                         { 
                             "action": "replace_block", 
-                            "file_path": file_path, // Uses the fixed variable from previous step
+                            "file_path": file_path,
                             "find_block": lineContent,
                             "replace_with": lineContent + charToInsert 
                         }
                     ];
-                    return new Response(JSON.stringify({ operations: JSON.stringify(cleanOps) }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+                    return new Response(JSON.stringify({ operations: JSON.stringify(cleanOps), success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
                 }
             }
         }
 
-        // --- STRATEGY 2: AI FALLBACK ---
-        // Specialized Architect Agent for precise block replacement of syntax errors
-
-        // Immediate Trace: Log the syntax error context being sent to the AI
-        await supabase.from('conduit_logs').insert({
-            repo_name: TARGET_REPO,
-            type: 'ai_trace',
-            data: {
-                stage: 'SYNTAX_FIX_REQUESTED',
-                file_path: payload.file_path || 'unknown',
-                error: error,
-                focused_content: code.split('\n').slice(Math.max(0, error.line - 10), error.line + 10).join('\n')
-            }
-        });
-        
-        // LOGIC UPGRADE: Context Strategy based on file size
-        // If file is small (<15KB), give AI the whole thing for better closure analysis.
-        const IS_SMALL_FILE = code.length <= 15000;
-        let contextHeader = "";
-        let contextContent = "";
-        
-        if (IS_SMALL_FILE) {
-            contextHeader = "=== FULL FILE CONTENT (Small File - Global Scope Available) ===";
-            contextContent = code;
-        } else {
-            const startLine = Math.max(0, error.line - 10);
-            const endLine = error.line + 10;
-            contextHeader = `=== FOCUSED CONTEXT (Lines ${startLine} to ${endLine}) ===`;
-            contextContent = code.split('\n').slice(startLine, endLine).join('\n');
-        }
-        
-        const prompt = `
-You are the ELITE SYNTAX REPAIR ENGINE.
-Your Mission: Restore executable state to the provided code file.
-
-=== INCIDENT REPORT ===
-ERROR LOCATION: Line ${error.line}
-ERROR MESSAGE: ${error.message}
-
-${contextHeader}
-${contextContent}
-
-=== THE PROTOCOL ===
-You must generate a JSON PATCH that surgically repairs the syntax error.
-
-RULES OF ENGAGEMENT:
-1. STRICT JSON ONLY. No conversational text. No markdown prologues outside the JSON block.
-2. "find_block" ACCURACY: Must be a cryptographic-level match. Copy the existing broken code EXACTLY (including indentation/newlines). If you change even one space in "find_block", the patch will fail.
-3. MINIMAL INVASION: Do not refactor unrelated code. Fix ONLY the syntax error (missing brace, unclosed string, bad keyword).
-4. STRATEGY: Use "replace_block" ONLY.
-
-=== JSON SCHEMA ===
-\`\`\`json
-[
-  { "action": "comment", "text": "Concise technical summary of fix" },
-  { 
-    "action": "replace_block", 
-    "file_path": "${file_path}", 
-    "find_block": "<EXACT_COPY_OF_BROKEN_CODE>", 
-    "replace_with": "<REPAIRED_CODE>" 
-  }
-]
-\`\`\`
-
-=== THOUGHT PROCESS ===
-1. Locate the error line in the context.
-2. Identify the root cause (e.g., is a previous brace missing? is it a typo?).
-3. Select a unique block of code surrounding the error that captures the problem.
-4. Write the fixed version.
-5. GENERATE JSON.
-`;
-
-        const result = await genericRequestAI('architect', [{ role: "user", content: prompt }], ai_config);
-        let ops = result.content || "[]";
-        
-        // Cleanup markdown
-        ops = ops.replace(/```json/g, "").replace(/```/g, "").trim();
-        
-        return new Response(JSON.stringify({ operations: ops }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Fallback: Return empty to signal manual intervention needed
+        return new Response(JSON.stringify({ operations: "[]", success: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "validate_syntax_deep") {
