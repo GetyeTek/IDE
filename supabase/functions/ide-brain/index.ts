@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Parser from "npm:web-tree-sitter"; // WASM Parser Support
 
 // --- CONFIGURATION ---
 const GITHUB_USER = "GetyeTek"; 
@@ -156,6 +157,82 @@ function validateCodeStructure(code: string, fileName: string): { valid: boolean
     }
 
     return { valid: true };
+}
+
+// --- WASM DEEP SCANNER ---
+const WASM_LANG_URLS: Record<string, string> = {
+    'java': 'https://unpkg.com/tree-sitter-java@0.20.0/tree-sitter-java.wasm',
+    'javascript': 'https://unpkg.com/tree-sitter-javascript@0.20.0/tree-sitter-javascript.wasm',
+    'typescript': 'https://unpkg.com/tree-sitter-typescript@0.20.0/tree-sitter-typescript.wasm',
+    'python': 'https://unpkg.com/tree-sitter-python@0.20.0/tree-sitter-python.wasm',
+    'cpp': 'https://unpkg.com/tree-sitter-cpp@0.20.0/tree-sitter-cpp.wasm'
+};
+
+let parserInitialized = false;
+
+async function deepScanSyntax(code: string, filePath: string) {
+    if (!parserInitialized) {
+        await Parser.init();
+        parserInitialized = true;
+    }
+
+    let langKey = '';
+    if (filePath.endsWith('.java')) langKey = 'java';
+    else if (filePath.endsWith('.js')) langKey = 'javascript';
+    else if (filePath.endsWith('.ts')) langKey = 'typescript';
+    else if (filePath.endsWith('.py')) langKey = 'python';
+    else if (filePath.endsWith('.cpp') || filePath.endsWith('.c')) langKey = 'cpp';
+    
+    if (!langKey) return { supported: false, valid: true };
+
+    try {
+        const langUrl = WASM_LANG_URLS[langKey];
+        // Create language from URL (Deno fetches and caches this)
+        const lang = await Parser.Language.load(langUrl);
+        
+        const parser = new Parser();
+        parser.setLanguage(lang);
+        
+        const tree = parser.parse(code);
+        const errors: string[] = [];
+        
+        // Traverse tree for ERROR nodes
+        const cursor = tree.walk();
+        let reachedRoot = false;
+        
+        // Recursive walker is tricky with cursor, using simple loop for depth
+        const traverse = (c: any) => {
+            // Check current node
+            if (c.nodeType === 'ERROR' || c.nodeType === 'MISSING') {
+                const pos = c.startPosition;
+                errors.push(`Syntax Error at Line ${pos.row + 1}, Col ${pos.column}`);
+            }
+            
+            // Go deeper
+            if (c.gotoFirstChild()) {
+                traverse(c);
+                c.gotoParent();
+            }
+            // Go sideways
+            if (c.gotoNextSibling()) {
+                traverse(c);
+                // backtrack is handled by the recursion unwinding
+            }
+        };
+        
+        traverse(cursor);
+        tree.delete();
+        parser.delete();
+
+        return { 
+            supported: true, 
+            valid: errors.length === 0, 
+            errors: errors 
+        };
+    } catch (e: any) {
+        console.error("WASM Load Error:", e);
+        return { supported: true, valid: false, errors: ["WASM Loader Failed: " + e.message] };
+    }
 }
 
 function isRecordInScope(record: any, scopePath: string): boolean {
@@ -1078,6 +1155,11 @@ serve(async (req) => {
     if (action === "fix_syntax") {
         const result = await repairSyntaxWithAI(code_block, error_message, ai_config);
         return new Response(JSON.stringify({ success: !!result.fixed_code, fixed_code: result.fixed_code, explanation: result.explanation }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "validate_syntax_deep") {
+        const result = await deepScanSyntax(code_block, file_path);
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "trigger_build") {
