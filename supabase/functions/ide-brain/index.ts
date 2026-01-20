@@ -1210,6 +1210,40 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: !!result.fixed_code, fixed_code: result.fixed_code, explanation: result.explanation }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "propose_syntax_fix") {
+        // Specialized Architect Agent for precise block replacement of syntax errors
+        const { code, error } = payload;
+        const errorContext = code.split('\n').slice(Math.max(0, error.line - 5), error.line + 5).join('\n');
+        
+        const prompt = `
+        You are a Syntax Repair Engine.
+        
+        THE BROKEN CODE (Full context provided for reference):
+        ${code}
+
+        THE ERROR:
+        Line ${error.line}: ${error.message}
+        
+        FOCUS AREA:
+        ${errorContext}
+
+        TASK:
+        Generate a strict JSON Patch (Array) to fix this specific error.
+        Use "replace_block" action.
+        The "find_block" must match the broken code EXACTLY.
+        
+        RETURN JSON ONLY.
+        `;
+
+        const result = await genericRequestAI('architect', [{ role: "user", content: prompt }], ai_config);
+        let ops = result.content || "[]";
+        
+        // Cleanup markdown
+        ops = ops.replace(/```json/g, "").replace(/```/g, "").trim();
+        
+        return new Response(JSON.stringify({ operations: ops }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "validate_syntax_deep") {
         // ERROR FIX: 'code_block' and 'file_path' are already in the top-level scope.
         // We must NOT extract them from 'payload' (the rest object) or they will be undefined.
