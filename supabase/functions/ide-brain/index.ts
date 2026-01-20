@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Parser from "npm:web-tree-sitter"; // WASM Parser Support
 
 // --- CONFIGURATION ---
 const GITHUB_USER = "GetyeTek"; 
@@ -87,152 +86,7 @@ function textToBase64(str: string) {
 }
 
 function escapeRegExp(string: string) { 
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\function escapeRegExp(string: string) { 
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-}'); 
-}
-
-// --- STRUCTURAL VALIDATOR ---
-function validateCodeStructure(code: string, fileName: string): { valid: boolean; error?: string; line?: number } {
-    // Only check structural languages
-    if (!/\.(java|kt|js|ts|cpp|cs|dart|json)$/.test(fileName)) return { valid: true };
-
-    const stack: { char: string; line: number }[] = [];
-    const lines = code.split('\n');
-    let inQuote = false;
-    let quoteChar = '';
-    let inBlockComment = false;
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        for (let j = 0; j < line.length; j++) {
-            const char = line[j];
-            const next = line[j + 1];
-
-            // 1. Handle Comments (Skip)
-            if (!inQuote && !inBlockComment) {
-                if (char === '/' && next === '/') break; // Line comment, skip rest of line
-                if (char === '/' && next === '*') { inBlockComment = true; j++; continue; }
-            }
-            if (!inQuote && inBlockComment) {
-                if (char === '*' && next === '/') { inBlockComment = false; j++; continue; }
-                continue;
-            }
-
-            // 2. Handle Strings (Skip content, check bounds)
-            if (!inBlockComment) {
-                if (char === '"' || char === "'") {
-                    if (!inQuote) { 
-                        inQuote = true; 
-                        quoteChar = char; 
-                    } else if (char === quoteChar && line[j - 1] !== '\\') { 
-                        inQuote = false; 
-                    }
-                }
-            }
-
-            if (inQuote || inBlockComment) continue;
-
-            // 3. Check Brackets
-            if (['{', '(', '['].includes(char)) {
-                stack.push({ char, line: i + 1 });
-            }
-            if (['}', ')', ']'].includes(char)) {
-                if (stack.length === 0) return { valid: false, error: `Unexpected closing '${char}'`, line: i + 1 };
-                const last = stack.pop();
-                const expected = last?.char === '{' ? '}' : (last?.char === '(' ? ')' : ']');
-                if (char !== expected) {
-                    return { valid: false, error: `Mismatched '${char}' (Expected '${expected}' for match on line ${last?.line})`, line: i + 1 };
-                }
-            }
-        }
-    }
-
-    if (inBlockComment) return { valid: false, error: "Unclosed Block Comment /*", line: lines.length };
-    // Note: Multiline strings exist in Kotlin/Java, so unclosed quote check is fuzzy, skipping for now to avoid false positives.
-    
-    if (stack.length > 0) {
-        const last = stack[stack.length - 1];
-        return { valid: false, error: `Unclosed '${last.char}'`, line: last.line };
-    }
-
-    return { valid: true };
-}
-
-// --- WASM DEEP SCANNER ---
-const WASM_LANG_URLS: Record<string, string> = {
-    'java': 'https://unpkg.com/tree-sitter-java@0.20.0/tree-sitter-java.wasm',
-    'javascript': 'https://unpkg.com/tree-sitter-javascript@0.20.0/tree-sitter-javascript.wasm',
-    'typescript': 'https://unpkg.com/tree-sitter-typescript@0.20.0/tree-sitter-typescript.wasm',
-    'python': 'https://unpkg.com/tree-sitter-python@0.20.0/tree-sitter-python.wasm',
-    'cpp': 'https://unpkg.com/tree-sitter-cpp@0.20.0/tree-sitter-cpp.wasm'
-};
-
-let parserInitialized = false;
-
-async function deepScanSyntax(code: string, filePath: string) {
-    if (!parserInitialized) {
-        await Parser.init();
-        parserInitialized = true;
-    }
-
-    let langKey = '';
-    if (filePath.endsWith('.java')) langKey = 'java';
-    else if (filePath.endsWith('.js')) langKey = 'javascript';
-    else if (filePath.endsWith('.ts')) langKey = 'typescript';
-    else if (filePath.endsWith('.py')) langKey = 'python';
-    else if (filePath.endsWith('.cpp') || filePath.endsWith('.c')) langKey = 'cpp';
-    
-    if (!langKey) return { supported: false, valid: true };
-
-    try {
-        const langUrl = WASM_LANG_URLS[langKey];
-        // Create language from URL (Deno fetches and caches this)
-        const lang = await Parser.Language.load(langUrl);
-        
-        const parser = new Parser();
-        parser.setLanguage(lang);
-        
-        const tree = parser.parse(code);
-        const errors: string[] = [];
-        
-        // Traverse tree for ERROR nodes
-        const cursor = tree.walk();
-        let reachedRoot = false;
-        
-        // Recursive walker is tricky with cursor, using simple loop for depth
-        const traverse = (c: any) => {
-            // Check current node
-            if (c.nodeType === 'ERROR' || c.nodeType === 'MISSING') {
-                const pos = c.startPosition;
-                errors.push(`Syntax Error at Line ${pos.row + 1}, Col ${pos.column}`);
-            }
-            
-            // Go deeper
-            if (c.gotoFirstChild()) {
-                traverse(c);
-                c.gotoParent();
-            }
-            // Go sideways
-            if (c.gotoNextSibling()) {
-                traverse(c);
-                // backtrack is handled by the recursion unwinding
-            }
-        };
-        
-        traverse(cursor);
-        tree.delete();
-        parser.delete();
-
-        return { 
-            supported: true, 
-            valid: errors.length === 0, 
-            errors: errors 
-        };
-    } catch (e: any) {
-        console.error("WASM Load Error:", e);
-        return { supported: true, valid: false, errors: ["WASM Loader Failed: " + e.message] };
-    }
 }
 
 function isRecordInScope(record: any, scopePath: string): boolean {
@@ -851,21 +705,6 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
                 opLogs.push({ type: op.action, success: result.success, score: result.score, message: result.message, ...op });
             }
         }
-        
-        // --- POST-OP STRUCTURAL VALIDATION ---
-        if (anyChange && currentContent) {
-            const structureCheck = validateCodeStructure(currentContent, filePath);
-            if (!structureCheck.valid) {
-                opLogs.push({ 
-                    type: 'structure_warn', 
-                    success: false, 
-                    score: 0, 
-                    message: `⚠️ SYNTAX ERROR: ${structureCheck.error} (Line ${structureCheck.line})` 
-                });
-                // Note: We currently Log it but don't abort the commit (User might want to force save)
-                // To abort, set anyOpFailed = true;
-            }
-        }
 
         if (anyChange) {
             try { lastCommitSha = await updateFile(TARGET_REPO, filePath, currentContent, sha, DEV_BRANCH, `Conduit: ${fileOps.length} ops`); } 
@@ -1155,11 +994,6 @@ serve(async (req) => {
     if (action === "fix_syntax") {
         const result = await repairSyntaxWithAI(code_block, error_message, ai_config);
         return new Response(JSON.stringify({ success: !!result.fixed_code, fixed_code: result.fixed_code, explanation: result.explanation }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    if (action === "validate_syntax_deep") {
-        const result = await deepScanSyntax(code_block, file_path);
-        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "trigger_build") {
