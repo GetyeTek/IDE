@@ -1118,6 +1118,17 @@ You have access to exactly 3 atomic operations. Do not invent others.
     if (action === "auto_fix_build") {
         if (!run_id) throw new Error("run_id required");
 
+        // Immediate Trace: Signal that analysis is starting
+        await supabase.from('conduit_logs').insert({
+            repo_name: TARGET_REPO,
+            type: 'ai_trace',
+            data: { 
+                stage: 'INIT_AUTO_FIX', 
+                run_id: run_id, 
+                message: 'Fetching logs and preparing AI Detective...' 
+            }
+        });
+
         // 1. Get Log Text
         const jobsData = await githubFetch(TARGET_REPO, `/actions/runs/${run_id}/jobs`);
         const failedJob = jobsData.jobs.find((j: any) => j.conclusion === "failure");
@@ -1210,6 +1221,18 @@ You have access to exactly 3 atomic operations. Do not invent others.
         }
 
         // 4. PHASE 3: Surgeon (Generate Fix) - Pass the new change context
+        // Immediate Trace: Log the exact prompt context being sent to the Surgeon
+        await supabase.from('conduit_logs').insert({
+            repo_name: TARGET_REPO,
+            type: 'ai_trace',
+            data: {
+                stage: 'SURGEON_PROMPT_SENT',
+                error_summary: summary,
+                context_files: files,
+                diff_context: changeContext.substring(0, 2000) + "..."
+            }
+        });
+
         const opsJson = await generateFixFromFullContext(summary, contextPayload, changeContext, ai_config);
         let ops = [];
         try { ops = JSON.parse(opsJson); } catch(e) { throw new Error("AI generated invalid JSON"); }
@@ -1289,6 +1312,18 @@ You have access to exactly 3 atomic operations. Do not invent others.
     if (action === "propose_syntax_fix") {
         // Specialized Architect Agent for precise block replacement of syntax errors
         const { code, error } = payload;
+
+        // Immediate Trace: Log the syntax error context being sent to the AI
+        await supabase.from('conduit_logs').insert({
+            repo_name: TARGET_REPO,
+            type: 'ai_trace',
+            data: {
+                stage: 'SYNTAX_FIX_REQUESTED',
+                file_path: payload.file_path || 'unknown',
+                error: error,
+                focused_content: code.split('\n').slice(Math.max(0, error.line - 10), error.line + 10).join('\n')
+            }
+        });
         
         // LOGIC UPGRADE: Context Strategy based on file size
         // If file is small (<15KB), give AI the whole thing for better closure analysis.
