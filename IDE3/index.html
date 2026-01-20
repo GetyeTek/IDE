@@ -1579,39 +1579,37 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
         let errorCount = 0;
         let logHtml = '';
 
-        // 3. Process Files
-        for (const path of filesToScan) {
-            try {
-                // A. Get Content (Cache or Network)
-                let content = "";
-                if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path]) {
-                    content = window.CURRENT_FILE_CACHE[path].content;
-                } else {
-                    const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
-                    const data = await res.json();
-                    if (!data.content) throw new Error("File empty or not found");
-                    content = b64DecodeUnicode(data.content);
-                }
+        // 3. Process Files (Optimized Concurrent Batching)
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < filesToScan.length; i += BATCH_SIZE) {
+            const batch = filesToScan.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(batch.map(async (path) => {
+                try {
+                    let content = "";
+                    if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path]) {
+                        content = window.CURRENT_FILE_CACHE[path].content;
+                    } else {
+                        const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
+                        const data = await res.json();
+                        content = b64DecodeUnicode(data.content || "");
+                    }
 
-                // B. Send to Tree-sitter
-                const scanRes = await fetch(CONFIG.funcUrl, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ action: 'validate_syntax_deep', code_block: content, file_path: path })
-                });
-                const scanData = await scanRes.json();
+                    const scanRes = await fetch(CONFIG.funcUrl, { 
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: apiBody({ action: 'validate_syntax_deep', code_block: content, file_path: path })
+                    });
+                    return { path, ...(await scanRes.json()) };
+                } catch(e) { return { path, success: false, error: e.message }; }
+            }));
 
-                // C. Log Results
-                if (scanData.valid) {
-                    logHtml += `<div class="op-row"><div class="op-title" style="color:var(--prod)">✅ ${escapeHtml(path)}</div><div class="op-details">Syntax OK</div></div>`;
+            for (const res of batchResults) {
+                if (res.valid) {
+                    logHtml += `<div class="op-row"><div class="op-title" style="color:var(--prod)">✅ ${escapeHtml(res.path)}</div><div class="op-details">Syntax OK</div></div>`;
                 } else {
                     errorCount++;
-                    const errMsgs = scanData.errors && scanData.errors.length ? scanData.errors : ["Unknown Validation Error"];
-                    errMsgs.forEach(err => {
-                         logHtml += `<div class="op-row row-fail"><div class="op-title" style="color:var(--danger)">❌ ${escapeHtml(path)}</div><div class="op-details">${escapeHtml(err)}</div></div>`;
-                    });
+                    const msgs = res.errors || [res.error || "Scan failed"];
+                    msgs.forEach(m => { logHtml += `<div class="op-row row-fail"><div class="op-title" style="color:var(--danger)">❌ ${escapeHtml(res.path)}</div><div class="op-details">${escapeHtml(m)}</div></div>`; });
                 }
-            } catch(e) {
-                logHtml += `<div class="op-row"><div class="op-details" style="color:#eab308">⚠️ Skipped ${escapeHtml(path)}: ${e.message}</div></div>`;
             }
         }
 
