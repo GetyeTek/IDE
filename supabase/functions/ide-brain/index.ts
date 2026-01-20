@@ -864,11 +864,23 @@ async function validateWithTreeSitter(code: string, filePath: string) {
   const parser = new Parser();
   let langWasmUrl = "";
   
-  if (filePath.endsWith(".java")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-java/releases/download/v0.20.2/tree-sitter-java.wasm";
-  else if (filePath.endsWith(".kt")) langWasmUrl = "https://unpkg.com/tree-sitter-kotlin@0.3.5/tree-sitter-kotlin.wasm";
-  else if (filePath.endsWith(".js") || filePath.endsWith(".ts") || filePath.endsWith(".tsx")) langWasmUrl = "https://unpkg.com/tree-sitter-javascript@0.20.4/tree-sitter-javascript.wasm";
-  else if (filePath.endsWith(".py")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-python/releases/download/v0.20.4/tree-sitter-python.wasm";
-  else return { supported: false, valid: true, errors: [] };
+  // Using UNPKG mirrors for stability (GitHub Release URLs are fragile)
+  // Versions selected to match web-tree-sitter 0.20.x compatibility
+  if (filePath.endsWith(".java")) {
+      langWasmUrl = "https://unpkg.com/tree-sitter-java@0.20.2/tree-sitter-java.wasm";
+  }
+  else if (filePath.endsWith(".kt")) {
+      langWasmUrl = "https://unpkg.com/tree-sitter-kotlin@0.3.5/tree-sitter-kotlin.wasm";
+  }
+  else if (filePath.endsWith(".js") || filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
+      langWasmUrl = "https://unpkg.com/tree-sitter-javascript@0.20.4/tree-sitter-javascript.wasm";
+  }
+  else if (filePath.endsWith(".py")) {
+      langWasmUrl = "https://unpkg.com/tree-sitter-python@0.20.4/tree-sitter-python.wasm";
+  }
+  else {
+      return { supported: false, valid: true, errors: [] };
+  }
 
   try {
     // FIX: Manually fetch the WASM binary to avoid FS errors in Edge Runtime
@@ -1211,7 +1223,6 @@ serve(async (req) => {
 
         try {
             if (workflow_id) {
-if (workflow_id) {
                 await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, inputs || {});
             } else {
                 await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
