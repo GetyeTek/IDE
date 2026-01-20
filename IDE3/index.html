@@ -414,7 +414,7 @@
                 </div>
                 <input type="file" id="import-file-input" class="hidden" accept=".zip,.txt" onchange="handleImportFileSelect(this)">
                 <div class="flex-between">
-                     <button class="btn-outline" style="width: auto; padding: 6px 10px; font-size: 11px; border-color: var(--border);" onclick="resetSession()">↺ Reset Log</button>
+                     <button class="btn-outline" style="width: auto; padding: 6px 10px; font-size: 11px; border-color: var(--ai-accent); color: var(--ai-accent);" onclick="runDeepScan(true)">🧬 Scan Selected</button>
                     <div class="flex-gap">
                         <button class="btn-outline" style="padding: 4px 8px; font-size: 11px; color: var(--danger); border-color: var(--danger);" onclick="stageDeleteSelectedFiles()">Delete Selected</button>
                         <label style="font-size: 12px; color: var(--primary); display: flex; align-items: center; gap: 6px; cursor: pointer;">
@@ -1540,7 +1540,7 @@
     }
 
     function escapeHtml(text) {
-        if (!text) return '';
+    if (!text) return '';
         return String(text)
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
@@ -1549,84 +1549,64 @@
             .replace(/'/g, "&#039;");
     }
 
-    async function runDeepScan() {
-        let inputVal = document.getElementById('json-input').value;
-        let ops = [];
-        try { 
-            ops = JSON.parse(inputVal); 
-            if(ops.operations) ops = ops.operations; 
-        } 
-        catch(e) {
-            // Same Auto-Fix logic for Deep Scan
-            try {
-                const fixedVal = inputVal.replace(/\\(?![\"\\\/bfnrtu])/g, "\\\\");
-                ops = JSON.parse(fixedVal);
-                if(ops.operations) ops = ops.operations;
-                document.getElementById('json-input').value = fixedVal;
-                saveState();
-                showGlobalToast("✨ Auto-fixed JSON syntax");
-            } catch(e2) {
-                return alert("Invalid JSON payload: " + e.message);
-            }
+    async function runDeepScan(target) {
+        // 1. Identify files
+        let filesToScan = [];
+        if (target === true) {
+            // Scan Selected
+            filesToScan = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
+        } else if (typeof target === 'string') {
+            // Scan Single
+            filesToScan = [target];
         }
-        
-        if (!Array.isArray(ops)) ops = [ops];
-        
+
+        if (filesToScan.length === 0) return alert("No files selected.");
+
+        // 2. Prepare UI
+        switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
         const termId = addTerminalCard(null, { loading: true });
-        document.getElementById(termId).querySelector('.log-header span').innerText = "Running Deep Scan...";
-        
+        document.getElementById(termId).querySelector('.log-header span').innerText = `Running Deep Scan (${filesToScan.length} files)...`;
+
         let errorCount = 0;
         let logHtml = '';
-        
-        for (const op of ops) {
-            if ((op.action === 'create_file' || op.action.includes('replace') || op.action.includes('insert')) && op.file_path) {
-                // We need the FULL content to parse AST. 
-                // 1. Fetch current content
-                // 2. Apply patch in memory
-                // 3. Send to backend WASM
-                
-                try {
-                    let currentContent = '';
-                    // Try cache first
-                    if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[op.file_path]) {
-                        currentContent = window.CURRENT_FILE_CACHE[op.file_path].content;
-                    } else {
-                        // Fetch from backend (preview_file)
-                        const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: op.file_path }) });
-                        const data = await res.json();
-                        currentContent = b64DecodeUnicode(data.content);
-                    }
-                    
-                    // Apply simulated op (Basic replace/create)
-                    let targetContent = currentContent;
-                    if (op.action === 'create_file') targetContent = op.content;
-                    else if (op.action === 'replace_block' && op.find_block) targetContent = currentContent.replace(op.find_block, op.replace_with);
-                    // (Insert ops are harder to sim perfectly without the engine, sending best effort)
-                    
-                    const scanRes = await fetch(CONFIG.funcUrl, {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: apiBody({ action: 'validate_syntax_deep', code_block: targetContent, file_path: op.file_path })
-                    });
-                    const scanData = await scanRes.json();
-                    
-                    if (scanData.supported) {
-                        if (scanData.valid) {
-                            logHtml += `<div class="op-row"><div class="op-title" style="color:var(--prod)">✅ ${escapeHtml(op.file_path)}</div><div class="op-details">Structure Validated via Tree-Sitter</div></div>`;
-                        } else {
-                            errorCount++;
-                            scanData.errors.forEach(err => {
-                                logHtml += `<div class="op-row row-fail"><div class="op-title" style="color:var(--danger)">❌ ${escapeHtml(op.file_path)}</div><div class="op-details">${escapeHtml(err)}</div></div>`;
-                            });
-                        }
-                    }
-                } catch(e) {
-                    logHtml += `<div class="op-row"><div class="op-details" style="color:#eab308">⚠️ Skipped ${escapeHtml(op.file_path)}: ${e.message}</div></div>`;
+
+        // 3. Process Files
+        for (const path of filesToScan) {
+            try {
+                // A. Get Content (Cache or Network)
+                let content = "";
+                if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path]) {
+                    content = window.CURRENT_FILE_CACHE[path].content;
+                } else {
+                    const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
+                    const data = await res.json();
+                    if (!data.content) throw new Error("File empty or not found");
+                    content = b64DecodeUnicode(data.content);
                 }
+
+                // B. Send to Tree-sitter
+                const scanRes = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'validate_syntax_deep', code_block: content, file_path: path })
+                });
+                const scanData = await scanRes.json();
+
+                // C. Log Results
+                if (scanData.valid) {
+                    logHtml += `<div class="op-row"><div class="op-title" style="color:var(--prod)">✅ ${escapeHtml(path)}</div><div class="op-details">Syntax OK</div></div>`;
+                } else {
+                    errorCount++;
+                    const errMsgs = scanData.errors && scanData.errors.length ? scanData.errors : ["Unknown Validation Error"];
+                    errMsgs.forEach(err => {
+                         logHtml += `<div class="op-row row-fail"><div class="op-title" style="color:var(--danger)">❌ ${escapeHtml(path)}</div><div class="op-details">${escapeHtml(err)}</div></div>`;
+                    });
+                }
+            } catch(e) {
+                logHtml += `<div class="op-row"><div class="op-details" style="color:#eab308">⚠️ Skipped ${escapeHtml(path)}: ${e.message}</div></div>`;
             }
         }
-        
-        if (!logHtml) logHtml = `<div class="op-row"><div class="op-details">No code operations found to scan.</div></div>`;
-        
+
+        // 4. Finalize UI
         const el = document.getElementById(termId);
         el.innerHTML = `
             <div class="log-header">
@@ -1638,8 +1618,7 @@
             </div>
             <div class="log-body open">${logHtml}</div>`;
     }
-
-    function addTerminalCard(data, options = {}) {
+function addTerminalCard(data, options = {}) {
         const container = document.getElementById('terminal-list');
         const id = 'term-' + Date.now();
         const div = document.createElement('div');
@@ -2549,6 +2528,7 @@ async function downloadArtifact(runId) {
                     <small>${file.path}</small>
                 </div>
                 <div class="flex-gap" style="align-items:center;">
+                    <button class="menu-btn" onclick="runDeepScan('${file.path}')" style="color:var(--ai-accent); margin-right:4px;" title="Deep Syntax Scan">🧬</button>
                     <button class="menu-btn" onclick="downloadSingleFile('${file.path}', this)" style="color:var(--text-muted); margin-right:4px;" title="Download">⬇</button>
                     <button class="menu-btn" onclick="stageDeleteFile('${file.path}')" style="color:var(--danger)">🗑</button>
                     <input type="checkbox" class="file-check" value="${file.path}" checked style="accent-color:var(--primary)">
