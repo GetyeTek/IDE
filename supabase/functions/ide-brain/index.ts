@@ -568,11 +568,53 @@ async function generateFixFromFullContext(summary: string, contextFiles: any[], 
 }
 
 // --- PATCHER ENGINE ---
+
+// Helper: Finds code block ignoring whitespace, tabs, newlines, and quote styles
+function findBlockRobust(originalContent: string, searchBlock: string): { start: number; end: number } | null {
+  if (!searchBlock || !originalContent) return null;
+
+  const createFingerprint = (str: string) => {
+    let clean = "";
+    const map: number[] = [];
+    for (let i = 0; i < str.length; i++) {
+      if (!/\s/.test(str[i])) {
+        clean += str[i];
+        map.push(i);
+      }
+    }
+    return { clean, map };
+  };
+
+  const fileFP = createFingerprint(originalContent);
+  const searchFP = createFingerprint(searchBlock);
+
+  // 1. Strict Structural Match
+  let matchIndex = fileFP.clean.indexOf(searchFP.clean);
+
+  // 2. Quote-Agnostic Fallback (e.g. " vs ')
+  if (matchIndex === -1) {
+    const normalizeQuotes = (s: string) => s.replace(/['"`]/g, '"');
+    matchIndex = normalizeQuotes(fileFP.clean).indexOf(normalizeQuotes(searchFP.clean));
+  }
+
+  if (matchIndex === -1) return null;
+
+  const start = fileFP.map[matchIndex];
+  const end = fileFP.map[matchIndex + searchFP.clean.length - 1] + 1;
+  return { start, end };
+}
+
 function applyOperation(content: string, op: any) {
   const lines = content.split("\n");
-  let newContent = content;
+  
+  // Helper to find line by trimmed content
+  const getLineIndex = (anchor: string) => {
+      const cleanAnchor = anchor.trim();
+      return lines.findIndex(l => l.trim() === cleanAnchor);
+  };
 
   try {
+    // --- AI HEALING ---
     if (op.is_ai_fix) {
         if (op.ai_strategy === "range_replace" && op.start_line && op.end_line) {
             lines.splice(op.start_line - 1, (op.end_line - op.start_line) + 1, op.replace_with || op.content || "");
@@ -588,29 +630,82 @@ function applyOperation(content: string, op: any) {
     }
 
     switch (op.action) {
-      case "replace_block":
-        if (!op.find_block) return { newContent, success: false, score: 0, message: "Missing find_block" };
-        if (content.includes(op.find_block)) return { newContent: content.replace(op.find_block, op.replace_with || ""), success: true, score: 100, message: "Exact match" };
-        const regex = new RegExp(escapeRegExp(op.find_block).replace(/\\s+/g, '\\s+'));
-        if (regex.test(content)) return { newContent: content.replace(regex, op.replace_with || ""), success: true, score: 90, message: "Fuzzy regex match" };
-        return { newContent, success: false, score: 0, message: "Block not found" };
-      case "insert_after":
-        if(content.includes(op.anchor)) return { newContent: content.replace(op.anchor, `${op.anchor}\n${op.content}`), success: true, score: 100, message: "Inserted after" };
-        return { newContent, success: false, score: 0, message: "Anchor not found" };
-      case "insert_before":
-        if(content.includes(op.anchor)) return { newContent: content.replace(op.anchor, `${op.content}\n${op.anchor}`), success: true, score: 100, message: "Inserted before" };
-        return { newContent, success: false, score: 0, message: "Anchor not found" };
+      case "replace_block": {
+        if (!op.find_block) return { newContent: content, success: false, score: 0, message: "Missing find_block" };
+        
+        // Strategy A: Exact Match
+        if (content.includes(op.find_block)) {
+            return { newContent: content.replace(op.find_block, op.replace_with || ""), success: true, score: 100, message: "Exact match" };
+        }
+        // Strategy B: Robust Match (Ignores whitespace/indentation)
+        const match = findBlockRobust(content, op.find_block);
+        if (match) {
+            const before = content.substring(0, match.start);
+            const after = content.substring(match.end);
+            return { newContent: before + (op.replace_with || "") + after, success: true, score: 95, message: "Structure match" };
+        }
+        return { newContent: content, success: false, score: 0, message: "Block not found" };
+      }
+
+      case "insert_after": {
+        // Strategy A: Exact Line
+        let idx = lines.indexOf(op.anchor);
+        // Strategy B: Trimmed Line
+        if (idx === -1) idx = getLineIndex(op.anchor);
+        
+        if (idx !== -1) {
+            lines.splice(idx + 1, 0, op.content);
+            return { newContent: lines.join("\n"), success: true, score: 100, message: "Inserted after line" };
+        }
+        
+        // Strategy C: Robust Block Anchor
+        const match = findBlockRobust(content, op.anchor);
+        if (match) {
+             const before = content.substring(0, match.end);
+             const after = content.substring(match.end);
+             return { newContent: before + "\n" + op.content + after, success: true, score: 90, message: "Robust anchor match" };
+        }
+        return { newContent: content, success: false, score: 0, message: "Anchor not found" };
+      }
+
+      case "insert_before": {
+        let idx = lines.indexOf(op.anchor);
+        if (idx === -1) idx = getLineIndex(op.anchor);
+
+        if (idx !== -1) {
+            lines.splice(idx, 0, op.content);
+            return { newContent: lines.join("\n"), success: true, score: 100, message: "Inserted before line" };
+        }
+
+        const match = findBlockRobust(content, op.anchor);
+        if (match) {
+             const before = content.substring(0, match.start);
+             const after = content.substring(match.start);
+             return { newContent: before + op.content + "\n" + after, success: true, score: 90, message: "Robust anchor match" };
+        }
+        return { newContent: content, success: false, score: 0, message: "Anchor not found" };
+      }
+
       case "replace_between_anchors":
         const s = content.indexOf(op.start_anchor), e = content.indexOf(op.end_anchor);
         if(s > -1 && e > -1 && e > s) {
              const pre = content.substring(0, s + op.start_anchor.length), post = content.substring(e);
              return { newContent: pre + "\n" + op.content + "\n" + post, success: true, score: 100, message: "Range replaced" };
         }
-        return { newContent, success: false, score: 0, message: "Anchors not found" };
-      case "create_file": return { newContent: op.content || "", success: true, score: 100, message: "Created" };
-      default: return { newContent, success: false, score: 0, message: "Unknown action" };
+        return { newContent: content, success: false, score: 0, message: "Anchors not found" };
+
+      case "create_file": 
+        return { newContent: op.content || "", success: true, score: 100, message: "Created" };
+
+      case "delete_file":
+         return { newContent: "", success: true, score: 100, message: "Deleted" };
+
+      default: 
+        return { newContent: content, success: false, score: 0, message: "Unknown action" };
     }
-  } catch(e:any) { return { newContent, success: false, score: 0, message: `Err: ${e.message}` }; }
+  } catch(e:any) { 
+      return { newContent: content, success: false, score: 0, message: `Err: ${e.message}` }; 
+  }
 }
 
 // --- CORE PROCESSING LOGIC ---
