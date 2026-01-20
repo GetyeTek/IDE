@@ -1092,6 +1092,108 @@
         return { content: newContent, success, logs };
     }
 
+    // --- REPO-LEVEL AUTO FIX LOOP (For CI/CD) ---
+    async function runRepoAutoFixLoop(filePath, initialErrors) {
+        // Helper to get content (reusing logic from preview_file)
+        async function fetchContent(path) {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'preview_file', file_path: path })
+            });
+            const d = await res.json();
+            return d.content ? b64DecodeUnicode(d.content) : "";
+        }
+
+        // 1. Fetch initial content
+        showGlobalToast(`📥 Fetching ${filePath}...`);
+        let currentCode = await fetchContent(filePath);
+        let currentErrors = initialErrors;
+
+        if (!currentCode) return alert("Failed to fetch file content.");
+
+        // Recursive Fixer (In-Memory)
+        async function fixNext(index) {
+            if (index >= currentErrors.length) return true; // Done
+
+            const err = currentErrors[index];
+            const toastId = `fix-toast-${Date.now()}`;
+            const t = document.createElement('div');
+            t.id = toastId;
+            t.innerHTML = `<span style="animation:pulse 1s infinite">🔧 Fixing Error ${index + 1}/${currentErrors.length} (Line ${err.line})...</span>`;
+            t.style.cssText = "position:fixed; bottom:150px; left:50%; transform:translateX(-50%); background:#eab308; color:black; padding:10px 20px; border-radius:30px; z-index:9999; font-weight:bold;";
+            document.body.appendChild(t);
+
+            try {
+                // A. Prompt AI
+                const res = await fetch(CONFIG.funcUrl, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'propose_syntax_fix', code: currentCode, error: err })
+                });
+                const data = await res.json();
+                const ops = data.operations;
+
+                if (!ops || ops === "[]") throw new Error("AI could not generate fix.");
+
+                // B. Apply Local Patch
+                const patchResult = applyLocalPatch(currentCode, ops);
+                if (!patchResult.success) throw new Error("Generated patch mismatch.");
+                currentCode = patchResult.content;
+
+                // C. Re-Validate
+                const scanRes = await fetch(CONFIG.funcUrl, { 
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'validate_syntax_deep', code_block: currentCode, file_path: filePath })
+                });
+                const scanData = await scanRes.json();
+                
+                document.getElementById(toastId).remove();
+
+                if (scanData.valid) {
+                    showGlobalToast("✅ File is now clean!");
+                    return true;
+                } else {
+                    currentErrors = scanData.errors;
+                    if (confirm(`Partial fix applied. ${currentErrors.length} errors remain. Continue?`)) {
+                        return await fixNext(0); // Restart at top error
+                    } else return false;
+                }
+
+            } catch (e) {
+                document.getElementById(toastId).remove();
+                if (confirm(`Auto-Fix Error: ${e.message}\n\nTry again?`)) {
+                    return await fixNext(index);
+                } else return false;
+            }
+        }
+
+        // Start Loop
+        const clean = await fixNext(0);
+        
+        if (clean) {
+            // Commit the clean file back to repo
+            if (confirm("File fixed in memory. Commit changes to repo now?")) {
+                showGlobalToast("💾 Committing fix...");
+                await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ 
+                        action: 'patch', 
+                        operations: [{
+                            action: 'replace_block', // or create_file to overwrite
+                            file_path: filePath,
+                            action: 'create_file',
+                            content: currentCode
+                        }, { 
+                            action: 'comment', 
+                            text: `[Auto-Fix] Resolved syntax errors in ${filePath}` 
+                        }]
+                    })
+                });
+                showGlobalToast("✅ Changes Saved.");
+            }
+        }
+    }
+
     async function runAutoFixLoop(name, code, errorList) {
         const status = document.getElementById('ef-status-msg');
         let currentCode = code;
@@ -2303,8 +2405,12 @@ function addTerminalCard(data, options = {}) {
                 toast.innerHTML = `⚠️ Syntax Error Detected`;
                 setTimeout(() => toast.remove(), 3000);
                 
-                // Show details in an alert or modal
-                alert(`Build Aborted: Syntax Error Detected!\n\n${data.error}`);
+                const msg = `Build Aborted: Syntax Error Detected!\nFile: ${data.file_path}\nErrors: ${data.errors.length}\n\nAttempt Interactive Auto-Fix?`;
+                if (confirm(msg)) {
+                    await runRepoAutoFixLoop(data.file_path, data.errors);
+                    // If we return here, it means fix was committed. We can retry the build.
+                    if(confirm("Fix committed. Retry Build Trigger?")) triggerBuild();
+                }
                 return;
             }
 
