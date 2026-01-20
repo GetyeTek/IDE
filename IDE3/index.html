@@ -1198,7 +1198,11 @@
                     return true;
                 } else {
                     currentErrors = scanData.errors;
-                    if (confirm(`Partial fix applied. ${currentErrors.length} errors remain. Continue?`)) {
+                    // Show the new errors to the user
+                    const errPreview = currentErrors.slice(0, 3).map(e => `• Line ${e.line}: ${e.message}`).join('\n');
+                    const msg = `Partial fix applied, but validation found ${currentErrors.length} issue(s):\n\n${errPreview}\n\n(These may be hidden errors revealed by the fix, or new issues.)\n\nContinue fixing?`;
+                    
+                    if (confirm(msg)) {
                         return await fixNext(0); // Restart at top error
                     } else return false;
                 }
