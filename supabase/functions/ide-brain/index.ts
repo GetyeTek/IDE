@@ -249,6 +249,29 @@ async function ensureBranchExists(repo: string) {
 async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], config?: AIConfig, tools?: any[], responseFormat?: any): Promise<any> {
   const provider = resolveProvider(role, config);
   if (!provider) throw new Error(`No provider found for role: ${role}`);
+
+  // --- DEBUG LOGGING ---
+  // 1. Critical Console Log (Visible in Supabase Dashboard)
+  console.log(`\n=== [AI PROMPT SENT] Role: ${role} | Provider: ${provider.name} ===`);
+  console.log(JSON.stringify(messages, null, 2));
+  if (tools) console.log("TOOLS:", JSON.stringify(tools, null, 2));
+  console.log("=== [END PROMPT] ===\n");
+
+  // 2. Persistent DB Log
+  // We use a try-catch to ensure logging failure doesn't block the actual AI request
+  try {
+      await supabase.from('conduit_logs').insert({
+          repo_name: 'DEBUG_TRACE', // Utility function doesn't know repo, using placeholder
+          type: 'ai_prompt_dump',
+          data: { 
+              role, 
+              provider: provider.name, 
+              model: provider.model, 
+              timestamp: new Date().toISOString(),
+              messages_preview: messages 
+          }
+      });
+  } catch (e) { console.error("Background log failed:", e); }
   
   // Advanced Rotation Logic: Fetch Least-Recently-Used key from 'api_keys' table
   const serviceMap: Record<string, string> = { 
