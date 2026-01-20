@@ -1055,6 +1055,112 @@
         } catch (e) { status.innerText = "Error loading code."; }
     }
 
+    // --- CLIENT SIDE PATCH ENGINE ---
+    function applyLocalPatch(content, ops) {
+        let newContent = content;
+        let logs = [];
+        let success = true;
+
+        if (typeof ops === 'string') {
+            try { ops = JSON.parse(ops); } catch(e) { return { content, success: false, logs: ["Invalid JSON"]}; }
+        }
+
+        ops.forEach(op => {
+            if (op.action === 'comment') return;
+            
+            if (op.action === 'replace_block') {
+                if (newContent.includes(op.find_block)) {
+                    newContent = newContent.replace(op.find_block, op.replace_with);
+                    logs.push(`Replaced block`);
+                } else {
+                    // Robust Match Fallback (Whitespace agnostic)
+                    const normalize = s => s.replace(/\s+/g, ' ').trim();
+                    const normContent = normalize(newContent);
+                    const normFind = normalize(op.find_block);
+                    if (normContent.includes(normFind)) {
+                        // Note: This is a risky fallback for a string replace, usually regex is needed
+                        // For now, we fail if exact match fails to prevent corruption
+                        success = false;
+                        logs.push(`Block not found (Exact match failed)`);
+                    } else {
+                        success = false;
+                        logs.push(`Block not found`);
+                    }
+                }
+            }
+        });
+        return { content: newContent, success, logs };
+    }
+
+    async function runAutoFixLoop(name, code, errorList) {
+        const status = document.getElementById('ef-status-msg');
+        let currentCode = code;
+        let currentErrors = errorList;
+
+        // Fix one by one (recursive loop)
+        async function fixNext(index) {
+            if (index >= currentErrors.length) return true; // All initial errors processed
+
+            const err = currentErrors[index];
+            status.innerText = `🔧 Fixing Error ${index + 1}/${currentErrors.length} (Line ${err.line})...`;
+            status.style.color = "#eab308"; // Dev yellow
+
+            try {
+                // 1. Get Patch from AI
+                const res = await fetch(CONFIG.funcUrl, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ 
+                        action: 'propose_syntax_fix', 
+                        code: currentCode, 
+                        error: err 
+                    })
+                });
+                const data = await res.json();
+                const ops = data.operations;
+
+                if (!ops || ops === "[]") throw new Error("AI could not generate a fix.");
+
+                // 2. Apply Patch Locally
+                const patchResult = applyLocalPatch(currentCode, ops);
+                if (!patchResult.success) throw new Error("Generated patch did not match code.");
+
+                currentCode = patchResult.content;
+                document.getElementById('ef-code').value = currentCode; // Update UI
+
+                // 3. Re-Validate
+                const scanRes = await fetch(CONFIG.funcUrl, { 
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'validate_syntax_deep', code_block: currentCode, file_path: 'index.ts' })
+                });
+                const scanData = await scanRes.json();
+
+                if (scanData.valid) {
+                    status.innerText = "✅ Syntax Fixed!";
+                    return true;
+                } else {
+                    // If errors remain, update list and Prompt user
+                    currentErrors = scanData.errors;
+                    if (confirm(`Fix applied, but ${currentErrors.length} errors remain. Continue fixing?`)) {
+                        // Recursively fix the *new* first error (since layout changed)
+                        return await fixNext(0);
+                    } else {
+                        return false;
+                    }
+                }
+
+            } catch (e) {
+                if (confirm(`Auto-Fix Failed: ${e.message}\n\nTry again?`)) {
+                    return await fixNext(index);
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        return await fixNext(0);
+    }
+
     async function deployEdgeFunction() {
         console.group("🚀 Edge Function Deployment");
         const name = document.getElementById('ef-name').value.trim();
@@ -1062,12 +1168,46 @@
         const status = document.getElementById('ef-status-msg');
 
         console.log("Target Function:", name);
-        if (!name) {
-            console.error("Deployment aborted: Missing function name.");
-            console.groupEnd();
-            return alert("Enter a function name.");
-        }
+        if (!name) return alert("Enter a function name.");
         if (!code) return alert("Enter function code.");
+
+        status.innerText = "🧬 Validating Syntax...";
+        status.style.color = "var(--ai-accent)";
+
+        // --- STEP 0: PRE-FLIGHT VALIDATION ---
+        try {
+            const scanRes = await fetch(CONFIG.funcUrl, { 
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'validate_syntax_deep', code_block: code, file_path: 'index.ts' })
+            });
+            const scanData = await scanRes.json();
+
+            if (!scanData.valid) {
+                console.log("Validation Failed:", scanData.errors);
+                status.innerText = `❌ ${scanData.errors.length} Syntax Errors Found`;
+                status.style.color = "var(--danger)";
+                
+                // Render Errors
+                const errorListStr = scanData.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
+                
+                if (confirm(`Syntax Errors Detected:\n\n${errorListStr}\n\nAttempt Auto-Fix?`)) {
+                    const fixed = await runAutoFixLoop(name, code, scanData.errors);
+                    if (!fixed) {
+                        status.innerText = "❌ Deployment Aborted (Syntax)";
+                        return;
+                    }
+                    // If fixed, proceed with deployment using the NEW code
+                } else {
+                    return;
+                }
+            }
+        } catch(e) {
+            console.error("Validation check failed", e);
+            if(!confirm("Syntax check failed to run. Deploy anyway?")) return;
+        }
+
+        // Use the (potentially updated) code from DOM
+        const finalCode = document.getElementById('ef-code').value.trim();
 
         status.innerText = "⏳ Deploying...";
         status.style.color = "var(--ai-accent)";
@@ -1080,7 +1220,7 @@
                 body: apiBody({ action: 'patch', operations: [{
                     file_path: `supabase/functions/${name}/index.ts`,
                     action: "create_file",
-                    content: code
+                    content: finalCode
                 }]})
             });
             const patchData = await patchRes.json();
