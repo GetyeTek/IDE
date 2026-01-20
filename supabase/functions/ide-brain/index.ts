@@ -1215,9 +1215,11 @@ serve(async (req) => {
         if (payload.validate_pre_build) {
             console.log("Running Optimized Pre-Build Syntax Scan...");
             const tree = await githubFetch(TARGET_REPO, `/git/trees/${targetBranch}?recursive=1`);
-            // Filter for supported source code files
+            // Filter for source code files within the project scope
             const codeFiles = tree.tree.filter((f: any) => 
-                f.type === "blob" && f.path.match(/\.(js|ts|tsx|jsx|py|go|rs|java|kt|c|cpp|json|bash|sh)$/)
+                f.type === "blob" && 
+                f.path.startsWith(project_path || "") && 
+                f.path.match(/\.(js|ts|tsx|jsx|py|go|rs|java|kt|c|cpp|json|bash|sh)$/)
             );
 
             const BATCH_SIZE = 5; 
