@@ -866,7 +866,7 @@ async function validateWithTreeSitter(code: string, filePath: string) {
   
   if (filePath.endsWith(".java")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-java/releases/download/v0.20.2/tree-sitter-java.wasm";
   else if (filePath.endsWith(".kt")) langWasmUrl = "https://unpkg.com/tree-sitter-kotlin@0.3.5/tree-sitter-kotlin.wasm";
-  else if (filePath.endsWith(".js") || filePath.endsWith(".ts") || filePath.endsWith(".tsx")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-javascript/releases/download/v0.20.1/tree-sitter-javascript.wasm";
+  else if (filePath.endsWith(".js") || filePath.endsWith(".ts") || filePath.endsWith(".tsx")) langWasmUrl = "https://unpkg.com/tree-sitter-javascript@0.20.4/tree-sitter-javascript.wasm";
   else if (filePath.endsWith(".py")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-python/releases/download/v0.20.4/tree-sitter-python.wasm";
   else return { supported: false, valid: true, errors: [] };
 
