@@ -878,6 +878,32 @@
     };
 
     // --- CORE UTILS ---
+    /**
+     * Tries to parse JSON. If it fails due to bad escaping (common with AI),
+     * it attempts to double-escape backslashes that aren't valid JSON control chars.
+     */
+    function smartJSONParse(jsonString) {
+        try {
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.warn("Standard JSON parse failed, attempting Auto-Fix for escapes...");
+            // Regex: Find backslashes NOT followed by valid JSON escape chars
+            const fixedString = jsonString.replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
+            try {
+                const cleanObj = JSON.parse(fixedString);
+                const inputEl = document.getElementById('json-input');
+                if (inputEl) {
+                    inputEl.value = fixedString;
+                    if (typeof saveState === 'function') saveState(); 
+                }
+                showGlobalToast("✨ Auto-corrected JSON Syntax");
+                return cleanObj;
+            } catch (e2) {
+                throw e; 
+            }
+        }
+    }
+
     function b64DecodeUnicode(str) {
         return decodeURIComponent(atob(str).split('').map(function(c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -1453,30 +1479,13 @@
         let payload = {};
         
         // --- SMART JSON PARSER ---
-        try { 
-            if(actionType === 'patch') {
-                const parsed = JSON.parse(inputVal);
-                payload = parsed.operations || parsed; 
-            }
-        } catch(e) {
-            // Attempt Auto-Fix for common AI errors (Bad Escapes)
-            console.warn("JSON Parse failed, attempting auto-fix...", e);
+        if (actionType === 'patch') {
             try {
-                // Fix 1: Escape backslashes that aren't part of a valid escape sequence
-                // Look for \ NOT followed by ["\/bfnrtu]
-                const fixedVal = inputVal.replace(/\\(?![\"\\\/bfnrtu])/g, "\\\\");
-                
-                const parsed = JSON.parse(fixedVal);
+                const parsed = smartJSONParse(inputVal);
                 payload = parsed.operations || parsed;
-                
-                // If successful, update UI and notify user
-                document.getElementById('json-input').value = fixedVal;
-                saveState();
-                showGlobalToast("✨ Auto-fixed JSON syntax (Bad Escapes)");
-                inputVal = fixedVal; // Update reference for logic below
-                
-            } catch(e2) {
-                // If it still fails, show original error
+                // Update ref in case smartParse fixed it
+                inputVal = document.getElementById('json-input').value; 
+            } catch(e) {
                 const errorMsg = `JSON PARSE ERROR:\n${e.message}`;
                 const errId = addTerminalCard(null, { error: errorMsg });
                 document.getElementById(errId).scrollIntoView({ behavior: 'smooth' });
@@ -1484,7 +1493,7 @@
             }
         }
 
-        if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.g. v1.0):") || "v1.0";
+if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.g. v1.0):") || "v1.0";
 
         if (Array.isArray(payload)) {
             for (let op of payload) {
