@@ -1525,7 +1525,7 @@
                 const termContainer = document.getElementById('terminal-list');
                 termContainer.innerHTML = ''; 
                 if(data.logs && data.logs.length > 0) {
-                    const visibleLogs = data.logs.filter(l => l.type !== 'auto_fix_trigger');
+                    const visibleLogs = data.logs.filter(l => l.type !== 'auto_fix_trigger' && l.type !== 'job_analysis');
                     visibleLogs.forEach(log => {
                         const id = 'term-saved-' + log.id;
                         const div = document.createElement('div');
@@ -2017,8 +2017,22 @@ function addTerminalCard(data, options = {}) {
                     }
                 });
             }
-        } else if (response.count !== undefined) {
+        } else         if (response.count !== undefined) {
             opHtml = `<div class="op-row"><div class="op-details" style="color:var(--prod)">Production Deploy: ${response.count} files synced to Main.</div></div>`;
+        } else if (response.stage) {
+             // NEW: Render AI Trace Stage (Immediate Log)
+             const stageColors = { 'INIT_AUTO_FIX': '#3b82f6', 'SURGEON_PROMPT_SENT': '#d946ef', 'SYNTAX_FIX_REQUESTED': '#eab308' };
+             const color = stageColors[response.stage] || '#666';
+             
+             opHtml = `
+                <div class="op-row">
+                    <div class="op-title" style="color:${color}">📡 AI TRACE: ${response.stage}</div>
+                    <div class="op-details" style="background:#050505; padding:8px; border-radius:6px; margin-top:5px; font-size:10px;">
+                        ${response.error ? `<div style="color:var(--danger)"><b>ERROR:</b> ${escapeHtml(response.error.message)}</div>` : ''}
+                        ${response.focused_content ? `<div style="color:#888; margin-top:4px;"><b>CONTEXT:</b><pre style="margin:4px 0; color:#ccc;">${escapeHtml(response.focused_content)}</pre></div>` : ''}
+                        ${response.message ? `<div style="color:#aaa">${escapeHtml(response.message)}</div>` : ''}
+                    </div>
+                </div>`;
         } else if (response.analysis) {
              // Handle Job Analysis (The Detective)
              opHtml = `<div class="op-row"><div class="op-details" style="white-space: pre-wrap; color:#ccc; font-size:11px; line-height:1.4;">${escapeHtml(response.analysis)}</div></div>`;
