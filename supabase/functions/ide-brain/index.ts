@@ -1175,8 +1175,43 @@ serve(async (req) => {
 
     if (action === "trigger_build") {
         const targetBranch = branch || DEV_BRANCH;
+        
+        // --- PRE-BUILD SYNTAX GUARD ---
+        if (payload.validate_pre_build) {
+            console.log("Running Pre-Build Syntax Scan...");
+            const tree = await githubFetch(TARGET_REPO, `/git/trees/${targetBranch}?recursive=1`);
+            // Filter for source code files only
+            const codeFiles = tree.tree.filter((f: any) => 
+                f.type === "blob" && f.path.match(/\.(js|ts|tsx|jsx|py|java|kt)$/)
+            );
+
+            for (const f of codeFiles) {
+                // Fetch content
+                const { content } = await getFileRaw(TARGET_REPO, f.path, targetBranch);
+                const text = base64ToText(content);
+                
+                // Validate
+                const validRes = await validateWithTreeSitter(text, f.path);
+                if (!validRes.valid) {
+                     const errorMsg = `File: ${f.path}\nErrors: ${validRes.errors.slice(0, 3).join(", ")}`;
+                     // Log the abortion
+                     await supabase.from('conduit_logs').insert({ 
+                        repo_name: TARGET_REPO, type: 'dispatch_aborted', 
+                        data: { reason: "syntax_error", details: errorMsg } 
+                     });
+                     // Return specific error structure for frontend
+                     return new Response(JSON.stringify({ 
+                         success: false, 
+                         validation_error: true, 
+                         error: errorMsg 
+                     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+                }
+            }
+        }
+
         try {
             if (workflow_id) {
+if (workflow_id) {
                 await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, inputs || {});
             } else {
                 await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
