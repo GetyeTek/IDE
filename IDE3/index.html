@@ -624,6 +624,7 @@
                 </div>
             </div>
             <div class="flex-gap">
+                <button class="icon-btn" onclick="copyViewerContent(this)" title="Copy Content">📋</button>
                 <button class="icon-btn" id="ace-search-toggle" onclick="toggleAceSearch()">🔍</button>
                 <button class="btn-outline" style="width: auto; padding: 6px 14px;" onclick="closeFileViewer()">Close</button>
             </div>
@@ -2859,6 +2860,28 @@ async function downloadArtifact(runId) {
         } catch (e) {
             aceEditorInstance.setValue(e.message, -1);
         }
+    }
+
+    function copyViewerContent(btn) {
+        let content = "";
+        // Check context: Editor or Log View?
+        if (document.getElementById('ace-container').style.display !== 'none' && aceEditorInstance) {
+            content = aceEditorInstance.getValue();
+        } else {
+            content = document.getElementById('log-custom-container').innerText;
+        }
+
+        if (!content) return showGlobalToast("No content to copy", true);
+
+        navigator.clipboard.writeText(content).then(() => {
+            const original = btn.innerHTML;
+            btn.innerHTML = '✔';
+            btn.style.color = 'var(--prod)';
+            setTimeout(() => {
+                btn.innerHTML = original;
+                btn.style.color = '';
+            }, 1500);
+        }).catch(err => alert("Copy failed: " + err));
     }
 
     function closeFileViewer() {
