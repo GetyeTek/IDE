@@ -1355,6 +1355,26 @@ serve(async (req) => {
     }
     
     if (action === "rollback") {
+    if (action === "fetch_models") {
+        const provider = resolveProvider(payload.role || 'chat', ai_config);
+        if (!provider) throw new Error("Provider not found");
+        
+        // Get API Key from DB (Reusing the rotation logic logic)
+        const serviceMap: Record<string, string> = { 'Deepseek_API': 'deepseek', 'GEMINI_API_KEY': 'gemini', 'GROQ_API_KEY': 'groq' };
+        const serviceName = serviceMap[provider.apiKeyEnv];
+        let apiKey = "";
+        if (serviceName) {
+            const { data: keyRow } = await supabase.from('api_keys').select('api_key').eq('service', serviceName).eq('is_active', true).order('last_used_at', { ascending: true }).limit(1).maybeSingle();
+            if (keyRow) apiKey = keyRow.api_key;
+        }
+        if (!apiKey) apiKey = Deno.env.get(provider.apiKeyEnv) || "";
+
+        const res = await fetch("https://api.groq.com/openai/v1/models", {
+            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify({ models: data.data || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
         if(!ref_sha) throw new Error("Target SHA required");
         await githubFetch(TARGET_REPO, `/git/refs/heads/${DEV_BRANCH}`, { method: "PATCH", body: JSON.stringify({ sha: ref_sha, force: true }) });
         await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'rollback', data: { message: `Rolled back to ${ref_sha.substring(0,7)}` } });
