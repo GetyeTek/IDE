@@ -3169,24 +3169,41 @@ async function downloadArtifact(runId) {
     async function fetchRemoteModels(key) {
         const input = document.getElementById(`model-input-${key}`);
         const original = input.value;
-        input.value = "Fetching models...";
+        
+        showGlobalToast("Connecting to Groq Registry...");
+        input.value = "⏳ Syncing models...";
+        
         try {
-            const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch_models', role: 'chat' }) });
+            const res = await fetch(CONFIG.funcUrl, { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: apiBody({ action: 'fetch_models', role: 'chat' }) 
+            });
+            
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
+            
             if (data.models && data.models.length > 0) {
-                const choice = prompt("Select Model:\n" + data.models.map((m, i) => `${i+1}. ${m.id}`).join('\n'), original);
+                input.value = "✅ Select from list...";
+                const listText = data.models.map((m, i) => `${i + 1}. ${m.id}`).join('\n');
+                const choice = prompt(`GROQ MODELS FOUND (${data.models.length})\n\nEnter number or exact ID:\n\n${listText}`, original);
+                
                 if (choice) {
-                    const selected = data.models.find((m, i) => m.id === choice || (i+1).toString() === choice);
+                    const selected = data.models.find((m, i) => m.id === choice || (i + 1).toString() === choice);
                     if (selected) {
                         input.value = selected.id;
                         updateAIProvider(key, 'model', selected.id);
+                        showGlobalToast(`Active model: ${selected.id}`);
                         return;
                     }
                 }
+            } else {
+                throw new Error("No models returned from provider.");
             }
             input.value = original;
         } catch(e) { 
-            alert("Fetch failed: " + e.message); 
+            console.error("Model Fetch Error:", e);
+            showGlobalToast("Fetch failed: " + e.message, true);
             input.value = original;
         }
     }
