@@ -923,15 +923,11 @@ async function validateWithTreeSitter(code: string, filePath: string) {
     
     // Adapter: Convert Validator Response -> IDE Format
     if (data.success && data.result) {
-        // Map detailed error objects to simple strings for the IDE
-        const formattedErrors = (data.result.errors || []).map((e: any) => 
-            `Line ${e.line}: ${e.message}`
-        );
-
+        // Return raw objects so Client/AI can use line numbers
         return { 
             supported: true, 
             valid: data.result.valid, 
-            errors: formattedErrors,
+            errors: data.result.errors || [],
             warning: null 
         };
     }
