@@ -1304,7 +1304,7 @@ RULES OF ENGAGEMENT:
 1. STRICT JSON ONLY. No conversational text. No markdown prologues outside the JSON block.
 2. "find_block" ACCURACY: Must be a cryptographic-level match. Copy the existing broken code EXACTLY (including indentation/newlines). If you change even one space in "find_block", the patch will fail.
 3. MINIMAL INVASION: Do not refactor unrelated code. Fix ONLY the syntax error (missing brace, unclosed string, bad keyword).
-4. STRATEGY: Use "replace_block". Do not use "insert_after" unless absolutely necessary.
+4. STRATEGY: Use "replace_block" ONLY. You are FORBIDDEN from using "create_file" (do not overwrite the file) or "insert_after".
 
 === JSON SCHEMA ===
 \`\`\`json
