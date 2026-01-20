@@ -1320,8 +1320,40 @@ You have access to exactly 3 atomic operations. Do not invent others.
     }
 
     if (action === "propose_syntax_fix") {
+        const { code, error, file_path } = payload;
+
+        // --- STRATEGY 1: DETERMINISTIC REPAIR (WASM-Guided) ---
+        // If the validator told us EXACTLY what is missing, just apply it.
+        if (error && error.message && error.message.startsWith("MISSING")) {
+            const missingCharMatch = error.message.match(/MISSING "(.*?)"/);
+            if (missingCharMatch) {
+                const charToInsert = missingCharMatch[1];
+                const lines = code.split('\n');
+                // Tree-Sitter lines are 0-indexed internally, but usually reported 1-indexed. Check your validator.
+                // Assuming 1-based from previous context:
+                const targetLineIdx = error.line - 1;
+                
+                if (lines[targetLineIdx] !== undefined) {
+                    console.log(`[DeterministicFix] Auto-inserting '${charToInsert}' at line ${error.line}`);
+                    
+                    // Construct a precise patch without AI
+                    const lineContent = lines[targetLineIdx];
+                    const cleanOps = [
+                        { "action": "comment", "text": `Auto-fix: Inserted missing ${charToInsert}` },
+                        { 
+                            "action": "replace_block", 
+                            "file_path": file_path, // Uses the fixed variable from previous step
+                            "find_block": lineContent,
+                            "replace_with": lineContent + charToInsert 
+                        }
+                    ];
+                    return new Response(JSON.stringify({ operations: JSON.stringify(cleanOps) }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+                }
+            }
+        }
+
+        // --- STRATEGY 2: AI FALLBACK ---
         // Specialized Architect Agent for precise block replacement of syntax errors
-        const { code, error } = payload;
 
         // Immediate Trace: Log the syntax error context being sent to the AI
         await supabase.from('conduit_logs').insert({
