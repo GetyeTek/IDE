@@ -841,7 +841,7 @@ async function validateWithTreeSitter(code: string, filePath: string) {
   await Parser.init();
   const parser = new Parser();
   let langWasmUrl = "";
-  // Map extensions to Tree-sitter WASM binaries
+  
   if (filePath.endsWith(".java")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-java/releases/download/v0.20.2/tree-sitter-java.wasm";
   else if (filePath.endsWith(".kt")) langWasmUrl = "https://unpkg.com/tree-sitter-kotlin@0.3.5/tree-sitter-kotlin.wasm";
   else if (filePath.endsWith(".js") || filePath.endsWith(".ts") || filePath.endsWith(".tsx")) langWasmUrl = "https://github.com/tree-sitter/tree-sitter-javascript/releases/download/v0.20.1/tree-sitter-javascript.wasm";
@@ -849,7 +849,12 @@ async function validateWithTreeSitter(code: string, filePath: string) {
   else return { supported: false, valid: true, errors: [] };
 
   try {
-    const Lang = await Parser.Language.load(langWasmUrl);
+    // FIX: Manually fetch the WASM binary to avoid FS errors in Edge Runtime
+    const res = await fetch(langWasmUrl);
+    if (!res.ok) throw new Error(`Failed to fetch grammar from ${langWasmUrl}`);
+    const wasmBytes = new Uint8Array(await res.arrayBuffer());
+    
+    const Lang = await Parser.Language.load(wasmBytes);
     parser.setLanguage(Lang);
     const tree = parser.parse(code);
     const errors: string[] = [];
