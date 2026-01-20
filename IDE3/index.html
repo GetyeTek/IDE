@@ -812,8 +812,15 @@
         'default_main': {
           name: 'DeepSeek V3 (OpenRouter)',
           baseUrl: 'https://openrouter.ai/api/v1/chat/completions',
-          model: 'deepseek/deepseek-chat',
+          model: 'deepseek/deepseek-chat', 
           apiKeyEnv: 'Deepseek_API',
+          type: 'openai'
+        },
+        'default_groq': {
+          name: 'GroqCloud',
+          baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
+          model: 'openai/gpt-oss-120b',
+          apiKeyEnv: 'GROQ_API_KEY',
           type: 'openai'
         },
         'default_analyst': {
@@ -825,9 +832,9 @@
         }
       },
       roles: {
-        chat: 'default_main',
-        architect: 'default_main',
-        fast_fix: 'default_main',
+        chat: 'default_groq',
+        architect: 'default_groq',
+        fast_fix: 'default_groq',
         analyst: 'default_analyst'
       }
     };
@@ -3071,7 +3078,10 @@ async function downloadArtifact(runId) {
                     <input type="text" class="input-field" value="${p.baseUrl}" placeholder="Base URL" onchange="updateAIProvider('${key}', 'baseUrl', this.value)">
                 </div>
                 <div class="flex-gap">
-                    <input type="text" class="input-field" value="${p.model}" placeholder="Model ID" style="flex:1" onchange="updateAIProvider('${key}', 'model', this.value)">
+                    <div style="flex:1; position:relative;">
+                        <input type="text" id="model-input-${key}" class="input-field" value="${p.model}" placeholder="Model ID" onchange="updateAIProvider('${key}', 'model', this.value)">
+                        ${p.name.includes('Groq') ? `<button class="action-mini-btn" style="position:absolute; right:5px; top:8px; background:var(--ai-accent); color:white; border-radius:4px;" onclick="fetchRemoteModels('${key}')">List</button>` : ''}
+                    </div>
                     <input type="password" class="input-field" value="${p.apiKeyEnv}" placeholder="Env Var or Raw Key" style="flex:1; color:var(--ai-accent);" onchange="updateAIProvider('${key}', 'apiKeyEnv', this.value)">
                 </div>
             `;
@@ -3155,6 +3165,26 @@ async function downloadArtifact(runId) {
     }
 
     function saveAIConfig() {
+
+    async function fetchRemoteModels(key) {
+        const btn = event.target;
+        const original = btn.innerText;
+        btn.innerText = "...";
+        try {
+            const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch_models', role: 'chat' }) });
+            const data = await res.json();
+            if (data.models && data.models.length > 0) {
+                const choice = prompt("Select Model:\n" + data.models.map((m, i) => `${i+1}. ${m.id}`).join('\n'), data.models[0].id);
+                if (choice) {
+                    const selected = data.models.find((m, i) => m.id === choice || (i+1).toString() === choice);
+                    if (selected) {
+                        document.getElementById(`model-input-${key}`).value = selected.id;
+                        updateAIProvider(key, 'model', selected.id);
+                    }
+                }
+            }
+        } catch(e) { alert("Fetch failed: " + e.message); } finally { btn.innerText = original; }
+    }
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
         alert("AI Configuration Saved!");
         closeAIManager();
