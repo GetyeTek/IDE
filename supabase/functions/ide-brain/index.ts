@@ -1211,35 +1211,39 @@ serve(async (req) => {
     if (action === "trigger_build") {
         const targetBranch = branch || DEV_BRANCH;
         
-        // --- PRE-BUILD SYNTAX GUARD ---
+        // --- PRE-BUILD SYNTAX GUARD (OPTIMIZED BATCHING) ---
         if (payload.validate_pre_build) {
-            console.log("Running Pre-Build Syntax Scan...");
+            console.log("Running Optimized Pre-Build Syntax Scan...");
             const tree = await githubFetch(TARGET_REPO, `/git/trees/${targetBranch}?recursive=1`);
-            // Filter for source code files only
+            // Filter for supported source code files
             const codeFiles = tree.tree.filter((f: any) => 
-                f.type === "blob" && f.path.match(/\.(js|ts|tsx|jsx|py|java|kt)$/)
+                f.type === "blob" && f.path.match(/\.(js|ts|tsx|jsx|py|go|rs|java|kt|c|cpp|json|bash|sh)$/)
             );
 
-            for (const f of codeFiles) {
-                // Fetch content
-                const { content } = await getFileRaw(TARGET_REPO, f.path, targetBranch);
-                const text = base64ToText(content);
-                
-                // Validate
-                const validRes = await validateWithTreeSitter(text, f.path);
-                if (!validRes.valid) {
-                     const errorMsg = `File: ${f.path}\nErrors: ${validRes.errors.slice(0, 3).join(", ")}`;
-                     // Log the abortion
-                     await supabase.from('conduit_logs').insert({ 
-                        repo_name: TARGET_REPO, type: 'dispatch_aborted', 
-                        data: { reason: "syntax_error", details: errorMsg } 
-                     });
-                     // Return specific error structure for frontend
-                     return new Response(JSON.stringify({ 
-                         success: false, 
-                         validation_error: true, 
-                         error: errorMsg 
-                     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            const BATCH_SIZE = 5; 
+            for (let i = 0; i < codeFiles.length; i += BATCH_SIZE) {
+                const batch = codeFiles.slice(i, i + BATCH_SIZE);
+                const batchResults = await Promise.all(batch.map(async (f: any) => {
+                    const { content } = await getFileRaw(TARGET_REPO, f.path, targetBranch);
+                    if (!content) return { path: f.path, valid: true };
+                    const text = base64ToText(content);
+                    const res = await validateWithTreeSitter(text, f.path);
+                    return { path: f.path, ...res };
+                }));
+
+                for (const res of batchResults) {
+                    if (!res.valid) {
+                        const errorMsg = `File: ${res.path}\nErrors: ${res.errors?.slice(0, 3).join(", ")}`;
+                        await supabase.from('conduit_logs').insert({ 
+                            repo_name: TARGET_REPO, type: 'dispatch_aborted', 
+                            data: { reason: "syntax_error", details: errorMsg } 
+                        });
+                        return new Response(JSON.stringify({ 
+                            success: false, 
+                            validation_error: true, 
+                            error: errorMsg 
+                        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+                    }
                 }
             }
         }
