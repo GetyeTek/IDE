@@ -452,7 +452,10 @@
                     <button class="btn btn-prod" onclick="runPatch('commit_prod')">Commit</button>
                 </div>
 
-                <div class="terminal-label">Operation Terminal</div>
+                <div class="flex-between" style="margin-top:10px;">
+                    <div class="terminal-label" style="margin:0">Operation Terminal</div>
+                    <button class="btn-outline" style="padding:4px 8px; font-size:10px;" onclick="runDeepScan()">🧬 Deep Scan (WASM)</button>
+                </div>
                 <div id="terminal-list" class="terminal-container"></div>
             </div>
         </div>
@@ -1523,6 +1526,81 @@
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    async function runDeepScan() {
+        const inputVal = document.getElementById('json-input').value;
+        let ops = [];
+        try { ops = JSON.parse(inputVal); if(ops.operations) ops = ops.operations; } 
+        catch(e) { return alert("Invalid JSON payload"); }
+        
+        if (!Array.isArray(ops)) ops = [ops];
+        
+        const termId = addTerminalCard(null, { loading: true });
+        document.getElementById(termId).querySelector('.log-header span').innerText = "Running Deep Scan...";
+        
+        let errorCount = 0;
+        let logHtml = '';
+        
+        for (const op of ops) {
+            if ((op.action === 'create_file' || op.action.includes('replace') || op.action.includes('insert')) && op.file_path) {
+                // We need the FULL content to parse AST. 
+                // 1. Fetch current content
+                // 2. Apply patch in memory
+                // 3. Send to backend WASM
+                
+                try {
+                    let currentContent = '';
+                    // Try cache first
+                    if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[op.file_path]) {
+                        currentContent = window.CURRENT_FILE_CACHE[op.file_path].content;
+                    } else {
+                        // Fetch from backend (preview_file)
+                        const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: op.file_path }) });
+                        const data = await res.json();
+                        currentContent = b64DecodeUnicode(data.content);
+                    }
+                    
+                    // Apply simulated op (Basic replace/create)
+                    let targetContent = currentContent;
+                    if (op.action === 'create_file') targetContent = op.content;
+                    else if (op.action === 'replace_block' && op.find_block) targetContent = currentContent.replace(op.find_block, op.replace_with);
+                    // (Insert ops are harder to sim perfectly without the engine, sending best effort)
+                    
+                    const scanRes = await fetch(CONFIG.funcUrl, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: apiBody({ action: 'validate_syntax_deep', code_block: targetContent, file_path: op.file_path })
+                    });
+                    const scanData = await scanRes.json();
+                    
+                    if (scanData.supported) {
+                        if (scanData.valid) {
+                            logHtml += `<div class="op-row"><div class="op-title" style="color:var(--prod)">✅ ${escapeHtml(op.file_path)}</div><div class="op-details">Structure Validated via Tree-Sitter</div></div>`;
+                        } else {
+                            errorCount++;
+                            scanData.errors.forEach(err => {
+                                logHtml += `<div class="op-row row-fail"><div class="op-title" style="color:var(--danger)">❌ ${escapeHtml(op.file_path)}</div><div class="op-details">${escapeHtml(err)}</div></div>`;
+                            });
+                        }
+                    }
+                } catch(e) {
+                    logHtml += `<div class="op-row"><div class="op-details" style="color:#eab308">⚠️ Skipped ${escapeHtml(op.file_path)}: ${e.message}</div></div>`;
+                }
+            }
+        }
+        
+        if (!logHtml) logHtml = `<div class="op-row"><div class="op-details">No code operations found to scan.</div></div>`;
+        
+        const el = document.getElementById(termId);
+        el.innerHTML = `
+            <div class="log-header">
+                <div class="log-meta">
+                    <span class="status-pill" style="background:#d946ef; color:white;">🧬 DEEP SCAN</span>
+                    <span class="status-pill ${errorCount > 0 ? 'pill-fail' : 'pill-success'}">${errorCount > 0 ? `${errorCount} ERRORS` : 'PASSED'}</span>
+                </div>
+                <span style="font-size:18px; color:#666; cursor:pointer;" onclick="toggleLogBody('${termId}')">⮞</span>
+            </div>
+            <div class="log-body open">${logHtml}</div>`;
     }
 
     function addTerminalCard(data, options = {}) {
