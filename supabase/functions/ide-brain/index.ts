@@ -962,7 +962,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ reply: result.content || "(Empty Response from AI)" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // --- REFINED GENERATE OPS (PROMPT UPGRADE) ---
+    // --- REFINED GENERATE OPS (ROBUST PROMPT & PARSER) ---
     if (action === "generate_ops") {
         if (!user_prompt) throw new Error("Prompt required");
         
@@ -973,39 +973,44 @@ serve(async (req) => {
         const systemPrompt = `You are a Strict JSON Patch Generator.
         Your goal: Convert User Request into a valid JSON Operations Array.
         
-        ALLOWED OPERATIONS & SCHEMA:
-        1. REPLACE: { "file_path": "string", "action": "replace_block", "find_block": "EXACT_CODE_MATCH", "replace_with": "NEW_CODE" }
-        2. INSERT AFTER: { "file_path": "string", "action": "insert_after", "anchor": "EXACT_UNIQUE_LINE", "content": "NEW_CODE" }
-        3. CREATE: { "file_path": "string", "action": "create_file", "content": "FULL_CONTENT" }
-        4. DELETE: { "file_path": "string", "action": "delete_file" }
-        5. COMMENT: { "action": "comment", "text": "CONCISE_SUMMARY" } (Must be first, max 50 words)
+        ALLOWED OPERATIONS:
+        - REPLACE: { "file_path": "string", "action": "replace_block", "find_block": "EXACT_CODE", "replace_with": "NEW_CODE" }
+        - INSERT: { "file_path": "string", "action": "insert_after", "anchor": "EXACT_LINE", "content": "NEW_CODE" }
+        - CREATE: { "file_path": "string", "action": "create_file", "content": "CODE" }
+        - DELETE: { "file_path": "string", "action": "delete_file" }
         
-        CRITICAL RULES:
-        - Output ONLY valid JSON.
-        - 'find_block' and 'anchor' must exist EXACTLY in the provided context (whitespace/indentation matters).
-        - Do not use regex or placeholders like '// ... rest of code'.
-        - If the file context is missing, do not hallucinate content.
+        STRICT RULES:
+        1. Output ONLY a raw JSON Array. No Markdown blocks. No Explanations.
+        2. Escape all quotes inside strings properly.
+        3. ABSOLUTELY NO TRAILING COMMAS.
+        4. 'find_block' must match whitespace EXACTLY.
         `;
 
         const finalPrompt = `${systemPrompt}\n=== CONTEXT ===\n${fileContext}\n=== REQUEST ===\n${user_prompt}`;
         
         const result = await genericRequestAI('architect', [{ role: "user", content: finalPrompt }], ai_config);
-        const text = result.content || "[]";
+        let text = result.content || "[]";
         
-        // Robust extraction
-        let rawText = "[]";
-        const match = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
-        if (match) {
-            rawText = match[1].trim();
-        } else {
-            const start = text.indexOf('[');
-            const end = text.lastIndexOf(']');
-            if (start !== -1 && end !== -1 && end > start) {
-                rawText = text.substring(start, end + 1);
-            }
+        // 1. Regex Extraction (Find outermost brackets)
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) text = jsonMatch[0];
+
+        // 2. Clean Markdown Wrappers if present
+        text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
+        // 3. Fix Common AI JSON Errors (Trailing commas)
+        text = text.replace(/,(\s*[\]}])/g, "$1");
+
+        // 4. Verification
+        try {
+            JSON.parse(text);
+        } catch (e) {
+            console.error("AI Generated Invalid JSON:", text);
+            // Emergency Fallback: Return empty array to prevent client crash
+            return new Response(JSON.stringify({ operations: "[]", error: "AI generated invalid JSON syntax. Please retry." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
         
-        return new Response(JSON.stringify({ operations: rawText }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ operations: text }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // --- AUTO FIX BUILD (UPDATED LOGIC) ---
