@@ -1904,8 +1904,14 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
                     logHtml += `<div class="op-row"><div class="op-title" style="color:var(--prod)">✅ ${escapeHtml(res.path)}</div><div class="op-details">Syntax OK</div></div>`;
                 } else {
                     errorCount++;
-                    const msgs = res.errors || [res.error || "Scan failed"];
-                    msgs.forEach(m => { logHtml += `<div class="op-row row-fail"><div class="op-title" style="color:var(--danger)">❌ ${escapeHtml(res.path)}</div><div class="op-details">${escapeHtml(m)}</div></div>`; });
+                    const msgs = res.errors || [];
+                    if (msgs.length === 0 && res.error) msgs.push({ message: res.error }); // Handle generic error
+                    
+                    msgs.forEach(m => { 
+                        // Handle both String (legacy) and Object (new) formats
+                        const text = (typeof m === 'string') ? m : `Line ${m.line}: ${m.message}`;
+                        logHtml += `<div class="op-row row-fail"><div class="op-title" style="color:var(--danger)">❌ ${escapeHtml(res.path)}</div><div class="op-details">${escapeHtml(text)}</div></div>`; 
+                    });
                 }
             }
         }
