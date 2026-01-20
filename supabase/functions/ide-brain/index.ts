@@ -86,7 +86,76 @@ function textToBase64(str: string) {
 }
 
 function escapeRegExp(string: string) { 
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\function escapeRegExp(string: string) { 
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+}'); 
+}
+
+// --- STRUCTURAL VALIDATOR ---
+function validateCodeStructure(code: string, fileName: string): { valid: boolean; error?: string; line?: number } {
+    // Only check structural languages
+    if (!/\.(java|kt|js|ts|cpp|cs|dart|json)$/.test(fileName)) return { valid: true };
+
+    const stack: { char: string; line: number }[] = [];
+    const lines = code.split('\n');
+    let inQuote = false;
+    let quoteChar = '';
+    let inBlockComment = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        for (let j = 0; j < line.length; j++) {
+            const char = line[j];
+            const next = line[j + 1];
+
+            // 1. Handle Comments (Skip)
+            if (!inQuote && !inBlockComment) {
+                if (char === '/' && next === '/') break; // Line comment, skip rest of line
+                if (char === '/' && next === '*') { inBlockComment = true; j++; continue; }
+            }
+            if (!inQuote && inBlockComment) {
+                if (char === '*' && next === '/') { inBlockComment = false; j++; continue; }
+                continue;
+            }
+
+            // 2. Handle Strings (Skip content, check bounds)
+            if (!inBlockComment) {
+                if (char === '"' || char === "'") {
+                    if (!inQuote) { 
+                        inQuote = true; 
+                        quoteChar = char; 
+                    } else if (char === quoteChar && line[j - 1] !== '\\') { 
+                        inQuote = false; 
+                    }
+                }
+            }
+
+            if (inQuote || inBlockComment) continue;
+
+            // 3. Check Brackets
+            if (['{', '(', '['].includes(char)) {
+                stack.push({ char, line: i + 1 });
+            }
+            if (['}', ')', ']'].includes(char)) {
+                if (stack.length === 0) return { valid: false, error: `Unexpected closing '${char}'`, line: i + 1 };
+                const last = stack.pop();
+                const expected = last?.char === '{' ? '}' : (last?.char === '(' ? ')' : ']');
+                if (char !== expected) {
+                    return { valid: false, error: `Mismatched '${char}' (Expected '${expected}' for match on line ${last?.line})`, line: i + 1 };
+                }
+            }
+        }
+    }
+
+    if (inBlockComment) return { valid: false, error: "Unclosed Block Comment /*", line: lines.length };
+    // Note: Multiline strings exist in Kotlin/Java, so unclosed quote check is fuzzy, skipping for now to avoid false positives.
+    
+    if (stack.length > 0) {
+        const last = stack[stack.length - 1];
+        return { valid: false, error: `Unclosed '${last.char}'`, line: last.line };
+    }
+
+    return { valid: true };
 }
 
 function isRecordInScope(record: any, scopePath: string): boolean {
@@ -703,6 +772,21 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
             } else {
                 if (result.success) { currentContent = result.newContent; anyChange = true; } else { anyOpFailed = true; }
                 opLogs.push({ type: op.action, success: result.success, score: result.score, message: result.message, ...op });
+            }
+        }
+        
+        // --- POST-OP STRUCTURAL VALIDATION ---
+        if (anyChange && currentContent) {
+            const structureCheck = validateCodeStructure(currentContent, filePath);
+            if (!structureCheck.valid) {
+                opLogs.push({ 
+                    type: 'structure_warn', 
+                    success: false, 
+                    score: 0, 
+                    message: `⚠️ SYNTAX ERROR: ${structureCheck.error} (Line ${structureCheck.line})` 
+                });
+                // Note: We currently Log it but don't abort the commit (User might want to force save)
+                // To abort, set anyOpFailed = true;
             }
         }
 
