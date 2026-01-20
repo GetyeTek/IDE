@@ -732,6 +732,37 @@
         </div>
     </div>
 
+    <!-- SYNTAX REPORT MODAL -->
+    <div id="syntax-report-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:300; align-items:center; justify-content:center;">
+        <div class="card" style="width:90%; max-width:600px; background:#151517; box-shadow:0 10px 40px rgba(0,0,0,0.6); display:flex; flex-direction:column; max-height:80vh;">
+            <div class="header" style="font-size:14px; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px; color:var(--danger);">
+                🛑 Build Blocked: Syntax Error
+            </div>
+            
+            <div style="padding:0 5px; flex:1; overflow-y:auto;">
+                <div class="input-group">
+                    <label class="input-label">File Path</label>
+                    <div id="sr-path" style="color:white; font-family:'JetBrains Mono'; font-size:12px; margin-bottom:10px;"></div>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Error Details</label>
+                    <div id="sr-message" style="background:rgba(239, 68, 68, 0.1); border:1px solid var(--danger); color:#ffcdcd; padding:10px; border-radius:6px; font-size:12px;"></div>
+                </div>
+                
+                <div class="code-block-wrapper">
+                    <label class="code-label">Problematic Code Context</label>
+                    <button class="code-copy" onclick="copySyntaxContext()">Copy Code</button>
+                    <pre id="sr-code" class="code-pre" style="border:1px solid #444; color:#ccc;"></pre>
+                </div>
+            </div>
+
+            <div class="flex-gap" style="margin-top:20px; padding-top:15px; border-top:1px solid #333;">
+                <button id="btn-auto-fix-wasm" class="btn btn-primary" style="display:none;" onclick="applyDeterministicFix()">✨ Apply Auto-Fix</button>
+                <button class="btn btn-outline" onclick="closeSyntaxReport()">Close & Fix Manually</button>
+            </div>
+        </div>
+    </div>
+
     <!-- DELETE HISTORY FAB -->
     <button id="delete-history-fab" class="btn btn-danger" onclick="deleteSelectedHistory()" style="position:fixed; bottom:100px; right:20px; width:auto; padding:12px 16px; border-radius:16px; z-index:150; display:none; box-shadow:0 5px 20px rgba(0,0,0,0.4);">Delete Selected</button>
 
@@ -1136,111 +1167,7 @@
         return { content: lines.join('\n'), success, logs };
     }
 
-    // --- REPO-LEVEL AUTO FIX LOOP (For CI/CD) ---
-    async function runRepoAutoFixLoop(filePath, initialErrors) {
-        // Helper to get content (reusing logic from preview_file)
-        async function fetchContent(path) {
-            const res = await fetch(CONFIG.funcUrl, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'preview_file', file_path: path })
-            });
-            const d = await res.json();
-            return d.content ? b64DecodeUnicode(d.content) : "";
-        }
 
-        // 1. Fetch initial content
-        showGlobalToast(`📥 Fetching ${filePath}...`);
-        let currentCode = await fetchContent(filePath);
-        let currentErrors = initialErrors;
-
-        if (!currentCode) return alert("Failed to fetch file content.");
-
-        // Recursive Fixer (In-Memory)
-        async function fixNext(index) {
-            if (index >= currentErrors.length) return true; // Done
-
-            const err = currentErrors[index];
-            const toastId = `fix-toast-${Date.now()}`;
-            const t = document.createElement('div');
-            t.id = toastId;
-            t.innerHTML = `<span style="animation:pulse 1s infinite">🔧 Fixing Error ${index + 1}/${currentErrors.length} (Line ${err.line})...</span>`;
-            t.style.cssText = "position:fixed; bottom:150px; left:50%; transform:translateX(-50%); background:#eab308; color:black; padding:10px 20px; border-radius:30px; z-index:9999; font-weight:bold;";
-            document.body.appendChild(t);
-
-            try {
-                // A. Prompt AI
-                const res = await fetch(CONFIG.funcUrl, { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ action: 'propose_syntax_fix', code: currentCode, error: err })
-                });
-                const data = await res.json();
-                const ops = data.operations;
-
-                if (!ops || ops === "[]") throw new Error("AI could not generate fix.");
-
-                // B. Apply Local Patch
-                const patchResult = applyLocalPatch(currentCode, ops);
-                if (!patchResult.success) throw new Error("Generated patch mismatch.");
-                currentCode = patchResult.content;
-
-                // C. Re-Validate
-                const scanRes = await fetch(CONFIG.funcUrl, { 
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ action: 'validate_syntax_deep', code_block: currentCode, file_path: filePath })
-                });
-                const scanData = await scanRes.json();
-                
-                document.getElementById(toastId).remove();
-
-                if (scanData.valid) {
-                    showGlobalToast("✅ File is now clean!");
-                    return true;
-                } else {
-                    currentErrors = scanData.errors;
-                    // Show the new errors to the user
-                    const errPreview = currentErrors.slice(0, 3).map(e => `• Line ${e.line}: ${e.message}`).join('\n');
-                    const msg = `Partial fix applied, but validation found ${currentErrors.length} issue(s):\n\n${errPreview}\n\n(These may be hidden errors revealed by the fix, or new issues.)\n\nContinue fixing?`;
-                    
-                    if (confirm(msg)) {
-                        return await fixNext(0); // Restart at top error
-                    } else return false;
-                }
-
-            } catch (e) {
-                document.getElementById(toastId).remove();
-                if (confirm(`Auto-Fix Error: ${e.message}\n\nTry again?`)) {
-                    return await fixNext(index);
-                } else return false;
-            }
-        }
-
-        // Start Loop
-        const clean = await fixNext(0);
-        
-        if (clean) {
-            // Commit the clean file back to repo
-            if (confirm("File fixed in memory. Commit changes to repo now?")) {
-                showGlobalToast("💾 Committing fix...");
-                await fetch(CONFIG.funcUrl, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ 
-                        action: 'patch', 
-                        operations: [{
-                            action: 'replace_block', // or create_file to overwrite
-                            file_path: filePath,
-                            action: 'create_file',
-                            content: currentCode
-                        }, { 
-                            action: 'comment', 
-                            text: `[Auto-Fix] Resolved syntax errors in ${filePath}` 
-                        }]
-                    })
-                });
-                showGlobalToast("✅ Changes Saved.");
-            }
-        }
-    }
 
     async function runAutoFixLoop(name, code, errorList) {
         const status = document.getElementById('ef-status-msg');
@@ -2445,6 +2372,9 @@ function addTerminalCard(data, options = {}) {
         });
     }
 
+    // Global state for syntax fixer
+    let currentSyntaxContext = { file: '', error: null, code: '', ops: null };
+
     async function triggerBuild() {
         const workflowFile = prompt("Enter Workflow Filename:", "build.yml");
         if (!workflowFile) return;
@@ -2473,12 +2403,8 @@ function addTerminalCard(data, options = {}) {
                 toast.innerHTML = `⚠️ Syntax Error Detected`;
                 setTimeout(() => toast.remove(), 3000);
                 
-                const msg = `Build Aborted: Syntax Error Detected!\nFile: ${data.file_path}\nErrors: ${data.errors.length}\n\nAttempt Interactive Auto-Fix?`;
-                if (confirm(msg)) {
-                    await runRepoAutoFixLoop(data.file_path, data.errors);
-                    // If we return here, it means fix was committed. We can retry the build.
-                    if(confirm("Fix committed. Retry Build Trigger?")) triggerBuild();
-                }
+                // STOP! Show detailed report instead of prompting for AI fix.
+                openSyntaxReport(data.file_path, data.errors[0]);
                 return;
             }
 
@@ -2487,8 +2413,6 @@ function addTerminalCard(data, options = {}) {
                 toast.style.color = "black";
                 toast.innerHTML = `🚀 Dispatched: ${workflowFile}`;
                 setTimeout(() => toast.remove(), 2500);
-                
-                // Sync workflows AND logs (to see dispatch entry)
                 setTimeout(() => { loadWorkflows(); fetchState(false, true); }, 2000); 
             } else {
                 throw new Error(data.error || "Unknown error");
@@ -2497,6 +2421,102 @@ function addTerminalCard(data, options = {}) {
             toast.remove(); 
             alert("Trigger Failed: " + e.message); 
         }
+    }
+
+    async function openSyntaxReport(path, error) {
+        const modal = document.getElementById('syntax-report-modal');
+        const pathEl = document.getElementById('sr-path');
+        const msgEl = document.getElementById('sr-message');
+        const codeEl = document.getElementById('sr-code');
+        const fixBtn = document.getElementById('btn-auto-fix-wasm');
+        
+        pathEl.innerText = path;
+        msgEl.innerHTML = `<strong>Line ${error.line}, Col ${error.column || '?'}:</strong> ${error.message}`;
+        codeEl.innerText = "Loading context...";
+        modal.style.display = 'flex';
+        fixBtn.style.display = 'none'; // Hide until we verify deterministic fix
+
+        // Fetch File Content
+        try {
+            const res = await fetch(CONFIG.funcUrl, { 
+                method: 'POST', headers: {'Content-Type': 'application/json'}, 
+                body: apiBody({ action: 'preview_file', file_path: path }) 
+            });
+            const data = await res.json();
+            const fullCode = b64DecodeUnicode(data.content || "");
+            
+            // Window: 5 lines before and after
+            const lines = fullCode.split('\n');
+            const start = Math.max(0, error.line - 6);
+            const end = Math.min(lines.length, error.line + 5);
+            
+            let snippet = "";
+            for (let i = start; i < end; i++) {
+                const lineNum = i + 1;
+                const marker = (lineNum === error.line) ? "> " : "  ";
+                snippet += `${marker}${lineNum.toString().padEnd(4)} | ${lines[i]}\n`;
+            }
+            
+            codeEl.innerText = snippet;
+            
+            // Store for fix application
+            currentSyntaxContext = { file: path, error: error, code: fullCode, ops: null };
+
+            // Check for Deterministic Fix Availability
+            checkDeterministicFix(path, error, fullCode);
+
+        } catch(e) {
+            codeEl.innerText = "Failed to load file content: " + e.message;
+        }
+    }
+
+    async function checkDeterministicFix(path, error, code) {
+        try {
+            const res = await fetch(CONFIG.funcUrl, { 
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'propose_syntax_fix', code: code, error: error, file_path: path })
+            });
+            const data = await res.json();
+            if (data.success && data.operations) {
+                currentSyntaxContext.ops = data.operations;
+                const btn = document.getElementById('btn-auto-fix-wasm');
+                btn.style.display = 'block';
+                btn.innerHTML = "✨ Apply Deterministic Fix";
+            }
+        } catch(e) { console.warn("Check fix failed", e); }
+    }
+
+    async function applyDeterministicFix() {
+        if (!currentSyntaxContext.ops) return;
+        const btn = document.getElementById('btn-auto-fix-wasm');
+        btn.disabled = true;
+        btn.innerText = "Applying...";
+
+        try {
+             await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'patch', 
+                    operations: JSON.parse(currentSyntaxContext.ops) 
+                })
+            });
+            alert("Fixed! Reloading state...");
+            closeSyntaxReport();
+            fetchState(false, true);
+            fetchFileList();
+        } catch(e) {
+            alert("Fix failed: " + e.message);
+            btn.disabled = false;
+        }
+    }
+
+    function closeSyntaxReport() {
+        document.getElementById('syntax-report-modal').style.display = 'none';
+    }
+
+    function copySyntaxContext() {
+        const text = document.getElementById('sr-code').innerText;
+        navigator.clipboard.writeText(text).then(() => alert("Copied code context!"));
     }
 
     let runStateCache = {};
