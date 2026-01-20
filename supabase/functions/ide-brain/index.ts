@@ -1056,9 +1056,6 @@ You have access to exactly 3 atomic operations. Do not invent others.
         
         ALLOWED OPERATIONS:
         - REPLACE: { "file_path": "string", "action": "replace_block", "find_block": "EXACT_CODE", "replace_with": "NEW_CODE" }
-        - INSERT: { "file_path": "string", "action": "insert_after", "anchor": "EXACT_LINE", "content": "NEW_CODE" }
-        - CREATE: { "file_path": "string", "action": "create_file", "content": "CODE" }
-        - DELETE: { "file_path": "string", "action": "delete_file" }
         
         STRICT RULES:
         1. Output ONLY a raw JSON Array. No Markdown blocks. No Explanations.
