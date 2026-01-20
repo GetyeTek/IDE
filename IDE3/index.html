@@ -1056,9 +1056,9 @@
         } catch (e) { status.innerText = "Error loading code."; }
     }
 
-    // --- CLIENT SIDE PATCH ENGINE ---
+    // --- CLIENT SIDE PATCH ENGINE (Smart Line-Matcher) ---
     function applyLocalPatch(content, ops) {
-        let newContent = content;
+        let lines = content.split('\n');
         let logs = [];
         let success = true;
 
@@ -1068,29 +1068,70 @@
 
         ops.forEach(op => {
             if (op.action === 'comment') return;
+            if (op.action === 'create_file') { lines = op.content.split('\n'); logs.push('Created file'); return; }
             
             if (op.action === 'replace_block') {
-                if (newContent.includes(op.find_block)) {
-                    newContent = newContent.replace(op.find_block, op.replace_with);
-                    logs.push(`Replaced block`);
-                } else {
-                    // Robust Match Fallback (Whitespace agnostic)
-                    const normalize = s => s.replace(/\s+/g, ' ').trim();
-                    const normContent = normalize(newContent);
-                    const normFind = normalize(op.find_block);
-                    if (normContent.includes(normFind)) {
-                        // Note: This is a risky fallback for a string replace, usually regex is needed
-                        // For now, we fail if exact match fails to prevent corruption
-                        success = false;
-                        logs.push(`Block not found (Exact match failed)`);
-                    } else {
-                        success = false;
-                        logs.push(`Block not found`);
+                // Strategy 1: Exact String Match (Fastest)
+                const currentStr = lines.join('\n');
+                if (currentStr.includes(op.find_block)) {
+                    lines = currentStr.replace(op.find_block, op.replace_with).split('\n');
+                    logs.push('Exact match applied');
+                    return;
+                }
+
+                // Strategy 2: Line-by-Line Fuzzy Match (Whitespace Agnostic)
+                const searchLines = op.find_block.split('\n').map(l => l.trim()).filter(l => l !== '');
+                if (searchLines.length === 0) return;
+
+                let matchStart = -1;
+                let matchEnd = -1;
+
+                // Scan file lines
+                for (let i = 0; i < lines.length; i++) {
+                    // If first line matches (ignoring whitespace)
+                    if (lines[i].trim() === searchLines[0]) {
+                        // Check subsequent lines
+                        let allMatch = true;
+                        let fileOffset = 0;
+                        let searchOffset = 1;
+                        
+                        while (searchOffset < searchLines.length) {
+                            if (i + fileOffset + 1 >= lines.length) { allMatch = false; break; }
+                            const nextFile = lines[i + fileOffset + 1].trim();
+                            // Skip empty lines in file if they aren't in search block
+                            if (nextFile === '') {
+                                fileOffset++;
+                                continue;
+                            }
+                            if (nextFile !== searchLines[searchOffset]) {
+                                allMatch = false;
+                                break;
+                            }
+                            fileOffset++;
+                            searchOffset++;
+                        }
+
+                        if (allMatch) {
+                            matchStart = i;
+                            matchEnd = i + fileOffset;
+                            break;
+                        }
                     }
+                }
+
+                if (matchStart !== -1) {
+                    // Replace the range of lines
+                    const replacement = op.replace_with.split('\n');
+                    lines.splice(matchStart, (matchEnd - matchStart) + 1, ...replacement);
+                    logs.push(`Fuzzy match applied (Lines ${matchStart+1}-${matchEnd+1})`);
+                } else {
+                    success = false;
+                    logs.push(`Failed to find block: "${op.find_block.substring(0, 30)}..."`);
+                    console.warn("Patch Mismatch. File has:", content.substring(0, 200), "... vs Search:", op.find_block);
                 }
             }
         });
-        return { content: newContent, success, logs };
+        return { content: lines.join('\n'), success, logs };
     }
 
     // --- REPO-LEVEL AUTO FIX LOOP (For CI/CD) ---
