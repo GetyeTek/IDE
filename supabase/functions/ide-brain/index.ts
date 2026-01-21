@@ -320,11 +320,35 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
 
     // MAP OPENAI TOOLS TO GOOGLE FUNCTION DECLARATIONS
     if (tools && tools.length > 0) {
+        const mapType = (t: any) => {
+            // Flatten union types ["integer", "null"] -> "INTEGER"
+            const rawType = Array.isArray(t) ? t[0] : t;
+            if (rawType === "integer") return "INTEGER";
+            if (rawType === "string") return "STRING";
+            if (rawType === "boolean") return "BOOLEAN";
+            if (rawType === "number") return "NUMBER";
+            if (rawType === "object") return "OBJECT";
+            if (rawType === "array") return "ARRAY";
+            return "STRING"; // Fallback
+        };
+
+        const transformSchema = (schema: any): any => {
+            const newSchema: any = { type: mapType(schema.type) };
+            if (schema.properties) {
+                newSchema.properties = {};
+                for (const key in schema.properties) {
+                    newSchema.properties[key] = transformSchema(schema.properties[key]);
+                }
+            }
+            if (schema.required) newSchema.required = schema.required;
+            return newSchema;
+        };
+
         payload.tools = [{
             function_declarations: tools.map((t: any) => ({
                 name: t.function.name,
                 description: t.function.description,
-                parameters: t.function.parameters
+                parameters: transformSchema(t.function.parameters)
             }))
         }];
     }
