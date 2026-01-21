@@ -424,12 +424,12 @@ async function consultAI(fileContent: string, failedOp: any, failReason: string,
             type: "object", 
             properties: { 
                 can_fix: { type: "boolean" }, 
-                confidence_score: { type: "integer" }, 
+                confidence_score: { type: "number" }, 
                 explanation: { type: "string" }, 
-                start_line: { type: "integer" }, 
-                end_line: { type: "integer" }, 
-                anchor_line: { type: "integer" }, 
-                new_anchor_text: { type: "string" } 
+                start_line: { type: ["integer", "null"] }, 
+                end_line: { type: ["integer", "null"] }, 
+                anchor_line: { type: ["integer", "null"] }, 
+                new_anchor_text: { type: ["string", "null"] } 
             }, 
             required: ["can_fix", "explanation", "confidence_score"] 
         } 
