@@ -515,13 +515,31 @@ async function consultAI(fileContent: string, failedOp: any, failReason: string,
         return { fixedOp: null, reason: `AI Refusal: ${rawText.substring(0, 200)}`, score: 0 };
     }
     
-    const args = JSON.parse(toolCall.function.arguments);
-    
-    // Normalize Score: Handle 0.95 (float) vs 95 (integer)
-    let score = args.confidence_score || 0;
+    let args: any = {};
+    try {
+        const raw = toolCall.function.arguments;
+        args = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch (e: any) {
+        return { fixedOp: null, reason: `JSON Parse Failed: ${e.message}`, score: 0 };
+    }
+
+    // 1. Normalize Score (Handle strings "95", floats 0.95, ints 95)
+    let score = Number(args.confidence_score);
+    if (isNaN(score)) score = 0;
     if (score > 0 && score <= 1) score = Math.round(score * 100);
 
-    if (!args || !args.can_fix || score < 60) return { fixedOp: null, reason: args?.explanation || "No match", score: score };
+    // 2. Normalize Booleans (Handle strings "true")
+    const canFix = args.can_fix === true || String(args.can_fix).toLowerCase() === 'true';
+
+    // 3. Normalize Integers (Handle strings "10")
+    const toInt = (val: any) => { const n = parseInt(val, 10); return isNaN(n) ? null : n; };
+    args.start_line = toInt(args.start_line);
+    args.end_line = toInt(args.end_line);
+    args.anchor_line = toInt(args.anchor_line);
+
+    if (!canFix || score < 60) {
+        return { fixedOp: null, reason: args.explanation || "AI Confidence too low", score: score };
+    }
     
     const newOp = { ...failedOp, is_ai_fix: true };
     if (args.start_line && args.end_line) { newOp.ai_strategy = "range_replace"; newOp.start_line = args.start_line; newOp.end_line = args.end_line; } 
