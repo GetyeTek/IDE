@@ -516,13 +516,18 @@ async function consultAI(fileContent: string, failedOp: any, failReason: string,
     }
     
     const args = JSON.parse(toolCall.function.arguments);
-    if (!args || !args.can_fix || args.confidence_score < 60) return { fixedOp: null, reason: args?.explanation || "No match", score: args?.confidence_score || 0 };
+    
+    // Normalize Score: Handle 0.95 (float) vs 95 (integer)
+    let score = args.confidence_score || 0;
+    if (score > 0 && score <= 1) score = Math.round(score * 100);
+
+    if (!args || !args.can_fix || score < 60) return { fixedOp: null, reason: args?.explanation || "No match", score: score };
     
     const newOp = { ...failedOp, is_ai_fix: true };
     if (args.start_line && args.end_line) { newOp.ai_strategy = "range_replace"; newOp.start_line = args.start_line; newOp.end_line = args.end_line; } 
     else if (args.anchor_line) { newOp.ai_strategy = "line_insert"; newOp.anchor_line = args.anchor_line; }
     else if (args.new_anchor_text) { newOp.anchor = args.new_anchor_text; }
-    return { fixedOp: newOp, reason: args.explanation, score: args.confidence_score };
+    return { fixedOp: newOp, reason: args.explanation, score: score };
   } catch (e: any) { console.error("[Healer] Error:", e); return { fixedOp: null, reason: e.message, score: 0 }; }
 }
 
