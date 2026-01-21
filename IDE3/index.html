@@ -1247,8 +1247,7 @@
     async function deployEdgeFunction() {
         console.group("🚀 Edge Function Deployment");
         const name = document.getElementById('ef-name').value.trim();
-        // Capture code but don't enforce it being present for a trigger-only deploy
-        const code = document.getElementById('ef-code').value.trim();
+        let code = document.getElementById('ef-code').value.trim();
         const status = document.getElementById('ef-status-msg');
 
         console.log("Target Function:", name);
@@ -1257,10 +1256,26 @@
         // Save preference
         localStorage.setItem('conduit_last_ef', name);
 
-        const isPatching = code && code !== "Loading..." && !code.startsWith("import { serve");
-        
-        if (isPatching) {
-             status.innerText = "🧬 Validating Syntax...";
+        // 1. AUTO-FETCH if editor is empty/stale
+        let isFreshCode = true;
+        if (!code || code === "Loading..." || code.startsWith("import { serve")) {
+             status.innerText = "📥 Fetching source for validation...";
+             try {
+                const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: `supabase/functions/${name}/index.ts` }) });
+                const data = await res.json();
+                if (data.content) {
+                    code = b64DecodeUnicode(data.content);
+                    isFreshCode = false; // It matches server exactly, so no need to patch
+                } else {
+                    throw new Error("Function file not found.");
+                }
+             } catch (e) {
+                 return alert(`Cannot deploy: Could not fetch code for '${name}'. ` + e.message);
+             }
+        }
+
+        // 2. VALIDATION (Always run this on the code we just resolved)
+        status.innerText = "🧬 Validating Syntax...";
         status.style.color = "var(--ai-accent)";
 
         // --- STEP 0: PRE-FLIGHT VALIDATION ---
@@ -1296,14 +1311,16 @@
         }
 
         // Use the (potentially updated) code from DOM
-        const finalCode = document.getElementById('ef-code').value.trim();
+        // Note: If we auto-fetched, 'code' variable holds the content, but DOM might be empty. 
+        // We use the 'code' variable we resolved earlier.
+        const finalCode = code;
 
         status.innerText = "⏳ Processing...";
         status.style.color = "var(--ai-accent)";
 
         try {
-            // Step 1: Commit code (ONLY if editor has valid content)
-            if (isPatching) {
+            // Step 1: Commit code (ONLY if it's user-edited code)
+            if (isFreshCode) {
                 status.innerText = "💾 Syncing to GitHub...";
                 const patchRes = await fetch(CONFIG.funcUrl, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -1315,8 +1332,8 @@
                 });
                 const patchData = await patchRes.json();
                 
-                // Handle overwrite if create failed
                 if (!patchData.success) {
+                    // Overwrite logic
                      await fetch(CONFIG.funcUrl, {
                         method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: apiBody({ action: 'patch', operations: [{
