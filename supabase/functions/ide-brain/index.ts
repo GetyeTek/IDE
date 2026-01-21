@@ -313,7 +313,21 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
   if (provider.type === 'google') {
     const promptText = messages.map(m => `[${m.role.toUpperCase()}]: ${m.content}`).join('\n');
     const url = `${provider.baseUrl}?key=${apiKey}`;
-    const payload = { contents: [{ parts: [{ text: promptText }] }] };
+    
+    const payload: any = { 
+        contents: [{ parts: [{ text: promptText }] }] 
+    };
+
+    // MAP OPENAI TOOLS TO GOOGLE FUNCTION DECLARATIONS
+    if (tools && tools.length > 0) {
+        payload.tools = [{
+            function_declarations: tools.map((t: any) => ({
+                name: t.function.name,
+                description: t.function.description,
+                parameters: t.function.parameters
+            }))
+        }];
+    }
     
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const data = await res.json();
