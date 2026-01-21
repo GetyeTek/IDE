@@ -519,7 +519,12 @@ async function consultAI(fileContent: string, failedOp: any, failReason: string,
     }
     
     const args = JSON.parse(toolCall.function.arguments);
-    if (!args || !args.can_fix || args.confidence_score < 60) return { fixedOp: null, reason: args?.explanation || "No match", score: args?.confidence_score || 0 };
+
+    // DEFENSIVE CODING: Normalize score. AI sometimes returns 0.95 instead of 95.
+    let score = args.confidence_score;
+    if (score <= 1 && score > 0) score = score * 100;
+
+    if (!args || !args.can_fix || score < 60) return { fixedOp: null, reason: args?.explanation || "Low confidence match", score: score || 0 };
     
     const newOp = { ...failedOp, is_ai_fix: true };
     if (args.start_line && args.end_line) { newOp.ai_strategy = "range_replace"; newOp.start_line = args.start_line; newOp.end_line = args.end_line; } 
