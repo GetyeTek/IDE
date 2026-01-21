@@ -1,0 +1,1 @@
+const myValue: string = ; // Error: Missing value assignment
