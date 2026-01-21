@@ -404,16 +404,23 @@ async function repairSyntaxWithAI(codeBlock: string, errorMessage: string, confi
 async function consultAI(fileContent: string, failedOp: any, failReason: string, config?: AIConfig): Promise<{ fixedOp: any | null; reason: string; score: number }> {
   console.log(`--- CONSULT AI (HEALER) START for ${failedOp?.action} ---`);
   
-  const systemInstruction = `You are the Conduit Self-Healing Patch Engine. 
-  A patch operation failed to find its target code in the file.
-  Your job: Look at the FILE CONTENT and the FAILED OP. Find where the semantic intent of the op belongs.
+  const systemInstruction = `You are the Conduit Self-Healing Patch Engine.
+  A patch operation failed because of a mismatch. Your goal is to HEAL it by finding the correct location.
+
+  PRIORITY: AGGRESSIVE FUZZY MATCHING.
+  The user is likely correct that the code exists, but provided a slightly outdated or malformatted block.
   
-  RULES:
-  1. If whitespace differs slightly, match it and update the op.
-  2. If the variable names changed but logic is identical, match it.
-  3. If you find the match, output 'can_fix: true' and the NEW coordinates/anchor.
-  4. If the code is missing or completely rewritten, output 'can_fix: false'.
-  5. Use 'suggest_fix' tool only.`;
+  SEARCH STRATEGY:
+  1. Ignore whitespace/indentation differences completely.
+  2. Look for semantic equivalents (e.g. "const x = 1" vs "const x=1").
+  3. Look for the code surrounding the target (context matching).
+  4. If variables are renamed but structure is identical, MATCH IT.
+  
+  REPORTING:
+  - You MUST populate the "explanation" field with your reasoning. Tell me exactly what differed (e.g., "Found match on line 50, but indentation was different").
+  - If you cannot find it, explain WHY (e.g., "Function 'init' is missing entirely").
+
+  Use the 'suggest_fix' tool to return your findings.`;
 
   const tools = [{ 
     type: "function",
