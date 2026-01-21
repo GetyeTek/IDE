@@ -325,9 +325,24 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
     console.log(JSON.stringify(data, null, 2));
     console.log("=== [END RESPONSE] ===\n");
 
+    const part = data.candidates?.[0]?.content?.parts?.[0];
+    let tool_calls = undefined;
+    
+    if (part?.functionCall) {
+        // Map Gemini FunctionCall to OpenAI ToolCall format
+        tool_calls = [{
+            function: {
+                name: part.functionCall.name,
+                // Gemini args are objects, OpenAI expects JSON strings
+                arguments: JSON.stringify(part.functionCall.args)
+            }
+        }];
+    }
+
     return { 
       raw: data, 
-      content: data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+      content: part?.text || "",
+      tool_calls: tool_calls
     };
   }
 
@@ -453,10 +468,14 @@ async function consultAI(fileContent: string, failedOp: any, failReason: string,
     ];
     
     const result = await genericRequestAI('fast_fix', messages, config, tools);
-    console.log("[Healer] Response:", JSON.stringify(result.raw));
+    console.log("🔥 [HEALER RAW DEBUG]:", JSON.stringify(result, null, 2));
     
     const toolCall = result.tool_calls?.[0];
-    if (!toolCall || toolCall.function.name !== "suggest_fix") return { fixedOp: null, reason: "No match", score: 0 };
+    if (!toolCall || toolCall.function.name !== "suggest_fix") {
+        // Fallback: If AI refused to call tool, return its text response as the reason
+        const rawText = result.content || "AI returned no content and no tool calls.";
+        return { fixedOp: null, reason: `AI Refusal: ${rawText.substring(0, 200)}`, score: 0 };
+    }
     
     const args = JSON.parse(toolCall.function.arguments);
     if (!args || !args.can_fix || args.confidence_score < 60) return { fixedOp: null, reason: args?.explanation || "No match", score: args?.confidence_score || 0 };
