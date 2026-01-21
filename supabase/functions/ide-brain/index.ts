@@ -484,7 +484,10 @@ async function consultAI(fileContent: string, failedOp: any, failReason: string,
             type: "object", 
             properties: { 
                 can_fix: { type: "boolean" }, 
-                confidence_score: { type: "number" }, 
+                confidence_score: { 
+                    type: "number",
+                    description: "Confidence score from 0 to 100 (e.g. 95, not 0.95)"
+                }, 
                 explanation: { type: "string" }, 
                 start_line: { type: ["integer", "null"] }, 
                 end_line: { type: ["integer", "null"] }, 
