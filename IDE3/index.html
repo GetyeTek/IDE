@@ -1007,6 +1007,12 @@
     function openEFManager() {
         document.getElementById('ef-manager-overlay').classList.add('active');
         toggleFab(false);
+        
+        // Auto-load last used function name
+        const lastUsed = localStorage.getItem('conduit_last_ef');
+        if(lastUsed) document.getElementById('ef-name').value = lastUsed;
+
+        // Auto-fetch list
         fetchEdgeFunctions();
     }
 
@@ -1241,14 +1247,20 @@
     async function deployEdgeFunction() {
         console.group("🚀 Edge Function Deployment");
         const name = document.getElementById('ef-name').value.trim();
+        // Capture code but don't enforce it being present for a trigger-only deploy
         const code = document.getElementById('ef-code').value.trim();
         const status = document.getElementById('ef-status-msg');
 
         console.log("Target Function:", name);
         if (!name) return alert("Enter a function name.");
-        if (!code) return alert("Enter function code.");
+        
+        // Save preference
+        localStorage.setItem('conduit_last_ef', name);
 
-        status.innerText = "🧬 Validating Syntax...";
+        const isPatching = code && code !== "Loading..." && !code.startsWith("import { serve");
+        
+        if (isPatching) {
+             status.innerText = "🧬 Validating Syntax...";
         status.style.color = "var(--ai-accent)";
 
         // --- STEP 0: PRE-FLIGHT VALIDATION ---
@@ -1286,33 +1298,36 @@
         // Use the (potentially updated) code from DOM
         const finalCode = document.getElementById('ef-code').value.trim();
 
-        status.innerText = "⏳ Deploying...";
+        status.innerText = "⏳ Processing...";
         status.style.color = "var(--ai-accent)";
 
         try {
-            // Step 1: Commit code
-            status.innerText = "💾 Syncing to GitHub...";
-            const patchRes = await fetch(CONFIG.funcUrl, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'patch', operations: [{
-                    file_path: `supabase/functions/${name}/index.ts`,
-                    action: "create_file",
-                    content: finalCode
-                }]})
-            });
-            const patchData = await patchRes.json();
-            
-            if (!patchData.success) {
-                const { content: old } = await (await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: `supabase/functions/${name}/index.ts` }) })).json();
-                await fetch(CONFIG.funcUrl, {
+            // Step 1: Commit code (ONLY if editor has valid content)
+            if (isPatching) {
+                status.innerText = "💾 Syncing to GitHub...";
+                const patchRes = await fetch(CONFIG.funcUrl, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: apiBody({ action: 'patch', operations: [{
                         file_path: `supabase/functions/${name}/index.ts`,
-                        action: "replace_block",
-                        find_block: b64DecodeUnicode(old),
-                        replace_with: code
+                        action: "create_file",
+                        content: finalCode
                     }]})
                 });
+                const patchData = await patchRes.json();
+                
+                // Handle overwrite if create failed
+                if (!patchData.success) {
+                     await fetch(CONFIG.funcUrl, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'patch', operations: [{
+                        file_path: `supabase/functions/${name}/index.ts`,
+                        action: "create_file",
+                        content: finalCode // Force overwrite if replace fails, simpler logic
+                    }]})
+                });
+                }
+            } else {
+                console.log("Skipping patch step - Deploying existing GitHub content.");
             }
 
             // Step 2: Trigger Workflow
@@ -1846,14 +1861,14 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
         // 4. Finalize UI
         const el = document.getElementById(termId);
         el.innerHTML = `
-            <div class="log-header">
+            <div class="log-header expanded" onclick="toggleLogBody('${termId}')" style="cursor:pointer;">
                 <div class="log-meta">
                     <span class="status-pill" style="background:#d946ef; color:white;">🧬 DEEP SCAN</span>
                     <span class="status-pill ${errorCount > 0 ? 'pill-fail' : 'pill-success'}">${errorCount > 0 ? `${errorCount} ERRORS` : 'PASSED'}</span>
                 </div>
-                <span style="font-size:18px; color:#666; cursor:pointer;" onclick="toggleLogBody('${termId}')">⮞</span>
+                <span style="font-size:18px; color:#666;">⮞</span>
             </div>
-            <div class="log-body open">${logHtml}</div>`;
+            <div class="log-body open" id="${termId}-body">${logHtml}</div>`;
     }
 function addTerminalCard(data, options = {}) {
         const container = document.getElementById('terminal-list');
