@@ -471,7 +471,7 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
 ### THE LAW OF COORDINATES
 - The context provided to you contains line numbers followed by a ' | ' separator (e.g., " 25 | code").
 - Your 'start_line' and 'end_line' MUST refer to these numbers.
-- If you are replacing a block that spans multiple lines, YOU MUST PROVIDE BOTH 'start_line' AND 'end_line'. NEVER provide a start_line alone for a multi-line replacement.
+- COORDINATE INTEGRITY: All coordinate fields are REQUIRED by the schema. If you are not using a specific field (e.g., you are doing a Range Replace and don't need 'anchor_line'), you MUST set the unused fields to 'null'.
 
 ### OUTPUT STRATEGY SELECTION
 - [STRATEGY: RANGE] Use 'start_line' + 'end_line'. Best for 'replace_block' failures. Ensure the range covers the ENTIRE logical block you want to overwrite.
@@ -529,7 +529,7 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
                     description: "A unique string that CURRENTLY EXISTS in the file. Do NOT put new code here."
                 } 
             }, 
-            required: ["can_fix", "explanation", "confidence_score"] 
+            required: ["can_fix", "explanation", "confidence_score", "start_line", "end_line", "anchor_line"] 
         } 
     } 
   }];
@@ -565,7 +565,15 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
     if (args.start_line) {
         newOp.ai_strategy = "range_replace";
         newOp.start_line = args.start_line;
-        newOp.end_line = args.end_line || args.start_line;
+        
+        // INTELLIGENT SPAN FALLBACK
+        // If AI is lazy and gives start_line but no end_line, calculate the original block length
+        if (!args.end_line && failedOp.find_block) {
+            const originalLineCount = failedOp.find_block.split('\n').length;
+            newOp.end_line = args.start_line + (originalLineCount - 1);
+        } else {
+            newOp.end_line = args.end_line || args.start_line;
+        }
     } 
     else if (args.anchor_line) {
         newOp.ai_strategy = "line_insert";
