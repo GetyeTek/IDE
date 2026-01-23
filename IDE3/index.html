@@ -2540,9 +2540,27 @@ function addTerminalCard(data, options = {}) {
 
     async function previewStageDiff(i) {
         const op = pendingOps[i];
-        const mockId = 'staged-' + i;
-        window.OP_CACHE[mockId] = { file: op.file_path, op: op, commit_sha: 'HEAD' };
-        openDiffViewer(mockId);
+        showGlobalToast("Generating preview...");
+        
+        try {
+            // 1. Fetch current content (Left side)
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'preview_file', file_path: op.file_path })
+            });
+            const data = await res.json();
+            const currentContent = data.content ? b64DecodeUnicode(data.content) : "";
+
+            // 2. Simulate the patch locally (Right side)
+            const patchResult = applyLocalPatch(currentContent, [op]);
+            
+            // 3. Open viewer with simulated data
+            const mockId = 'staged-' + i;
+            window.OP_CACHE[mockId] = { file: op.file_path, op: op, commit_sha: 'STAGED' };
+            openDiffViewer(mockId, currentContent, patchResult.content);
+        } catch (e) {
+            showGlobalToast("Failed to generate diff: " + e.message, true);
+        }
     }
 
     // --- RENAME ---
@@ -4169,7 +4187,7 @@ async function downloadArtifact(runId) {
         toggleFab(true);
     }
 
-    async function openDiffViewer(id) {
+    async function openDiffViewer(id, forcedLeft = null, forcedRight = null) {
         const data = window.OP_CACHE[id];
         if(!data) return;
         
@@ -4201,22 +4219,31 @@ async function downloadArtifact(runId) {
         diffRight.setValue("Loading...", -1);
 
         try {
-            const rightRef = data.commit_sha || 'HEAD';
-            const leftRef = rightRef + '^';
+            let leftContent = "", rightContent = "";
 
-            const fetchFile = async (ref) => {
-                const res = await fetch(CONFIG.funcUrl, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ action: 'preview_file', file_path: data.file, ref_sha: ref })
-                });
-                const d = await res.json();
-                return d.content ? b64DecodeUnicode(d.content) : '';
-            };
+            if (forcedLeft !== null && forcedRight !== null) {
+                leftContent = forcedLeft;
+                rightContent = forcedRight;
+            } else {
+                const rightRef = data.commit_sha || 'HEAD';
+                const leftRef = rightRef + '^';
 
-            const [leftContent, rightContent] = await Promise.all([
-                fetchFile(leftRef).catch(() => ""),
-                fetchFile(rightRef).catch(() => "")
-            ]);
+                const fetchFile = async (ref) => {
+                    const res = await fetch(CONFIG.funcUrl, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: apiBody({ action: 'preview_file', file_path: data.file, ref_sha: ref })
+                    });
+                    const d = await res.json();
+                    return d.content ? b64DecodeUnicode(d.content) : '';
+                };
+
+                const results = await Promise.all([
+                    fetchFile(leftRef).catch(() => ""),
+                    fetchFile(rightRef).catch(() => "")
+                ]);
+                leftContent = results[0];
+                rightContent = results[1];
+            }
 
             let mode = "ace/mode/text";
             if (data.file.endsWith('.js')) mode = "ace/mode/javascript";
