@@ -1637,50 +1637,50 @@ You have access to exactly 3 atomic operations. Do not invent others.
     }
     
     if (action === "fetch_models") {
-        const provider = resolveProvider(payload.role || 'chat', ai_config);
+        const providerId = payload.provider_id;
+        const provider = ai_config?.providers?.[providerId] || resolveProvider('chat', ai_config);
+
         if (!provider) throw new Error("Provider not found");
-        
+
         const serviceMap: Record<string, string> = { 'Deepseek_API': 'deepseek', 'GEMINI_API_KEY': 'gemini', 'GROQ_API_KEY': 'groq' };
         const serviceName = serviceMap[provider.apiKeyEnv];
         let apiKey = "";
-        
-        console.log(`[fetch_models] Attempting to fetch models for service: ${serviceName || 'Unknown'}`);
 
         if (serviceName) {
             const { data: keyRow } = await supabase.from('api_keys').select('api_key').eq('service', serviceName).eq('is_active', true).order('last_used_at', { ascending: true }).limit(1).maybeSingle();
-            if (keyRow) {
-                apiKey = keyRow.api_key;
-                console.log(`[fetch_models] Found active key in DB for ${serviceName}`);
-            }
+            if (keyRow) apiKey = keyRow.api_key;
         }
 
-        if (!apiKey) {
-            apiKey = Deno.env.get(provider.apiKeyEnv) || "";
-            if (apiKey) console.log(`[fetch_models] Using API Key from Environment/Raw Config for ${provider.apiKeyEnv}`);
+        if (!apiKey) apiKey = Deno.env.get(provider.apiKeyEnv) || "";
+        if (!apiKey) throw new Error("API Key not found");
+
+        let targetUrl = "";
+        let fetchOptions: RequestInit = { headers: { "Content-Type": "application/json" } };
+
+        if (provider.type === 'google') {
+            targetUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        } else {
+            // OpenAI-compatible: Strip /chat/completions and add /models
+            targetUrl = provider.baseUrl.replace(/\/chat\/completions\/?$/, "/models");
+            (fetchOptions.headers as any)["Authorization"] = `Bearer ${apiKey}`;
         }
 
-        if (!apiKey) throw new Error(`No API key found for service ${serviceName || provider.apiKeyEnv}`);
-
-        // NOTE: This URL is currently hardcoded to Groq. If your provider is NOT Groq, this will fail.
-        const targetUrl = "https://api.groq.com/openai/v1/models";
-        console.log(`[fetch_models] Calling URL: ${targetUrl}`);
-
-        const res = await fetch(targetUrl, {
-            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" }
-        });
-
+        const res = await fetch(targetUrl, fetchOptions);
         const rawText = await res.text();
-        console.log(`[fetch_models] Raw Response (Status ${res.status}):`, rawText);
 
         if (!res.ok) {
-            return new Response(JSON.stringify({ 
-                error: `Upstream Provider Error (${res.status})`, 
-                details: rawText 
-            }), { status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            return new Response(JSON.stringify({ error: `Provider Error (${res.status})`, details: rawText }), { status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         const data = JSON.parse(rawText);
-        return new Response(JSON.stringify({ models: data.data || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        let models = [];
+        if (provider.type === 'google') {
+            models = (data.models || []).map((m: any) => ({ id: m.name.split('/').pop() }));
+        } else {
+            models = data.data || [];
+        }
+
+        return new Response(JSON.stringify({ models }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "rollback") {
