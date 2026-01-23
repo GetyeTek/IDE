@@ -3555,13 +3555,11 @@ async function downloadArtifact(runId) {
         toggleFab(true);
     }
 
-    function saveAIConfig() {
-
-    async function fetchRemoteModels(key) {
+        async function fetchRemoteModels(key) {
         const input = document.getElementById(`model-input-${key}`);
         const original = input.value;
         
-        showGlobalToast("Connecting to Groq Registry...");
+        showGlobalToast("Connecting to Provider Registry...");
         input.value = "⏳ Syncing models...";
         
         try {
@@ -3577,7 +3575,7 @@ async function downloadArtifact(runId) {
             if (data.models && data.models.length > 0) {
                 input.value = "✅ Select from list...";
                 const listText = data.models.map((m, i) => `${i + 1}. ${m.id}`).join('\n');
-                const choice = prompt(`GROQ MODELS FOUND (${data.models.length})\n\nEnter number or exact ID:\n\n${listText}`, original);
+                const choice = prompt(`MODELS FOUND (${data.models.length})\n\nEnter number or exact ID:\n\n${listText}`, original);
                 
                 if (choice) {
                     const selected = data.models.find((m, i) => m.id === choice || (i + 1).toString() === choice);
@@ -3592,12 +3590,14 @@ async function downloadArtifact(runId) {
                 throw new Error("No models returned from provider.");
             }
             input.value = original;
-        } catch(e) { 
+        } catch(e) {
             console.error("Model Fetch Error:", e);
             showGlobalToast("Fetch failed: " + e.message, true);
             input.value = original;
         }
     }
+
+    function saveAIConfig() {
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
         alert("AI Configuration Saved!");
         closeAIManager();
