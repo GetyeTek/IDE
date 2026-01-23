@@ -1683,6 +1683,32 @@ You have access to exactly 3 atomic operations. Do not invent others.
         return new Response(JSON.stringify({ models }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "search_repo") {
+        const { query, project_path } = payload;
+        const tree = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
+        const files = tree.tree.filter((f: any) => f.type === "blob" && f.path.startsWith(project_path || ""));
+        
+        const results: any[] = [];
+        // Batch search - processing first 50 files for performance
+        for (const file of files.slice(0, 50)) {
+            const { content } = await getFileRaw(TARGET_REPO, file.path, DEV_BRANCH);
+            if (content) {
+                const text = base64ToText(content);
+                const lines = text.split('\n');
+                lines.forEach((line, i) => {
+                    if (line.toLowerCase().includes(query.toLowerCase())) {
+                        results.push({ 
+                            path: file.path, 
+                            line: i + 1, 
+                            context: line.trim().substring(0, 100)
+                        });
+                    }
+                });
+            }
+        }
+        return new Response(JSON.stringify({ results }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "fetch_repos") {
         const url = `https://api.github.com/user/repos?per_page=100&sort=pushed`;
         const res = await fetch(url, { headers: getHeaders() });
