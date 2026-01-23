@@ -196,8 +196,10 @@
             border-left-color: var(--primary); 
         }
         
-        .log-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+        .log-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; flex: 1; }
         .log-time { color: var(--text-muted); }
+        .log-header .chevron { transition: transform 0.2s ease; color: #666; }
+        .log-header.expanded .chevron { transform: rotate(90deg); }
         .status-pill { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
         .pill-success { background: rgba(34, 197, 94, 0.2); color: var(--prod); }
         .pill-fail { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
@@ -1922,7 +1924,7 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
                     <span class="status-pill" style="background:#d946ef; color:white;">🧬 DEEP SCAN</span>
                     <span class="status-pill ${errorCount > 0 ? 'pill-fail' : 'pill-success'}">${errorCount > 0 ? `${errorCount} ERRORS` : 'PASSED'}</span>
                 </div>
-                <span style="font-size:18px; color:#666;">⮞</span>
+                <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"></path></svg>
             </div>
             <div class="log-body open" id="${termId}-body">${logHtml}</div>`;
     }
@@ -2069,9 +2071,9 @@ function addTerminalCard(data, options = {}) {
                     <span class="status-pill ${isFail ? 'pill-fail' : 'pill-success'}">${isFail ? `${failCount} FAILED` : 'SUCCESS'}</span>
                 </div>
                 <div class="flex-gap" style="position: relative;">
-                    <span style="font-size:18px; color:#666; cursor:pointer; padding: 0 4px;" onclick="toggleLogBody('${id}')">
-                        ⮞
-                    </span>
+                    <div style="cursor:pointer; padding: 4px; display: flex; align-items: center;" onclick="toggleLogBody('${id}')">
+                        <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"></path></svg>
+                    </div>
                     <button class="menu-btn" style="font-size:18px; padding: 0 4px;" onclick="toggleLogMenu('${id}', event)">⋮</button>
                     <div id="${id}-menu" class="menu-dropdown">
                         <div class="menu-item" onclick="viewLogComment('${id}')">View Comment</div>
