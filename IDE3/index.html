@@ -123,7 +123,8 @@
 
         /* NEW UI COMPONENTS */
         .stage-item { background: #1a1a1c; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
-        .stage-header { padding: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; cursor: pointer; }
+        .stage-header { padding: 10px; display: flex; align-items: center; gap: 10px; font-size: 12px; cursor: pointer; overflow: hidden; }
+        .stage-path { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'JetBrains Mono'; }
         .stage-header:hover { background: #222; }
         .search-result { padding: 10px; border-bottom: 1px solid #222; cursor: pointer; }
         .search-result:hover { background: #111; }
@@ -471,8 +472,9 @@
                 <textarea id="json-input" class="json-editor" placeholder="[ { 'action': '...' } ]" spellcheck="false" oninput="saveState()"></textarea>
                 
                 <div class="flex-gap" style="margin-bottom: 12px;">
-                    <button class="btn btn-dev" onclick="stageChanges()">⚡ Stage Changes</button>
-                    <button class="btn btn-prod" onclick="runPatch('commit_prod')">Direct Commit</button>
+                    <button class="btn btn-dev" style="flex: 1; font-size: 12px;" onclick="runPatch('patch')">🧪 Test Patch</button>
+                    <button class="btn btn-outline" style="flex: 1; font-size: 12px; border-color: var(--ai-accent); color: var(--ai-accent);" onclick="stageChanges()">⚡ Stage Changes</button>
+                    <button class="btn btn-prod" style="flex: 1.2; font-size: 12px;" onclick="runPatch('commit_prod')">🚀 Deploy to Main</button>
                 </div>
 
                 <div class="flex-between" style="margin-top:10px;">
@@ -681,8 +683,8 @@
         <div class="viewer-header">
             <span class="viewer-title">Stage Changes</span>
             <div class="flex-gap">
-                <button class="btn btn-prod" style="width:auto; padding:6px 14px;" onclick="runPatch('commit_prod')">Commit All</button>
-                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="document.getElementById('staging-overlay').classList.remove('active')">Cancel</button>
+                <button class="btn btn-primary" style="width:auto; padding:6px 14px;" onclick="commitStagedChanges()">Commit All</button>
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="document.getElementById('staging-overlay').classList.remove('active')">Close</button>
             </div>
         </div>
         <div style="padding: 20px; flex: 1; overflow-y: auto;">
@@ -2512,8 +2514,9 @@ function addTerminalCard(data, options = {}) {
                 div.className = 'stage-item';
                 div.innerHTML = `
                     <div class="stage-header" onclick="previewStageDiff(${i})">
-                        <span><b>${op.action.toUpperCase()}</b>: ${op.file_path}</span>
-                        <button class="menu-btn" style="color:var(--danger)" onclick="event.stopPropagation(); removeStagedOp(${i})">×</button>
+                        <span style="color:var(--ai-accent); font-weight:bold; flex-shrink:0;">${op.action === 'replace_block' ? 'MOD' : 'ADD'}</span>
+                        <span class="stage-path">${op.file_path}</span>
+                        <button class="menu-btn" style="color:var(--danger); flex-shrink:0; padding: 4px 8px; font-size: 16px;" onclick="event.stopPropagation(); removeStagedOp(${i})">×</button>
                     </div>
                 `;
                 list.appendChild(div);
@@ -3887,6 +3890,32 @@ async function downloadArtifact(runId) {
 
     function closeRepoSelector() {
         document.getElementById('repo-selector-overlay').classList.remove('active');
+    }
+
+    async function commitStagedChanges() {
+        if (pendingOps.length === 0) return;
+        const termId = addTerminalCard(null, { loading: true });
+        document.getElementById('staging-overlay').classList.remove('active');
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'patch', 
+                    operations: pendingOps, 
+                    project_path: CONFIG.projectPath,
+                    auto_sanity: CONFIG.autoSanity 
+                })
+            });
+            const data = await res.json();
+            updateTerminalCard(termId, data, pendingOps, true);
+            if(data.success) {
+                setTimeout(() => { fetchState(false, false); fetchFileList(); }, 1000);
+                pendingOps = []; // Clear stage on success
+            }
+        } catch (e) {
+            updateTerminalCard(termId, { error: e.message });
+        }
     }
 
     function fixPreviewError(msg) {
