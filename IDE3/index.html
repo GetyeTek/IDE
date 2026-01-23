@@ -990,6 +990,23 @@
 
         if(typeof acorn === 'undefined') console.warn("Acorn missing. Syntax checking disabled.");
 
+        // Listen for console sync from preview iframe
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.type === 'CONDUIT_CONSOLE') {
+                const logId = addTerminalCard(null, {});
+                const color = e.data.method === 'error' ? 'var(--danger)' : (e.data.method === 'warn' ? 'var(--dev)' : 'var(--primary)');
+                const el = document.getElementById(logId);
+                if (!el) return;
+                el.innerHTML = '<div class="log-header expanded" style="border-left-color:' + color + ';">' +
+                    '<div class="log-meta">' +
+                    '<span class="status-pill" style="background:' + color + '; color:white;">PREVIEW</span>' +
+                    '<span style="font-size:11px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">' + escapeHtml(e.data.msg) + '</span>' +
+                    '</div>' +
+                    '<button class="btn-dev" style="width:auto; padding:4px 8px; font-size:10px; color:black;" onclick="fixPreviewError(\'' + escapeHtml(e.data.msg).replace(/'/g, "\\'") + '\')">✨ Fix</button>' +
+                    '</div>';
+            }
+        });
+
         if(CONFIG.funcUrl) {
             await fetchState();
             setTimeout(() => bundleAndPreview(null), 500); 
@@ -2267,7 +2284,18 @@ function addTerminalCard(data, options = {}) {
         const doc = parser.parseFromString(html, 'text/html');
 
         const flagScript = doc.createElement('script');
-        flagScript.textContent = 'window.IS_CONDUIT_PREVIEW = true; window.process = { env: { NODE_ENV: "development" } };';
+        flagScript.textContent = 'window.IS_CONDUIT_PREVIEW = true; window.process = { env: { NODE_ENV: "development" } };' + 
+            '\n\n// --- PREVIEW CONSOLE SYNC ---\n' +
+            'const sendToConduit = (type, args) => { ' +
+            '  window.parent.postMessage({ type: "CONDUIT_CONSOLE", method: type, msg: Array.from(args).map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ") }, "*"); ' +
+            '};\n' +
+            'const originalLog = console.log; const originalError = console.error;\n' +
+            'console.log = function() { sendToConduit("log", arguments); originalLog.apply(console, arguments); };\n' +
+            'console.error = function() { sendToConduit("error", arguments); originalError.apply(console, arguments); };\n' +
+            'console.warn = function() { sendToConduit("warn", arguments); };\n' +
+            'window.onerror = function(msg, url, line, col, error) { ' +
+            '  sendToConduit("error", ["RUNTIME ERROR: " + msg + " at " + line + ":" + col]); ' +
+            '};';
         doc.head.insertBefore(flagScript, doc.head.firstChild);
 
         const babelScript = doc.createElement('script');
@@ -3852,6 +3880,12 @@ async function downloadArtifact(runId) {
 
     function closeRepoSelector() {
         document.getElementById('repo-selector-overlay').classList.remove('active');
+    }
+
+    function fixPreviewError(msg) {
+        toggleChat(true);
+        chatHistory.push({ role: 'user', text: 'My application logged a runtime error: "' + msg + '". Please analyze my selected files and suggest a fix.' });
+        processAIResponse();
     }
 
     function saveAIConfig() {
