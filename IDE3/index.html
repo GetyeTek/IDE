@@ -19,6 +19,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <style>
+        .model-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px; border-bottom: 1px solid var(--border); transition: background 0.2s;
+        }
+        .model-item:hover { background: #1a1a1c; }
+        .model-item .model-id { font-family: 'JetBrains Mono'; font-size: 12px; color: #eee; flex: 1; }
+        .model-item .model-actions { display: flex; gap: 8px; }
+
         :root {
             --bg: #050505;
             --card-bg: #151517;
@@ -765,6 +773,18 @@
 
     <!-- DELETE HISTORY FAB -->
     <button id="delete-history-fab" class="btn btn-danger" onclick="deleteSelectedHistory()" style="position:fixed; bottom:100px; right:20px; width:auto; padding:12px 16px; border-radius:16px; z-index:150; display:none; box-shadow:0 5px 20px rgba(0,0,0,0.4);">Delete Selected</button>
+
+    <!-- MODEL SELECTOR OVERLAY -->
+    <div id="model-selector-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <div style="flex:1; display:flex; align-items:center; gap:10px;">
+                <span class="viewer-title">Select Model</span>
+                <input type="text" id="model-search" class="input-field" placeholder="Filter models..." style="max-width:250px; height:32px; font-size:12px;" onkeyup="filterModelList(this.value)">
+            </div>
+            <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeModelSelector()">Close</button>
+        </div>
+        <div id="model-selector-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
+    </div>
 
     <!-- NEW: AI CHAT FAB -->
     <button class="fab-chat" onclick="toggleChat(true)">
@@ -3470,8 +3490,9 @@ async function downloadArtifact(runId) {
                 </div>
                 <div class="flex-gap">
                     <div style="flex:1; position:relative;">
-                        <input type="text" id="model-input-${key}" class="input-field" value="${p.model}" placeholder="Model ID" 
-                            ${p.name.includes('Groq') ? `readonly onclick="fetchRemoteModels('${key}')" style="cursor:pointer; border-color:var(--ai-accent);"` : `onchange="updateAIProvider('${key}', 'model', this.value)"`}>
+                        <input type="text" id="model-input-${key}" class="input-field" value="${p.model}" 
+                            placeholder="Select Model..." readonly onclick="fetchRemoteModels('${key}')" 
+                            style="cursor:pointer; border-color:var(--ai-accent); background:rgba(217, 70, 239, 0.05);">
                     </div>
                     <input type="password" class="input-field" value="${p.apiKeyEnv}" placeholder="Env Var or Raw Key" style="flex:1; color:var(--ai-accent);" onchange="updateAIProvider('${key}', 'apiKeyEnv', this.value)">
                 </div>
@@ -3555,12 +3576,12 @@ async function downloadArtifact(runId) {
         toggleFab(true);
     }
 
-        async function fetchRemoteModels(key) {
-        const input = document.getElementById(`model-input-${key}`);
-        const original = input.value;
-        
-        showGlobalToast("Connecting to Provider Registry...");
-        input.value = "⏳ Syncing models...";
+        let currentModelList = [];
+    let currentModelTargetKey = null;
+
+    async function fetchRemoteModels(key) {
+        currentModelTargetKey = key;
+        showGlobalToast("Fetching registry...");
         
         try {
             const res = await fetch(CONFIG.funcUrl, {
@@ -3573,28 +3594,54 @@ async function downloadArtifact(runId) {
             const data = await res.json();
             
             if (data.models && data.models.length > 0) {
-                input.value = "✅ Select from list...";
-                const listText = data.models.map((m, i) => `${i + 1}. ${m.id}`).join('\n');
-                const choice = prompt(`MODELS FOUND (${data.models.length})\n\nEnter number or exact ID:\n\n${listText}`, original);
-                
-                if (choice) {
-                    const selected = data.models.find((m, i) => m.id === choice || (i + 1).toString() === choice);
-                    if (selected) {
-                        input.value = selected.id;
-                        updateAIProvider(key, 'model', selected.id);
-                        showGlobalToast(`Active model: ${selected.id}`);
-                        return;
-                    }
-                }
+                currentModelList = data.models;
+                renderModelSelector(data.models);
+                document.getElementById('model-selector-overlay').classList.add('active');
+                document.getElementById('model-search').value = '';
+                document.getElementById('model-search').focus();
             } else {
                 throw new Error("No models returned from provider.");
             }
-            input.value = original;
         } catch(e) {
             console.error("Model Fetch Error:", e);
             showGlobalToast("Fetch failed: " + e.message, true);
-            input.value = original;
         }
+    }
+
+    function renderModelSelector(models) {
+        const container = document.getElementById('model-selector-list');
+        container.innerHTML = models.map(m => `
+            <div class="model-item">
+                <span class="model-id">${m.id}</span>
+                <div class="model-actions">
+                    <button class="icon-btn" onclick="copyModelId('${m.id}')" title="Copy ID">📋</button>
+                    <button class="btn btn-primary" style="width:auto; padding:4px 12px; font-size:11px;" 
+                        onclick="selectModel('${m.id}')">Select</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function filterModelList(q) {
+        const filtered = currentModelList.filter(m => m.id.toLowerCase().includes(q.toLowerCase()));
+        renderModelSelector(filtered);
+    }
+
+    function copyModelId(id) {
+        navigator.clipboard.writeText(id).then(() => showGlobalToast("ID Copied!"));
+    }
+
+    function selectModel(id) {
+        if (!currentModelTargetKey) return;
+        updateAIProvider(currentModelTargetKey, 'model', id);
+        showGlobalToast(`Selected: ${id}`);
+        closeModelSelector();
+        renderAIConfigUI(); // Refresh UI to show the new model
+    }
+
+    function closeModelSelector() {
+        document.getElementById('model-selector-overlay').classList.remove('active');
+        currentModelTargetKey = null;
     }
 
     function saveAIConfig() {
