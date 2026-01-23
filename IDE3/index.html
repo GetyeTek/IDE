@@ -3416,7 +3416,7 @@ async function downloadArtifact(runId) {
             if (entry.note) report += `- **Note**: ${entry.note}\n`;
             
             if (entry.ops && entry.ops.length > 0) {
-                report += `- **Operations**:\n`;
+                report += `- **Operations Summary**:\n`;
                 entry.ops.forEach(op => {
                     if (op.action === 'comment') {
                         if (op.text) report += `  > ${op.text}\n`;
@@ -3425,6 +3425,7 @@ async function downloadArtifact(runId) {
                         report += `  - ${icon} **${op.action.toUpperCase().replace('_', ' ')}**: \`${op.file_path}\`\n`;
                     }
                 });
+                report += `\n- **Full JSON Payload**:\n\`\`\`json\n${JSON.stringify(entry.ops, null, 2)}\n\`\`\`\n`;
             }
             report += `\n---\n\n`;
         });
