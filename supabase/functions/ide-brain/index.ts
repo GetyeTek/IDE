@@ -457,39 +457,38 @@ async function repairSyntaxWithAI(codeBlock: string, errorMessage: string, confi
 async function consultAI(fileContent: string, failedOp: any, failReason: string, config?: AIConfig): Promise<{ fixedOp: any | null; reason: string; score: number }> {
   console.log(`--- CONSULT AI (HEALER) START for ${failedOp?.action} ---`);
   
-  const systemInstruction = `YOU ARE THE CONDUIT ADAPTIVE SELF-HEALING ENGINE.
+  const systemInstruction = `### ROLE: CONDUIT ADAPTIVE SELF-HEALING ENGINE (LEVEL 10)
 
 ### MISSION
-A code patch failed because the 'find_block' or 'anchor' provided by the user did not match the file content EXACTLY. Your mission is to find where that code was INTENDED to go by performing high-level semantic and fuzzy matching.
+You are the final line of defense for a code-patching engine. A developer's 'find_block' failed to match the file because of minor discrepancies (whitespace, line order, variable renaming, or partial code degradation). Your goal is to identify the EXACT coordinates where the patch should have applied.
 
-### CORE MATCHING RULES
-1. WHITESPACE INDEPENDENCE: Ignore all tabs, spaces, and newlines. If the logic is the same, it is a MATCH.
-2. SEMANTIC EQUIVALENCE: 'obj.prop' is the same as 'obj . prop'. 'x=1' is the same as 'x = 1'.
-3. CONTEXTUAL ANCHORING: If the target code is generic (like just a '}' or 'else'), look at the lines BEFORE and AFTER to confirm the location.
-4. DEGRADATION TOLERANCE: If the user provided 5 lines of code, but the file only has 4 of them (and 1 changed slightly), treat it as a match on those lines.
+### ALGORITHMIC FUZZY MATCHING PROTOCOL
+1. WHITESPACE/INDENTATION: Completely ignore it. A match exists if the tokens and logic flow are identical.
+2. QUOTE/SYNTAX AGNOSTICISM: Treat ' and " as identical. Treat trailing commas as optional.
+3. CONTEXTUAL ANCHORING: If the target block is small (e.g., 1-2 lines), you MUST look at the surrounding lines in the 'File' context to ensure you aren't matching a duplicate symbol in a different function.
+4. LOGICAL DRIFT: If the user's 'find_block' has 4 variables but the file has those 4 variables PLUS 1 new one in the middle, this is a MATCH. Your 'start_line' and 'end_line' must encompass the entire group.
 
-### OUTPUT STRATEGIES (Choose ONE)
-- STRATEGY A (Range Replace): Use 'start_line' AND 'end_line'. If the user's block was 3 lines, but the file is different, find the range that captures the intended target.
-- STRATEGY B (Line Insert): Use 'anchor_line' if the user wanted to 'insert_after' or 'insert_before' a line that moved.
-- STRATEGY C (String Anchor): Use 'new_anchor_text' if you found a more unique string that the Patcher can use for a standard match.
+### THE LAW OF COORDINATES
+- The context provided to you contains line numbers followed by a ' | ' separator (e.g., " 25 | code").
+- Your 'start_line' and 'end_line' MUST refer to these numbers.
+- If you are replacing a block that spans multiple lines, YOU MUST PROVIDE BOTH 'start_line' AND 'end_line'. NEVER provide a start_line alone for a multi-line replacement.
 
-### DATA INTEGRITY REQUIREMENTS
-- confidence_score: MUST BE AN INTEGER BETWEEN 0 AND 100. DO NOT USE DECIMALS (e.g., Use 95, NOT 0.95).
-- start_line / end_line: These are 1-based indices corresponding to the line numbers provided in the 'File' context.
-- explanation: Be technical but CONCISE (Max 3 sentences). Explain exactly what caused the mismatch.
+### OUTPUT STRATEGY SELECTION
+- [STRATEGY: RANGE] Use 'start_line' + 'end_line'. Best for 'replace_block' failures. Ensure the range covers the ENTIRE logical block you want to overwrite.
+- [STRATEGY: ANCHOR] Use 'anchor_line'. Best for 'insert_after' or 'insert_before' failures where the anchor moved but is still a single line.
+- [STRATEGY: STRING] Use 'new_anchor_text'. Only use this if you find a unique line that is 100% stable and wasn't provided by the user.
 
-### EXAMPLE SCENARIOS
+### SCORE RUBRIC (confidence_score)
+- 100: Identical logic, only whitespace or quote differences.
+- 90-95: Identical logic, but 1-2 variables were renamed or a trailing comma was added/removed.
+- 75-85: The structure matches but the file has 1-2 extra lines of code mixed in (logical drift).
+- 60: You found a possible location but it's risky (multiple similar spots).
+- 0: No logical match exists.
 
-Scenario 1: User wants to replace a function, but added a comment in the find_block that doesn't exist.
-- Fix: Set 'start_line' and 'end_line' to the actual function boundaries in the file. Set score to 90.
-
-Scenario 2: User wants to insert after 'const x = 10', but the file has 'const x=10' (no spaces).
-- Fix: Set 'anchor_line' to the line number where 'const x=10' exists. Set score to 100.
-
-Scenario 3: The code is nowhere to be found.
-- Fix: Set 'can_fix' to false. Explain that the logic appears to have been deleted. Set score to 0.
-
-Final Instruction: Look at the line numbers provided in the context carefully. If a block starts on line 10 and ends on line 15, 'start_line' is 10 and 'end_line' is 15.`;
+### DATA INTEGRITY CONSTRAINTS
+- 'confidence_score': MUST be a WHOLE INTEGER (e.g., 95). No floats (0.95 is ILLEGAL).
+- 'explanation': Technical, concise, and definitive. Max 30 words. Identify the exact mismatch (e.g., "Variables reversed on lines 24-25").
+- 'can_fix': If you are guessing with less than 60% confidence, set this to false.`;
 
   const tools = [{ 
     type: "function",
@@ -507,7 +506,7 @@ Final Instruction: Look at the line numbers provided in the context carefully. I
                     type: "integer", 
                     minimum: 0, 
                     maximum: 100, 
-                    description: "Integer from 0-100. 100 = Certain match. 0 = Not found. DO NOT USE FLOATS."
+                    description: "MANDATORY: Whole integer 0-100. (e.g. 98). DECIMALS/FLOATS WILL BREAK THE SYSTEM."
                 }, 
                 explanation: { 
                     type: "string",
@@ -515,11 +514,11 @@ Final Instruction: Look at the line numbers provided in the context carefully. I
                 }, 
                 start_line: { 
                     type: ["integer", "null"], 
-                    description: "The 1-based start line number of the code block to be replaced."
+                    description: "The 1-based start line number. Required for Strategy: RANGE."
                 }, 
                 end_line: { 
                     type: ["integer", "null"], 
-                    description: "The 1-based end line number of the code block to be replaced."
+                    description: "The 1-based end line number. MUST BE PROVIDED if start_line is provided for a block."
                 }, 
                 anchor_line: { 
                     type: ["integer", "null"], 
