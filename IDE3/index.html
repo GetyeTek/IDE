@@ -302,8 +302,9 @@
         .diff-add { background: rgba(34, 197, 94, 0.1); border-left: 2px solid var(--prod); color: #86efac; }
 
         /* Custom Diff Markers */
-        .marker-remove { position: absolute; background: rgba(239, 68, 68, 0.2); border-bottom: 2px solid var(--danger); z-index: 20; }
-        .marker-add { position: absolute; background: rgba(34, 197, 94, 0.2); border-bottom: 2px solid var(--prod); z-index: 20; }
+        /* Enhanced Ace Diff Markers */
+        .marker-remove { position: absolute; background: rgba(239, 68, 68, 0.25); border-left: 3px solid var(--danger); z-index: 20; }
+        .marker-add { position: absolute; background: rgba(34, 197, 94, 0.25); border-left: 3px solid var(--prod); z-index: 20; }
 
         /* ============================ */
         /*      NEW AI CHAT STYLES      */
@@ -4259,28 +4260,46 @@ async function downloadArtifact(runId) {
             diffRight.setValue(rightContent, -1);
 
             const Range = ace.require('ace/range').Range;
+
+            // Helper to get Range from String Index
+            const getRangeFromText = (session, searchText) => {
+                const fullText = session.getValue();
+                // 1. Try Exact Match
+                let startIdx = fullText.indexOf(searchText);
+                
+                // 2. Try Robust Match (Ignoring Line Endings differences)
+                if (startIdx === -1) {
+                    const clean = (s) => s.replace(/\r\n/g, '\n').trim();
+                    startIdx = clean(fullText).indexOf(clean(searchText));
+                }
+
+                if (startIdx !== -1) {
+                    const linesBefore = fullText.substring(0, startIdx).split('\n');
+                    const startRow = linesBefore.length - 1;
+                    const startCol = linesBefore[startRow].length;
+                    const linesInSearch = searchText.split('\n');
+                    const endRow = startRow + linesInSearch.length - 1;
+                    const endCol = linesInSearch.length > 1 ? linesInSearch[linesInSearch.length - 1].length : startCol + searchText.length;
+                    return new Range(startRow, startCol, endRow, endCol);
+                }
+                return null;
+            };
             
             const searchRemove = data.op.find_block || data.op.anchor;
             if(searchRemove) {
-                diffLeft.find(String(searchRemove), {
-                    backwards: false, wrap: true, caseSensitive: false, wholeWord: false, regExp: false
-                });
-                const sel = diffLeft.selection.getRange();
-                if(sel && !sel.isEmpty()) {
-                    diffLeft.session.addMarker(sel, "marker-remove", "text");
-                    diffLeft.scrollToLine(sel.start.row, true, true, function() {});
+                const range = getRangeFromText(diffLeft.session, String(searchRemove));
+                if(range) {
+                    diffLeft.session.addMarker(range, "marker-remove", "fullLine");
+                    diffLeft.scrollToLine(range.start.row, true, true, function() {});
                 }
             }
 
             const searchAdd = data.op.replace_with || data.op.content;
             if(searchAdd) {
-                diffRight.find(String(searchAdd), {
-                    backwards: false, wrap: true, caseSensitive: false, wholeWord: false, regExp: false
-                });
-                const sel = diffRight.selection.getRange();
-                if(sel && !sel.isEmpty()) {
-                    diffRight.session.addMarker(sel, "marker-add", "text");
-                    diffRight.scrollToLine(sel.start.row, true, true, function() {});
+                const range = getRangeFromText(diffRight.session, String(searchAdd));
+                if(range) {
+                    diffRight.session.addMarker(range, "marker-add", "fullLine");
+                    diffRight.scrollToLine(range.start.row, true, true, function() {});
                 }
             }
 
