@@ -3565,10 +3565,10 @@ async function downloadArtifact(runId) {
         input.value = "⏳ Syncing models...";
         
         try {
-            const res = await fetch(CONFIG.funcUrl, { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: apiBody({ action: 'fetch_models', role: 'chat' }) 
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: apiBody({ action: 'fetch_models', provider_id: key })
             });
             
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
