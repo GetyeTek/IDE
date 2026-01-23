@@ -457,42 +457,78 @@ async function repairSyntaxWithAI(codeBlock: string, errorMessage: string, confi
 async function consultAI(fileContent: string, failedOp: any, failReason: string, config?: AIConfig): Promise<{ fixedOp: any | null; reason: string; score: number }> {
   console.log(`--- CONSULT AI (HEALER) START for ${failedOp?.action} ---`);
   
-  const systemInstruction = `You are the Conduit Self-Healing Patch Engine.
-  A patch operation failed because of a mismatch. Your goal is to HEAL it by finding the correct location.
+  const systemInstruction = `YOU ARE THE CONDUIT ADAPTIVE SELF-HEALING ENGINE.
 
-  PRIORITY: AGGRESSIVE FUZZY MATCHING.
-  The user is likely correct that the code exists, but provided a slightly outdated or malformatted block.
-  
-  SEARCH STRATEGY:
-  1. Ignore whitespace/indentation differences completely.
-  2. Look for semantic equivalents (e.g. "const x = 1" vs "const x=1").
-  3. Look for the code surrounding the target (context matching).
-  4. If variables are renamed but structure is identical, MATCH IT.
-  
-  REPORTING:
-  - You MUST populate the "explanation" field with your reasoning. Tell me exactly what differed (e.g., "Found match on line 50, but indentation was different").
-  - If you cannot find it, explain WHY (e.g., "Function 'init' is missing entirely").
+### MISSION
+A code patch failed because the 'find_block' or 'anchor' provided by the user did not match the file content EXACTLY. Your mission is to find where that code was INTENDED to go by performing high-level semantic and fuzzy matching.
 
-  Use the 'suggest_fix' tool to return your findings.`;
+### CORE MATCHING RULES
+1. WHITESPACE INDEPENDENCE: Ignore all tabs, spaces, and newlines. If the logic is the same, it is a MATCH.
+2. SEMANTIC EQUIVALENCE: 'obj.prop' is the same as 'obj . prop'. 'x=1' is the same as 'x = 1'.
+3. CONTEXTUAL ANCHORING: If the target code is generic (like just a '}' or 'else'), look at the lines BEFORE and AFTER to confirm the location.
+4. DEGRADATION TOLERANCE: If the user provided 5 lines of code, but the file only has 4 of them (and 1 changed slightly), treat it as a match on those lines.
+
+### OUTPUT STRATEGIES (Choose ONE)
+- STRATEGY A (Range Replace): Use 'start_line' and 'end_line' if you found the exact block. This is the most reliable.
+- STRATEGY B (Line Insert): Use 'anchor_line' if the user wanted to 'insert_after' or 'insert_before' a line that moved.
+- STRATEGY C (String Anchor): Use 'new_anchor_text' if you found a more unique string that the Patcher can use for a standard match.
+
+### DATA INTEGRITY REQUIREMENTS
+- confidence_score: MUST BE AN INTEGER BETWEEN 0 AND 100. DO NOT USE DECIMALS (e.g., Use 95, NOT 0.95).
+- start_line / end_line: These are 1-based indices corresponding to the line numbers provided in the 'File' context.
+- explanation: Be technical. Explain exactly what caused the mismatch (e.g., "User expected a single line, but the file split the arguments across lines 12-14").
+
+### EXAMPLE SCENARIOS
+
+Scenario 1: User wants to replace a function, but added a comment in the find_block that doesn't exist.
+- Fix: Set 'start_line' and 'end_line' to the actual function boundaries in the file. Set score to 90.
+
+Scenario 2: User wants to insert after 'const x = 10', but the file has 'const x=10' (no spaces).
+- Fix: Set 'anchor_line' to the line number where 'const x=10' exists. Set score to 100.
+
+Scenario 3: The code is nowhere to be found.
+- Fix: Set 'can_fix' to false. Explain that the logic appears to have been deleted. Set score to 0.
+
+Final Instruction: Look at the line numbers provided in the context carefully. If a block starts on line 10 and ends on line 15, 'start_line' is 10 and 'end_line' is 15.`;
 
   const tools = [{ 
     type: "function",
     function: { 
         name: "suggest_fix", 
-        description: "Return corrected patch params", 
+        description: "Provide the correct coordinates or strings to fix a failed patch operation.", 
         parameters: { 
             type: "object", 
             properties: { 
-                can_fix: { type: "boolean" }, 
-                confidence_score: { 
-                    type: "number",
-                    description: "Confidence score from 0 to 100 (e.g. 95, not 0.95)"
+                can_fix: { 
+                    type: "boolean",
+                    description: "Whether you successfully located the intended code target."
                 }, 
-                explanation: { type: "string" }, 
-                start_line: { type: ["integer", "null"] }, 
-                end_line: { type: ["integer", "null"] }, 
-                anchor_line: { type: ["integer", "null"] }, 
-                new_anchor_text: { type: ["string", "null"] } 
+                confidence_score: { 
+                    type: "integer", 
+                    minimum: 0, 
+                    maximum: 100, 
+                    description: "Integer from 0-100. 100 = Certain match. 0 = Not found. DO NOT USE FLOATS."
+                }, 
+                explanation: { 
+                    type: "string",
+                    description: "Detailed technical reasoning for why the original match failed and why this new target is correct."
+                }, 
+                start_line: { 
+                    type: ["integer", "null"], 
+                    description: "The 1-based start line number of the code block to be replaced."
+                }, 
+                end_line: { 
+                    type: ["integer", "null"], 
+                    description: "The 1-based end line number of the code block to be replaced."
+                }, 
+                anchor_line: { 
+                    type: ["integer", "null"], 
+                    description: "For insertion ops: The 1-based line number to act as the anchor."
+                }, 
+                new_anchor_text: { 
+                    type: ["string", "null"], 
+                    description: "A unique, exact string from the file that can be used as a new anchor."
+                } 
             }, 
             required: ["can_fix", "explanation", "confidence_score"] 
         } 
