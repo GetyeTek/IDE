@@ -121,6 +121,14 @@
         }
         .v-note.has-content { display: block; }
 
+        /* NEW UI COMPONENTS */
+        .stage-item { background: #1a1a1c; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+        .stage-header { padding: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; cursor: pointer; }
+        .stage-header:hover { background: #222; }
+        .search-result { padding: 10px; border-bottom: 1px solid #222; cursor: pointer; }
+        .search-result:hover { background: #111; }
+        .search-context { font-family: 'JetBrains Mono'; font-size: 11px; color: #888; white-space: pre; margin-top: 4px; }
+
         /* MENUS */
         .menu-btn { background: none; border: none; color: var(--text-muted); padding: 4px; cursor: pointer; }
         .menu-dropdown {
@@ -460,8 +468,8 @@
                 <textarea id="json-input" class="json-editor" placeholder="[ { 'action': '...' } ]" spellcheck="false" oninput="saveState()"></textarea>
                 
                 <div class="flex-gap" style="margin-bottom: 12px;">
-                    <button class="btn btn-dev" onclick="runPatch('patch')">Test Patch</button>
-                    <button class="btn btn-prod" onclick="runPatch('commit_prod')">Commit</button>
+                    <button class="btn btn-dev" onclick="stageChanges()">⚡ Stage Changes</button>
+                    <button class="btn btn-prod" onclick="runPatch('commit_prod')">Direct Commit</button>
                 </div>
 
                 <div class="flex-between" style="margin-top:10px;">
@@ -650,6 +658,34 @@
         </div>
         <div id="ace-container"></div>
         <div id="log-custom-container" class="log-viewer-custom" style="display:none; padding:10px; overflow-y:auto; flex:1;"></div>
+    </div>
+
+    <!-- GLOBAL SEARCH OVERLAY -->
+    <div id="search-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <div style="flex:1; display:flex; align-items:center; gap:10px;">
+                <span class="viewer-title">Global Search</span>
+                <input type="text" id="global-search-input" class="input-field" placeholder="Search string..." style="max-width:300px;" onkeydown="if(event.key==='Enter') runGlobalSearch()">
+                <button class="btn btn-primary" style="width:auto; height:36px; padding:0 15px;" onclick="runGlobalSearch()">Find</button>
+            </div>
+            <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="document.getElementById('search-overlay').classList.remove('active')">Close</button>
+        </div>
+        <div id="search-results-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
+    </div>
+
+    <!-- STAGING AREA OVERLAY -->
+    <div id="staging-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span class="viewer-title">Stage Changes</span>
+            <div class="flex-gap">
+                <button class="btn btn-prod" style="width:auto; padding:6px 14px;" onclick="runPatch('commit_prod')">Commit All</button>
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="document.getElementById('staging-overlay').classList.remove('active')">Cancel</button>
+            </div>
+        </div>
+        <div style="padding: 20px; flex: 1; overflow-y: auto;">
+            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">Review changes before sending to GitHub.</p>
+            <div id="staging-list"></div>
+        </div>
     </div>
 
     <!-- OP DETAIL MODAL -->
