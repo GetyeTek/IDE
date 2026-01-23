@@ -469,7 +469,7 @@ A code patch failed because the 'find_block' or 'anchor' provided by the user di
 4. DEGRADATION TOLERANCE: If the user provided 5 lines of code, but the file only has 4 of them (and 1 changed slightly), treat it as a match on those lines.
 
 ### OUTPUT STRATEGIES (Choose ONE)
-- STRATEGY A (Range Replace): Use 'start_line' and 'end_line' if you found the exact block. This is the most reliable.
+- STRATEGY A (Range Replace): Use 'start_line' AND 'end_line'. If the user's block was 3 lines, but the file is different, find the range that captures the intended target.
 - STRATEGY B (Line Insert): Use 'anchor_line' if the user wanted to 'insert_after' or 'insert_before' a line that moved.
 - STRATEGY C (String Anchor): Use 'new_anchor_text' if you found a more unique string that the Patcher can use for a standard match.
 
@@ -804,9 +804,10 @@ function applyOperation(content: string, op: any) {
     if (op.is_ai_fix) {
         if (op.ai_strategy === "range_replace" && op.start_line && op.end_line) {
             lines.splice(op.start_line - 1, (op.end_line - op.start_line) + 1, op.replace_with || op.content || "");
-            const shortMsg = op.explanation ? (op.explanation.substring(0, 150) + "...") : "AI Fixed";
+                        const shortMsg = op.explanation ? (op.explanation.substring(0, 150) + "...") : "AI Fixed";
             return { newContent: lines.join("\n"), success: true, score: 95, message: `✨ AI: ${shortMsg}` };
         }
+
         if (op.ai_strategy === "line_insert" && op.anchor_line) {
             const idx = op.anchor_line - 1;
             const payload = op.replace_with || op.content || "";
@@ -815,7 +816,6 @@ function applyOperation(content: string, op: any) {
             } else if (op.action === "insert_before") {
                 lines.splice(idx, 0, payload);
             } else {
-                // If original was 'replace_block', we replace exactly that line
                 lines[idx] = payload;
             }
             const shortMsg = op.explanation ? (op.explanation.substring(0, 150) + "...") : "AI Fixed";
