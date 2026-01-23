@@ -1629,12 +1629,10 @@ You have access to exactly 3 atomic operations. Do not invent others.
         return new Response(JSON.stringify(logData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     
-    if (action === "rollback") {
     if (action === "fetch_models") {
         const provider = resolveProvider(payload.role || 'chat', ai_config);
         if (!provider) throw new Error("Provider not found");
         
-        // Get API Key from DB (Reusing the rotation logic logic)
         const serviceMap: Record<string, string> = { 'Deepseek_API': 'deepseek', 'GEMINI_API_KEY': 'gemini', 'GROQ_API_KEY': 'groq' };
         const serviceName = serviceMap[provider.apiKeyEnv];
         let apiKey = "";
@@ -1650,6 +1648,8 @@ You have access to exactly 3 atomic operations. Do not invent others.
         const data = await res.json();
         return new Response(JSON.stringify({ models: data.data || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
+    if (action === "rollback") {
         if(!ref_sha) throw new Error("Target SHA required");
         await githubFetch(TARGET_REPO, `/git/refs/heads/${DEV_BRANCH}`, { method: "PATCH", body: JSON.stringify({ sha: ref_sha, force: true }) });
         await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'rollback', data: { message: `Rolled back to ${ref_sha.substring(0,7)}` } });
