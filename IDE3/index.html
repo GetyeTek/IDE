@@ -1024,20 +1024,27 @@
         try {
             return JSON.parse(jsonString);
         } catch (e) {
-            console.warn("Standard JSON parse failed, attempting Auto-Fix for escapes...");
-            // Regex: Find backslashes NOT followed by valid JSON escape chars
-            const fixedString = jsonString.replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
+            console.warn("Standard JSON parse failed, attempting Robust Auto-Fix...");
+            let fixed = jsonString
+                // 1. Fix backslashes that aren't part of a valid escape sequence
+                .replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
+                // 2. Fix literal newlines inside strings (replace with \n)
+                .replace(/(\n)/g, (match, p1, offset) => {
+                    // Only replace if we are likely inside a quoted string
+                    const before = jsonString.slice(0, offset);
+                    const quoteCount = (before.match(/"/g) || []).length;
+                    return (quoteCount % 2 === 1) ? "\\n" : "\n";
+                });
+
             try {
-                const cleanObj = JSON.parse(fixedString);
-                const inputEl = document.getElementById('json-input');
-                if (inputEl) {
-                    inputEl.value = fixedString;
-                    if (typeof saveState === 'function') saveState(); 
-                }
-                showGlobalToast("✨ Auto-corrected JSON Syntax");
+                const cleanObj = JSON.parse(fixed);
+                document.getElementById('json-input').value = fixed;
+                if (typeof saveState === 'function') saveState();
+                showGlobalToast("✨ Robust Auto-Correction Applied");
                 return cleanObj;
             } catch (e2) {
-                throw e; 
+                console.error("Robust fix failed:", e2);
+                throw e; // Throw original error for better debugging
             }
         }
     }
