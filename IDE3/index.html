@@ -2127,9 +2127,6 @@ function addTerminalCard(data, options = {}) {
 
         if(!fileCache[entryFile]) return iframe.srcdoc = `Error: ${entryFile} not found (Check Project Path settings)`;
 
-        // DEBUG: Log bundled files to help user find 'phantom' files
-        console.log("📦 Bundled Files:", Object.keys(fileCache));
-
         let syntaxErrors = [];
         Object.keys(fileCache).forEach(path => {
             if (fileCache[path].mime === 'text/javascript') {
