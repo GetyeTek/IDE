@@ -476,7 +476,7 @@ A code patch failed because the 'find_block' or 'anchor' provided by the user di
 ### DATA INTEGRITY REQUIREMENTS
 - confidence_score: MUST BE AN INTEGER BETWEEN 0 AND 100. DO NOT USE DECIMALS (e.g., Use 95, NOT 0.95).
 - start_line / end_line: These are 1-based indices corresponding to the line numbers provided in the 'File' context.
-- explanation: Be technical. Explain exactly what caused the mismatch (e.g., "User expected a single line, but the file split the arguments across lines 12-14").
+- explanation: Be technical but CONCISE (Max 3 sentences). Explain exactly what caused the mismatch.
 
 ### EXAMPLE SCENARIOS
 
@@ -527,7 +527,7 @@ Final Instruction: Look at the line numbers provided in the context carefully. I
                 }, 
                 new_anchor_text: { 
                     type: ["string", "null"], 
-                    description: "A unique, exact string from the file that can be used as a new anchor."
+                    description: "A unique string that CURRENTLY EXISTS in the file. Do NOT put new code here."
                 } 
             }, 
             required: ["can_fix", "explanation", "confidence_score"] 
@@ -804,7 +804,8 @@ function applyOperation(content: string, op: any) {
     if (op.is_ai_fix) {
         if (op.ai_strategy === "range_replace" && op.start_line && op.end_line) {
             lines.splice(op.start_line - 1, (op.end_line - op.start_line) + 1, op.replace_with || op.content || "");
-            return { newContent: lines.join("\n"), success: true, score: 95, message: `✨ AI: ${op.explanation}` };
+            const shortMsg = op.explanation ? (op.explanation.substring(0, 150) + "...") : "AI Fixed";
+            return { newContent: lines.join("\n"), success: true, score: 95, message: `✨ AI: ${shortMsg}` };
         }
         if (op.ai_strategy === "line_insert" && op.anchor_line) {
             const idx = op.anchor_line - 1;
@@ -817,7 +818,8 @@ function applyOperation(content: string, op: any) {
                 // If original was 'replace_block', we replace exactly that line
                 lines[idx] = payload;
             }
-            return { newContent: lines.join("\n"), success: true, score: 95, message: `✨ AI: ${op.explanation}` };
+            const shortMsg = op.explanation ? (op.explanation.substring(0, 150) + "...") : "AI Fixed";
+            return { newContent: lines.join("\n"), success: true, score: 95, message: `✨ AI: ${shortMsg}` };
         }
     }
 
