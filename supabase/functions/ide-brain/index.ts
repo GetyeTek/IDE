@@ -563,9 +563,21 @@ Final Instruction: Look at the line numbers provided in the context carefully. I
     if (!args || !args.can_fix || score < 60) return { fixedOp: null, reason: args?.explanation || "Low confidence match", score: score || 0 };
     
     const newOp = { ...failedOp, is_ai_fix: true };
-    if (args.start_line && args.end_line) { newOp.ai_strategy = "range_replace"; newOp.start_line = args.start_line; newOp.end_line = args.end_line; } 
-    else if (args.anchor_line) { newOp.ai_strategy = "line_insert"; newOp.anchor_line = args.anchor_line; }
-    else if (args.new_anchor_text) { newOp.anchor = args.new_anchor_text; }
+    if (args.start_line) {
+        newOp.ai_strategy = "range_replace";
+        newOp.start_line = args.start_line;
+        newOp.end_line = args.end_line || args.start_line;
+    } 
+    else if (args.anchor_line) {
+        newOp.ai_strategy = "line_insert";
+        newOp.anchor_line = args.anchor_line;
+    }
+    else if (args.new_anchor_text) {
+        // If AI gives a better string, swap it into the original operation
+        if (newOp.action === "replace_block") newOp.find_block = args.new_anchor_text;
+        else newOp.anchor = args.new_anchor_text;
+        newOp.is_ai_fix = false; // Run it through standard logic with the new string
+    }
     return { fixedOp: newOp, reason: args.explanation, score: args.confidence_score };
   } catch (e: any) { console.error("[Healer] Error:", e); return { fixedOp: null, reason: e.message, score: 0 }; }
 }
@@ -796,9 +808,15 @@ function applyOperation(content: string, op: any) {
         }
         if (op.ai_strategy === "line_insert" && op.anchor_line) {
             const idx = op.anchor_line - 1;
-            const payload = op.content || "";
-            if (op.action === "insert_after") lines.splice(idx + 1, 0, payload);
-            else if (op.action === "insert_before") lines.splice(idx, 0, payload);
+            const payload = op.replace_with || op.content || "";
+            if (op.action === "insert_after") {
+                lines.splice(idx + 1, 0, payload);
+            } else if (op.action === "insert_before") {
+                lines.splice(idx, 0, payload);
+            } else {
+                // If original was 'replace_block', we replace exactly that line
+                lines[idx] = payload;
+            }
             return { newContent: lines.join("\n"), success: true, score: 95, message: `✨ AI: ${op.explanation}` };
         }
     }
