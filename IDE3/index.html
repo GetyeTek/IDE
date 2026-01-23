@@ -503,7 +503,14 @@
                 </div>
                 <div class="input-group">
                     <label class="input-label">GitHub Repo Name</label>
-                    <input type="text" id="setting-repo-name" class="input-field" placeholder="IDE">
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <input type="text" id="setting-repo-name" class="input-field" placeholder="IDE" style="padding-right: 40px;">
+                        <button class="icon-btn" 
+                                style="position: absolute; right: 8px; border: none; background: transparent; color: var(--ai-accent); padding: 4px;"
+                                onclick="fetchRepoList()" title="List Repositories">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7v10c0 1.1.9 2 2 2h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2zM9 19v-6h6v6"></path></svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="input-group">
                     <label class="input-label">Project Root Path (Optional)</label>
@@ -784,6 +791,18 @@
             <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeModelSelector()">Close</button>
         </div>
         <div id="model-selector-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
+    </div>
+
+    <!-- REPO SELECTOR OVERLAY -->
+    <div id="repo-selector-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <div style="flex:1; display:flex; align-items:center; gap:10px;">
+                <span class="viewer-title">Select Repository</span>
+                <input type="text" id="repo-search" class="input-field" placeholder="Filter repos..." style="max-width:250px; height:32px; font-size:12px;" onkeyup="filterRepoList(this.value)">
+            </div>
+            <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeRepoSelector()">Close</button>
+        </div>
+        <div id="repo-selector-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
     </div>
 
     <!-- NEW: AI CHAT FAB -->
@@ -3639,6 +3658,62 @@ async function downloadArtifact(runId) {
     function closeModelSelector() {
         document.getElementById('model-selector-overlay').classList.remove('active');
         currentModelTargetKey = null;
+    }
+
+    let currentRepoList = [];
+
+    async function fetchRepoList() {
+        showGlobalToast("Fetching repositories...");
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: apiBody({ action: 'fetch_repos' })
+            });
+            const data = await res.json();
+            if (data.repos) {
+                currentRepoList = data.repos;
+                renderRepoSelector(data.repos);
+                document.getElementById('repo-selector-overlay').classList.add('active');
+                document.getElementById('repo-search').value = '';
+                document.getElementById('repo-search').focus();
+            } else {
+                throw new Error(data.error || "Failed to fetch repos");
+            }
+        } catch (e) {
+            showGlobalToast(e.message, true);
+        }
+    }
+
+    function renderRepoSelector(repos) {
+        const container = document.getElementById('repo-selector-list');
+        container.innerHTML = repos.map(r => `
+            <div class="model-item">
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <span class="model-id">${r.name}</span>
+                    <small style="font-size:9px; color:var(--text-muted);">${r.full_name}</small>
+                </div>
+                <div class="model-actions">
+                    <button class="btn btn-primary" style="width:auto; padding:4px 12px; font-size:11px;" 
+                        onclick="selectRepo('${r.name}')">Select</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function filterRepoList(q) {
+        const filtered = currentRepoList.filter(r => r.name.toLowerCase().includes(q.toLowerCase()) || r.full_name.toLowerCase().includes(q.toLowerCase()));
+        renderRepoSelector(filtered);
+    }
+
+    function selectRepo(name) {
+        document.getElementById('setting-repo-name').value = name;
+        closeRepoSelector();
+        showGlobalToast(`Repo set to: ${name}`);
+    }
+
+    function closeRepoSelector() {
+        document.getElementById('repo-selector-overlay').classList.remove('active');
     }
 
     function saveAIConfig() {
