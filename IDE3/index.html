@@ -542,8 +542,8 @@
                 <div class="input-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
                     <label class="input-label">EF Deployment Mode</label>
                     <select id="setting-ef-mode" class="input-field" style="appearance: auto;">
-                        <option value="custom">Custom (Respect payload paths)</option>
                         <option value="default">Default (Auto-resolve index.ts to supabase/functions/)</option>
+                        <option value="custom">Custom (Respect payload paths)</option>
                     </select>
                     <p style="font-size:10px; color:#666; margin-top:5px;">In Default mode, 'index.ts' targets are automatically routed to your Supabase directory structure.</p>
                 </div>
@@ -868,7 +868,7 @@
         autoFix: localStorage.getItem('conduit_auto_fix') === 'true',
         autoSanity: localStorage.getItem('conduit_auto_sanity') === 'true',
         showPreview: localStorage.getItem('conduit_showPreview') !== 'false', // Default to true
-        efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'custom'
+        efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default'
     };
     
     // Global State
