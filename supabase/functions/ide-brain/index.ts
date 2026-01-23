@@ -1683,6 +1683,15 @@ You have access to exactly 3 atomic operations. Do not invent others.
         return new Response(JSON.stringify({ models }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "fetch_repos") {
+        const url = `https://api.github.com/user/repos?per_page=100&sort=pushed`;
+        const res = await fetch(url, { headers: getHeaders() });
+        if (!res.ok) throw new Error(`GitHub API Error: ${res.status}`);
+        const data = await res.json();
+        const repos = data.map((r: any) => ({ name: r.name, full_name: r.full_name }));
+        return new Response(JSON.stringify({ repos }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "rollback") {
         if(!ref_sha) throw new Error("Target SHA required");
         await githubFetch(TARGET_REPO, `/git/refs/heads/${DEV_BRANCH}`, { method: "PATCH", body: JSON.stringify({ sha: ref_sha, force: true }) });
