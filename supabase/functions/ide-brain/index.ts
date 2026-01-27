@@ -1263,7 +1263,7 @@ If a user asks for a change, explain your plan briefly as a CONSULTANT, then imm
             const jsonOps = JSON.stringify(patchData.operations, null, 2);
             finalReply += `\n\n### 🪄 Surgeon's Plan:\n${patchData.explanation}\n\n\`\`\`json\n${jsonOps}\n\`\`\``;
         }
-        return new Response(JSON.stringify({ reply: result.content || "(Empty Response from AI)" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ reply: finalReply || "(Empty Response from AI)" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // --- REFINED GENERATE OPS (ROBUST PROMPT & PARSER) ---
