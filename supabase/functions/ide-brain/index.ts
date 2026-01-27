@@ -1133,7 +1133,7 @@ serve(async (req) => {
     // 2. AI CHAT
     if (action === "ai_chat") {
         const ctx = context_files && context_files.length > 0 
-            ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content).substring(0, 5000) : "(omitted)"}\n`).join("\n---\n") 
+            ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content) : "(omitted)"}\n`).join("\n---\n") 
             : "No files selected.";
             
         const sysPrompt = `You are "Conduit", an elite Senior Software Architect and Coding Engine.
@@ -1216,7 +1216,7 @@ You have access to exactly 3 atomic operations. Do not invent others.
         if (!user_prompt) throw new Error("Prompt required");
         
         const fileContext = context_files.map((f: any) => 
-            `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content).substring(0, 3000) : "(Content omitted)"}\n`
+            `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content) : "(Content omitted)"}\n`
         ).join("\n---\n");
 
         const systemPrompt = `You are a Strict JSON Patch Generator.
@@ -1503,7 +1503,7 @@ You have access to exactly 3 atomic operations. Do not invent others.
                  return new Response(JSON.stringify(tsResult), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
             // 2. Fallback: AI Analyst
-            const prompt = `Analyze code for FATAL syntax errors only. Ignore warnings. CODE (${file_path}):\n${(code_block || "").substring(0, 5000)}\nOUTPUT JSON: { "valid": boolean, "errors": ["..."] }`;
+            const prompt = `Analyze code for FATAL syntax errors only. Ignore warnings. CODE (${file_path}):\n${code_block || ""}\nOUTPUT JSON: { "valid": boolean, "errors": ["..."] }`;
             const result = await genericRequestAI('analyst', [{ role: "user", content: prompt }], ai_config, undefined, { type: "json_object" });
             const json = JSON.parse(result.content || '{"valid":true}');
             return new Response(JSON.stringify({ ...json, supported: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
