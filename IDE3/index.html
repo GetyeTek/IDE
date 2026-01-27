@@ -1657,7 +1657,9 @@
             const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch' }) });
             const data = await res.json();
             const allFiles = data.files || [];
-            window.repoFiles = CONFIG.projectPath ? allFiles.filter(f => f.path.startsWith(CONFIG.projectPath)) : allFiles;
+            window.repoFiles = CONFIG.projectPath 
+                ? allFiles.filter(f => f.path.startsWith(CONFIG.projectPath) || f.path.startsWith('supabase/functions/')) 
+                : allFiles;
             renderFileList(window.repoFiles);
         } catch (e) {
             listContainer.innerHTML = `<div style="color:var(--danger); padding:20px;">Error: ${e.message}</div>`;
