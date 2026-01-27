@@ -483,6 +483,7 @@
                     <button class="btn-outline" style="padding:4px 8px; font-size:10px;" onclick="runDeepScan()">🧬 Deep Scan (WASM)</button>
                 </div>
                 <div id="terminal-list" class="terminal-container"></div>
+                <button id="load-more-logs-btn" class="btn btn-outline" style="margin-top: 10px; font-size: 12px;" onclick="loadMoreLogs()">Load More Logs</button>
             </div>
         </div>
 
@@ -505,8 +506,9 @@
 
         <!-- HISTORY TAB -->
         <div id="tab-history" class="tab-content">
-            <div class="header">History <button class="icon-btn" onclick="fetchState(true)">Sync</button></div>
-             <div class="card" id="history-container"><div style="padding:10px; text-align:center;">Loading...</div></div>
+            <div class="header">History <button class="icon-btn" onclick="resetHistoryAndSync()">Sync</button></div>
+             <div class="card" id="history-container" style="padding-bottom:0;"><div style="padding:10px; text-align:center;">Loading...</div></div>
+             <button id="load-more-history-btn" class="btn btn-outline" style="margin-top: 10px; font-size: 12px;" onclick="loadMoreHistory()">Load More History</button>
         </div>
 
         <!-- SETTINGS TAB -->
@@ -594,6 +596,7 @@
                 <div id="workflow-list" style="display:flex; flex-direction:column;">
                     <div style="padding:20px; text-align:center; color:#666;">Click Refresh to load runs.</div>
                 </div>
+                <button id="load-more-cicd-btn" class="btn btn-outline" style="margin-top: 10px; font-size: 12px;" onclick="loadMoreWorkflows()">Load More Runs</button>
             </div>
         </div>
     </div>
@@ -921,7 +924,10 @@
     let repoFiles = []; 
     let editHistory = []; 
     let historyIndex = -1;
-    let chatHistory = []; // Stores {role, text} for AI Chat
+    let chatHistory = []; 
+    let logOffset = 0;
+    let historyOffset = 0;
+    let workflowPage = 1;
 
     // --- AI CONFIG STATE ---
     const DEFAULT_AI_CONFIG = {
@@ -1570,30 +1576,41 @@
     }
 
     // --- API & DATA ---
-    async function fetchState(force = false, updateTerminal = true) {
-        if(force) {
+    async function fetchState(force = false, updateTerminal = true, isAppend = false) {
+        if(force && !isAppend) {
             document.getElementById('history-container').innerHTML = '<div style="padding:10px; text-align:center;">Syncing...</div>';
             if (updateTerminal) document.getElementById('terminal-list').innerHTML = '<div style="padding:10px; text-align:center; color:#666">Syncing logs...</div>';
         }
         try {
             const res = await fetch(CONFIG.funcUrl, { 
                 method: 'POST', headers: {'Content-Type': 'application/json'}, 
-                body: apiBody({ action: 'init', project_path: CONFIG.projectPath }) 
+                body: apiBody({ 
+                    action: 'init', 
+                    project_path: CONFIG.projectPath,
+                    history_offset: isAppend ? historyOffset : 0,
+                    log_offset: isAppend ? logOffset : 0
+                }) 
             });
             const data = await res.json();
             
             if(data.history) { 
-                dbHistory = data.history.filter(h => h.type !== 'Chat'); 
-                renderHistory(dbHistory); 
+                const filteredHistory = data.history.filter(h => h.type !== 'Chat');
+                if (isAppend) dbHistory = dbHistory.concat(filteredHistory);
+                else dbHistory = filteredHistory;
+                renderHistory(dbHistory);
+                if (filteredHistory.length < 10) document.getElementById('load-more-history-btn').style.display = 'none';
+                else document.getElementById('load-more-history-btn').style.display = 'block';
             }
 
             if (updateTerminal) {
                 const termContainer = document.getElementById('terminal-list');
-                termContainer.innerHTML = ''; 
+                if (!isAppend) termContainer.innerHTML = ''; 
+                
                 if(data.logs && data.logs.length > 0) {
                     const visibleLogs = data.logs.filter(l => l.type !== 'auto_fix_trigger' && l.type !== 'job_analysis');
                     visibleLogs.forEach(log => {
                         const id = 'term-saved-' + log.id;
+                        if (document.getElementById(id)) return; // Avoid duplicates
                         const div = document.createElement('div');
                         div.id = id; div.className = 'log-entry';
                         termContainer.appendChild(div); 
@@ -1601,12 +1618,36 @@
                         const timeEl = div.querySelector('.log-time');
                         if(timeEl) timeEl.innerText = new Date(log.created_at).toLocaleString();
                     });
-                } else {
+                    if (visibleLogs.length < 10) document.getElementById('load-more-logs-btn').style.display = 'none';
+                    else document.getElementById('load-more-logs-btn').style.display = 'block';
+                } else if (!isAppend) {
                     termContainer.innerHTML = '<div style="padding:10px; text-align:center; color:#444; font-size:12px;">No logs.</div>';
+                    document.getElementById('load-more-logs-btn').style.display = 'none';
                 }
             }
-
         } catch (e) { console.error(e); }
+    }
+
+    function resetHistoryAndSync() {
+        historyOffset = 0;
+        logOffset = 0;
+        fetchState(true);
+    }
+
+    async function loadMoreLogs() {
+        const btn = document.getElementById('load-more-logs-btn');
+        btn.innerText = 'Loading...';
+        logOffset += 20;
+        await fetchState(false, true, true);
+        btn.innerText = 'Load More Logs';
+    }
+
+    async function loadMoreHistory() {
+        const btn = document.getElementById('load-more-history-btn');
+        btn.innerText = 'Loading...';
+        historyOffset += 20;
+        await fetchState(false, false, true);
+        btn.innerText = 'Load More History';
     }
 
     async function fetchFileList() {
@@ -2643,6 +2684,14 @@ function addTerminalCard(data, options = {}) {
     // Global state for syntax fixer
     let currentSyntaxContext = { file: '', error: null, code: '', ops: null };
 
+    async function loadMoreWorkflows() {
+        const btn = document.getElementById('load-more-cicd-btn');
+        btn.innerText = 'Loading...';
+        workflowPage++;
+        await loadWorkflows(true, true);
+        btn.innerText = 'Load More Runs';
+    }
+
     async function triggerBuild() {
         const workflowFile = prompt("Enter Workflow Filename:", "build.yml");
         if (!workflowFile) return;
@@ -2789,20 +2838,24 @@ function addTerminalCard(data, options = {}) {
 
     let runStateCache = {};
 
-    async function loadWorkflows(silent = false) {
+        async function loadWorkflows(silent = false, isAppend = false) {
         const container = document.getElementById('workflow-list');
-        // Only show loading spinner if empty (prevent UI flicker)
-        if (!silent && container.children.length === 0) {
+        if (!isAppend) workflowPage = 1;
+
+        if (!silent && !isAppend && container.children.length === 0) {
             container.innerHTML = '<div style="padding:20px; text-align:center;">Fetching runs...</div>';
         }
         
         try {
-            const res = await fetch(CONFIG.funcUrl, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'fetch_workflows' })
+            const res = await fetch(CONFIG.funcUrl, { 
+                method: 'POST', headers: {'Content-Type': 'application/json'}, 
+                body: apiBody({ action: 'fetch_workflows', page: workflowPage }) 
             });
-            lastCicdRefresh = Date.now(); // Update timestamp
+            lastCicdRefresh = Date.now(); 
             const data = await res.json();
+
+            if (data.runs && data.runs.length < 20) document.getElementById('load-more-cicd-btn').style.display = 'none';
+            else document.getElementById('load-more-cicd-btn').style.display = 'block';
 
             // --- SMART POLLING LOGIC ---
             // 1. Check if we are still on the tab
@@ -2847,16 +2900,15 @@ function addTerminalCard(data, options = {}) {
             }
 
             if(!data.runs || data.runs.length === 0) {
-                if (!silent) container.innerHTML = '<div style="padding:20px; text-align:center;">No workflow runs found.</div>';
+                if (!silent && !isAppend) container.innerHTML = '<div style="padding:20px; text-align:center;">No workflow runs found.</div>';
                 return;
             }
 
-            // Capture currently expanded items to preserve state
             const expandedIds = Array.from(container.querySelectorAll('div[id^="wf-jobs-"]'))
                 .filter(el => el.style.display !== 'none')
                 .map(el => el.id);
 
-            container.innerHTML = '';
+            if (!isAppend) container.innerHTML = '';
             data.runs.forEach(run => {
                 // --- STATE TRACKING & TOAST ---
                 const currentState = run.conclusion || run.status;
