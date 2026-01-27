@@ -547,14 +547,34 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
     const result = await genericRequestAI('fast_fix', messages, config, tools);
     console.log("🔥 [HEALER RAW DEBUG]:", JSON.stringify(result, null, 2));
     
+    let args: any = null;
+
+    // 1. Try formal Tool Call first
     const toolCall = result.tool_calls?.[0];
-    if (!toolCall || toolCall.function.name !== "suggest_fix") {
-        // Fallback: If AI refused to call tool, return its text response as the reason
+    if (toolCall && toolCall.function.name === "suggest_fix") {
+        try {
+            args = JSON.parse(toolCall.function.arguments);
+        } catch (e) { console.error("[Healer] Failed to parse tool arguments"); }
+    }
+
+    // 2. Robust Fallback: Search content for JSON block or raw JSON structure
+    if (!args && result.content) {
+        console.log("[Healer] Tool call missing, attempting regex extraction from content...");
+        const jsonMatch = result.content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                          result.content.match(/\{\s*"can_fix"[\s\S]*?\}/);
+        
+        if (jsonMatch) {
+            try {
+                args = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                console.log("[Healer] Successfully extracted JSON from conversational text.");
+            } catch (e) { console.error("[Healer] Regex found JSON but it was malformed"); }
+        }
+    }
+
+    if (!args) {
         const rawText = result.content || "AI returned no content and no tool calls.";
         return { fixedOp: null, reason: `AI Refusal: ${rawText.substring(0, 200)}`, score: 0 };
     }
-    
-    const args = JSON.parse(toolCall.function.arguments);
 
     // DEFENSIVE CODING: Normalize score. AI sometimes returns 0.95 instead of 95.
     let score = args.confidence_score;
