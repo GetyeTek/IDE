@@ -1695,20 +1695,32 @@
 
     async function processAIResponse() {
         const loadingId = addChatMessage('ai', 'Thinking...', true);
-
-        const checkedBoxes = document.querySelectorAll('#file-list-container .file-check:checked');
-        const filePaths = Array.from(checkedBoxes).map(cb => cb.value);
         const contextPayload = [];
 
         try {
-            for (const path of filePaths) {
-                if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path]) {
-                    contextPayload.push({ path: path, content: b64EncodeUnicode(window.CURRENT_FILE_CACHE[path].content) });
-                } else {
-                    const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
-                    const data = await res.json();
-                    contextPayload.push({ path: path, content: data.content });
+            // --- SURGICAL DEBUG OVERRIDE ---
+            if (window.SURGICAL_DEBUG_DATA) {
+                contextPayload.push({
+                    path: window.SURGICAL_DEBUG_DATA.path,
+                    content: b64EncodeUnicode(window.SURGICAL_DEBUG_DATA.content)
+                });
+                // Clear after use to prevent polluting next chat
+                window.SURGICAL_DEBUG_DATA = null;
+                console.log("[AI] Using Surgical Context (Single File)");
+            } else {
+                // Standard: Grab all checked files
+                const checkedBoxes = document.querySelectorAll('#file-list-container .file-check:checked');
+                const filePaths = Array.from(checkedBoxes).map(cb => cb.value);
+                for (const path of filePaths) {
+                    if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path]) {
+                        contextPayload.push({ path: path, content: b64EncodeUnicode(window.CURRENT_FILE_CACHE[path].content) });
+                    } else {
+                        const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
+                        const data = await res.json();
+                        contextPayload.push({ path: path, content: data.content });
+                    }
                 }
+                console.log(`[AI] Using Global Context (${contextPayload.length} files)`);
             }
 
             const res = await fetch(CONFIG.funcUrl, {
@@ -4088,10 +4100,43 @@ async function downloadArtifact(runId) {
     }
 
     function fixPreviewError(msg) {
+        console.group("[SurgicalDebug] Initializing...");
         startNewChat();
         toggleChat(true);
-        chatHistory.push({ role: 'user', text: 'My application logged a runtime error: "' + msg + '". Please analyze my selected files and suggest a fix.' });
+
+        // 1. Extract Filename using Regex (matches path.js:line:col or path.js)
+        const fileMatch = msg.match(/([\w.-]+\.(?:js|html|css|ts|tsx|jsx))/i);
+        const filePath = fileMatch ? fileMatch[1] : null;
+        
+        let surgicalContext = null;
+        
+        // 2. Resolve Full Path and Operation History
+        if (filePath) {
+            // Find actual path in cache (handling partial matches from console)
+            const fullPath = Object.keys(window.CURRENT_FILE_CACHE || {}).find(p => p.endsWith(filePath));
+            if (fullPath) {
+                const lastOps = FILE_OP_MAP[fullPath] || [];
+                surgicalContext = {
+                    path: fullPath,
+                    content: window.CURRENT_FILE_CACHE[fullPath].content,
+                    lastOp: lastOps[lastOps.length - 1] || "No recent op recorded for this file.",
+                    error: msg
+                };
+                console.log("[SurgicalDebug] Context found for:", fullPath);
+            }
+        }
+
+        if (surgicalContext) {
+            window.SURGICAL_DEBUG_DATA = surgicalContext;
+            const prompt = `[SURGICAL DEBUG]\nFILE: ${surgicalContext.path}\nERROR: ${surgicalContext.error}\n\nLAST OPERATION APPLIED TO THIS FILE:\n${JSON.stringify(surgicalContext.lastOp, null, 2)}\n\nAnalyze the regression caused by this specific operation and provide a fix.`;
+            chatHistory.push({ role: 'user', text: prompt });
+        } else {
+            console.warn("[SurgicalDebug] No specific file context identified. Falling back to global context.");
+            chatHistory.push({ role: 'user', text: `My application logged a runtime error: "${msg}". Analyze my selected files and suggest a fix.` });
+        }
+
         processAIResponse();
+        console.groupEnd();
     }
 
     function saveAIConfig() {
