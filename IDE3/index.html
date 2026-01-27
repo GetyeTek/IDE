@@ -3210,6 +3210,26 @@ async function downloadArtifact(runId) {
     }
 
     // --- GENERIC UI ---
+    function formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function timeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        if (seconds < 60) return 'just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return minutes + 'm ago';
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return hours + 'h ago';
+        return date.toLocaleDateString();
+    }
+
     function renderFileList(files) {
         const container = document.getElementById('file-list-container');
         container.innerHTML = '';
@@ -3218,15 +3238,24 @@ async function downloadArtifact(runId) {
         files.forEach(file => {
             const div = document.createElement('div');
             div.className = 'file-item';
+            const fileName = file.path.split('/').pop();
+            const fileSize = formatBytes(file.size);
+            const updated = timeAgo(file.last_updated);
+
             div.innerHTML = `
-                <div class="v-info" onclick="openFileViewer('${file.path}')" style="cursor:pointer; flex:1; min-width: 0;">
-                    <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">${file.path.split('/').pop()}</strong>
-                    <small>${file.path}</small>
+                <div class="v-info" onclick="openFileViewer('${file.path}')" style="cursor:pointer; flex:1; min-width: 0; padding-right: 10px;">
+                    <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 13px;">${fileName}</strong>
+                    <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+                        <span style="color:var(--text-muted); font-size:10px; font-family:'JetBrains Mono';">${fileSize}</span>
+                        <span style="color:#444;">•</span>
+                        <span style="color:var(--text-muted); font-size:10px;">${updated}</span>
+                    </div>
+                    <small style="opacity:0.5; font-size:9px; display:block; margin-top:2px;">${file.path}</small>
                 </div>
                 <div class="flex-gap" style="align-items:center;">
-                    <button class="menu-btn" onclick="openRenameModal('${file.path}')" title="Rename/Move" style="margin-right:4px;">✎</button>
-                    <button class="menu-btn" onclick="runDeepScan('${file.path}')" style="color:var(--ai-accent); margin-right:4px;" title="Deep Syntax Scan">🧬</button>
-                    <button class="menu-btn" onclick="downloadSingleFile('${file.path}', this)" style="color:var(--text-muted); margin-right:4px;" title="Download">⬇</button>
+                    <button class="menu-btn" onclick="openRenameModal('${file.path}')" title="Rename/Move">✎</button>
+                    <button class="menu-btn" onclick="runDeepScan('${file.path}')" style="color:var(--ai-accent);" title="Deep Syntax Scan">🧬</button>
+                    <button class="menu-btn" onclick="downloadSingleFile('${file.path}', this)" style="color:var(--text-muted);" title="Download">⬇</button>
                     <button class="menu-btn" onclick="stageDeleteFile('${file.path}')" style="color:var(--danger)">🗑</button>
                     <input type="checkbox" class="file-check" value="${file.path}" checked style="accent-color:var(--primary)">
                 </div>`;
