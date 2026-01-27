@@ -209,6 +209,13 @@
         }
         .nav-item svg { width: 24px; height: 24px; }
         .nav-item.active { color: var(--primary); }
+
+        @keyframes highlightPulse {
+            0% { background: var(--primary-dim); outline: 2px solid var(--primary); }
+            100% { background: transparent; outline: 2px solid transparent; }
+        }
+        .jump-highlight { animation: highlightPulse 2s cubic-bezier(0.4, 0, 0.2, 1); }
+
 /* Fullscreen Code Viewer */
         .viewer-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -543,6 +550,7 @@
                 if (lOffset === 0) termContainer.innerHTML = '';
 
                 if (data.history && data.history.length > 0) {
+                    console.log(`[Sync] Received ${data.history.length} history items. Total cached: ${hOffset + data.history.length}`);
                     dbHistory = hOffset === 0 ? data.history : [...dbHistory, ...data.history];
                     renderHistory(data.history, hOffset > 0);
                     document.getElementById('btn-load-history').style.display = data.history.length === PAGE_SIZE ? 'block' : 'none';
@@ -609,6 +617,39 @@
         }
 
         function loadMoreWorkflows() { wPage++; fetchWorkflows(); }
+
+        function jumpToHistory(conduitId) {
+            console.log(`[Jump] Target ConduitID: ${conduitId}`);
+            
+            // 1. Switch Tab
+            const historyTabBtn = document.querySelectorAll('.nav-item')[3];
+            switchTab('tab-history', historyTabBtn);
+            console.log("[Jump] Switched to History Tab");
+
+            // 2. Wait for DOM cycle
+            setTimeout(() => {
+                const targetId = `hist-item-${conduitId}`;
+                const element = document.getElementById(targetId);
+
+                if (element) {
+                    console.log(`[Jump] SUCCESS: Found element #${targetId}`);
+                    
+                    // 3. Scroll
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // 4. Highlight
+                    element.classList.remove('jump-highlight');
+                    void element.offsetWidth; // Trigger reflow
+                    element.classList.add('jump-highlight');
+                    console.log("[Jump] Scroll and Highlight applied.");
+                } else {
+                    console.error(`[Jump] FAILED: Element #${targetId} not found in DOM.`);
+                    console.warn("[Jump] Tip: If the item is old, you may need to click 'Load More History' first.");
+                    alert("Item not found in current view. It might be on a previous page of History.");
+                }
+            }, 100);
+        }
+
         async function triggerAutoFix(runId) {
             if(!confirm("Trigger AI Auto-Fix for this build failure?")) return;
             const termId = addTerminalCard(null, { loading: true });
@@ -917,6 +958,8 @@
             const statusText = isFail ? `${failCount} FAILED` : 'SUCCESS';
             
             // Build the collapsible Header and Body
+            const jumpBtn = response.conduit_id ? `<button class="icon-btn" style="color:var(--primary); border-color:var(--primary-dim);" onclick="event.stopPropagation(); jumpToHistory(${response.conduit_id})">VIEW IN HISTORY</button>` : '';
+
             el.innerHTML = `
                 <div class="log-header ${isFail ? 'expanded' : ''}" onclick="toggleLogBody('${id}')">
                     <div class="log-meta">
@@ -925,6 +968,7 @@
                         <span class="status-pill ${badgeClass}">${statusText}</span>
                     </div>
                     <div class="flex-gap">
+                        ${jumpBtn}
                         <button class="icon-btn" style="padding:2px 6px; height:24px;" onclick="event.stopPropagation(); copyLogData('${id}')">COPY</button>
                         <span style="font-size:10px; color:#666">▼</span>
                     </div>
@@ -1326,7 +1370,7 @@ function clearAceSearch() {
                  const canLoad = !!h.ops;
                  const canRestore = !!h.sha; 
                  return `
-                <div class="version-item">
+                <div class="version-item" id="hist-item-${h.conduit_id}">
                     <div class="v-header">
                         <div class="v-info"><strong>${h.title}</strong><small>${new Date(h.created_at).toLocaleString()}</small></div>
                         <div style="position:relative">
