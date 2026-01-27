@@ -2117,7 +2117,8 @@ function addTerminalCard(data, options = {}) {
                             let badgeText = `${op.score || 0}% Match`;
                             if (op.message && (op.message.includes('AI') || op.is_ai_fix)) { 
                                 scoreColor = '#d946ef'; 
-                                badgeText = `✨ AI FIXED (${op.score || 0}%)`; 
+                                const strategy = op.ai_strategy === 'range_replace' ? `L${op.start_line}-${op.end_line}` : `L${op.anchor_line}`;
+                                badgeText = `✨ AI ${strategy} (${op.score || 0}%)`; 
                                 hasAI = true; 
                             } 
                             else if(op.score === 100) scoreColor = 'var(--prod)';
@@ -4497,10 +4498,19 @@ async function downloadArtifact(runId) {
         const replaceVal = op.replace_with || op.content;
         
         // ATTEMPT 1: Build the visual "before/after" diff
+        if (op.is_ai_fix) {
+            contentHtml += `
+            <div style="background:rgba(217, 70, 239, 0.1); border:1px solid rgba(217, 70, 239, 0.3); padding:10px; border-radius:8px; margin-bottom:12px; font-size:12px;">
+                <div style="color:#d946ef; font-weight:bold; margin-bottom:4px;">🪄 AI Healing Context</div>
+                <div style="color:#ccc; margin-bottom:4px;"><b>Strategy:</b> ${op.ai_strategy === 'range_replace' ? 'Range Overwrite' : 'Line Insertion'}</div>
+                <div style="color:#ccc; margin-bottom:4px;"><b>Target:</b> ${op.ai_strategy === 'range_replace' ? `Lines ${op.start_line} to ${op.end_line}` : `Line ${op.anchor_line}`}</div>
+                <div style="color:#aaa; font-style:italic;">"${op.explanation}"</div>
+            </div>`;
+        }
         if (searchVal && (op.action === 'replace_block' || op.action.includes('insert'))) {
             contentHtml += `
             <div class="code-block-wrapper">
-                <label class="code-label">${op.action.includes('insert') ? 'Anchor Point' : 'Code to Replace'}</label>
+                <label class="code-label">${op.action.includes('insert') ? 'Anchor Point' : 'Original Search Block'}</label>
                 <button class="code-copy" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText)">Copy</button>
                 <pre class="code-pre diff-remove">${esc(searchVal)}</pre>
             </div>`;
