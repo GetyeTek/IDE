@@ -3343,58 +3343,71 @@ async function downloadArtifact(runId) {
 
     // --- NAVIGATION HELPER ---
     function jumpToElement(element, tabId, navIndex) {
-        console.group(`[JumpEngine] Target Tab: ${tabId}`);
+        console.group(`[JumpEngine] Triggered: ${tabId}`);
         if (!element) {
-            console.error("[JumpEngine] Aborted: Element reference is null.");
+            console.error("[JumpEngine] Failed: Element is null");
             console.groupEnd();
             return;
         }
 
-        console.log("[JumpEngine] Switching Tab...");
-        switchTab(tabId, document.querySelectorAll('.nav-item')[navIndex]);
+        // 1. Force Tab Switch
+        const navItems = document.querySelectorAll('.nav-item');
+        switchTab(tabId, navItems[navIndex]);
+        console.log("[JumpEngine] Tab switched.");
 
-        // Increase delay and use a retry loop for scrolling
+        const scrollContainer = document.querySelector('.main-view');
+        
         let attempts = 0;
-        const maxAttempts = 5;
-
-        const performScroll = () => {
+        const scrollLogic = () => {
             attempts++;
-            const rect = element.getBoundingClientRect();
-            const isVisible = rect.top !== 0 || rect.left !== 0;
+            
+            // Calculate position relative to the scroll container
+            // We iterate up the offsetParents until we hit the container
+            let offsetTop = 0;
+            let curr = element;
+            while (curr && curr !== scrollContainer) {
+                offsetTop += curr.offsetTop;
+                curr = curr.offsetParent;
+            }
 
-            console.log(`[JumpEngine] Scroll Attempt ${attempts}. Visible in DOM: ${isVisible}`);
+            console.log(`[JumpEngine] Attempt ${attempts}: Calculated offsetTop as ${offsetTop}`);
 
-            if (isVisible) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (offsetTop > 0 || attempts > 3) {
+                // Center the element: targetTop = offsetTop - (containerHeight / 2) + (elementHeight / 2)
+                const targetScroll = offsetTop - (scrollContainer.clientHeight / 2) + (element.clientHeight / 2);
                 
-                // Apply Highlight
-                element.style.transition = 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
-                const originalBg = element.style.backgroundColor;
-                const originalShadow = element.style.boxShadow;
-                const originalBorder = element.style.border;
+                console.log(`[JumpEngine] Executing scroll to: ${targetScroll}`);
                 
-                element.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'; 
-                element.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.5)';
+                scrollContainer.scrollTo({
+                    top: targetScroll,
+                    behavior: 'smooth'
+                });
+
+                // Visual Feedback
+                element.style.transition = 'all 0.5s ease';
+                const oldBg = element.style.backgroundColor;
+                const oldShadow = element.style.boxShadow;
+                const oldBorder = element.style.border;
+
+                element.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+                element.style.boxShadow = '0 0 30px rgba(59, 130, 246, 0.6)';
                 element.style.border = '2px solid var(--primary)';
-                
-                console.log("[JumpEngine] Scroll and Highlight applied successfully.");
-                console.groupEnd();
 
                 setTimeout(() => {
-                    element.style.backgroundColor = originalBg;
-                    element.style.boxShadow = originalShadow;
-                    element.style.border = originalBorder;
+                    element.style.backgroundColor = oldBg;
+                    element.style.boxShadow = oldShadow;
+                    element.style.border = oldBorder;
                 }, 3000);
-            } else if (attempts < maxAttempts) {
-                setTimeout(performScroll, 100);
-            } else {
-                console.warn("[JumpEngine] Failed to scroll: Element never became visible in layout.");
+
                 console.groupEnd();
+            } else {
+                // If offset is still 0, the tab content might still be hidden/rendering
+                setTimeout(scrollLogic, 150);
             }
         };
 
-        // Initial delay to allow display:block to take effect
-        setTimeout(performScroll, 300);
+        // Wait for tab transition animation before starting logic
+        setTimeout(scrollLogic, 250);
     }
 
     function renderHistory(historyData) {
