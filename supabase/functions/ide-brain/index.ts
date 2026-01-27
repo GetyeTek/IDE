@@ -315,8 +315,18 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
     const url = `${provider.baseUrl}?key=${apiKey}`;
     
     const payload: any = { 
-        contents: [{ parts: [{ text: promptText }] }] 
+        contents: [{ parts: [{ text: promptText }] }]
     };
+
+    // ADAPTER: Google Strict Function Calling
+    if (tools && tools.length > 0 && messages[0].content.includes('STRICT')) {
+        payload.tool_config = {
+            function_calling_config: {
+                mode: "ANY",
+                allowed_function_names: [tools[0].function.name]
+            }
+        };
+    }
 
     // MAP OPENAI TOOLS TO GOOGLE FUNCTION DECLARATIONS
     if (tools && tools.length > 0) {
@@ -594,11 +604,11 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
     const anchorLine = args.anchor_line !== null ? parseInt(String(args.anchor_line)) : null;
 
     const newOp = { ...failedOp, is_ai_fix: true };
-    if (startLine) {
+    
+    // Prioritize Range Replace for replace_block actions
+    if (startLine && (failedOp.action === "replace_block" || !anchorLine)) {
         newOp.ai_strategy = "range_replace";
         newOp.start_line = startLine;
-        
-        // INTELLIGENT SPAN FALLBACK
         if (!endLine && failedOp.find_block) {
             const originalLineCount = failedOp.find_block.split('\n').length;
             newOp.end_line = startLine + (originalLineCount - 1);
