@@ -390,7 +390,8 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
     messages: messages,
   };
   if (tools) body.tools = tools;
-  if (tools) body.tool_choice = "auto";
+  // If we have tools, we want to allow the caller to specify if it's mandatory
+  if (tools) body.tool_choice = (tools.length > 0 && messages[0].content.includes('STRICT')) ? { type: "function", function: { name: tools[0].function.name } } : "auto";
   if (responseFormat) body.response_format = responseFormat;
 
   const res = await fetch(provider.baseUrl, {
@@ -488,7 +489,12 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
 ### DATA INTEGRITY CONSTRAINTS
 - 'confidence_score': MUST be a WHOLE INTEGER (e.g., 95). No floats (0.95 is ILLEGAL).
 - 'explanation': Technical, concise, and definitive. Max 30 words. Identify the exact mismatch (e.g., "Variables reversed on lines 24-25").
-- 'can_fix': If you are guessing with less than 60% confidence, set this to false.`;
+- 'can_fix': If you are guessing with less than 60% confidence, set this to false.
+
+### STRICT MODE
+- DO NOT RESPOND WITH TEXT.
+- ONLY CALL THE suggest_fix FUNCTION.
+- SILENCE IS MANDATORY.`;
 
   const tools = [{ 
     type: "function",
