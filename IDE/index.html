@@ -282,6 +282,7 @@
             </div>
             <div class="terminal-label">Operation Terminal</div>
             <div id="terminal-list" class="terminal-container"></div>
+            <button id="btn-load-logs" class="btn btn-outline" style="margin-top:10px; display:none;" onclick="loadMoreLogs()">Load More Logs</button>
         </div>
 
         <!-- PREVIEW TAB -->
@@ -305,8 +306,16 @@
 
         <!-- HISTORY TAB -->
         <div id="tab-history" class="tab-content">
-            <div class="header">History <button class="icon-btn" onclick="fetchState(true)">Sync</button></div>
-             <div class="card" id="history-container"><div style="padding:10px; text-align:center;">Loading...</div></div>
+            <div class="header">History <button class="icon-btn" onclick="resetOffsets(); fetchState(true)">Sync</button></div>
+             <div class="card" id="history-container" style="padding-bottom: 0;"><div style="padding:10px; text-align:center;">Loading...</div></div>
+             <button id="btn-load-history" class="btn btn-outline" style="margin-top:10px; display:none;" onclick="loadMoreHistory()">Load More History</button>
+        </div>
+
+        <!-- CI/CD TAB -->
+        <div id="tab-cicd" class="tab-content">
+            <div class="header">Workflows <button class="icon-btn" onclick="wPage=1; fetchWorkflows()">Sync</button></div>
+            <div id="workflow-list" class="terminal-container" style="margin-top:0;"></div>
+            <button id="btn-load-workflows" class="btn btn-outline" style="margin-top:10px; display:none;" onclick="loadMoreWorkflows()">Load More Runs</button>
         </div>
 
         <!-- SETTINGS TAB -->
@@ -412,6 +421,7 @@
         <button class="nav-item" onclick="switchTab('tab-patcher', this)">Patcher</button>
         <button class="nav-item" onclick="switchTab('tab-preview', this)">Preview</button>
         <button class="nav-item" onclick="switchTab('tab-history', this)">History</button>
+        <button class="nav-item" onclick="switchTab('tab-cicd', this)">CI/CD</button>
         <button class="nav-item" onclick="switchTab('tab-settings', this)">Settings</button>
     </nav>
 <script>
@@ -424,6 +434,8 @@
         let sessionLogs = [];
         let dbHistory = [];
         let repoFiles = []; 
+        let hOffset = 0; let lOffset = 0; let wPage = 1;
+        const PAGE_SIZE = 20;
         let editHistory = []; let historyIndex = -1;
 
         // --- INIT ---
@@ -506,65 +518,108 @@
             fetchFileList();
         }
 
-        // --- API & DATA FETCHING ---
-      async function fetchState(force = false) {
+                // --- API & DATA FETCHING ---
+        function resetOffsets() { hOffset = 0; lOffset = 0; }
+
+        async function fetchState(force = false) {
+            const histContainer = document.getElementById('history-container');
+            const termContainer = document.getElementById('terminal-list');
+            
             if(force) {
-                document.getElementById('history-container').innerHTML = '<div style="padding:10px; text-align:center;">Syncing...</div>';
-                document.getElementById('terminal-list').innerHTML = '<div style="padding:10px; text-align:center; color:#666">Syncing logs...</div>';
+                resetOffsets();
+                histContainer.innerHTML = '<div style="padding:10px; text-align:center;">Syncing...</div>';
+                termContainer.innerHTML = '<div style="padding:10px; text-align:center; color:#666">Syncing logs...</div>';
             }
+
             try {
-                // Pass repoName to action to ensure we get scoped data
-                const res = await fetch(CONFIG.funcUrl, { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: apiBody({ action: 'init' }) 
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'init', history_offset: hOffset, log_offset: lOffset })
                 });
                 const data = await res.json();
-                
-                // Render Versions
-                if(data.history) { 
-                    dbHistory = data.history; 
-                    renderHistory(dbHistory); 
+
+                if (hOffset === 0) histContainer.innerHTML = '';
+                if (lOffset === 0) termContainer.innerHTML = '';
+
+                if (data.history && data.history.length > 0) {
+                    dbHistory = hOffset === 0 ? data.history : [...dbHistory, ...data.history];
+                    renderHistory(data.history, hOffset > 0);
+                    document.getElementById('btn-load-history').style.display = data.history.length === PAGE_SIZE ? 'block' : 'none';
+                } else if (hOffset === 0) {
+                    histContainer.innerHTML = '<div style="padding:10px; text-align:center;">No history found.</div>';
                 }
 
-                // Render Terminal Logs (New Logic)
-                const termContainer = document.getElementById('terminal-list');
-                termContainer.innerHTML = ''; // Clear loading state
-                if(data.logs && data.logs.length > 0) {
-                    // Reverse to show newest at top (flex-col behavior in CSS might need adjustment or prepend)
-                    // The backend sends newest first. We prepend elements.
-                    // But since we are rebuilding the list, we can just append in order if we want standard flow
-                    // or iterate backwards.
-                    
-                    // Actually, the CSS has flex-direction: column. 
-                    // Let's iterate the backend list (Newest -> Oldest).
+                if (data.logs && data.logs.length > 0) {
                     data.logs.forEach(log => {
                         const id = 'term-saved-' + log.id;
-                        // Determine failure/success based on data content
-                        const responseData = log.data;
-                        let isError = false;
-                        if(responseData.error || (responseData.results && responseData.results.some(r => r.status === 'failed'))) {
-                            isError = true;
-                        }
-
-                        // Create the card structure using existing helper logic manually or adapting helper
                         const div = document.createElement('div');
-                        div.id = id;
-                        div.className = 'log-entry';
-                        termContainer.appendChild(div); // Add to list
-                        
-                        // Use existing update logic to populate it
-                        updateTerminalCard(id, responseData, null);
-                        
-                        // Fix timestamp in the rendered card
+                        div.id = id; div.className = 'log-entry'; div.style.marginBottom = '12px';
+                        termContainer.appendChild(div);
+                        updateTerminalCard(id, log.data, null);
                         const timeEl = div.querySelector('.log-time');
                         if(timeEl) timeEl.innerText = new Date(log.created_at).toLocaleString();
                     });
-                } else {
-                    termContainer.innerHTML = '<div style="padding:10px; text-align:center; color:#444; font-size:12px;">No terminal logs for ' + CONFIG.repoName + '</div>';
+                    document.getElementById('btn-load-logs').style.display = data.logs.length === PAGE_SIZE ? 'block' : 'none';
+                } else if (lOffset === 0) {
+                    termContainer.innerHTML = '<div style="padding:10px; text-align:center; color:#444;">No logs found.</div>';
                 }
-
             } catch (e) { console.error(e); }
+        }
+
+        function loadMoreHistory() { hOffset += PAGE_SIZE; fetchState(); }
+        function loadMoreLogs() { lOffset += PAGE_SIZE; fetchState(); }
+
+        async function fetchWorkflows() {
+            const container = document.getElementById('workflow-list');
+            if (wPage === 1) container.innerHTML = '<div style="padding:20px; text-align:center;">Fetching Runs...</div>';
+            
+            try {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'fetch_workflows', page: wPage })
+                });
+                const data = await res.json();
+                if (wPage === 1) container.innerHTML = '';
+                
+                if (data.runs && data.runs.length > 0) {
+                    data.runs.forEach(run => {
+                        const div = document.createElement('div');
+                        div.className = 'log-entry'; div.style.marginBottom = '10px';
+                        const isFail = run.conclusion === 'failure';
+                        div.innerHTML = `
+                            <div class="log-header">
+                                <div class="log-meta">
+                                    <span class="status-pill ${isFail ? 'pill-fail' : 'pill-success'}">${run.conclusion || 'running'}</span>
+                                    <strong>${run.name}</strong>
+                                    <span class="log-time">#${run.run_number}</span>
+                                </div>
+                                <div class="flex-gap">
+                                    <small style="color:var(--text-muted)">${new Date(run.created_at).toLocaleTimeString()}</small>
+                                    ${isFail ? `<button class="btn-dev" style="padding:2px 8px; font-size:10px; width:auto;" onclick="triggerAutoFix('${run.id}')">Auto-Fix</button>` : ''}
+                                </div>
+                            </div>`;
+                        container.appendChild(div);
+                    });
+                    document.getElementById('btn-load-workflows').style.display = data.runs.length >= 20 ? 'block' : 'none';
+                } else if (wPage === 1) {
+                    container.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No workflow runs found.</div>';
+                }
+            } catch (e) { container.innerHTML = 'Error: ' + e.message; }
+        }
+
+        function loadMoreWorkflows() { wPage++; fetchWorkflows(); }
+        async function triggerAutoFix(runId) {
+            if(!confirm("Trigger AI Auto-Fix for this build failure?")) return;
+            const termId = addTerminalCard(null, { loading: true });
+            try {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'auto_fix_build', run_id: runId })
+                });
+                const data = await res.json();
+                updateTerminalCard(termId, data.patch_result || data, null);
+            } catch(e) { updateTerminalCard(termId, { error: e.message }); }
         }
 
         async function fetchFileList() {
@@ -1261,10 +1316,13 @@ function clearAceSearch() {
             countEl.innerText = `${nextIdx + 1} of ${total}`;
         }
 
-        function renderHistory(historyData) {
+        function renderHistory(historyData, append = false) {
              const container = document.getElementById('history-container');
-             if(!historyData || historyData.length === 0) return container.innerHTML = '<div style="padding:10px; text-align:center;">No history.</div>';
-             container.innerHTML = historyData.filter(h => h.title !== "Rollback").map((h, index) => {
+             if (!append && (!historyData || historyData.length === 0)) return container.innerHTML = '<div style="padding:10px; text-align:center;">No history.</div>';
+             
+             const html = historyData.filter(h => h.title !== "Rollback").map((h) => {
+                 // Use the global dbHistory index by matching the conduit_id
+                 const globalIdx = dbHistory.findIndex(item => item.conduit_id === h.conduit_id);
                  const canLoad = !!h.ops;
                  const canRestore = !!h.sha; 
                  return `
@@ -1282,14 +1340,23 @@ function clearAceSearch() {
                             </div>
                         </div>
                     </div>
-                    <div class="v-note ${h.note ? 'has-content' : ''}" onclick="addNote(${index})">${h.note || ''}</div>
+                    <div class="v-note ${h.note ? 'has-content' : ''}" onclick="addNote(${globalIdx})">${h.note || ''}</div>
                 </div>`;
             }).join('');
+
+            if (append) container.insertAdjacentHTML('beforeend', html);
+            else container.innerHTML = html;
         }
 
         // --- HELPERS ---
         function toggleAllFiles(s) { document.querySelectorAll('.file-check').forEach(cb => cb.checked = s.checked); }
-        function switchTab(id, btn) { document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); document.getElementById(id).classList.add('active'); if(btn) btn.classList.add('active'); }
+        function switchTab(id, btn) { 
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); 
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active')); 
+            document.getElementById(id).classList.add('active'); 
+            if(btn) btn.classList.add('active');
+            if(id === 'tab-cicd' && wPage === 1) fetchWorkflows();
+        }
         function toggleFullscreen(a) { a ? document.body.classList.add('fs-mode') : document.body.classList.remove('fs-mode'); }
         function toggleMenu(i) { document.querySelectorAll('.menu-dropdown').forEach(m => m.classList.remove('show')); document.getElementById(`menu-${i}`).classList.add('show'); }
         function closeAllMenus(e) { if(!e.target.closest('.menu-btn')) document.querySelectorAll('.menu-dropdown').forEach(m => m.classList.remove('show')); }
