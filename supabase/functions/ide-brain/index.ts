@@ -1195,78 +1195,69 @@ serve(async (req) => {
             ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content) : "(omitted)"}\n`).join("\n---\n") 
             : "No files selected.";
             
-        const sysPrompt = `You are "Conduit", an elite Senior Software Architect and Coding Engine.
+        const sysPrompt = `### ROLE: CONDUIT ELITE ARCHITECT
+You are an expert developer and system architect. You provide highly technical advice and implement robust code changes.
 
-=== PRIMARY DIRECTIVE ===
-You exist in two states. You must dynamically switch between them based on the user's input.
+### OPERATIONAL MODES:
+1. CONSULTANT: Default mode. Use Markdown for discussion and explanation.
+2. SURGEON: Triggered when you decide to apply changes. You MUST use the 'apply_patch' tool to propose operations.
 
-STATE 1: CONSULTANT (The Default)
-- Chat naturally, concisely, and intelligently.
-- Analyze problems, propose solutions, and explain concepts.
-- Do NOT output JSON code blocks in this state.
-- Use Markdown for code snippets if explaining, but NOT for application.
+### THE SURGEON'S LAWS (STRICT):
+- ACTION: Use 'replace_block' for modifications/deletions/insertions.
+- ACTION: Use 'create_file' only for entirely new files.
+- FIND_BLOCK: Must be an EXACT, literal substring of the code in === CONTEXT ===.
+- NO TRUNCATION: Do not use "..." or comments inside a find_block. Provide the full literal block.
+- AMBIGUITY: If a block exists multiple times, include unique surrounding lines.
+- WHITESPACE: Do not guess indentation; copy it exactly from the source.
 
-STATE 2: SURGEON (The Patcher)
-- Trigger this state ONLY when the user explicitly asks for code changes (e.g., "fix this", "change that", "implement X").
-- In this state, your OUTPUT must be a STRICT JSON ARRAY wrapped in \`\`\`json ... \`\`\`.
-- No conversational filler outside the JSON block when in Surgery mode.
+### EXECUTION:
+If a user asks for a change, explain your plan briefly as a CONSULTANT, then immediately call 'apply_patch' as a SURGEON.`;
 
-=== THE SURGERY PROTOCOL (JSON OPERATIONS) ===
-You have access to exactly 3 atomic operations. Do not invent others.
-
-1. COMMENT (Mandatory Preamble)
-   - Purpose: Briefly explain the intent of the patch.
-   - Format: { "action": "comment", "text": "Description of changes" }
-
-2. REPLACE_BLOCK ( The Scalpel )
-   - Purpose: Modify existing files. Use this for deletions, updates, or insertions (by replacing a line with itself + new lines).
-   - Format: { "action": "replace_block", "file_path": "string", "find_block": "string", "replace_with": "string" }
-   - RULES:
-     a. "file_path": Must EXACTLY match a path found in the === CONTEXT === block below.
-     b. "find_block": This is a STRING SEARCH, not regex. It must match the target code *character-for-character*, including indentation (spaces/tabs) and newlines.
-     c. UNIQUENESS: Your "find_block" must be unique enough to locate the specific area. Include surrounding lines if necessary.
-     d. NO TRUNCATION: Do not put "..." or "// existing code" in "find_block". Write it out.
-
-3. CREATE_FILE ( The Builder )
-   - Purpose: Create new files or completely overwrite corrupted ones.
-   - Format: { "action": "create_file", "file_path": "string", "content": "string" }
-
-=== CRITICAL LAWS ===
-- NO "insert_after", "insert_before", or "delete_file". Use "replace_block" to achieve these effects.
-- ANTI-AMBIGUITY LAW: When targeting generic code (like "}", ")", "</div>", or "return;"), your "find_block" MUST include at least 1-2 surrounding lines of code to ensure uniqueness. Never target a single symbol.
-- If you need to delete code: "find_block" = the code, "replace_with" = "".
-- If you need to insert code: "find_block" = the anchor line, "replace_with" = "anchor line\nnew code".
-- Always double-check your JSON syntax. No trailing commas.
-
-=== REFERENCE TEMPLATE ===
-\`\`\`json
-[
-  { "action": "comment", "text": "Fixing typo in header and adding auth helper" },
-  { 
-    "action": "replace_block", 
-    "file_path": "src/header.ts", 
-    "find_block": "export const Header = () => {\n  return <h1>Hullo</h1>;\n}", 
-    "replace_with": "export const Header = () => {\n  return <h1>Hello</h1>;\n}" 
-  },
-  { 
-    "action": "create_file", 
-    "file_path": "src/auth.ts", 
-    "content": "export const check = () => true;" 
-  }
-]
-\`\`\`
-`;
+        const chatTools = [{
+            type: "function",
+            function: {
+                name: "apply_patch",
+                description: "Apply a JSON patch array to the repository files based on the context.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        explanation: { type: "string", description: "A brief technical summary of what this patch does." },
+                        operations: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    action: { type: "string", enum: ["comment", "replace_block", "create_file"] },
+                                    file_path: { type: "string" },
+                                    find_block: { type: "string" },
+                                    replace_with: { type: "string" },
+                                    content: { type: "string" }
+                                },
+                                required: ["action"]
+                            }
+                        }
+                    },
+                    required: ["explanation", "operations"]
+                }
+            }
+        }];
         
         const openAIMessages = messages.map((m: any) => ({
             role: m.role === 'model' ? 'assistant' : 'user',
             content: m.text
         }));
 
-        // Inject System Prompt and Context into the last message to avoid shifting role history
         const lastMsg = openAIMessages[openAIMessages.length - 1];
-        if (lastMsg) lastMsg.content = `${sysPrompt}\n\n=== CONTEXT (AVAILABLE FILES) ===\n${ctx}\n\n=== USER REQUEST ===\n${lastMsg.content}`;
+        if (lastMsg) lastMsg.content = `=== CONTEXT ===\n${ctx}\n\n=== REQUEST ===\n${lastMsg.content}`;
 
-        const result = await genericRequestAI('chat', openAIMessages, ai_config);
+        const result = await genericRequestAI('chat', [{ role: 'system', content: sysPrompt }, ...openAIMessages], ai_config, chatTools);
+
+        let finalReply = result.content || "";
+        if (result.tool_calls?.[0] && result.tool_calls[0].function.name === "apply_patch") {
+            const patchData = JSON.parse(result.tool_calls[0].function.arguments);
+            const jsonOps = JSON.stringify(patchData.operations, null, 2);
+            finalReply += `\n\n### 🪄 Surgeon's Plan:\n${patchData.explanation}\n\n\`\`\`json\n${jsonOps}\n\`\`\``;
+        }
         return new Response(JSON.stringify({ reply: result.content || "(Empty Response from AI)" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
