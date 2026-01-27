@@ -1125,9 +1125,27 @@ serve(async (req) => {
     // 1. INIT
     if (action === "init") {
         const scope = project_path || "";
-        const { data: history } = await supabase.from('conduit_history').select('*, conduit_id').eq('repo_name', TARGET_REPO).order('conduit_id', { ascending: false }).limit(50);
-        const { data: logs } = await supabase.from('conduit_logs').select('*').eq('repo_name', TARGET_REPO).order('created_at', { ascending: false }).limit(50);
-        return new Response(JSON.stringify({ history: (history || []).filter((h:any)=>isRecordInScope(h, scope)), logs: (logs || []).filter((l:any)=>isRecordInScope(l, scope)) }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const historyLimit = 20;
+        const logLimit = 20;
+        const hOff = payload.history_offset || 0;
+        const lOff = payload.log_offset || 0;
+
+        const { data: history } = await supabase.from('conduit_history')
+            .select('*, conduit_id')
+            .eq('repo_name', TARGET_REPO)
+            .order('conduit_id', { ascending: false })
+            .range(hOff, hOff + historyLimit - 1);
+
+        const { data: logs } = await supabase.from('conduit_logs')
+            .select('*')
+            .eq('repo_name', TARGET_REPO)
+            .order('created_at', { ascending: false })
+            .range(lOff, lOff + logLimit - 1);
+
+        return new Response(JSON.stringify({ 
+            history: (history || []).filter((h:any)=>isRecordInScope(h, scope)), 
+            logs: (logs || []).filter((l:any)=>isRecordInScope(l, scope)) 
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // 2. AI CHAT
@@ -1578,7 +1596,8 @@ You have access to exactly 3 atomic operations. Do not invent others.
     }
 
     if (action === "fetch_workflows") {
-      const data = await githubFetch(TARGET_REPO, `/actions/runs?per_page=50`);
+      const page = payload.page || 1;
+      const data = await githubFetch(TARGET_REPO, `/actions/runs?per_page=20&page=${page}`);
       return new Response(JSON.stringify({ runs: data.workflow_runs }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
