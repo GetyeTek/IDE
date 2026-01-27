@@ -1455,7 +1455,12 @@ You have access to exactly 3 atomic operations. Do not invent others.
 
       const files = treeData.tree
         .filter((f: any) => f.type === "blob")
-        .map((f: any) => ({ ...f, last_updated: lastUpdated }));
+        .map((f: any) => ({
+          path: f.path,
+          sha: f.sha,
+          size: f.size, // Bytes
+          last_updated: lastUpdated // Branch level timestamp
+        }));
 
       return new Response(JSON.stringify({ files }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
