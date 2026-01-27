@@ -872,9 +872,9 @@
                             let scoreColor = 'var(--text-muted)';
                             let badgeText = `${op.score}% Match`;
 
-                            if (op.message && op.message.includes('AI Repaired')) {
+                            if (op.message && (op.message.includes('AI Repaired') || op.message.includes('✨ AI'))) {
                                 scoreColor = '#d946ef'; 
-                                badgeText = `✨ AI FIXED`;
+                                badgeText = `✨ AI ${op.score || 0}%`;
                                 hasAI = true;
                             } 
                             else if(op.score === 100) scoreColor = 'var(--prod)';
