@@ -1446,8 +1446,17 @@ You have access to exactly 3 atomic operations. Do not invent others.
     }
 
     if (action === "fetch") {
-      const tree = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
-      const files = tree.tree.filter((f: any) => f.type === "blob");
+      // 1. Get the full tree (for sizes and paths)
+      const treeData = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
+      
+      // 2. Get the latest commit for the branch (as a baseline timestamp for files)
+      const branchData = await githubFetch(TARGET_REPO, `/branches/${DEV_BRANCH}`);
+      const lastUpdated = branchData.commit.commit.committer.date;
+
+      const files = treeData.tree
+        .filter((f: any) => f.type === "blob")
+        .map((f: any) => ({ ...f, last_updated: lastUpdated }));
+
       return new Response(JSON.stringify({ files }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
