@@ -1209,6 +1209,7 @@ You are an expert developer and system architect. You provide highly technical a
 - NO TRUNCATION: Do not use "..." or comments inside a find_block. Provide the full literal block.
 - AMBIGUITY: If a block exists multiple times, include unique surrounding lines.
 - WHITESPACE: Do not guess indentation; copy it exactly from the source.
+- BATCHING: You CAN and SHOULD stack multiple operations (REPLACE_BLOCK or CREATE_FILE) in a single 'apply_patch' call. If a feature requires changes to 5 files, send one payload with all 5 files.
 
 ### EXECUTION:
 If a user asks for a change, explain your plan briefly as a CONSULTANT, then immediately call 'apply_patch' as a SURGEON.`;
@@ -1224,6 +1225,7 @@ If a user asks for a change, explain your plan briefly as a CONSULTANT, then imm
                         explanation: { type: "string", description: "A brief technical summary of what this patch does." },
                         operations: {
                             type: "array",
+                            description: "A batch of atomic operations to be applied in sequence. Stack multiple files here if the task requires it.",
                             items: {
                                 type: "object",
                                 properties: {
