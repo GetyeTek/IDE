@@ -3311,32 +3311,58 @@ async function downloadArtifact(runId) {
 
     // --- NAVIGATION HELPER ---
     function jumpToElement(element, tabId, navIndex) {
-        if (!element) return;
-        
-        // 1. Switch Tab
+        console.group(`[JumpEngine] Target Tab: ${tabId}`);
+        if (!element) {
+            console.error("[JumpEngine] Aborted: Element reference is null.");
+            console.groupEnd();
+            return;
+        }
+
+        console.log("[JumpEngine] Switching Tab...");
         switchTab(tabId, document.querySelectorAll('.nav-item')[navIndex]);
-        
-        // 2. Wait for DOM/Layout to stabilize (Display: block transition)
-        setTimeout(() => {
-            // 3. Scroll
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            // 4. Highlight Effect
-            element.style.transition = 'background-color 0.3s, box-shadow 0.3s, border 0.3s';
-            const originalBg = element.style.backgroundColor;
-            const originalShadow = element.style.boxShadow;
-            
-            element.style.backgroundColor = 'rgba(234, 179, 8, 0.15)'; // --dev color
-            element.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.4)';
-            element.style.border = '1px solid var(--dev)';
-            
-            // 5. Cleanup
-            setTimeout(() => {
-                element.style.backgroundColor = originalBg;
-                element.style.boxShadow = originalShadow;
-                element.style.border = '';
-            }, 2000);
-        }, 150);
+
+        // Increase delay and use a retry loop for scrolling
+        let attempts = 0;
+        const maxAttempts = 5;
+
+        const performScroll = () => {
+            attempts++;
+            const rect = element.getBoundingClientRect();
+            const isVisible = rect.top !== 0 || rect.left !== 0;
+
+            console.log(`[JumpEngine] Scroll Attempt ${attempts}. Visible in DOM: ${isVisible}`);
+
+            if (isVisible) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Apply Highlight
+                element.style.transition = 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+                const originalBg = element.style.backgroundColor;
+                const originalShadow = element.style.boxShadow;
+                const originalBorder = element.style.border;
+                
+                element.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'; 
+                element.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.5)';
+                element.style.border = '2px solid var(--primary)';
+                
+                console.log("[JumpEngine] Scroll and Highlight applied successfully.");
+                console.groupEnd();
+
+                setTimeout(() => {
+                    element.style.backgroundColor = originalBg;
+                    element.style.boxShadow = originalShadow;
+                    element.style.border = originalBorder;
+                }, 3000);
+            } else if (attempts < maxAttempts) {
+                setTimeout(performScroll, 100);
+            } else {
+                console.warn("[JumpEngine] Failed to scroll: Element never became visible in layout.");
+                console.groupEnd();
+            }
+        };
+
+        // Initial delay to allow display:block to take effect
+        setTimeout(performScroll, 300);
     }
 
     function renderHistory(historyData) {
@@ -3377,14 +3403,13 @@ async function downloadArtifact(runId) {
     }
 
     function traceHistoryToRun(sha) {
+        console.log(`[Trace] History -> Run | SHA: ${sha}`);
         if (!sha) return showGlobalToast("No SHA linked to this entry", true);
 
-        const targetRun = document.querySelector(`#workflow-list > div[data-commit-sha="${sha}"]`);
+        const targetRun = document.querySelector(`#workflow-list div[data-commit-sha="${sha}"]`);
 
         if (targetRun) {
             jumpToElement(targetRun, 'tab-cicd', 4);
-            
-            // Specific logic for CI/CD: Auto-expand jobs
             setTimeout(() => {
                 const headerEl = targetRun.querySelector('div[onclick]');
                 const runId = targetRun.dataset.runId;
@@ -3392,13 +3417,15 @@ async function downloadArtifact(runId) {
                 if (headerEl && jobsContainer && jobsContainer.style.display === 'none') {
                     toggleWorkflowJobs(runId, headerEl);
                 }
-            }, 200);
+            }, 500);
         } else {
-            showGlobalToast("Build not found in loaded workflows. Try refreshing CI/CD tab.");
+            console.warn(`[Trace] Run not found for SHA: ${sha}. Current workflow count: ${document.querySelectorAll('#workflow-list > div').length}`);
+            showGlobalToast("Build not found in loaded workflows. Try loading more in CI/CD tab.");
         }
     }
 
     function traceRunToHistory(sha) {
+        console.log(`[Trace] Run -> History | SHA: ${sha}`);
         if (!sha) return showGlobalToast("No SHA linked to this run", true);
 
         const targetHistoryItem = document.querySelector(`.version-item[data-commit-sha="${sha}"]`);
@@ -3406,17 +3433,20 @@ async function downloadArtifact(runId) {
         if (targetHistoryItem) {
             jumpToElement(targetHistoryItem, 'tab-history', 3);
         } else {
-            showGlobalToast("History entry not found (try loading more).");
+            console.warn(`[Trace] History entry not found for SHA: ${sha}`);
+            showGlobalToast("History entry not found. Try loading more in History tab.");
         }
     }
 
     function traceRunToLog(sha) {
+        console.log(`[Trace] Run -> Log | SHA: ${sha}`);
         if (!sha) return showGlobalToast("No commit SHA linked to this run.", true);
         const targetLog = document.querySelector(`.log-entry[data-commit-sha="${sha}"]`);
         if (targetLog) {
             jumpToElement(targetLog, 'tab-patcher', 1);
         } else {
-            showGlobalToast("Could not find matching log in Terminal.");
+            console.warn(`[Trace] Log entry not found for SHA: ${sha}`);
+            showGlobalToast("Could not find matching log in Terminal. Try loading more logs.");
         }
     }
 
