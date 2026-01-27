@@ -1446,20 +1446,39 @@ You have access to exactly 3 atomic operations. Do not invent others.
     }
 
     if (action === "fetch") {
-      // 1. Get the full tree (for sizes and paths)
       const treeData = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
-      
-      // 2. Get the latest commit for the branch (as a baseline timestamp for files)
       const branchData = await githubFetch(TARGET_REPO, `/branches/${DEV_BRANCH}`);
-      const lastUpdated = branchData.commit.commit.committer.date;
+      const branchDate = branchData.commit.commit.committer.date;
+
+      // 1. Fetch recent history to map file-specific updates
+      const { data: history } = await supabase
+        .from('conduit_history')
+        .select('created_at, ops')
+        .eq('repo_name', TARGET_REPO)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const fileDateMap: Record<string, string> = {};
+      if (history) {
+        history.forEach(entry => {
+          if (Array.isArray(entry.ops)) {
+            entry.ops.forEach((op: any) => {
+              if (op.file_path && !fileDateMap[op.file_path]) {
+                fileDateMap[op.file_path] = entry.created_at;
+              }
+            });
+          }
+        });
+      }
 
       const files = treeData.tree
         .filter((f: any) => f.type === "blob")
         .map((f: any) => ({
           path: f.path,
           sha: f.sha,
-          size: f.size, // Bytes
-          last_updated: lastUpdated // Branch level timestamp
+          size: f.size,
+          // Priority: 1. IDE History Date, 2. Branch Update Date
+          last_updated: fileDateMap[f.path] || branchDate
         }));
 
       return new Response(JSON.stringify({ files }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
