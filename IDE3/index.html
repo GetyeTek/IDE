@@ -2102,8 +2102,12 @@ function addTerminalCard(data, options = {}) {
                             window.OP_CACHE[opId] = { file: fileRes.file, op: op, commit_sha: response.commit_sha || null };
 
                             let scoreColor = 'var(--text-muted)';
-                            let badgeText = `${op.score}% Match`;
-                            if (op.message && (op.message.includes('AI') || op.is_ai_fix)) { scoreColor = '#d946ef'; badgeText = `✨ AI FIXED`; hasAI = true; } 
+                            let badgeText = `${op.score || 0}% Match`;
+                            if (op.message && (op.message.includes('AI') || op.is_ai_fix)) { 
+                                scoreColor = '#d946ef'; 
+                                badgeText = `✨ AI FIXED (${op.score || 0}%)`; 
+                                hasAI = true; 
+                            } 
                             else if(op.score === 100) scoreColor = 'var(--prod)';
                             else if(op.score >= 80) scoreColor = 'var(--dev)';
                             else if(op.score > 0) scoreColor = 'var(--danger)';
