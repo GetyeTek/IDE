@@ -492,6 +492,7 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
 
   const tools = [{ 
     type: "function",
+    strict: true, 
     function: { 
         name: "suggest_fix", 
         description: "Provide the correct coordinates or strings to fix a failed patch operation.", 
@@ -561,23 +562,27 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
 
     if (!args || !args.can_fix || score < 60) return { fixedOp: null, reason: args?.explanation || "Low confidence match", score: score || 0 };
     
+    // COORDINATE SANITY CHECK
+    const startLine = args.start_line !== null ? parseInt(String(args.start_line)) : null;
+    const endLine = args.end_line !== null ? parseInt(String(args.end_line)) : null;
+    const anchorLine = args.anchor_line !== null ? parseInt(String(args.anchor_line)) : null;
+
     const newOp = { ...failedOp, is_ai_fix: true };
-    if (args.start_line) {
+    if (startLine) {
         newOp.ai_strategy = "range_replace";
-        newOp.start_line = args.start_line;
+        newOp.start_line = startLine;
         
         // INTELLIGENT SPAN FALLBACK
-        // If AI is lazy and gives start_line but no end_line, calculate the original block length
-        if (!args.end_line && failedOp.find_block) {
+        if (!endLine && failedOp.find_block) {
             const originalLineCount = failedOp.find_block.split('\n').length;
-            newOp.end_line = args.start_line + (originalLineCount - 1);
+            newOp.end_line = startLine + (originalLineCount - 1);
         } else {
-            newOp.end_line = args.end_line || args.start_line;
+            newOp.end_line = endLine || startLine;
         }
     } 
-    else if (args.anchor_line) {
+    else if (anchorLine) {
         newOp.ai_strategy = "line_insert";
-        newOp.anchor_line = args.anchor_line;
+        newOp.anchor_line = anchorLine;
     }
     else if (args.new_anchor_text) {
         // If AI gives a better string, swap it into the original operation
