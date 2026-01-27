@@ -1848,7 +1848,7 @@ If a user asks for a change, explain your plan briefly as a CONSULTANT, then imm
     }
 
     if (action === "load_chat") {
-        const { data } = await supabase.from('conduit_history').select('ops').eq('id', payload.chat_id).single();
+        const { data } = await supabase.from('conduit_history').select('ops').eq('id', chat_id).single();
         return new Response(JSON.stringify({ messages: data?.ops || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
