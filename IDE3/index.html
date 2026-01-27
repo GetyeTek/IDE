@@ -2643,6 +2643,7 @@ function addTerminalCard(data, options = {}) {
             switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
             
             if (confirm("Ask AI to heal broken imports in other files?")) {
+                startNewChat();
                 toggleChat(true);
                 chatHistory.push({ role: 'user', text: `I renamed "${path}" to "${newPath}". Scan the repo and provide a JSON patch to update files that import this path.` });
                 processAIResponse();
@@ -4087,6 +4088,7 @@ async function downloadArtifact(runId) {
     }
 
     function fixPreviewError(msg) {
+        startNewChat();
         toggleChat(true);
         chatHistory.push({ role: 'user', text: 'My application logged a runtime error: "' + msg + '". Please analyze my selected files and suggest a fix.' });
         processAIResponse();
