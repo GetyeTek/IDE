@@ -350,6 +350,9 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
                     newSchema.properties[key] = transformSchema(schema.properties[key]);
                 }
             }
+            if (schema.items) {
+                newSchema.items = transformSchema(schema.items);
+            }
             if (schema.required) newSchema.required = schema.required;
             return newSchema;
         };
