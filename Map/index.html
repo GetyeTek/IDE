@@ -384,7 +384,6 @@
                 // 1. Atmosphere / Sky Fix
                 document.getElementById('map-container').className = scene.filter ? `filter-${scene.filter}` : '';
                 if (scene.weather) this.startWeather(scene.weather);
-                if (scene.unit) document.getElementById('hud-unit').innerText = scene.unit;
                 
                 if (scene.sky || scene.fog) {
                     this.map.setSky({
@@ -395,17 +394,12 @@
                     });
                 }
 
-                // 2. Intel Overlay
-                const intel = document.getElementById('intel-container');
-                const img = document.getElementById('intel-img');
-                const vid = document.getElementById('intel-video');
-                if (scene.intel) {
-                    const isVid = scene.intel.match(/\.(mp4|webm|mov)/);
-                    img.style.display = isVid ? 'none' : 'block';
-                    vid.style.display = isVid ? 'block' : 'none';
-                    if(isVid) { vid.src = scene.intel; vid.play(); } else { img.src = scene.intel; }
-                    intel.classList.add('active');
-                } else { intel.classList.remove('active'); }
+                // 2. Academic HUD Updates
+                const hud = document.getElementById('academic-hud');
+                if (hud) {
+                    hud.style.opacity = scene.unit ? '1' : '0.5';
+                    if (scene.unit) document.getElementById('hud-unit').innerText = scene.unit.toUpperCase();
+                }
 
                 // 3. Choice Interactivity
                 if (scene.choices) {
