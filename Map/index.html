@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Map Director v1</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <!-- MapLibre CSS & JS -->
+    <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; padding: 0; background: #000; font-family: sans-serif; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        
+        /* Cinematic Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Let clicks pass through to map */
+            display: flex;
+            flex-direction: column;
+            justify-content:间-between;
+        }
+
+        #subtitle-box {
+            margin-top: auto;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5rem;
+            min-height: 60px;
+            transition: opacity 0.5s;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px; left: 20px;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #ff4400;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="ui-layer">
+    <div id="controls">
+        <button onclick="startMovie()">START MOVIE</button>
+    </div>
+    <div id="subtitle-box" id="subtitles">Press Start to begin...</div>
+</div>
+
+<script>
+    // 1. Initialize the Map with Satellite imagery
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: {
+            "version": 8,
+            "sources": {
+                "raster-tiles": {
+                    "type": "raster",
+                    "tiles": [
+                        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                    ],
+                    "tileSize": 256
+                }
+            },
+            "layers": [{
+                "id": "simple-tiles",
+                "type": "raster",
+                "source": "raster-tiles",
+                "minzoom": 0,
+                "maxzoom": 22
+            }]
+        },
+        center: [0, 20],
+        zoom: 2,
+        pitch: 45
+    });
+
+    // 2. This is your "JSON" script
+    const movieScript = [
+        {
+            center: [-74.006, 40.7128], // NYC
+            zoom: 12,
+            pitch: 60,
+            bearing: 45,
+            duration: 4000,
+            subtitle: "We start our journey in the concrete jungle of New York."
+        },
+        {
+            center: [2.3522, 48.8566], // Paris
+            zoom: 13,
+            pitch: 40,
+            bearing: -20,
+            duration: 5000,
+            subtitle: "Then, we cross the Atlantic to the city of lights."
+        },
+        {
+            center: [139.6503, 35.6762], // Tokyo
+            zoom: 14,
+            pitch: 80,
+            bearing: 90,
+            duration: 6000,
+            subtitle: "Finally, we land in the neon heart of Tokyo."
+        }
+    ];
+
+    let currentStep = 0;
+
+    async function startMovie() {
+        if (currentStep >= movieScript.length) {
+            document.getElementById('subtitle-box').innerText = "End of Tour.";
+            return;
+        }
+
+        const scene = movieScript[currentStep];
+        
+        // Update Subtitle
+        document.getElementById('subtitle-box').innerText = scene.subtitle;
+
+        // Fly the camera
+        map.flyTo({
+            center: scene.center,
+            zoom: scene.zoom,
+            pitch: scene.pitch,
+            bearing: scene.bearing,
+            duration: scene.duration,
+            essential: true
+        });
+
+        // Wait for the duration, then do the next step
+        setTimeout(() => {
+            currentStep++;
+            startMovie();
+        }, scene.duration + 1000); // add 1s pause
+    }
+</script>
+
+</body>
+</html>
