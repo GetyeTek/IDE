@@ -142,8 +142,9 @@
         .timeline-container { position: absolute; bottom: 85px; width: 80%; left: 10%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
         #timeline-progress { width: 0%; height: 100%; background: var(--accent); transition: width 0.1s linear; }
 
-        /* Weather Canvas */
+        /* Weather & Flow Canvas */
         #weather-canvas { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 10; }
+        #flow-canvas { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 11; }
     </style>
 </head>
 <body>
@@ -156,6 +157,7 @@
     <div id="map-container">
         <div id="map"></div>
         <canvas id="weather-canvas"></canvas>
+        <canvas id="flow-canvas"></canvas>
         <div id="lens-scope"><div class="scope-overlay"></div><div class="scan-line"></div></div>
     </div>
     <div class="vignette"></div>
@@ -368,6 +370,11 @@
                     });
                 } else { this.map.setFog(null); }
 
+                if (scene.sky) {
+                    this.map.setPaintProperty('sky', 'sky-layer-color', scene.sky.color || '#87ceeb');
+                    this.map.setPaintProperty('sky', 'sky-layer-horizon-color', scene.sky.horizon || '#ffffff');
+                }
+
                 // Lens Logic
                 const lens = document.getElementById('lens-scope');
                 lens.classList.toggle('active', !!scene.lens);
@@ -458,6 +465,7 @@
 
                 // 6. Action Layer
                 if (scene.action === 'draw') this.animateTrace(scene);
+                if (scene.action === 'flow') this.startFlow(scene);
                 if (scene.action === 'heatmap') this.addHeatmap(scene);
                 if (scene.action === 'extrude') this.addExtrusion(scene);
                 if (scene.action === 'radar') this.startRadar(scene.radar);
@@ -472,6 +480,36 @@
 
                 setTimeout(resolve, (scene.duration || 3000) + (scene.wait || 500));
             });
+        }
+
+        startFlow(scene) {
+            const canvas = document.getElementById('flow-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            const points = scene.coordinates.map(c => this.map.project(c));
+            let progress = 0;
+
+            const animate = () => {
+                ctx.clearRect(0,0,canvas.width, canvas.height);
+                ctx.strokeStyle = scene.color || '#00ffaa';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const currentPoints = scene.coordinates.map(c => this.map.project(c));
+                ctx.moveTo(currentPoints[0].x, currentPoints[0].y);
+                currentPoints.forEach(p => ctx.lineTo(p.x, p.y));
+                ctx.stroke();
+
+                // Particle
+                progress += 0.01; if(progress > 1) progress = 0;
+                const idx = Math.floor(progress * (currentPoints.length - 1));
+                const p = currentPoints[idx];
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 10; ctx.shadowColor = scene.color || '#00ffaa';
+                ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill();
+
+                if(this.isPlaying) requestAnimationFrame(animate);
+            };
+            animate();
         }
 
         animateTrace(scene) {
@@ -662,6 +700,14 @@
             updates: { fuel: -20, stealth: +10 },
             camera: { center: [86.925, 27.988], zoom: 13, pitch: 60, bearing: 45 },
             duration: 3000
+        },
+        { 
+            subtitle: "ESTABLISHING SECURE DATA FLOW CORRIDOR", 
+            action: "flow",
+            color: "#3b82f6",
+            coordinates: [[86.925, 27.988], [86.935, 28.005], [86.95, 28.02]],
+            sky: { color: "#050505", horizon: "#1a1a2e" },
+            duration: 6000
         },
         { 
             subtitle: "KINETIC IMPACT DETECTED", 
