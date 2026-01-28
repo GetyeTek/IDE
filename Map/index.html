@@ -68,8 +68,10 @@
         .fab-outline { background: rgba(255,255,255,0.1); color: white; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
 
         /* Filters */
-        .filter-vhs { filter: contrast(1.1) brightness(1.1) sepia(0.2); }
-        .filter-night { filter: brightness(0.6) sepia(1) hue-rotate(100deg); }
+        .filter-night { filter: brightness(0.6) sepia(1) hue-rotate(100deg) contrast(1.2); }
+        .filter-blueprint { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.5); }
+        .filter-vhs { filter: contrast(1.1) saturate(1.2) sepia(0.2); animation: vhs-flicker 0.1s infinite; }
+        @keyframes vhs-flicker { 0% { opacity: 0.99; } 50% { opacity: 1; } 100% { opacity: 0.98; } }
     </style>
 </head>
 <body>
@@ -125,6 +127,7 @@
                 center: [0, 20], zoom: 2, pitch: 45
             });
 
+            this.narrator = window.speechSynthesis;
             this.map.on('load', () => {
                 document.getElementById('splash').style.opacity = '0';
                 document.getElementById('map-container').style.filter = 'brightness(1)';
@@ -145,18 +148,35 @@
 
         executeScene(scene) {
             return new Promise((resolve) => {
+                // 1. Atmosphere
+                document.getElementById('map-container').className = scene.filter ? `filter-${scene.filter}` : '';
+
+                // 2. Subtitles & Voice
                 const sub = document.getElementById('subtitle');
                 sub.innerText = scene.subtitle || '';
                 sub.classList.toggle('active', !!scene.subtitle);
-
-                if (scene.camera) {
-                    this.map.flyTo({
-                        ...scene.camera,
-                        duration: scene.duration || 3000,
-                        essential: true
-                    });
+                
+                if (scene.narrate && scene.subtitle) {
+                    const utterance = new SpeechSynthesisUtterance(scene.subtitle);
+                    utterance.rate = 0.95;
+                    this.narrator.speak(utterance);
                 }
 
+                // 3. Camera Archetypes
+                if (scene.camera) {
+                    if (scene.camera.type === 'orbit') {
+                        this.startOrbit(scene.camera, scene.duration);
+                    } else {
+                        this.map.flyTo({
+                            ...scene.camera,
+                            duration: scene.duration || 3000,
+                            essential: true
+                        });
+                    }
+                    if (scene.camera.shake) this.startShake(scene.camera.shake, scene.duration);
+                }
+
+                // 4. Action Layer
                 if (scene.action === 'draw') this.animateTrace(scene);
 
                 setTimeout(resolve, (scene.duration || 3000) + (scene.wait || 500));
@@ -176,13 +196,61 @@
             };
             draw();
         }
+
+        startOrbit(config, duration) {
+            let start = null;
+            const animate = (time) => {
+                if (!start) start = time;
+                const progress = time - start;
+                this.map.setBearing((progress / (duration/360)) % 360);
+                if (progress < duration) requestAnimationFrame(animate);
+            };
+            requestAnimationFrame(animate);
+        }
+
+        startShake(intensity, duration) {
+            const canvas = this.map.getCanvas();
+            if (window.navigator.vibrate) window.navigator.vibrate(duration / 4);
+            const start = Date.now();
+            const interval = setInterval(() => {
+                const elapsed = Date.now() - start;
+                if (elapsed > duration) {
+                    canvas.style.transform = '';
+                    clearInterval(interval);
+                    return;
+                }
+                canvas.style.transform = `translate(${(Math.random()-0.5)*intensity}px, ${(Math.random()-0.5)*intensity}px)`;
+            }, 50);
+        }
     }
 
     const director = new MapDirector();
 
     const demo = [
-        { subtitle: "Mission Start: Everest Recon", camera: { center: [86.925, 27.988], zoom: 13, pitch: 60 }, duration: 4000 },
-        { subtitle: "Ascending North Ridge", action: "draw", color: "#ff3366", coordinates: [[86.925, 27.988], [86.935, 28.005], [86.95, 28.02]], camera: { center: [86.95, 28.02], zoom: 14, pitch: 75, bearing: 40 }, duration: 5000 }
+        { 
+            subtitle: "INITIALIZING NIGHT VISION SURVEILLANCE", 
+            filter: "night", 
+            narrate: true, 
+            camera: { center: [86.925, 27.988], zoom: 12, pitch: 65 }, 
+            duration: 4000 
+        },
+        { 
+            subtitle: "STABILIZING ORBITAL VIEW", 
+            filter: "blueprint", 
+            narrate: true, 
+            action: "draw", 
+            color: "#00ffaa", 
+            coordinates: [[86.925, 27.988], [86.935, 28.005], [86.95, 28.02]], 
+            camera: { type: "orbit", center: [86.925, 27.988], duration: 6000 }, 
+            duration: 6000 
+        },
+        { 
+            subtitle: "WARNING: SEVERE TURBULENCE", 
+            filter: "vhs", 
+            narrate: true, 
+            camera: { center: [86.95, 28.02], zoom: 14, pitch: 80, shake: 15 }, 
+            duration: 4000 
+        }
     ];
     document.getElementById('json-input').value = JSON.stringify(demo, null, 2);
 </script>
