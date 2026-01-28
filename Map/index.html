@@ -106,6 +106,8 @@
         .filter-glitch { filter: hue-rotate(90deg) contrast(1.5); animation: glitch-anim 0.2s infinite; }
         .filter-hologram { filter: brightness(1.2) hue-rotate(180deg) saturate(2); }
         .filter-hologram::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: repeating-linear-gradient(0deg, rgba(0, 243, 255, 0.05) 0px, rgba(0, 243, 255, 0.05) 1px, transparent 1px, transparent 20px); pointer-events: none; }
+        .filter-surveillance { filter: contrast(1.2) brightness(0.9) saturate(0.5); }
+        .filter-surveillance::before { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; box-shadow: inset 0 0 100px rgba(255,0,0,0.2); z-index: 152; pointer-events: none; mix-blend-mode: color-dodge; }
         @keyframes vhs-flicker { 0% { opacity: 0.99; } 50% { opacity: 1; } 100% { opacity: 0.98; } }
         @keyframes glitch-anim { 0% { transform: translate(0); } 20% { transform: translate(-2px, 2px); } 40% { transform: translate(-2px, -2px); } 60% { transform: translate(2px, 2px); } 80% { transform: translate(2px, -2px); } 100% { transform: translate(0); } }
 
@@ -185,6 +187,17 @@
             const gain = this.ctx.createGain(); gain.gain.value = 0.02;
             osc.connect(gain); gain.connect(this.ctx.destination); osc.start();
             setTimeout(() => osc.stop(), 200);
+        }
+        playImpact() {
+            this.init();
+            const noise = this.ctx.createBufferSource();
+            const bufferSize = this.ctx.sampleRate * 2, buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate), data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1000;
+            const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.5, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 1.5);
+            noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+            noise.start();
         }
         init() {
             if (this.ctx) return;
@@ -360,6 +373,8 @@
                 if (scene.action === 'heatmap') this.addHeatmap(scene);
                 if (scene.action === 'extrude') this.addExtrusion(scene);
                 if (scene.action === 'radar') this.startRadar(scene.radar);
+                if (scene.action === 'blast') this.addBlast(scene);
+                if (scene.action === 'spotlight') this.addSpotlight(scene);
 
                 // 7. Transitions
                 if (scene.transition === 'flash') {
@@ -394,14 +409,18 @@
             
             const animate = () => {
                 ctx.clearRect(0,0,canvas.width, canvas.height);
-                ctx.fillStyle = type === 'rain' ? '#3b82f6' : (type === 'data' ? '#00ffaa' : '#fff');
+                ctx.fillStyle = type === 'rain' ? '#3b82f6' : (type === 'data' ? '#00ffaa' : (type === 'embers' ? '#ff4400' : '#fff'));
                 particles.forEach(p => {
                     if(type === 'data') {
                         ctx.fillText(Math.floor(Math.random()*2), p.x, p.y);
+                    } else if(type === 'embers') {
+                        ctx.beginPath(); ctx.arc(p.x, p.y, p.s/2, 0, Math.PI*2); ctx.fill();
+                        p.y -= p.s/2; p.x += Math.sin(p.y/20);
                     } else {
                         ctx.fillRect(p.x, p.y, type === 'rain' ? 1 : 3, type === 'rain' ? 10 : 3);
+                        p.y += p.s;
                     }
-                    p.y += p.s; if(p.y > canvas.height) p.y = -10;
+                    if(p.y > canvas.height || p.y < -10) p.y = (type === 'embers' ? canvas.height : -10);
                 });
                 if (this.moviePlaying) requestAnimationFrame(animate);
             };
@@ -447,24 +466,39 @@
             return [[center[0]-size, center[1]-size], [center[0]+size, center[1]-size], [center[0]+size, center[1]+size], [center[0]-size, center[1]+size], [center[0]-size, center[1]-size]];
         }
 
-        startRadar(config) {
-            const id = 'radar-' + Math.random().toString(36).substr(2,4);
-            let angle = 0;
-            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[]] } } });
-            this.map.addLayer({ id, type: 'fill', source: id, paint: { 'fill-color': config.color || '#00ff00', 'fill-opacity': 0.3 } });
+        addBlast(scene) {
+            const id = 'blast-' + Math.random().toString(36).substr(2,4);
+            this.sounds.playImpact();
+            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [[]] } } });
+            this.map.addLayer({ id, type: 'line', source: id, paint: { 'line-color': scene.color || '#ff4400', 'line-width': 2, 'line-opacity': 1 } });
             
-            const update = () => {
-                angle += 2; const radius = config.radius || 0.01; const center = config.center;
-                const coords = [center];
-                for(let i=0; i<=30; i++) {
-                    const rad = (angle + i) * Math.PI / 180;
+            let radius = 0;
+            const expand = () => {
+                radius += 0.001; const center = scene.center; const coords = [];
+                for(let i=0; i<=360; i+=10) {
+                    const rad = i * Math.PI / 180;
                     coords.push([center[0] + Math.cos(rad) * radius, center[1] + Math.sin(rad) * radius]);
                 }
-                coords.push(center);
-                const src = this.map.getSource(id); if(src) src.setData({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } });
-                if(this.currentStep < this.currentScript.length) requestAnimationFrame(update);
+                const src = this.map.getSource(id); if(src) {
+                    src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+                    this.map.setPaintProperty(id, 'line-opacity', 1 - (radius * 10));
+                    if(radius < 0.1) requestAnimationFrame(expand); else this.map.removeLayer(id);
+                }
             };
-            update();
+            expand();
+        }
+
+        addSpotlight(scene) {
+            const id = 'spot-' + Math.random().toString(36).substr(2,4);
+            const world = [[-180, 90], [180, 90], [180, -90], [-180, -90], [-180, 90]];
+            const center = scene.center; const r = 0.02;
+            const circle = [];
+            for(let i=0; i<=360; i+=10) {
+                const rad = i * Math.PI / 180;
+                circle.push([center[0] + Math.cos(rad) * r, center[1] + Math.sin(rad) * r]);
+            }
+            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [world, circle] } } });
+            this.map.addLayer({ id, type: 'fill', source: id, paint: { 'fill-color': '#000', 'fill-opacity': 0.7 } });
         }
 
         startOrbit(config, duration) {
@@ -499,13 +533,26 @@
     const demo = [
         { 
             id: "start",
-            subtitle: "CYBERNETIC UPLINK ESTABLISHED", 
-            filter: "hologram", 
-            weather: "data",
+            subtitle: "SATELLITE SURVEILLANCE ACTIVE", 
+            filter: "surveillance", 
+            weather: "embers",
             transition: "flash",
-            sun: { altitude: 10, azimuth: 200, color: "#00f3ff" },
             camera: { center: [86.925, 27.988], zoom: 12, pitch: 70 }, 
             duration: 4000 
+        },
+        { 
+            subtitle: "KINETIC IMPACT DETECTED", 
+            action: "blast",
+            center: [86.925, 27.988],
+            camera: { center: [86.925, 27.988], zoom: 14, shake: 20 },
+            duration: 3000
+        },
+        { 
+            subtitle: "INVESTIGATING SECTOR ZERO", 
+            action: "spotlight",
+            center: [86.935, 27.995],
+            camera: { center: [86.935, 27.995], zoom: 15, pitch: 45 },
+            duration: 5000
         },
         { 
             subtitle: "INITIATING 3D DATA EXTRUSION", 
