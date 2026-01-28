@@ -1,52 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Map Director v1</title>
-    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-    <!-- MapLibre CSS & JS -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Director Standalone</title>
     <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
-        body { margin: 0; padding: 0; background: #000; font-family: sans-serif; overflow: hidden; }
+        :root {
+            --cinematic-black: #050505;
+            --accent-color: #00f3ff;
+        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--cinematic-black); font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
-        
+
         /* Cinematic Overlays */
-        #ui-layer {
+        .viewport-frame {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; /* Let clicks pass through to map */
+            pointer-events: none;
             display: flex;
             flex-direction: column;
-            justify-content:间-between;
-        }
-
-        #subtitle-box {
-            margin-top: auto;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            font-size: 1.5rem;
-            min-height: 60px;
-            transition: opacity 0.5s;
-        }
-
-        #controls {
-            position: absolute;
-            top: 20px; left: 20px;
-            pointer-events: auto;
+            justify-content: space-between;
             z-index: 10;
         }
 
-        button {
-            padding: 10px 20px;
-            background: #ff4400;
+        .bar-top, .bar-bottom {
+            height: 12vh;
+            background: var(--cinematic-black);
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            padding: 0 40px;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #subtitle-text {
+            width: 100%;
+            text-align: center;
             color: white;
-            border: none;
+            font-size: 1.4rem;
+            font-weight: 300;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 14vh;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: auto;
+            z-index: 20;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 20px;
             cursor: pointer;
-            font-weight: bold;
-            border-radius: 4px;
+            backdrop-filter: blur(5px);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.7rem;
+        }
+
+        button:hover { background: var(--accent-color); color: black; }
+
+        #json-input {
+            position: absolute;
+            top: 14vh;
+            right: 20px;
+            width: 300px;
+            height: 200px;
+            background: rgba(0,0,0,0.8);
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 10px;
+            border: 1px solid #333;
+            padding: 10px;
+            pointer-events: auto;
+            z-index: 30;
         }
     </style>
 </head>
@@ -54,99 +91,160 @@
 
 <div id="map"></div>
 
-<div id="ui-layer">
-    <div id="controls">
-        <button onclick="startMovie()">START MOVIE</button>
+<div class="viewport-frame">
+    <div class="bar-top"></div>
+    <div class="controls">
+        <button onclick="director.play()">Run Script</button>
+        <button onclick="location.reload()">Reset</button>
     </div>
-    <div id="subtitle-box" id="subtitles">Press Start to begin...</div>
+    <div class="bar-bottom">
+        <div id="subtitle-text">Waiting for script...</div>
+    </div>
 </div>
 
+<textarea id="json-input" placeholder="Paste Movie JSON here..."></textarea>
+
 <script>
-    // 1. Initialize the Map with Satellite imagery
-    const map = new maplibregl.Map({
-        container: 'map',
-        style: {
-            "version": 8,
-            "sources": {
-                "raster-tiles": {
-                    "type": "raster",
-                    "tiles": [
-                        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                    ],
-                    "tileSize": 256
-                }
+/**
+ * THE MATERIAL FACTORY
+ * Defines visual styles for various annotation types
+ */
+const MaterialFactory = {
+    'neon-line': (id, color = '#00f3ff') => ({
+        type: 'line',
+        paint: {
+            'line-color': color,
+            'line-width': 4,
+            'line-blur': 3,
+            'line-opacity': 0.8
+        }
+    }),
+    'ink-trace': (id, color = '#000000') => ({
+        type: 'line',
+        paint: {
+            'line-color': color,
+            'line-width': 2,
+            'line-dasharray': [1, 1],
+            'line-opacity': 0.9
+        }
+    }),
+    'pulse-point': (id, color = '#ff4400') => ({
+        type: 'circle',
+        paint: {
+            'circle-radius': 10,
+            'circle-color': color,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#fff'
+        }
+    })
+};
+
+/**
+ * THE DIRECTOR ENGINE
+ * Handles camera, timing, and visual execution
+ */
+class MapDirector {
+    constructor() {
+        this.map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    'satellite': {
+                        type: 'raster',
+                        tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+                        tileSize: 256
+                    }
+                },
+                layers: [{ id: 'sat-layer', type: 'raster', source: 'satellite' }]
             },
-            "layers": [{
-                "id": "simple-tiles",
-                "type": "raster",
-                "source": "raster-tiles",
-                "minzoom": 0,
-                "maxzoom": 22
-            }]
-        },
-        center: [0, 20],
-        zoom: 2,
-        pitch: 45
-    });
+            center: [0, 0],
+            zoom: 2
+        });
+        this.script = [];
+    }
 
-    // 2. This is your "JSON" script
-    const movieScript = [
-        {
-            center: [-74.006, 40.7128], // NYC
-            zoom: 12,
-            pitch: 60,
-            bearing: 45,
-            duration: 4000,
-            subtitle: "We start our journey in the concrete jungle of New York."
-        },
-        {
-            center: [2.3522, 48.8566], // Paris
-            zoom: 13,
-            pitch: 40,
-            bearing: -20,
-            duration: 5000,
-            subtitle: "Then, we cross the Atlantic to the city of lights."
-        },
-        {
-            center: [139.6503, 35.6762], // Tokyo
-            zoom: 14,
-            pitch: 80,
-            bearing: 90,
-            duration: 6000,
-            subtitle: "Finally, we land in the neon heart of Tokyo."
+    async play() {
+        const input = document.getElementById('json-input').value;
+        try {
+            this.script = JSON.parse(input);
+            for (const scene of this.script) {
+                await this.executeScene(scene);
+            }
+        } catch (e) {
+            alert("JSON Error: " + e.message);
         }
-    ];
+    }
 
-    let currentStep = 0;
+    executeScene(scene) {
+        return new Promise((resolve) => {
+            console.log("Executing scene:", scene.subtitle);
+            
+            // 1. Update Subtitles
+            document.getElementById('subtitle-text').innerText = scene.subtitle || "";
 
-    async function startMovie() {
-        if (currentStep >= movieScript.length) {
-            document.getElementById('subtitle-box').innerText = "End of Tour.";
-            return;
-        }
+            // 2. Camera Movement
+            if (scene.camera) {
+                this.map.flyTo({
+                    ...scene.camera,
+                    duration: scene.duration || 2000,
+                    essential: true
+                });
+            }
 
-        const scene = movieScript[currentStep];
-        
-        // Update Subtitle
-        document.getElementById('subtitle-box').innerText = scene.subtitle;
+            // 3. Drawing Actions
+            if (scene.action === 'draw' && scene.material) {
+                this.addAnnotation(scene);
+            }
 
-        // Fly the camera
-        map.flyTo({
-            center: scene.center,
-            zoom: scene.zoom,
-            pitch: scene.pitch,
-            bearing: scene.bearing,
-            duration: scene.duration,
-            essential: true
+            setTimeout(resolve, (scene.duration || 2000) + (scene.wait || 500));
+        });
+    }
+
+    addAnnotation(scene) {
+        const id = 'layer-' + Math.random().toString(36).substr(2, 9);
+        const materialConfig = MaterialFactory[scene.material](id, scene.color);
+
+        this.map.addSource(id, {
+            type: 'geojson',
+            data: {
+                type: 'Feature',
+                geometry: { type: scene.geometryType || 'LineString', coordinates: scene.coordinates }
+            }
         });
 
-        // Wait for the duration, then do the next step
-        setTimeout(() => {
-            currentStep++;
-            startMovie();
-        }, scene.duration + 1000); // add 1s pause
+        this.map.addLayer({
+            id: id,
+            source: id,
+            ...materialConfig
+        });
     }
-</script>
+}
 
+const director = new MapDirector();
+
+// Default Sample Script
+const sampleScript = [
+    {
+        subtitle: "Our story begins in the Himalayas...",
+        camera: { center: [86.9250, 27.9881], zoom: 12, pitch: 60, bearing: 0 },
+        duration: 4000
+    },
+    {
+        subtitle: "Tracing the dangerous path to the summit.",
+        action: "draw",
+        material: "neon-line",
+        color: "#ff0055",
+        geometryType: "LineString",
+        coordinates: [
+            [86.9250, 27.9881], [86.9350, 27.9981], [86.9450, 28.0081]
+        ],
+        camera: { center: [86.9450, 28.0081], zoom: 14, pitch: 70, bearing: 45 },
+        duration: 3000
+    }
+];
+document.getElementById('json-input').value = JSON.stringify(sampleScript, null, 2);
+
+</script>
 </body>
 </html>
