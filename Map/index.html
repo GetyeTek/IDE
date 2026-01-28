@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="//cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init(); console.log('Director Studio Debugger Active');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Director Studio Mobile</title>
@@ -343,7 +345,7 @@
             if(document.getElementById('editor-sheet').classList.contains('open')) toggleSheet();
             this.sounds.init();
             try { if(this.recognition) this.recognition.start(); } catch(e) {}
-            
+            try { if(this.recognition) this.recognition.start(); } catch(e) { console.warn("Speech Recognition already active or blocked"); }
             this.isPlaying = true;
             this.currentWeatherType = null;
             this.sounds.stopAll();
@@ -363,8 +365,12 @@
             this.markers = [];
             this.currentStep = 0;
             
-            const raw = document.getElementById('json-input').value;
+            let raw = document.getElementById('json-input').value;
+            // Sanitize: Replace smart quotes and remove invisible characters
+            raw = raw.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\u200B/g, '');
+            
             try {
+                console.log("Attempting to parse JSON... length:", raw.length);
                 this.currentScript = JSON.parse(raw);
             } catch (e) {
                 alert("JSON Syntax Error: " + e.message);
@@ -380,13 +386,11 @@
                     }
                     this.currentStep++;
                 }
-            } catch (e) {
-                console.error("Scene Execution Error:", e);
-            } finally {
-                this.isPlaying = false; 
-                this.currentWeatherType = null;
-            }
-        }
+            } catch (e) { 
+                console.error("CRITICAL PARSE ERROR:", e);
+                console.log("RAW STRING AT ERROR:", raw);
+                alert("Script JSON Error: " + e.message + "\n\nCheck the Eruda console (gear icon) for details."); 
+            } finally { 
 
         evaluateCondition(cond) {
             if (!cond) return true;
