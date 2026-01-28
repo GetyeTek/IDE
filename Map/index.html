@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Director Studio Mobile</title>
+    <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #000; --accent: #3b82f6; --glass: rgba(18, 18, 20, 0.95);
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: white; }
+        
+        /* Map Container */
+        #map-container { position: absolute; width: 100%; height: 100%; filter: brightness(0); transition: filter 1.5s ease; }
+        #map { width: 100%; height: 100%; }
+
+        /* Loading Splash */
+        #splash { position: fixed; z-index: 1000; top:0; left:0; width:100%; height:100%; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 1s; }
+        .loader { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Bottom Sheet Editor */
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 70vh;
+            background: var(--glass); backdrop-filter: blur(25px);
+            border-top: 1px solid rgba(255,255,255,0.1); border-radius: 20px 20px 0 0;
+            z-index: 500; transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+            display: flex; flex-direction: column; pointer-events: auto;
+        }
+        .bottom-sheet.open { transform: translateY(0); }
+        .sheet-handle { width: 40px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 10px; margin: 12px auto; }
+
+        .editor-header { padding: 0 20px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .editor-header h3 { margin: 0; font-size: 0.9rem; letter-spacing: 1px; color: var(--accent); }
+
+        .editor-body { flex: 1; padding: 0 15px 15px; display: flex; flex-direction: column; }
+        #json-input {
+            flex: 1; background: #000; border: 1px solid #222; border-radius: 12px;
+            color: #00ffaa; font-family: 'Menlo', 'Monaco', monospace; font-size: 13px; padding: 15px; outline: none;
+            -webkit-appearance: none;
+        }
+
+        /* Cinematic HUD */
+        .hud-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; display: flex; flex-direction: column; justify-content: space-between; }
+        .cinema-bar { height: 15vh; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); }
+        .cinema-bar.bottom { 
+            height: 25vh; 
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 20%, transparent);
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            padding-bottom: calc(20px + var(--safe-bottom));
+        }
+
+        #subtitle { 
+            font-size: 1.2rem; font-weight: 300; text-align: center; padding: 0 30px; margin-bottom: 20px;
+            opacity: 0; transition: 0.5s; text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+        #subtitle.active { opacity: 1; }
+
+        .touch-controls { display: flex; gap: 10px; pointer-events: auto; }
+        .fab { 
+            background: white; color: black; border: none; padding: 14px 24px; border-radius: 30px;
+            font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+        }
+        .fab-outline { background: rgba(255,255,255,0.1); color: white; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+
+        /* Filters */
+        .filter-vhs { filter: contrast(1.1) brightness(1.1) sepia(0.2); }
+        .filter-night { filter: brightness(0.6) sepia(1) hue-rotate(100deg); }
+    </style>
+</head>
+<body>
+
+<div id="splash">
+    <div class="loader"></div>
+    <p style="margin-top: 20px; font-size: 0.7rem; letter-spacing: 3px; opacity: 0.6;">INITIALIZING SATELLITE</p>
+</div>
+
+<div id="map-container">
+    <div id="map"></div>
+</div>
+
+<div class="hud-overlay">
+    <div class="cinema-bar top"></div>
+    
+    <div class="cinema-bar bottom">
+        <div id="subtitle"></div>
+        <div class="touch-controls">
+            <button class="fab" onclick="director.play()">Launch Movie</button>
+            <button class="fab fab-outline" onclick="toggleSheet()">Edit Script</button>
+        </div>
+    </div>
+</div>
+
+<div class="bottom-sheet" id="editor-sheet">
+    <div class="sheet-handle" onclick="toggleSheet()"></div>
+    <div class="editor-header">
+        <h3>SCRIPT EDITOR</h3>
+        <button class="fab" style="padding: 8px 15px; font-size: 0.6rem;" onclick="toggleSheet()">Done</button>
+    </div>
+    <div class="editor-body">
+        <textarea id="json-input" spellcheck="false"></textarea>
+    </div>
+</div>
+
+<script>
+    const toggleSheet = () => document.getElementById('editor-sheet').classList.toggle('open');
+
+    class MapDirector {
+        constructor() {
+            this.map = new maplibregl.Map({
+                container: 'map',
+                style: {
+                    version: 8,
+                    sources: {
+                        'sat': { type: 'raster', tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 },
+                        'terrain': { type: 'raster-dem', url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json', tileSize: 256 }
+                    },
+                    layers: [{ id: 'sat', type: 'raster', source: 'sat' }],
+                    terrain: { source: 'terrain', exaggeration: 1.5 }
+                },
+                center: [0, 20], zoom: 2, pitch: 45
+            });
+
+            this.map.on('load', () => {
+                document.getElementById('splash').style.opacity = '0';
+                document.getElementById('map-container').style.filter = 'brightness(1)';
+                setTimeout(() => document.getElementById('splash').remove(), 1000);
+            });
+        }
+
+        async play() {
+            if(document.getElementById('editor-sheet').classList.contains('open')) toggleSheet();
+            
+            try {
+                const script = JSON.parse(document.getElementById('json-input').value);
+                for (const scene of script) {
+                    await this.executeScene(scene);
+                }
+            } catch (e) { alert("Script Error: " + e.message); }
+        }
+
+        executeScene(scene) {
+            return new Promise((resolve) => {
+                const sub = document.getElementById('subtitle');
+                sub.innerText = scene.subtitle || '';
+                sub.classList.toggle('active', !!scene.subtitle);
+
+                if (scene.camera) {
+                    this.map.flyTo({
+                        ...scene.camera,
+                        duration: scene.duration || 3000,
+                        essential: true
+                    });
+                }
+
+                if (scene.action === 'draw') this.animateTrace(scene);
+
+                setTimeout(resolve, (scene.duration || 3000) + (scene.wait || 500));
+            });
+        }
+
+        animateTrace(scene) {
+            const id = 't-' + Math.random().toString(36).substr(2, 4);
+            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [scene.coordinates[0]] } } });
+            this.map.addLayer({ id, source: id, type: 'line', paint: { 'line-color': scene.color || '#3b82f6', 'line-width': 4 } });
+
+            let step = 0;
+            const draw = () => {
+                if (step >= scene.coordinates.length) return;
+                this.map.getSource(id).setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: scene.coordinates.slice(0, ++step) } });
+                if (step < scene.coordinates.length) setTimeout(() => requestAnimationFrame(draw), scene.duration / scene.coordinates.length);
+            };
+            draw();
+        }
+    }
+
+    const director = new MapDirector();
+
+    const demo = [
+        { subtitle: "Mission Start: Everest Recon", camera: { center: [86.925, 27.988], zoom: 13, pitch: 60 }, duration: 4000 },
+        { subtitle: "Ascending North Ridge", action: "draw", color: "#ff3366", coordinates: [[86.925, 27.988], [86.935, 28.005], [86.95, 28.02]], camera: { center: [86.95, 28.02], zoom: 14, pitch: 75, bearing: 40 }, duration: 5000 }
+    ];
+    document.getElementById('json-input').value = JSON.stringify(demo, null, 2);
+</script>
+</body>
+</html>
