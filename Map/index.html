@@ -91,7 +91,24 @@
         .filter-night { filter: brightness(0.6) sepia(1) hue-rotate(100deg) contrast(1.2); }
         .filter-blueprint { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.5); }
         .filter-vhs { filter: contrast(1.1) saturate(1.2) sepia(0.2); animation: vhs-flicker 0.1s infinite; }
+        .filter-glitch { filter: hue-rotate(90deg) contrast(1.5); animation: glitch-anim 0.2s infinite; }
         @keyframes vhs-flicker { 0% { opacity: 0.99; } 50% { opacity: 1; } 100% { opacity: 0.98; } }
+        @keyframes glitch-anim { 0% { transform: translate(0); } 20% { transform: translate(-2px, 2px); } 40% { transform: translate(-2px, -2px); } 60% { transform: translate(2px, 2px); } 80% { transform: translate(2px, -2px); } 100% { transform: translate(0); } }
+
+        /* Intel Overlay */
+        #intel-container { position: absolute; top: 20px; right: 20px; width: 150px; height: 100px; border: 2px solid var(--accent); background: #000; border-radius: 8px; overflow: hidden; opacity: 0; transform: scale(0.8); transition: 0.5s; z-index: 200; pointer-events: auto; }
+        #intel-container.active { opacity: 1; transform: scale(1); }
+        #intel-img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Spatial Labels */
+        .spatial-label { color: white; background: rgba(0,0,0,0.7); padding: 4px 10px; border-radius: 4px; font-size: 10px; border: 1px solid var(--accent); white-space: nowrap; pointer-events: none; }
+
+        /* Timeline Scrubber */
+        .timeline-container { position: absolute; bottom: 85px; width: 80%; left: 10%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+        #timeline-progress { width: 0%; height: 100%; background: var(--accent); transition: width 0.1s linear; }
+
+        /* Weather Canvas */
+        #weather-canvas { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 10; }
     </style>
 </head>
 <body>
@@ -101,14 +118,17 @@
     <p style="margin-top: 20px; font-size: 0.7rem; letter-spacing: 3px; opacity: 0.6;">INITIALIZING SATELLITE</p>
 </div>
 
-<div id="map-container">
-    <div id="map"></div>
-</div>
+    <div id="map-container">
+        <div id="map"></div>
+        <canvas id="weather-canvas"></canvas>
+    </div>
+    <div id="intel-container"><img id="intel-img" src="" /></div>
 
 <div class="hud-overlay">
     <div class="cinema-bar top"></div>
     
     <div class="cinema-bar bottom">
+        <div class="timeline-container"><div id="timeline-progress"></div></div>
         <div id="subtitle"></div>
         <div class="touch-controls">
             <button class="fab" onclick="director.play()">Launch Movie</button>
@@ -135,6 +155,13 @@
         constructor() {
             this.ctx = null;
             this.nodes = {};
+        }
+        playStatic() {
+            this.init();
+            const osc = this.ctx.createOscillator(); osc.type = 'square'; osc.frequency.value = 100;
+            const gain = this.ctx.createGain(); gain.gain.value = 0.02;
+            osc.connect(gain); gain.connect(this.ctx.destination); osc.start();
+            setTimeout(() => osc.stop(), 200);
         }
         init() {
             if (this.ctx) return;
@@ -210,8 +237,22 @@
 
         executeScene(scene) {
             return new Promise((resolve) => {
-                // 1. Atmosphere
+                // 0. Timeline Progress
+                const totalSteps = this.currentScript.length;
+                const currentIdx = this.currentScript.indexOf(scene);
+                document.getElementById('timeline-progress').style.width = `${((currentIdx + 1) / totalSteps) * 100}%`;
+
+                // 1. Atmosphere & Weather
                 document.getElementById('map-container').className = scene.filter ? `filter-${scene.filter}` : '';
+                if (scene.weather) this.startWeather(scene.weather);
+
+                // 2. Intel Overlay
+                const intel = document.getElementById('intel-container');
+                if (scene.intel) {
+                    document.getElementById('intel-img').src = scene.intel;
+                    intel.classList.add('active');
+                    this.sounds.playStatic();
+                } else { intel.classList.remove('active'); }
 
                 // 2. Subtitles & Voice
                 const sub = document.getElementById('subtitle');
@@ -243,7 +284,11 @@
                 if (scene.sound === 'tech') this.sounds.playTech();
                 if (scene.sound === 'none') this.sounds.stopAll();
 
-                // 5. Marker Layer
+                // 5. Marker & Label Layer
+                if (scene.label) {
+                    const el = document.createElement('div'); el.className = 'spatial-label'; el.innerText = scene.label.text;
+                    new maplibregl.Marker(el).setLngLat(scene.label.coords).addTo(this.map);
+                }
                 if (scene.marker) {
                     const el = document.createElement('div');
                     el.className = `marker-${scene.marker.type}`;
@@ -279,6 +324,26 @@
             draw();
         }
 
+        startWeather(type) {
+            const canvas = document.getElementById('weather-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            let particles = [];
+            for(let i=0; i<100; i++) particles.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: Math.random()*5+2 });
+            
+            const animate = () => {
+                ctx.clearRect(0,0,canvas.width, canvas.height);
+                ctx.fillStyle = type === 'rain' ? '#3b82f6' : '#fff';
+                particles.forEach(p => {
+                    ctx.fillRect(p.x, p.y, type === 'rain' ? 1 : 3, type === 'rain' ? 10 : 3);
+                    p.y += p.s; if(p.y > canvas.height) p.y = -10;
+                });
+                if (this.moviePlaying) requestAnimationFrame(animate);
+            };
+            this.moviePlaying = true;
+            animate();
+        }
+
         startOrbit(config, duration) {
             let start = null;
             const animate = (time) => {
@@ -310,17 +375,19 @@
 
     const demo = [
         { 
-            subtitle: "APPROACHING SECTOR 7: WIND SPEEDS ELEVATED", 
+            subtitle: "WEATHER ADVISORY: HEAVY SNOW IN HIMALAYAS", 
             filter: "night", 
+            weather: "snow",
             sound: "wind",
-            narrate: true, 
+            label: { text: "MOUNT EVEREST BASE", coords: [86.925, 27.988] },
             camera: { center: [86.925, 27.988], zoom: 12, pitch: 65 }, 
             duration: 5000 
         },
         { 
-            subtitle: "TARGET ACQUIRED: DEPLOYING BEACON", 
+            subtitle: "SCANNING ARCHIVAL INTEL...", 
             filter: "blueprint", 
             sound: "tech",
+            intel: "https://images.unsplash.com/photo-1544281679-510d853f479d?auto=format&fit=crop&w=300",
             marker: { type: "beacon", coords: [86.925, 27.988] },
             action: "draw", 
             color: "#00ffaa", 
@@ -329,10 +396,10 @@
             duration: 7000 
         },
         { 
-            subtitle: "CRITICAL FAILURE: EVACUATE", 
-            filter: "vhs", 
-            marker: { type: "arrow", coords: [86.95, 28.02] },
-            camera: { center: [86.95, 28.02], zoom: 15, pitch: 85, shake: 20 }, 
+            subtitle: "SYSTEM GLITCH: SENSOR INTERFERENCE", 
+            filter: "glitch", 
+            weather: "rain",
+            camera: { center: [86.95, 28.02], zoom: 15, pitch: 85, shake: 25 }, 
             duration: 4000 
         }
     ];
