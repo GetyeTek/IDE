@@ -298,9 +298,15 @@
 
             this.map.on('movestart', () => document.getElementById('map-container').classList.add('moving'));
             this.map.on('move', () => {
-                const center = this.map.getCenter();
-                const elevation = this.map.queryTerrainElevation(center);
-                if (elevation) document.getElementById('hud-alt').innerText = `${Math.round(elevation)} m.a.s.l`;
+                try {
+                    const center = this.map.getCenter();
+                    if (this.map.getSource('terrain')) {
+                        const elevation = this.map.queryTerrainElevation(center);
+                        if (typeof elevation === 'number') {
+                            document.getElementById('hud-alt').innerText = `${Math.round(elevation)} m.a.s.l`;
+                        }
+                    }
+                } catch (e) {}
             });
 
             this.map.on('moveend', () => {
@@ -325,6 +331,7 @@
         async play() {
             if(document.getElementById('editor-sheet').classList.contains('open')) toggleSheet();
             this.sounds.init();
+            this.narrator.cancel(); // Stop any previous reading
             this.isPlaying = true;
             this.currentWeatherType = null;
             this.sounds.stopAll();
@@ -411,25 +418,34 @@
                     return;
                 }
 
-                // 4. Subtitles & Voice
+                // 4. Subtitles & Synchronized Voice
                 const sub = document.getElementById('subtitle');
                 sub.innerText = scene.subtitle || '';
                 sub.classList.toggle('active', !!scene.subtitle);
+                
+                let voiceFinished = true;
                 if (scene.narrate && scene.subtitle) {
+                    voiceFinished = false;
                     const u = new SpeechSynthesisUtterance(scene.subtitle);
-                    u.rate = 0.95; this.narrator.speak(u);
+                    u.rate = 1.0; 
+                    u.onend = () => { voiceFinished = true; };
+                    u.onerror = () => { voiceFinished = true; };
+                    this.narrator.speak(u);
                 }
 
-                // 5. Camera
+                // 5. Camera with Interruption Handling
                 if (scene.camera) {
-                    if (scene.camera.type === 'orbit') {
-                        this.startOrbit(scene.camera, scene.duration);
-                    } else {
-                        this.map.flyTo({
-                            ...scene.camera,
-                            duration: scene.duration || 3000
-                        });
-                    }
+                    try {
+                        if (scene.camera.type === 'orbit') {
+                            this.startOrbit(scene.camera, scene.duration);
+                        } else {
+                            this.map.flyTo({
+                                ...scene.camera,
+                                duration: scene.duration || 3000,
+                                essential: true
+                            });
+                        }
+                    } catch (e) { console.warn("Camera transition interrupted"); }
                     if (scene.camera.shake) this.startShake(scene.camera.shake, scene.duration);
                 }
 
@@ -453,7 +469,13 @@
                     this.markers.push(m);
                 }
 
-                setTimeout(resolve, (scene.duration || 3000) + (scene.wait || 500));
+                // Wait for both the visual duration AND the narration to finish
+                const checkFinish = setInterval(() => {
+                    if (voiceFinished) {
+                        clearInterval(checkFinish);
+                        setTimeout(resolve, scene.wait || 500);
+                    }
+                }, 100);
             });
         }
 
