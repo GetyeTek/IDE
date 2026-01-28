@@ -391,6 +391,9 @@
                 console.log("RAW STRING AT ERROR:", raw);
                 alert("Script JSON Error: " + e.message + "\n\nCheck the Eruda console (gear icon) for details."); 
             } finally { 
+                this.isPlaying = false;
+            }
+        }
 
         evaluateCondition(cond) {
             if (!cond) return true;
@@ -808,16 +811,8 @@
     "duration": 3000
   }
 ];
-    const demo = [
-        { "id": "intro", "subtitle": "NEURAL LINK ESTABLISHED.", "filter": "vhs", "camera": { "center": [0, 20], "zoom": 2 }, "duration": 2000, "transition": "flash" },
-        { "subtitle": "LOCATING ANOMALY: TOKYO SECTOR", "camera": { "center": [139.6503, 35.6762], "zoom": 12, "pitch": 60 }, "weather": "data", "duration": 4000 },
-        { "id": "choice_point", "subtitle": "ANOMALY IDENTIFIED. SELECT RESPONSE.", "choices": [{ "label": "RECON", "scene_id": "recon" }, { "label": "STRIKE", "scene_id": "strike" }] },
-        { "id": "recon", "subtitle": "INITIATING RADAR SWEEP", "filter": "hologram", "action": "radar", "radar": { "center": [139.6503, 35.6762], "radius": 0.02, "color": "#00ffff" }, "duration": 4000 },
-        { "id": "strike", "subtitle": "KINETIC STRIKE AUTHORIZED", "filter": "glitch", "action": "blast", "center": [139.6503, 35.6762], "camera": { "zoom": 16, "shake": 40 }, "duration": 3000 },
-        { "subtitle": "RELOCATING TO DUBAI HUB", "camera": { "center": [55.2708, 25.2048], "zoom": 14, "pitch": 70 }, "filter": "night", "lens": true, "duration": 4000 },
-        { "subtitle": "STRUCTURAL SCAN ACTIVE", "action": "extrude", "color": "#ffcc00", "data": [{ "c": [55.274, 25.197], "h": 828 }, { "c": [55.270, 25.200], "h": 400 }], "camera": { "type": "orbit", "duration": 6000 }, "duration": 6000 },
-        { "subtitle": "DATA UPLOAD COMPLETE", "filter": "blueprint", "action": "flow", "color": "#00ffaa", "coordinates": [[55.274, 25.197], [55.29, 25.22]], "duration": 4000 }
-    ];
+
+    document.getElementById('json-input').value = JSON.stringify(demo, null, 2);
 </script>
 </body>
 </html>
