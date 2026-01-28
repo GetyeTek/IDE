@@ -5,12 +5,13 @@
     <script>eruda.init(); console.log('Director Studio Debugger Active');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Director Studio Mobile</title>
+    <title>Geo-Scholar: Ethiopia & The Horn</title>
     <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
         :root {
-            --bg: #000; --accent: #3b82f6; --glass: rgba(18, 18, 20, 0.95);
+            --bg: #0a0a0c; --accent: #60a5fa; --glass: rgba(15, 23, 42, 0.9);
+            --text-main: #f1f5f9; --highlight: #fbbf24;
             --safe-bottom: env(safe-area-inset-bottom);
         }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: white; }
@@ -52,10 +53,13 @@
         }
 
         #subtitle { 
-            font-size: 1.2rem; font-weight: 300; text-align: center; padding: 0 30px; margin-bottom: 20px;
-            opacity: 0; transition: 0.5s; text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            font-size: 1.05rem; line-height: 1.6; font-weight: 400; text-align: left; 
+            padding: 25px; margin-bottom: 20px; background: var(--glass); 
+            border-radius: 12px; border-left: 4px solid var(--accent);
+            max-width: 85%; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            opacity: 0; transform: translateY(20px); transition: 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        #subtitle.active { opacity: 1; }
+        #subtitle.active { opacity: 1; transform: translateY(0); }
 
         .touch-controls { display: flex; gap: 10px; pointer-events: auto; }
         
@@ -145,10 +149,12 @@
     <div id="choice-buttons"></div>
 </div>
 
-<div id="intel-container">
-    <img id="intel-img" style="display:none" />
-    <video id="intel-video" style="display:none" autoplay loop muted playsinline></video>
-</div>
+    <div id="academic-hud" style="position:fixed; top:20px; left:20px; z-index:700; font-family:monospace; background:rgba(0,0,0,0.8); padding:10px; border:1px solid var(--accent); border-radius:4px;">
+        <div style="color:var(--accent); font-size:10px;">PHYSIOGRAPHIC UNIT</div>
+        <div id="hud-unit" style="color:white; font-size:14px; margin-bottom:10px;">GENERAL OVERVIEW</div>
+        <div style="color:var(--accent); font-size:10px;">ELEVATION (EST.)</div>
+        <div id="hud-alt" style="color:var(--highlight); font-size:18px;">--- m.a.s.l</div>
+    </div>
 
 <div class="hud-overlay">
     <div class="cinema-bar top"></div>
@@ -291,6 +297,12 @@
             });
 
             this.map.on('movestart', () => document.getElementById('map-container').classList.add('moving'));
+            this.map.on('move', () => {
+                const center = this.map.getCenter();
+                const elevation = this.map.queryTerrainElevation(center);
+                if (elevation) document.getElementById('hud-alt').innerText = `${Math.round(elevation)} m.a.s.l`;
+            });
+
             this.map.on('moveend', () => {
                 document.getElementById('map-container').classList.remove('moving');
                 this.sounds.updatePanners(this.map);
@@ -372,6 +384,7 @@
                 // 1. Atmosphere / Sky Fix
                 document.getElementById('map-container').className = scene.filter ? `filter-${scene.filter}` : '';
                 if (scene.weather) this.startWeather(scene.weather);
+                if (scene.unit) document.getElementById('hud-unit').innerText = scene.unit;
                 
                 if (scene.sky || scene.fog) {
                     this.map.setSky({
@@ -590,7 +603,45 @@
         { "id": "dubai", "subtitle": "TARGET SECURED. RELOCATING TO DUBAI HUB.", "camera": { "center": [55.2708, 25.2048], "zoom": 14, "pitch": 70 }, "duration": 4000 },
         { "id": "end", "subtitle": "LINK TERMINATED.", "camera": { "zoom": 2 }, "duration": 2000 }
     ];
-    document.getElementById('json-input').value = JSON.stringify(demo, null, 2);
+    const textbook = [
+        {
+            "id": "ch3_intro",
+            "unit": "ETHIOPIA & THE HORN",
+            "subtitle": "CHAPTER 3: THE TOPOGRAPHY OF ETHIOPIA. The topography is largely determined by the geologic activities of the Cenozoic Era. The uplifting of the Arabo-Ethiopian swell and Trapean lava have given rise to an outward sloping highland plateau.",
+            "camera": { "center": [39.5, 9.0], "zoom": 5.5, "pitch": 30, "bearing": 0 },
+            "duration": 8000,
+            "narrate": true
+        },
+        {
+            "id": "western_highlands",
+            "unit": "WESTERN HIGHLANDS",
+            "subtitle": "The Western Highlands make up 44% of the country. This region includes the Tigray Plateau, North Central Massifs, and the Shewa Plateau. More than 50% of the landmass is above 1,000 meters.",
+            "camera": { "center": [37.5, 11.5], "zoom": 7, "pitch": 50, "bearing": -10 },
+            "duration": 7000,
+            "narrate": true
+        },
+        {
+            "id": "ras_dashen",
+            "unit": "SIMEN MOUNTAINS",
+            "subtitle": "MOUNT RAS DASHEN (4,620 m.a.s.l): Located in the North Central Massifs, it is the fourth highest mountain in Africa and the highest point in Ethiopia.",
+            "camera": { "center": [38.37, 13.23], "zoom": 11, "pitch": 75, "bearing": 45 },
+            "marker": { "type": "beacon", "coords": [38.37, 13.23] },
+            "action": "extrude",
+            "color": "#fbbf24",
+            "data": [{"c": [38.37, 13.23], "h": 4620}],
+            "duration": 10000,
+            "narrate": true
+        },
+        {
+            "id": "rift_valley",
+            "unit": "RIFT VALLEY",
+            "subtitle": "THE RIFT VALLEY: A structural depression formed by faulting. It extends from the Afar Triangle to Chew Bahir. Elevation drops to 125m below sea level at the Kobar Sink (Dallol).",
+            "camera": { "center": [40.5, 12.0], "zoom": 8, "pitch": 45, "bearing": 0 },
+            "duration": 9000,
+            "narrate": true
+        }
+    ];
+    document.getElementById('json-input').value = JSON.stringify(textbook, null, 2);
 </script>
 </body>
 </html>
