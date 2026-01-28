@@ -712,58 +712,90 @@
     const director = new MapDirector();
 
     const demo = [
-        { 
-            id: "start",
-            subtitle: "ESTABLISHING SECURE SATELLITE LINK...", 
-            filter: "surveillance", 
-            fog: { color: '#000000' },
-            transition: "flash",
-            camera: { center: [-122.4194, 37.7749], zoom: 2, pitch: 0 }, 
-            duration: 2000 
-        },
-        { 
-            subtitle: "ZOOMING TO SECTOR ALPHA: SAN FRANCISCO", 
-            camera: { center: [-122.4194, 37.7749], zoom: 14, pitch: 60, bearing: -20 },
-            weather: "data",
-            duration: 4000
-        },
-        { 
-            subtitle: "KINETIC IMPACT DETECTED!", 
-            action: "blast", center: [-122.4194, 37.7749], color: "#ff0055",
-            camera: { zoom: 16, shake: 30 },
-            duration: 2000
-        },
-        { 
-            subtitle: "LENS MODE: THERMAL SCAN", 
-            lens: "thermal",
-            filter: "night",
-            marker: { type: "beacon", coords: [-122.4194, 37.7749], sound: "tech" },
-            camera: { type: "orbit", center: [-122.4194, 37.7749], duration: 5000 },
-            duration: 5000
-        },
-        { 
-            subtitle: "INITIALIZING 3D INFRASTRUCTURE EXTRUSION", 
-            action: "extrude",
-            color: "#00ffaa",
-            data: [{ c: [-122.4194, 37.7749], h: 500 }, { c: [-122.422, 37.776], h: 800 }, { c: [-122.415, 37.773], h: 300 }],
-            camera: { zoom: 15, pitch: 75, bearing: 90 },
-            duration: 4000
-        },
-        { 
-            subtitle: "ANALYZING DATA FLOWS", 
-            action: "flow",
-            color: "#3b82f6",
-            coordinates: [[-122.4194, 37.7749], [-122.425, 37.780], [-122.430, 37.785]],
-            duration: 5000
-        },
-        { 
-            subtitle: "MISSION COMPLETE. RETURNING TO ORBIT.", 
-            filter: "blueprint",
-            sky: { color: "#000000", horizon: "#001133" },
-            camera: { center: [-122.4194, 37.7749], zoom: 2, pitch: 0, bearing: 0 },
-            duration: 4000
-        }
-    ];
+  {
+    "id": "intro",
+    "subtitle": "INITIALIZING NEURAL LINK... GLOBAL SURVEILLANCE ACTIVE.",
+    "narrate": true,
+    "filter": "vhs",
+    "camera": { "center": [0, 20], "zoom": 2, "pitch": 0 },
+    "duration": 3000,
+    "transition": "flash"
+  },
+  {
+    "id": "tokyo_zoom",
+    "subtitle": "INTERCEPTING SIGNAL: TOKYO SECTOR.",
+    "camera": { "center": [139.6503, 35.6762], "zoom": 12, "pitch": 60, "bearing": 45 },
+    "weather": "data",
+    "duration": 4000,
+    "intel": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=400"
+  },
+  {
+    "id": "choice_point",
+    "subtitle": "ANOMALY DETECTED. SELECT OPERATIONAL MODE.",
+    "camera": { "type": "orbit", "duration": 10000 },
+    "choices": [
+      { "label": "RECON SCAN", "scene_id": "recon_path" },
+      { "label": "KINETIC STRIKE", "scene_id": "strike_path" }
+    ]
+  },
+  {
+    "id": "recon_path",
+    "subtitle": "INITIATING HIGH-RES RADAR SWEEP.",
+    "filter": "hologram",
+    "action": "radar",
+    "radar": { "center": [139.6503, 35.6762], "radius": 0.02, "color": "#00ffff" },
+    "camera": { "zoom": 15, "pitch": 80 },
+    "duration": 5000,
+    "updates": { "stealth": 100 }
+  },
+  {
+    "id": "dubai_transition",
+    "subtitle": "RELOCATING TO DUBAI HUB...",
+    "camera": { "center": [55.2708, 25.2048], "zoom": 14, "pitch": 70, "bearing": -30 },
+    "filter": "night",
+    "lens": true,
+    "duration": 4000
+  },
+  {
+    "id": "strike_path",
+    "subtitle": "KINETIC IMPACT INBOUND.",
+    "filter": "glitch",
+    "weather": "embers",
+    "action": "blast",
+    "center": [139.6503, 35.6762],
+    "camera": { "zoom": 17, "shake": 50 },
+    "duration": 3000,
+    "updates": { "stealth": 10 }
+  },
+  {
+    "id": "infrastructure",
+    "subtitle": "ANALYZING STRUCTURAL VULNERABILITIES.",
+    "action": "extrude",
+    "color": "#ffcc00",
+    "data": [
+      { "c": [55.274, 25.197], "h": 828 },
+      { "c": [55.270, 25.200], "h": 400 },
+      { "c": [55.278, 25.205], "h": 600 }
+    ],
+    "camera": { "center": [55.274, 25.197], "zoom": 15, "pitch": 75, "type": "orbit" },
+    "duration": 6000
+  },
+  {
+    "id": "final_flow",
+    "subtitle": "EXTRACTION COMPLETE. UPLOADING INTEL.",
+    "filter": "blueprint",
+    "action": "flow",
+    "color": "#00ffaa",
+    "coordinates": [[55.274, 25.197], [55.280, 25.210], [55.300, 25.230]],
+    "camera": { "zoom": 12, "pitch": 0, "bearing": 0 },
+    "duration": 5000
+  },
+  {
+    "subtitle": "SATELLITE LINK TERMINATED.",
+    "camera": { "zoom": 2 },
+    "duration": 3000
+  }
+];
     document.getElementById('json-input').value = JSON.stringify(demo, null, 2);
 </script>
 </body>
