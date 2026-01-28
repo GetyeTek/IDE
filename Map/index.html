@@ -99,7 +99,9 @@
 
         /* Filters */
         .filter-night { filter: brightness(0.6) sepia(1) hue-rotate(100deg) contrast(1.2); }
+        .filter-night::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); background-size: 100% 2px, 3px 100%; pointer-events: none; }
         .filter-blueprint { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.5); }
+        .filter-blueprint::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background-image: radial-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px); background-size: 20px 20px; pointer-events: none; }
         .filter-vhs { filter: contrast(1.1) saturate(1.2) sepia(0.2); animation: vhs-flicker 0.1s infinite; }
         .filter-glitch { filter: hue-rotate(90deg) contrast(1.5); animation: glitch-anim 0.2s infinite; }
         @keyframes vhs-flicker { 0% { opacity: 0.99; } 50% { opacity: 1; } 100% { opacity: 0.98; } }
@@ -243,16 +245,19 @@
         async play() {
             if(document.getElementById('editor-sheet').classList.contains('open')) toggleSheet();
             this.sounds.init();
+            this.sounds.stopAll();
             this.markers.forEach(m => m.remove());
             this.markers = [];
-            document.getElementById('timeline-progress').style.width = '0%';
+            this.currentStep = 0;
             
             try {
                 this.currentScript = JSON.parse(document.getElementById('json-input').value);
-                for (const scene of this.currentScript) {
+                while (this.currentStep < this.currentScript.length) {
+                    const scene = this.currentScript[this.currentStep];
                     await this.executeScene(scene);
+                    this.currentStep++;
                 }
-            } catch (e) { alert("Script Error: " + e.message); }
+            } catch (e) { console.error(e); alert("Script Error: " + e.message); }
         }
 
         executeScene(scene) {
@@ -474,10 +479,9 @@
             subtitle: "SOUTHERN APPROACH SECURE. DEPLOYING DRONE.", 
             intel: "https://www.w3schools.com/html/mov_bbb.mp4",
             is_video: true,
-            camera: { type: "orbit", center: [86.925, 27.988] },
+            camera: { type: "orbit", center: [86.925, 27.988], duration: 5000 }, 
             duration: 5000
-        }
-    ];
+        },
         { 
             subtitle: "WEATHER ADVISORY: HEAVY SNOW IN HIMALAYAS", 
             filter: "night", 
