@@ -91,6 +91,25 @@
         .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 150; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 100%); }
         .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 151; opacity: 0.05; background: url('https://grainy-gradients.vercel.app/noise.svg'); }
         
+        /* Kinetic Blur */
+        .moving { filter: blur(2px) saturate(1.2); transition: filter 0.3s; }
+
+        /* Lens Scope System */
+        #lens-scope {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 250px; height: 250px; border-radius: 50%;
+            border: 2px solid var(--accent); box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);
+            pointer-events: none; z-index: 400; display: none;
+            overflow: hidden;
+        }
+        #lens-scope.active { display: block; animation: scope-intro 0.5s ease-out; }
+        .scope-overlay { position: absolute; top:0; left:0; width:100%; height:100%; backdrop-filter: invert(1) hue-rotate(180deg) brightness(1.5); opacity: 0.4; }
+        @keyframes scope-intro { from { width: 0; height: 0; opacity: 0; } to { width: 250px; height: 250px; opacity: 1; } }
+
+        /* Scanline */
+        .scan-line { position: absolute; top: 0; width: 100%; height: 2px; background: var(--accent); opacity: 0.3; animation: scan 4s linear infinite; }
+        @keyframes scan { from { top: 0; } to { top: 100%; } }
+        
         /* Branching UI */
         #choice-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 600; pointer-events: auto; }
         #choice-overlay.active { display: flex; }
@@ -137,6 +156,7 @@
     <div id="map-container">
         <div id="map"></div>
         <canvas id="weather-canvas"></canvas>
+        <div id="lens-scope"><div class="scope-overlay"></div><div class="scan-line"></div></div>
     </div>
     <div class="vignette"></div>
     <div class="grain"></div>
@@ -180,6 +200,33 @@
         constructor() {
             this.ctx = null;
             this.nodes = {};
+            this.panners = new Map();
+        }
+        init() {
+            if (this.ctx) return;
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        playSpatial(id, coords, type = 'tech') {
+            this.init();
+            const panner = this.ctx.createPanner();
+            panner.panningModel = 'HRTF';
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type === 'tech' ? 'sine' : 'sawtooth';
+            osc.frequency.value = type === 'tech' ? 440 : 110;
+            gain.gain.value = 0.1;
+            osc.connect(gain); gain.connect(panner); panner.connect(this.ctx.destination);
+            osc.start();
+            this.panners.set(id, { panner, osc, coords });
+        }
+        updatePanners(map) {
+            if (!this.ctx) return;
+            const cam = map.getCenter();
+            this.panners.forEach((p, id) => {
+                const dx = p.coords[0] - cam.lng;
+                const dy = p.coords[1] - cam.lat;
+                p.panner.setPosition(dx * 100, dy * 100, -0.5);
+            });
         }
         playStatic() {
             this.init();
@@ -199,10 +246,6 @@
             noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
             noise.start();
         }
-        init() {
-            if (this.ctx) return;
-            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        }
         playWind(intensity = 0.5) {
             this.init();
             const bufferSize = 2 * this.ctx.sampleRate, noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate), output = noiseBuffer.getChannelData(0);
@@ -214,20 +257,10 @@
             whiteNoise.start();
             this.nodes.wind = { source: whiteNoise, filter, gain };
         }
-        playTech() {
-            this.init();
-            const osc = this.ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 50;
-            const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 400;
-            const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.5;
-            const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 200;
-            const gain = this.ctx.createGain(); gain.gain.value = 0.05;
-            lfo.connect(lfoGain); lfoGain.connect(filter.frequency); osc.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
-            osc.start(); lfo.start();
-            this.nodes.tech = { osc, lfo };
-        }
         stopAll() {
             Object.values(this.nodes).forEach(n => { if(n.source) n.source.stop(); if(n.osc) n.osc.stop(); });
-            this.nodes = {};
+            this.panners.forEach(p => p.osc.stop());
+            this.nodes = {}; this.panners.clear();
         }
     }
 
@@ -235,6 +268,7 @@
         constructor() {
             this.sounds = new SoundEngine();
             this.markers = [];
+            this.state = { fuel: 100, intel: 0, stealth: 100 };
             this.map = new maplibregl.Map({
                 container: 'map',
                 style: {
@@ -250,15 +284,47 @@
             });
 
             this.narrator = window.speechSynthesis;
+            this.initVoice();
             this.map.on('load', () => {
                 document.getElementById('splash').style.opacity = '0';
                 document.getElementById('map-container').style.filter = 'brightness(1)';
                 setTimeout(() => document.getElementById('splash').remove(), 1000);
+                this.startBRollTimer();
             });
+
+            this.map.on('movestart', () => document.getElementById('map-container').classList.add('moving'));
+            this.map.on('moveend', () => {
+                document.getElementById('map-container').classList.remove('moving');
+                this.sounds.updatePanners(this.map);
+            });
+        }
+
+        initVoice() {
+            const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!Speech) return;
+            this.recognition = new Speech();
+            this.recognition.continuous = true;
+            this.recognition.onresult = (e) => {
+                const cmd = e.results[e.results.length-1][0].transcript.toLowerCase();
+                console.log("Voice Command:", cmd);
+                const match = this.currentScript?.find(s => s.voice_trigger && cmd.includes(s.voice_trigger));
+                if (match) this.executeScene(match);
+            };
+            this.recognition.start();
+        }
+
+        startBRollTimer() {
+            setInterval(() => {
+                if (!this.isPlaying && Math.random() > 0.7) {
+                    const c = this.map.getCenter();
+                    this.map.easeTo({ center: [c.lng + (Math.random()-0.5)*0.01, c.lat + (Math.random()-0.5)*0.01], duration: 10000 });
+                }
+            }, 15000);
         }
 
         async play() {
             if(document.getElementById('editor-sheet').classList.contains('open')) toggleSheet();
+            this.isPlaying = true;
             this.sounds.init();
             this.sounds.stopAll();
             this.markers.forEach(m => m.remove());
@@ -269,10 +335,21 @@
                 this.currentScript = JSON.parse(document.getElementById('json-input').value);
                 while (this.currentStep < this.currentScript.length) {
                     const scene = this.currentScript[this.currentStep];
-                    await this.executeScene(scene);
+                    if (this.evaluateCondition(scene.condition)) {
+                        await this.executeScene(scene);
+                        if (scene.updates) Object.assign(this.state, scene.updates);
+                    }
                     this.currentStep++;
                 }
-            } catch (e) { console.error(e); alert("Script Error: " + e.message); }
+            } catch (e) { console.error(e); } finally { this.isPlaying = false; }
+        }
+
+        evaluateCondition(cond) {
+            if (!cond) return true;
+            try { 
+                const func = new Function('state', `return ${cond}`);
+                return func(this.state);
+            } catch(e) { return true; }
         }
 
         executeScene(scene) {
@@ -285,6 +362,15 @@
                 // 1. Atmosphere & Weather
                 document.getElementById('map-container').className = scene.filter ? `filter-${scene.filter}` : '';
                 if (scene.weather) this.startWeather(scene.weather);
+                if (scene.fog) {
+                    this.map.setFog({
+                        'range': [0.5, 10], 'color': scene.fog.color || '#ffffff', 'horizon-blend': 0.1
+                    });
+                } else { this.map.setFog(null); }
+
+                // Lens Logic
+                const lens = document.getElementById('lens-scope');
+                lens.classList.toggle('active', !!scene.lens);
 
                 // 2. Intel Overlay (Image or Video)
                 const intel = document.getElementById('intel-container');
@@ -364,8 +450,10 @@
                             el.appendChild(ring);
                         }
                     }
-                    const m = new maplibregl.Marker(el).setLngLat(scene.marker.coords).addTo(this.map);
+                    const m = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' })
+                        .setLngLat(scene.marker.coords).addTo(this.map);
                     this.markers.push(m);
+                    if(scene.marker.sound) this.sounds.playSpatial(Math.random(), scene.marker.coords, scene.marker.sound);
                 }
 
                 // 6. Action Layer
@@ -553,12 +641,27 @@
     const demo = [
         { 
             id: "start",
-            subtitle: "SATELLITE SURVEILLANCE ACTIVE", 
+            subtitle: "SATELLITE SURVEILLANCE ACTIVE. FOG DEPTH INITIALIZED.", 
             filter: "surveillance", 
             weather: "embers",
+            fog: { color: '#242b31' },
             transition: "flash",
             camera: { center: [86.925, 27.988], zoom: 12, pitch: 70 }, 
             duration: 4000 
+        },
+        { 
+            subtitle: "LENS SCAN: DETECTING THERMAL SIGNATURES", 
+            lens: "thermal",
+            marker: { type: "beacon", coords: [86.935, 27.995], sound: "tech" },
+            camera: { center: [86.935, 27.995], zoom: 15, pitch: 45 },
+            duration: 5000
+        },
+        { 
+            subtitle: "CHECKING FUEL LEVELS...", 
+            condition: "state.fuel > 50",
+            updates: { fuel: -20, stealth: +10 },
+            camera: { center: [86.925, 27.988], zoom: 13, pitch: 60, bearing: 45 },
+            duration: 3000
         },
         { 
             subtitle: "KINETIC IMPACT DETECTED", 
