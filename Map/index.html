@@ -501,6 +501,26 @@
             this.map.addLayer({ id, type: 'fill', source: id, paint: { 'fill-color': '#000', 'fill-opacity': 0.7 } });
         }
 
+        startRadar(config) {
+            const id = 'radar-' + Math.random().toString(36).substr(2,4);
+            let angle = 0;
+            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[]] } } });
+            this.map.addLayer({ id, type: 'fill', source: id, paint: { 'fill-color': config.color || '#00ff00', 'fill-opacity': 0.3 } });
+            
+            const update = () => {
+                angle += 2; const radius = config.radius || 0.01; const center = config.center;
+                const coords = [center];
+                for(let i=0; i<=30; i++) {
+                    const rad = (angle + i) * Math.PI / 180;
+                    coords.push([center[0] + Math.cos(rad) * radius, center[1] + Math.sin(rad) * radius]);
+                }
+                coords.push(center);
+                const src = this.map.getSource(id); if(src) src.setData({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } });
+                if(this.currentStep < this.currentScript.length) requestAnimationFrame(update);
+            };
+            update();
+        }
+
         startOrbit(config, duration) {
             let start = null;
             const animate = (time) => {
