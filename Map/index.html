@@ -87,6 +87,16 @@
         }
         .fab-outline { background: rgba(255,255,255,0.1); color: white; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
 
+        /* Post-Processing Overlays */
+        .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 150; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 100%); }
+        .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 151; opacity: 0.05; background: url('https://grainy-gradients.vercel.app/noise.svg'); }
+        
+        /* Branching UI */
+        #choice-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 600; pointer-events: auto; }
+        #choice-overlay.active { display: flex; }
+        .choice-btn { background: var(--accent); color: white; border: none; padding: 15px 40px; margin: 10px; border-radius: 50px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
+        .choice-btn:hover { transform: scale(1.1); box-shadow: 0 0 20px var(--accent); }
+
         /* Filters */
         .filter-night { filter: brightness(0.6) sepia(1) hue-rotate(100deg) contrast(1.2); }
         .filter-blueprint { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.5); }
@@ -122,7 +132,16 @@
         <div id="map"></div>
         <canvas id="weather-canvas"></canvas>
     </div>
-    <div id="intel-container"><img id="intel-img" src="" /></div>
+    <div class="vignette"></div>
+    <div class="grain"></div>
+    <div id="choice-overlay">
+        <h2 id="choice-prompt" style="margin-bottom: 20px; font-weight: 300;">SELECT PATH</h2>
+        <div id="choice-buttons"></div>
+    </div>
+    <div id="intel-container">
+        <img id="intel-img" style="display:none" src="" />
+        <video id="intel-video" style="display:none" autoplay loop muted playsinline width="100%" height="100%" style="object-fit:cover"></video>
+    </div>
 
 <div class="hud-overlay">
     <div class="cinema-bar top"></div>
@@ -247,13 +266,38 @@
                 document.getElementById('map-container').className = scene.filter ? `filter-${scene.filter}` : '';
                 if (scene.weather) this.startWeather(scene.weather);
 
-                // 2. Intel Overlay
+                // 2. Intel Overlay (Image or Video)
                 const intel = document.getElementById('intel-container');
+                const img = document.getElementById('intel-img');
+                const vid = document.getElementById('intel-video');
                 if (scene.intel) {
-                    document.getElementById('intel-img').src = scene.intel;
+                    const isVid = scene.intel.match(/\.(mp4|webm|mov)/) || scene.is_video;
+                    img.style.display = isVid ? 'none' : 'block';
+                    vid.style.display = isVid ? 'block' : 'none';
+                    if(isVid) { vid.src = scene.intel; vid.play(); } else { img.src = scene.intel; }
                     intel.classList.add('active');
                     this.sounds.playStatic();
                 } else { intel.classList.remove('active'); }
+
+                // 2b. Sun/Light Control
+                if (scene.sun) {
+                    this.map.setLight({
+                        anchor: 'viewport',
+                        color: scene.sun.color || 'white',
+                        intensity: scene.sun.intensity || 0.4,
+                        position: [1.5, scene.sun.azimuth || 90, scene.sun.altitude || 40]
+                    });
+                }
+
+                // 2c. Choice Interactivity
+                if (scene.choices) {
+                    this.presentChoices(scene.choices, scene.subtitle).then(nextId => {
+                        const nextSceneIdx = this.currentScript.findIndex(s => s.id === nextId);
+                        this.currentStep = nextSceneIdx - 1; // Offset for loop
+                        resolve();
+                    });
+                    return;
+                }
 
                 // 2. Subtitles & Voice
                 const sub = document.getElementById('subtitle');
@@ -306,6 +350,7 @@
 
                 // 6. Action Layer
                 if (scene.action === 'draw') this.animateTrace(scene);
+                if (scene.action === 'heatmap') this.addHeatmap(scene);
 
                 setTimeout(resolve, (scene.duration || 3000) + (scene.wait || 500));
             });
@@ -345,6 +390,31 @@
             animate();
         }
 
+        presentChoices(choices, prompt) {
+            return new Promise(res => {
+                const overlay = document.getElementById('choice-overlay');
+                const btns = document.getElementById('choice-buttons');
+                document.getElementById('choice-prompt').innerText = prompt || "CHOOSE PATH";
+                btns.innerHTML = '';
+                overlay.classList.add('active');
+                choices.forEach(c => {
+                    const b = document.createElement('button');
+                    b.className = 'choice-btn'; b.innerText = c.label;
+                    b.onclick = () => {
+                        overlay.classList.remove('active');
+                        res(c.scene_id);
+                    };
+                    btns.appendChild(b);
+                });
+            });
+        }
+
+        addHeatmap(scene) {
+            const id = 'heat-' + Math.random().toString(36).substr(2,4);
+            this.map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: scene.points.map(p => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p } })) } });
+            this.map.addLayer({ id, type: 'heatmap', source: id, paint: { 'heatmap-weight': 1, 'heatmap-intensity': 1, 'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(0,0,255,0)', 0.5, 'yellow', 1, 'red'], 'heatmap-radius': 30, 'heatmap-opacity': 0.7 } });
+        }
+
         startOrbit(config, duration) {
             let start = null;
             const animate = (time) => {
@@ -375,6 +445,39 @@
     const director = new MapDirector();
 
     const demo = [
+        { 
+            id: "start",
+            subtitle: "STRATEGIC OVERVIEW: HIMALAYAS SECTOR", 
+            sun: { altitude: 10, azimuth: 200, color: "#ffaa88" },
+            camera: { center: [86.925, 27.988], zoom: 12, pitch: 70 }, 
+            duration: 4000 
+        },
+        { 
+            subtitle: "INTEL SUGGESTS TWO POSSIBLE ROUTES. SELECT ADVISORY.", 
+            choices: [
+                { label: "North Face (High Risk)", scene_id: "north" },
+                { label: "South Base (Standard)", scene_id: "south" }
+            ]
+        },
+        { 
+            id: "north",
+            subtitle: "PROCEEDING VIA NORTH FACE. WEATHER: SEVERE.", 
+            filter: "vhs", 
+            weather: "snow",
+            action: "heatmap",
+            points: [[86.925, 27.988], [86.926, 27.989], [86.927, 27.987]],
+            camera: { center: [86.93, 28.00], zoom: 14, shake: 10 },
+            duration: 5000
+        },
+        { 
+            id: "south",
+            subtitle: "SOUTHERN APPROACH SECURE. DEPLOYING DRONE.", 
+            intel: "https://www.w3schools.com/html/mov_bbb.mp4",
+            is_video: true,
+            camera: { type: "orbit", center: [86.925, 27.988] },
+            duration: 5000
+        }
+    ];
         { 
             subtitle: "WEATHER ADVISORY: HEAVY SNOW IN HIMALAYAS", 
             filter: "night", 
