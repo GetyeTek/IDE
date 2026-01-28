@@ -104,6 +104,8 @@
         .filter-blueprint::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background-image: radial-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 1px); background-size: 20px 20px; pointer-events: none; }
         .filter-vhs { filter: contrast(1.1) saturate(1.2) sepia(0.2); animation: vhs-flicker 0.1s infinite; }
         .filter-glitch { filter: hue-rotate(90deg) contrast(1.5); animation: glitch-anim 0.2s infinite; }
+        .filter-hologram { filter: brightness(1.2) hue-rotate(180deg) saturate(2); }
+        .filter-hologram::after { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: repeating-linear-gradient(0deg, rgba(0, 243, 255, 0.05) 0px, rgba(0, 243, 255, 0.05) 1px, transparent 1px, transparent 20px); pointer-events: none; }
         @keyframes vhs-flicker { 0% { opacity: 0.99; } 50% { opacity: 1; } 100% { opacity: 0.98; } }
         @keyframes glitch-anim { 0% { transform: translate(0); } 20% { transform: translate(-2px, 2px); } 40% { transform: translate(-2px, -2px); } 60% { transform: translate(2px, 2px); } 80% { transform: translate(2px, -2px); } 100% { transform: translate(0); } }
 
@@ -356,6 +358,14 @@
                 // 6. Action Layer
                 if (scene.action === 'draw') this.animateTrace(scene);
                 if (scene.action === 'heatmap') this.addHeatmap(scene);
+                if (scene.action === 'extrude') this.addExtrusion(scene);
+                if (scene.action === 'radar') this.startRadar(scene.radar);
+
+                // 7. Transitions
+                if (scene.transition === 'flash') {
+                    const f = document.createElement('div'); f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:999;transition:opacity 0.5s';
+                    document.body.appendChild(f); setTimeout(() => { f.style.opacity = '0'; setTimeout(() => f.remove(), 500); }, 50);
+                }
 
                 setTimeout(resolve, (scene.duration || 3000) + (scene.wait || 500));
             });
@@ -384,9 +394,13 @@
             
             const animate = () => {
                 ctx.clearRect(0,0,canvas.width, canvas.height);
-                ctx.fillStyle = type === 'rain' ? '#3b82f6' : '#fff';
+                ctx.fillStyle = type === 'rain' ? '#3b82f6' : (type === 'data' ? '#00ffaa' : '#fff');
                 particles.forEach(p => {
-                    ctx.fillRect(p.x, p.y, type === 'rain' ? 1 : 3, type === 'rain' ? 10 : 3);
+                    if(type === 'data') {
+                        ctx.fillText(Math.floor(Math.random()*2), p.x, p.y);
+                    } else {
+                        ctx.fillRect(p.x, p.y, type === 'rain' ? 1 : 3, type === 'rain' ? 10 : 3);
+                    }
                     p.y += p.s; if(p.y > canvas.height) p.y = -10;
                 });
                 if (this.moviePlaying) requestAnimationFrame(animate);
@@ -418,6 +432,39 @@
             const id = 'heat-' + Math.random().toString(36).substr(2,4);
             this.map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: scene.points.map(p => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p } })) } });
             this.map.addLayer({ id, type: 'heatmap', source: id, paint: { 'heatmap-weight': 1, 'heatmap-intensity': 1, 'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(0,0,255,0)', 0.5, 'yellow', 1, 'red'], 'heatmap-radius': 30, 'heatmap-opacity': 0.7 } });
+        }
+
+        addExtrusion(scene) {
+            const id = 'ext-' + Math.random().toString(36).substr(2,4);
+            this.map.addSource(id, { type: 'geojson', data: {
+                type: 'FeatureCollection',
+                features: scene.data.map(d => ({ type: 'Feature', properties: { height: d.h, base: 0 }, geometry: { type: 'Polygon', coordinates: [this.createSquare(d.c, 0.002)] } }))
+            }});
+            this.map.addLayer({ id, type: 'fill-extrusion', source: id, paint: { 'fill-extrusion-color': scene.color || '#3b82f6', 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-base': ['get', 'base'], 'fill-extrusion-opacity': 0.8 } });
+        }
+
+        createSquare(center, size) {
+            return [[center[0]-size, center[1]-size], [center[0]+size, center[1]-size], [center[0]+size, center[1]+size], [center[0]-size, center[1]+size], [center[0]-size, center[1]-size]];
+        }
+
+        startRadar(config) {
+            const id = 'radar-' + Math.random().toString(36).substr(2,4);
+            let angle = 0;
+            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[]] } } });
+            this.map.addLayer({ id, type: 'fill', source: id, paint: { 'fill-color': config.color || '#00ff00', 'fill-opacity': 0.3 } });
+            
+            const update = () => {
+                angle += 2; const radius = config.radius || 0.01; const center = config.center;
+                const coords = [center];
+                for(let i=0; i<=30; i++) {
+                    const rad = (angle + i) * Math.PI / 180;
+                    coords.push([center[0] + Math.cos(rad) * radius, center[1] + Math.sin(rad) * radius]);
+                }
+                coords.push(center);
+                const src = this.map.getSource(id); if(src) src.setData({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } });
+                if(this.currentStep < this.currentScript.length) requestAnimationFrame(update);
+            };
+            update();
         }
 
         startOrbit(config, duration) {
@@ -452,10 +499,28 @@
     const demo = [
         { 
             id: "start",
-            subtitle: "STRATEGIC OVERVIEW: HIMALAYAS SECTOR", 
-            sun: { altitude: 10, azimuth: 200, color: "#ffaa88" },
+            subtitle: "CYBERNETIC UPLINK ESTABLISHED", 
+            filter: "hologram", 
+            weather: "data",
+            transition: "flash",
+            sun: { altitude: 10, azimuth: 200, color: "#00f3ff" },
             camera: { center: [86.925, 27.988], zoom: 12, pitch: 70 }, 
             duration: 4000 
+        },
+        { 
+            subtitle: "INITIATING 3D DATA EXTRUSION", 
+            action: "extrude",
+            color: "#00f3ff",
+            data: [{ c: [86.925, 27.988], h: 2000 }, { c: [86.935, 27.995], h: 3500 }, { c: [86.915, 27.975], h: 1500 }],
+            camera: { center: [86.925, 27.988], zoom: 13, pitch: 60, bearing: 45 },
+            duration: 5000
+        },
+        { 
+            subtitle: "RADAR SCANNING: SECTOR DELTA", 
+            action: "radar",
+            radar: { center: [86.925, 27.988], radius: 0.05, color: "#00ffaa" },
+            camera: { type: "orbit", center: [86.925, 27.988], duration: 6000 },
+            duration: 6000
         },
         { 
             subtitle: "INTEL SUGGESTS TWO POSSIBLE ROUTES. SELECT ADVISORY.", 
