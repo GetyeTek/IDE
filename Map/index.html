@@ -237,6 +237,18 @@
             osc.connect(gain); gain.connect(this.ctx.destination); osc.start();
             setTimeout(() => osc.stop(), 200);
         }
+        playTech() {
+            this.init();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(440, this.ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(this.ctx.destination);
+            osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+        }
         playImpact() {
             this.init();
             const noise = this.ctx.createBufferSource();
@@ -326,11 +338,24 @@
 
         async play() {
             if(document.getElementById('editor-sheet').classList.contains('open')) toggleSheet();
-            if(this.recognition && this.recognition.state !== 'listening') this.recognition.start();
+            this.sounds.init();
+            try { if(this.recognition) this.recognition.start(); } catch(e) {}
             
             this.isPlaying = true;
-            this.currentWeatherType = null; // Kill existing weather
+            this.currentWeatherType = null;
             this.sounds.stopAll();
+            
+            // Cleanup Map Resources
+            const style = this.map.getStyle();
+            if (style) {
+                style.layers.forEach(l => {
+                    if (l.id.match(/^(t-|heat-|ext-|blast-|spot-|radar-)/)) this.map.removeLayer(l.id);
+                });
+                Object.keys(style.sources).forEach(s => {
+                    if (s.match(/^(t-|heat-|ext-|blast-|spot-|radar-)/)) this.map.removeSource(s);
+                });
+            }
+
             this.markers.forEach(m => m.remove());
             this.markers = [];
             this.currentStep = 0;
@@ -379,7 +404,7 @@
                     });
                 } else { this.map.setFog(null); }
 
-                if (scene.sky) {
+                if (scene.sky && this.map.getLayer('sky')) {
                     this.map.setPaintProperty('sky', 'sky-layer-color', scene.sky.color || '#87ceeb');
                     this.map.setPaintProperty('sky', 'sky-layer-horizon-color', scene.sky.horizon || '#ffffff');
                 }
