@@ -60,6 +60,26 @@
         #subtitle.active { opacity: 1; }
 
         .touch-controls { display: flex; gap: 10px; pointer-events: auto; }
+        
+        /* 3D Markers */
+        .marker-beacon {
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+        }
+        .beacon-ring {
+            position: absolute; border: 2px solid var(--accent); border-radius: 50%;
+            animation: pulse-ring 2s infinite ease-out;
+        }
+        @keyframes pulse-ring {
+            0% { width: 4px; height: 4px; opacity: 1; }
+            100% { width: 50px; height: 50px; opacity: 0; }
+        }
+        .marker-arrow {
+            width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent;
+            border-top: 20px solid #ff3366; filter: drop-shadow(0 0 5px #ff3366);
+            animation: bounce 1s infinite alternate ease-in-out;
+        }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-15px); } }
+
         .fab { 
             background: white; color: black; border: none; padding: 14px 24px; border-radius: 30px;
             font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
@@ -111,8 +131,47 @@
 <script>
     const toggleSheet = () => document.getElementById('editor-sheet').classList.toggle('open');
 
+    class SoundEngine {
+        constructor() {
+            this.ctx = null;
+            this.nodes = {};
+        }
+        init() {
+            if (this.ctx) return;
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        playWind(intensity = 0.5) {
+            this.init();
+            const bufferSize = 2 * this.ctx.sampleRate, noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate), output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+            const whiteNoise = this.ctx.createBufferSource(); whiteNoise.buffer = noiseBuffer; whiteNoise.loop = true;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 100 + (intensity * 1000);
+            const gain = this.ctx.createGain(); gain.gain.value = 0.1 * intensity;
+            whiteNoise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+            whiteNoise.start();
+            this.nodes.wind = { source: whiteNoise, filter, gain };
+        }
+        playTech() {
+            this.init();
+            const osc = this.ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 50;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 400;
+            const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.5;
+            const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 200;
+            const gain = this.ctx.createGain(); gain.gain.value = 0.05;
+            lfo.connect(lfoGain); lfoGain.connect(filter.frequency); osc.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+            osc.start(); lfo.start();
+            this.nodes.tech = { osc, lfo };
+        }
+        stopAll() {
+            Object.values(this.nodes).forEach(n => { if(n.source) n.source.stop(); if(n.osc) n.osc.stop(); });
+            this.nodes = {};
+        }
+    }
+
     class MapDirector {
         constructor() {
+            this.sounds = new SoundEngine();
+            this.markers = [];
             this.map = new maplibregl.Map({
                 container: 'map',
                 style: {
@@ -137,6 +196,9 @@
 
         async play() {
             if(document.getElementById('editor-sheet').classList.contains('open')) toggleSheet();
+            this.sounds.init();
+            this.markers.forEach(m => m.remove());
+            this.markers = [];
             
             try {
                 const script = JSON.parse(document.getElementById('json-input').value);
@@ -176,7 +238,27 @@
                     if (scene.camera.shake) this.startShake(scene.camera.shake, scene.duration);
                 }
 
-                // 4. Action Layer
+                // 4. Audio Layer
+                if (scene.sound === 'wind') this.sounds.playWind(0.6);
+                if (scene.sound === 'tech') this.sounds.playTech();
+                if (scene.sound === 'none') this.sounds.stopAll();
+
+                // 5. Marker Layer
+                if (scene.marker) {
+                    const el = document.createElement('div');
+                    el.className = `marker-${scene.marker.type}`;
+                    if(scene.marker.type === 'beacon') {
+                        for(let i=0; i<3; i++) {
+                            const ring = document.createElement('div'); ring.className = 'beacon-ring';
+                            ring.style.animationDelay = `${i * 0.6}s`;
+                            el.appendChild(ring);
+                        }
+                    }
+                    const m = new maplibregl.Marker(el).setLngLat(scene.marker.coords).addTo(this.map);
+                    this.markers.push(m);
+                }
+
+                // 6. Action Layer
                 if (scene.action === 'draw') this.animateTrace(scene);
 
                 setTimeout(resolve, (scene.duration || 3000) + (scene.wait || 500));
@@ -228,27 +310,29 @@
 
     const demo = [
         { 
-            subtitle: "INITIALIZING NIGHT VISION SURVEILLANCE", 
+            subtitle: "APPROACHING SECTOR 7: WIND SPEEDS ELEVATED", 
             filter: "night", 
+            sound: "wind",
             narrate: true, 
             camera: { center: [86.925, 27.988], zoom: 12, pitch: 65 }, 
-            duration: 4000 
+            duration: 5000 
         },
         { 
-            subtitle: "STABILIZING ORBITAL VIEW", 
+            subtitle: "TARGET ACQUIRED: DEPLOYING BEACON", 
             filter: "blueprint", 
-            narrate: true, 
+            sound: "tech",
+            marker: { type: "beacon", coords: [86.925, 27.988] },
             action: "draw", 
             color: "#00ffaa", 
             coordinates: [[86.925, 27.988], [86.935, 28.005], [86.95, 28.02]], 
-            camera: { type: "orbit", center: [86.925, 27.988], duration: 6000 }, 
-            duration: 6000 
+            camera: { type: "orbit", center: [86.925, 27.988], duration: 7000 }, 
+            duration: 7000 
         },
         { 
-            subtitle: "WARNING: SEVERE TURBULENCE", 
+            subtitle: "CRITICAL FAILURE: EVACUATE", 
             filter: "vhs", 
-            narrate: true, 
-            camera: { center: [86.95, 28.02], zoom: 14, pitch: 80, shake: 15 }, 
+            marker: { type: "arrow", coords: [86.95, 28.02] },
+            camera: { center: [86.95, 28.02], zoom: 15, pitch: 85, shake: 20 }, 
             duration: 4000 
         }
     ];
