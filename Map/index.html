@@ -226,10 +226,11 @@
             this.sounds.init();
             this.markers.forEach(m => m.remove());
             this.markers = [];
+            document.getElementById('timeline-progress').style.width = '0%';
             
             try {
-                const script = JSON.parse(document.getElementById('json-input').value);
-                for (const scene of script) {
+                this.currentScript = JSON.parse(document.getElementById('json-input').value);
+                for (const scene of this.currentScript) {
                     await this.executeScene(scene);
                 }
             } catch (e) { alert("Script Error: " + e.message); }
