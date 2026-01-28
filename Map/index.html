@@ -387,12 +387,14 @@
                     this.currentStep++;
                 }
             } catch (e) { 
-                console.error("CRITICAL PARSE ERROR:", e);
-                console.log("RAW STRING AT ERROR:", raw);
-                alert("Script JSON Error: " + e.message + "\n\nCheck the Eruda console (gear icon) for details."); 
-            } finally { 
+                console.error("CRITICAL ERROR:", e);
+                alert("Execution Error: " + e.message);
+            } finally {
                 this.isPlaying = false;
             }
+        }
+
+        evaluateCondition(cond) {
         }
 
         evaluateCondition(cond) {
@@ -433,6 +435,22 @@
                 }
 
                 // Lens Logic
+                // 1. Atmosphere & Weather
+                document.getElementById('map-container').className = scene.filter ? `filter-${scene.filter}` : '';
+                if (scene.weather) this.startWeather(scene.weather);
+                
+                // MapLibre v3 Atmosphere (Sky & Fog combined)
+                if (scene.sky || scene.fog) {
+                    this.map.setSky({
+                        "sky-color": (scene.sky && scene.sky.color) || "#87ceeb",
+                        "horizon-color": (scene.sky && scene.sky.horizon) || "#ffffff",
+                        "fog-color": (scene.fog && scene.fog.color) || "#ffffff",
+                        "fog-ground-blend": 0.5
+                    });
+                    if (this.map.getLayer('atmosphere')) {
+                        this.map.setPaintProperty('atmosphere', 'background-color', (scene.sky && scene.sky.color) || '#87ceeb');
+                    }
+                }
                 const lens = document.getElementById('lens-scope');
                 lens.classList.toggle('active', !!scene.lens);
 
