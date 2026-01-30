@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Protocol Master</title>
+    <style>
+        :root { --glow: #0f0; --bg: #000; }
+        body { background: var(--bg); color: var(--glow); font-family: 'Courier New', monospace; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Layout */
+        #header { padding: 10px; border-bottom: 1px solid #030; display: flex; justify-content: space-between; font-size: 12px; }
+        #view { flex: 1; overflow-y: auto; padding: 15px; white-space: pre-wrap; word-break: break-all; background: radial-gradient(circle, #050505 0%, #000 100%); }
+        #input-area { padding: 10px; border-top: 1px solid #030; background: #080808; }
+        
+        /* Elements */
+        #msg-in { background: transparent; border: 1px solid #030; color: #fff; width: 100%; padding: 12px; outline: none; font-family: monospace; }
+        #msg-in:focus { border-color: var(--glow); }
+        .stats { font-size: 9px; color: #060; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* Visuals */
+        .token { color: #fff; font-weight: bold; border-bottom: 1px dotted #555; }
+        .img-pixel { display: inline-block; width: 4px; height: 4px; }
+        .meta { color: #040; font-size: 10px; }
+        button { background: #020; color: #0f0; border: 1px solid #0f0; font-size: 10px; cursor: pointer; padding: 2px 5px; }
+    </style>
+</head>
+<body>
+
+<div id="header">
+    <span>GHOST-PROTOCOL v4.0 (STABLE)</span>
+    <span id="conn-status">SIGNAL: ACTIVE</span>
+</div>
+
+<div id="view">-- ENCRYPTED CHANNEL ESTABLISHED --<br></div>
+
+<div id="input-area">
+    <div style="display:flex; gap:10px; margin-bottom:5px;">
+        <input id="msg-in" autofocus placeholder="Type message..." autocomplete="off">
+        <input type="file" id="img-in" accept="image/*" style="display:none">
+        <button onclick="document.getElementById('img-in').click()">📷 IMG</button>
+    </div>
+    <div class="stats">
+        DATA SAVED: <span id="saved">0%</span> | 
+        PATH: <span id="path-active">IDLE</span> | 
+        THROUGHPUT: <span id="tput">0</span>b
+    </div>
+</div>
+
+<script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    // CREDENTIALS
+    const S_URL = 'https://xvldfsmxskhemkslsbym.supabase.co'
+    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmx214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU'
+    const supabase = createClient(S_URL, S_KEY)
+
+    // SHARED DICTIONARY (Tokenization)
+    const DICT = [" the "," be "," to "," of "," and "," a "," in "," that "," have "," I "," it "," for "," not "," on "," with "," he "," as "," you "," do "," at "," this "," but "," his "," by "," from "," they "," we "," say "," her "," she "," or "," an "," will "," my "," one "," all "," would "," there "," their "," what "," so "," up "," out "," if "," about "," who "," get "," which "," go "," me ","hello","how","are","doing","today","thanks","good","where","home","night","busy","talk","later"];
+
+    // SYSTEM STATE
+    const uid = Math.floor(Math.random() * 999);
+    const view = document.getElementById('view');
+    const msgIn = document.getElementById('msg-in');
+    const imgIn = document.getElementById('img-in');
+    const paths = ['path_a', 'path_b', 'path_c'];
+    let lastIds = { path_a:0, path_b:0, path_c:0 };
+    let pathPtr = 0;
+    let rawCount = 0;
+    let sentCount = 0;
+
+    // --- FEATURE: MULTI-PATH DISPATCHER ---
+    async function ghostSend(bytes) {
+        const targetPath = paths[pathPtr];
+        pathPtr = (pathPtr + 1) % paths.length; // Rotate paths
+        
+        document.getElementById('path-active').innerText = targetPath;
+        const rows = bytes.map(b => ({ b, u: uid }));
+        
+        const { error } = await supabase.from(targetPath).insert(rows);
+        if(!error) {
+            sentCount += bytes.length;
+            updateStats();
+        }
+    }
+
+    // --- FEATURE: TOKENIZED ENCODER ---
+    function encodeText(text) {
+        rawCount += text.length;
+        let result = [];
+        let words = text.split(' ');
+        
+        words.forEach((word, i) => {
+            let clean = word.toLowerCase().trim();
+            let idx = DICT.indexOf(clean);
+            if(idx !== -1) result.push(128 + idx); // Byte 128-255 = Token
+            else [...word].forEach(c => result.push(c.charCodeAt(0)));
+            if(i < words.length - 1) result.push(32); // Space
+        });
+        return result;
+    }
+
+    // --- FEATURE: GHOST-IMAGE DITHERER ---
+    imgIn.onchange = async (e) => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 32; canvas.height = 32; // ULTRA SQUEEZE
+                ctx.drawImage(img, 0, 0, 32, 32);
+                const data = ctx.getImageData(0,0,32,32).data;
+                let imageBytes = [127]; // Start of Image Marker
+                for(let i=0; i<data.length; i+=4) {
+                    let avg = (data[i] + data[i+1] + data[i+2]) / 3;
+                    imageBytes.push(avg > 128 ? 1 : 0); // 1 bit per pixel!
+                }
+                ghostSend(imageBytes);
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // --- FEATURE: PARALLEL POLL (Sips) ---
+    async function sip() {
+        // Poll all 3 paths at the same time
+        const requests = paths.map(p => 
+            supabase.from(p).select('id, b, u').gt('id', lastIds[p]).order('id', {ascending:true})
+        );
+        
+        const results = await Promise.all(requests);
+        
+        results.forEach((res, i) => {
+            if(res.data && res.data.length > 0) {
+                const pathName = paths[i];
+                res.data.forEach(row => {
+                    renderByte(row.b, row.u);
+                    lastIds[pathName] = row.id;
+                });
+            }
+        });
+        setTimeout(sip, 2000); // 2s Sip Cycle
+    }
+
+    // --- FEATURE: DECODER & RENDERER ---
+    let imgBuffer = [];
+    function renderByte(b, sender) {
+        // Image Processing Mode
+        if(b === 127) { imgBuffer = []; return; }
+        if(imgBuffer !== null && b <= 1) {
+            imgBuffer.push(b);
+            if(imgBuffer.length === 1024) { // 32x32 reached
+                let canvas = document.createElement('canvas');
+                canvas.width = 32; canvas.height = 32;
+                let ctx = canvas.getContext('2d');
+                imgBuffer.forEach((px, i) => {
+                    ctx.fillStyle = px === 1 ? '#fff' : '#000';
+                    ctx.fillRect(i % 32, Math.floor(i / 32), 1, 1);
+                });
+                view.appendChild(canvas);
+                imgBuffer = null;
+            }
+            return;
+        }
+
+        // Text Processing
+        let html = "";
+        if(b >= 128) html = `<span class="token">${DICT[b-128]}</span>`;
+        else if(b === 13) html = "<br>";
+        else html = String.fromCharCode(b);
+        
+        const span = document.createElement('span');
+        span.innerHTML = html;
+        view.appendChild(span);
+        view.scrollTop = view.scrollHeight;
+    }
+
+    // INPUT HANDLER
+    msgIn.onkeydown = (e) => {
+        if(e.key === 'Enter') {
+            const bytes = encodeText(msgIn.value);
+            ghostSend([...bytes, 13]); // Text + Newline
+            msgIn.value = '';
+        }
+    };
+
+    function updateStats() {
+        const saved = Math.round((1 - (sentCount/rawCount)) * 100);
+        document.getElementById('saved').innerText = (saved || 0) + "%";
+        document.getElementById('tput').innerText = sentCount;
+    }
+
+    // START PROTOCOL
+    sip();
+</script>
+</body>
+</html>
