@@ -60,11 +60,12 @@
     async function ghostSend(payload, isText = true) {
         let bytes = [];
         if(isText) {
-            payload.split(' ').forEach(word => {
+            const words = payload.split(' ');
+            words.forEach((word, i) => {
                 let idx = DICT.indexOf(word.toLowerCase().trim());
                 if(idx !== -1) bytes.push(128 + idx);
                 else [...word].forEach(c => bytes.push(c.charCodeAt(0)));
-                bytes.push(32);
+                if(i < words.length - 1) bytes.push(32); // Only add space BETWEEN words
             });
             bytes.push(13);
         } else { bytes = payload; }
