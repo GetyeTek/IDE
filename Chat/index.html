@@ -48,114 +48,58 @@
 </div>
 
 <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+    const GHOST_URL = 'YOUR_FUNCTION_URL';
+    const AUTH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Your Anon Key
 
-    // CREDENTIALS
-    const S_URL = 'https://xvldfsmxskhemkslsbym.supabase.co'
-    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmx214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU'
-    const supabase = createClient(S_URL, S_KEY)
-
-    // SHARED DICTIONARY (Tokenization)
     const DICT = [" the "," be "," to "," of "," and "," a "," in "," that "," have "," I "," it "," for "," not "," on "," with "," he "," as "," you "," do "," at "," this "," but "," his "," by "," from "," they "," we "," say "," her "," she "," or "," an "," will "," my "," one "," all "," would "," there "," their "," what "," so "," up "," out "," if "," about "," who "," get "," which "," go "," me ","hello","how","are","doing","today","thanks","good","where","home","night","busy","talk","later"];
-
-    // SYSTEM STATE
     const uid = Math.floor(Math.random() * 999);
     const view = document.getElementById('view');
     const msgIn = document.getElementById('msg-in');
     const imgIn = document.getElementById('img-in');
-    const paths = ['path_a', 'path_b', 'path_c'];
-    let lastIds = { path_a:0, path_b:0, path_c:0 };
-    let pathPtr = 0;
-    let rawCount = 0;
-    let sentCount = 0;
 
-    // --- FEATURE: MULTI-PATH DISPATCHER ---
-    async function ghostSend(bytes) {
-        const targetPath = paths[pathPtr];
-        pathPtr = (pathPtr + 1) % paths.length; // Rotate paths
-        
-        document.getElementById('path-active').innerText = targetPath;
-        const rows = bytes.map(b => ({ b, u: uid }));
-        
-        const { error } = await supabase.from(targetPath).insert(rows);
-        if(!error) {
-            sentCount += bytes.length;
-            updateStats();
-        }
-    }
+    async function ghostSend(payload, isText = true) {
+        let bytes = [];
+        if(isText) {
+            payload.split(' ').forEach(word => {
+                let idx = DICT.indexOf(word.toLowerCase().trim());
+                if(idx !== -1) bytes.push(128 + idx);
+                else [...word].forEach(c => bytes.push(c.charCodeAt(0)));
+                bytes.push(32);
+            });
+            bytes.push(13);
+        } else { bytes = payload; }
 
-    // --- FEATURE: TOKENIZED ENCODER ---
-    function encodeText(text) {
-        rawCount += text.length;
-        let result = [];
-        let words = text.split(' ');
-        
-        words.forEach((word, i) => {
-            let clean = word.toLowerCase().trim();
-            let idx = DICT.indexOf(clean);
-            if(idx !== -1) result.push(128 + idx); // Byte 128-255 = Token
-            else [...word].forEach(c => result.push(c.charCodeAt(0)));
-            if(i < words.length - 1) result.push(32); // Space
+        await fetch(GHOST_URL, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${AUTH_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'dispatch', payload: bytes, uid })
         });
-        return result;
     }
 
-    // --- FEATURE: GHOST-IMAGE DITHERER ---
-    imgIn.onchange = async (e) => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = 32; canvas.height = 32; // ULTRA SQUEEZE
-                ctx.drawImage(img, 0, 0, 32, 32);
-                const data = ctx.getImageData(0,0,32,32).data;
-                let imageBytes = [127]; // Start of Image Marker
-                for(let i=0; i<data.length; i+=4) {
-                    let avg = (data[i] + data[i+1] + data[i+2]) / 3;
-                    imageBytes.push(avg > 128 ? 1 : 0); // 1 bit per pixel!
-                }
-                ghostSend(imageBytes);
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-    };
-
-    // --- FEATURE: PARALLEL POLL (Sips) ---
     async function sip() {
-        // Poll all 3 paths at the same time
-        const requests = paths.map(p => 
-            supabase.from(p).select('id, b, u').gt('id', lastIds[p]).order('id', {ascending:true})
-        );
-        
-        const results = await Promise.all(requests);
-        
-        results.forEach((res, i) => {
-            if(res.data && res.data.length > 0) {
-                const pathName = paths[i];
-                res.data.forEach(row => {
-                    renderByte(row.b, row.u);
-                    lastIds[pathName] = row.id;
-                });
-            }
-        });
-        setTimeout(sip, 2000); // 2s Sip Cycle
+        try {
+            const res = await fetch(GHOST_URL, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${AUTH_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'sip', uid })
+            });
+            const body = await res.json();
+            if(body.data) body.data.forEach(row => renderByte(row.b));
+        } catch(e) {}
+        setTimeout(sip, 2000);
     }
 
-    // --- FEATURE: DECODER & RENDERER ---
-    let imgBuffer = [];
-    function renderByte(b, sender) {
-        // Image Processing Mode
+    let imgBuffer = null;
+    function renderByte(b) {
         if(b === 127) { imgBuffer = []; return; }
-        if(imgBuffer !== null && b <= 1) {
+        if(imgBuffer !== null) {
             imgBuffer.push(b);
-            if(imgBuffer.length === 1024) { // 32x32 reached
-                let canvas = document.createElement('canvas');
+            if(imgBuffer.length === 1024) {
+                const canvas = document.createElement('canvas');
                 canvas.width = 32; canvas.height = 32;
-                let ctx = canvas.getContext('2d');
+                canvas.style.imageRendering = 'pixelated';
+                canvas.style.width = '128px';
+                const ctx = canvas.getContext('2d');
                 imgBuffer.forEach((px, i) => {
                     ctx.fillStyle = px === 1 ? '#fff' : '#000';
                     ctx.fillRect(i % 32, Math.floor(i / 32), 1, 1);
@@ -166,34 +110,33 @@
             return;
         }
 
-        // Text Processing
-        let html = "";
-        if(b >= 128) html = `<span class="token">${DICT[b-128]}</span>`;
-        else if(b === 13) html = "<br>";
-        else html = String.fromCharCode(b);
-        
+        let html = b >= 128 ? `<span class="token">${DICT[b-128]}</span>` : (b === 13 ? "<br>" : String.fromCharCode(b));
         const span = document.createElement('span');
         span.innerHTML = html;
         view.appendChild(span);
         view.scrollTop = view.scrollHeight;
     }
 
-    // INPUT HANDLER
-    msgIn.onkeydown = (e) => {
-        if(e.key === 'Enter') {
-            const bytes = encodeText(msgIn.value);
-            ghostSend([...bytes, 13]); // Text + Newline
-            msgIn.value = '';
-        }
+    imgIn.onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 32; canvas.height = 32;
+                ctx.drawImage(img, 0, 0, 32, 32);
+                const data = ctx.getImageData(0,0,32,32).data;
+                let bytes = [127];
+                for(let i=0; i<data.length; i+=4) bytes.push(((data[i]+data[i+1]+data[i+2])/3) > 128 ? 1 : 0);
+                ghostSend(bytes, false);
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
     };
 
-    function updateStats() {
-        const saved = Math.round((1 - (sentCount/rawCount)) * 100);
-        document.getElementById('saved').innerText = (saved || 0) + "%";
-        document.getElementById('tput').innerText = sentCount;
-    }
-
-    // START PROTOCOL
+    msgIn.onkeydown = (e) => { if(e.key === 'Enter') { ghostSend(msgIn.value); msgIn.value = ''; } };
     sip();
 </script>
 </body>
