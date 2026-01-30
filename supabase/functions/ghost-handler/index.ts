@@ -52,12 +52,9 @@ serve(async (req) => {
     // Sort by ID to ensure message integrity
     allBytes.sort((a, b) => a.id - b.id)
 
-    // Decode bytes back to text using the server-side dictionary
-    let message = allBytes.map(row => {
-      if (row.b >= 128) return DICT[row.b - 128]
-      return String.fromCharCode(row.b)
-    }).join('')
-
-    return new Response(JSON.stringify({ message }), { headers: { "Content-Type": "application/json" } })
+    // Return raw bytes and metadata to the client for rendering
+    return new Response(JSON.stringify({ data: allBytes }), { 
+      headers: { "Content-Type": "application/json" } 
+    })
   }
 })
