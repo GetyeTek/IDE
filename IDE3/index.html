@@ -1097,20 +1097,8 @@
         return stack.join('/');
     }
 
-    function checkSyntaxErrors(code, filePath) {
-        if (!code || typeof acorn === 'undefined') return null;
-        // Don't let Acorn touch JSX/TSX or files outside the current project root
-        if (filePath.endsWith('.jsx') || filePath.endsWith('.tsx')) return null;
-        if (CONFIG.projectPath && !filePath.startsWith(CONFIG.projectPath)) return null;
-        if (!filePath.endsWith('.js') && !filePath.endsWith('.mjs')) return null;
-        try {
-            acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true });
-            return null;
-        } catch (e) {
-            return { message: e.message, line: e.loc ? e.loc.line : '?' };
-        }
-    }
-
+    // Acorn is deprecated. Syntax checking is now handled by backend WASM.
+    function checkSyntaxErrors() { return null; }
     // --- SETTINGS ---
     function applyPreviewTabVisibility() {
         const navButton = document.getElementById('nav-preview-btn');
@@ -2250,6 +2238,7 @@ function addTerminalCard(data, options = {}) {
     // --- BUNDLER & PREVIEW ---
     async function bundleAndPreview(index) {
         if(!CONFIG.funcUrl) return;
+        console.group("🧬 WASM BUNDLER SCAN");
 
         let entry = (typeof index === 'number') ? dbHistory[index] : null;
         let sha = entry ? entry.sha : null;
@@ -2296,16 +2285,26 @@ function addTerminalCard(data, options = {}) {
         if(!fileCache[entryFile]) return iframe.srcdoc = `Error: ${entryFile} not found (Check Project Path settings)`;
 
         let syntaxErrors = [];
-        Object.keys(fileCache).forEach(path => {
-            if (fileCache[path].mime === 'text/javascript') {
-                const error = checkSyntaxErrors(fileCache[path].content, path);
-                if (error) {
-                    // Don't block, just report
-                    syntaxErrors.push({ path, ...error });
-                    highlightCulpritOp('unknown', error);
+        const filesToScan = Object.keys(fileCache).filter(path => 
+            path.match(/\.(js|ts|jsx|tsx|html|css)$/) && path.startsWith(effectiveRoot)
+        );
+
+        // Concurrent WASM Scan via Backend
+        await Promise.all(filesToScan.map(async (path) => {
+            try {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'validate_syntax_deep', code_block: fileCache[path].content, file_path: path })
+                });
+                const data = await res.json();
+                if (data.valid === false && data.errors) {
+                    data.errors.forEach(err => {
+                        syntaxErrors.push({ path, message: err.message, line: err.line });
+                        console.error(`🛑 WASM Found Error in ${path}:`, err);
+                    });
                 }
-            }
-        }); 
+            } catch(e) { console.warn("WASM scan failed for", path); }
+        }));
 
         // Import Rewrite Logic
         function rewriteImports(code, currentPath) {
