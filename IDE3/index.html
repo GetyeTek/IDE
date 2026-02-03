@@ -566,6 +566,11 @@
                     <input type="checkbox" id="setting-show-preview" style="accent-color:var(--primary); transform:scale(1.2);">
                 </label>
 
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px;">
+                    <span style="font-size:13px;">🧬 WASM Syntax Scan (Preview)</span>
+                    <input type="checkbox" id="setting-wasm-validation" style="accent-color:var(--primary); transform:scale(1.2);">
+                </label>
+
                 <div class="input-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
                     <label class="input-label">EF Deployment Mode</label>
                     <select id="setting-ef-mode" class="input-field" style="appearance: auto;">
@@ -925,7 +930,8 @@
         autoFix: localStorage.getItem('conduit_auto_fix') === 'true',
         autoSanity: localStorage.getItem('conduit_auto_sanity') === 'true',
         showPreview: localStorage.getItem('conduit_showPreview') !== 'false', // Default to true
-        efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default'
+        efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
+        wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false'
     };
     
     // Global State
@@ -994,6 +1000,7 @@
         document.getElementById('setting-auto-fix').checked = CONFIG.autoFix;
         document.getElementById('setting-auto-sanity').checked = CONFIG.autoSanity;
         document.getElementById('setting-show-preview').checked = CONFIG.showPreview;
+        document.getElementById('setting-wasm-validation').checked = CONFIG.wasmValidation;
         document.getElementById('setting-ef-mode').value = CONFIG.efDeploymentMode;
         
         renderAIConfigUI(); // Render AI Settings
@@ -1544,6 +1551,7 @@
         const autoFix = document.getElementById('setting-auto-fix').checked;
         const autoSanity = document.getElementById('setting-auto-sanity').checked;
         const showPreview = document.getElementById('setting-show-preview').checked;
+        const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
 
         if(!funcUrl) return alert("Function URL is required");
@@ -1554,12 +1562,13 @@
         localStorage.setItem('conduit_auto_fix', autoFix);
         localStorage.setItem('conduit_auto_sanity', autoSanity);
         localStorage.setItem('conduit_showPreview', showPreview);
+        localStorage.setItem('conduit_wasm_validation', wasmValidation);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
         
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
 
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, efDeploymentMode };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, wasmValidation, efDeploymentMode };
         
         applyPreviewTabVisibility(); // Apply change immediately
 
@@ -2289,8 +2298,9 @@ function addTerminalCard(data, options = {}) {
             path.match(/\.(js|ts|jsx|tsx|html|css)$/) && path.startsWith(effectiveRoot)
         );
 
-        // Concurrent WASM Scan via Backend
-        await Promise.all(filesToScan.map(async (path) => {
+        // Concurrent WASM Scan via Backend (If enabled)
+        if (CONFIG.wasmValidation) {
+            await Promise.all(filesToScan.map(async (path) => {
             try {
                 const res = await fetch(CONFIG.funcUrl, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -2304,7 +2314,10 @@ function addTerminalCard(data, options = {}) {
                     });
                 }
             } catch(e) { console.warn("WASM scan failed for", path); }
-        }));
+            }));
+        } else {
+            console.log("🧬 WASM Scan Disabled via Settings");
+        }
 
         // Import Rewrite Logic
         function rewriteImports(code, currentPath) {
