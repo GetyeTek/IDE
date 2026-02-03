@@ -1099,6 +1099,9 @@
 
     function checkSyntaxErrors(code, filePath) {
         if (!code || typeof acorn === 'undefined') return null;
+        // Don't let Acorn touch JSX/TSX or files outside the current project root
+        if (filePath.endsWith('.jsx') || filePath.endsWith('.tsx')) return null;
+        if (CONFIG.projectPath && !filePath.startsWith(CONFIG.projectPath)) return null;
         if (!filePath.endsWith('.js') && !filePath.endsWith('.mjs')) return null;
         try {
             acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true });
@@ -2311,16 +2314,33 @@ function addTerminalCard(data, options = {}) {
 
         const importMap = { imports: { "react": "https://esm.sh/react@18.2.0", "react-dom/client": "https://esm.sh/react-dom@18.2.0/client" } };
 
+        console.group("🚀 BUNDLER DIAGNOSTICS");
+        console.log("📂 Project Root Path:", effectiveRoot);
+
         Object.keys(fileCache).forEach(path => {
-            const isJs = fileCache[path].mime === 'text/javascript';
-            const isJsx = fileCache[path].mime === 'text/jsx';
-            if(isJs || isJsx) fileCache[path].content = rewriteImports(fileCache[path].content, path);
+            // 1. GHOST FILE PROTECTION
+            if (effectiveRoot && !path.startsWith(effectiveRoot)) {
+                console.warn(`👻 GHOST IGNORED: ${path} (Outside scope)`);
+                return;
+            }
+
+            // 2. ENHANCED DETECTION LOGIC
+            const mime = fileCache[path].mime;
+            const isJsx = path.endsWith('.jsx') || path.endsWith('.tsx') || mime === 'text/jsx';
+            const isJs = path.endsWith('.js') || path.endsWith('.mjs') || mime === 'text/javascript';
+
+            console.log(`📄 Proc: ${path.padEnd(35)} | JSX: ${isJsx ? '✅' : '❌'} | MIME: ${mime}`);
+
+            if(isJs || isJsx) {
+                fileCache[path].content = rewriteImports(fileCache[path].content, path);
+            }
 
             const mapKey = path.startsWith(effectiveRoot) ? path.substring(effectiveRoot.length) : path;
             const cacheKey = path;
             const currentSha = fileCache[path].sha;
             
             if (isJsx) {
+                console.log(`   🛠️ Babel Transforming: ${path}`);
                 if (window.BUILD_CACHE[cacheKey] && window.BUILD_CACHE[cacheKey].sha === currentSha) {
                     fileCache[path].content = window.BUILD_CACHE[cacheKey].code;
                     fileCache[path].mime = 'text/javascript';
@@ -2420,6 +2440,8 @@ function addTerminalCard(data, options = {}) {
         }
 
         const finalHtml = doc.documentElement.outerHTML;
+        console.log("🗺️ FINAL IMPORT MAP:", JSON.parse(JSON.stringify(importMap)));
+        console.groupEnd();
         iframe.srcdoc = finalHtml;
         
         if(window.PREVIEW_BLOB_URL) URL.revokeObjectURL(window.PREVIEW_BLOB_URL);
