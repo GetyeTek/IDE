@@ -1205,9 +1205,8 @@ serve(async (req) => {
    - When I propose an idea, DO NOT jump straight to coding. 
    - **Reflect**: specific critique of the idea. Is it efficient? Is it secure?
    - **Brainstorm**: If my idea is suboptimal, propose a better architecture.
-   - **Reject**: If I ask for something that breaks the app or is an anti-pattern, refuse politely and explain why.
-   - **Only generate the JSON Payload when I explicitly ask** (e.g., "Do it," "Give me the code," "Implement this," "Generate payload"). Until then, we are in discussion mode.
-
+   - **Only generate the JSON Payload when I explicitly ask (e.g., "Do it," "Give me the code," "Implement this," "Generate payload"). Until then, we are in discussion mode.**
+   - **TRIGGER ACTIVATION**: As soon as I use a trigger phrase, the 'CONSULTATIVE' phase is CLOSED. You MUST immediately transition to the 'SURGEON' role and provide the JSON payload using the \`apply_patch\` tool. Do not repeat your architectural analysis if you have already provided it; proceed directly to the payload.
 2. **INCREMENTAL CONTEXT**:
    - Assume any previous operations we discussed have *already been applied*. 
    - Do not try to fix code based on its state 5 minutes ago. Fix it based on the state *after* your last payload.
