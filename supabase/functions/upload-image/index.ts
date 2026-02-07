@@ -17,26 +17,37 @@ serve(async (req) => {
     const contentType = req.headers.get("content-type") || "";
     console.log(`[${requestId}] Content-Type: ${contentType}`);
     
-    // --- STAGE 2: SOLVING (Triggered by JSON request with ID) ---
+    // --- STAGE 2: SOLVING (Triggered by JSON request or Webhook) ---
     if (contentType.includes("application/json")) {
       const body = await req.json();
-      const { id } = body;
+      // Webhooks wrap data in 'record'. Direct calls might not.
+      const id = body.record?.id || body.id;
+      const status = body.record?.status || body.status;
+
+      if (!id) throw new Error("DATA_ERROR: No ID found in JSON or Webhook payload");
+      
+      // Safety check: only solve if status is 'transcribed'
+      if (status !== 'transcribed' && body.record) {
+          console.log(`[${requestId}] Webhook ignored: status is ${status}`);
+          return new Response(JSON.stringify({ skipped: true }));
+      }
+
       console.log(`[${requestId}] STAGE 2: Processing ID ${id}`);
 
-      const { data: record, error: fetchError } = await supabase
+      const { data: dbRecord, error: fetchError } = await supabase
         .from('processed_images')
         .select('*')
         .eq('id', id)
         .single();
 
-      if (fetchError || !record) {
+      if (fetchError || !dbRecord) {
         throw new Error(`DB_FETCH_ERROR: Record ${id} not found. ${fetchError?.message}`);
       }
 
-      console.log(`[${requestId}] Record retrieved. Transcription length: ${record.transcription?.length}`);
+      console.log(`[${requestId}] Record retrieved. Transcription length: ${dbRecord.transcription?.length}`);
       const geminiKey = await getGeminiKey(supabase, requestId);
       
-      const solution = await runGeminiSolver(record.transcription, geminiKey, requestId);
+      const solution = await runGeminiSolver(dbRecord.transcription, geminiKey, requestId);
       
       const { error: updateError } = await supabase
         .from('processed_images')
