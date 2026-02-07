@@ -148,7 +148,7 @@ async function getGeminiKey(supabase: any) {
 }
 
 async function runGeminiTranscription(base64: string, mime: string, key: string) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
   
   const res = await fetch(url, {
     method: 'POST',
@@ -175,7 +175,7 @@ async function runGeminiTranscription(base64: string, mime: string, key: string)
 }
 
 async function runGeminiSolver(friendlyText: string, key: string) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
   
   const res = await fetch(url, {
     method: 'POST',
