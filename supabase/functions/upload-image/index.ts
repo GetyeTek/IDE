@@ -132,43 +132,78 @@ async function getGeminiKey(supabase: any, requestId: string) {
   return data.api_key;
 }
 
-async function runGeminiTranscription(base64: string, mime: string, key: string, requestId: string) {
+async function runGeminiTranscription(b64: string, mime: string, key: string, rid: string) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-  const payload = {
-    contents: [{ parts: [
-      { text: "Transcribe all text from this image exactly. Provide ONLY the transcription text. No fillers." },
-      { inline_data: { mime_type: mime, data: base64 } }
-    ] }]
-  };
-
-  const res = await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
-  const json = await res.json();
-
-  if (!res.ok || !json.candidates) {
-    console.error(`[${requestId}] Gemini API Error:`, JSON.stringify(json));
-    throw new Error(`GEMINI_TRANSCRIPTION_API_ERROR: ${res.status}`);
-  }
-
-  return json.candidates[0].content.parts[0].text;
-}
-
-async function runGeminiSolver(text: string, key: string, requestId: string) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-  const prompt = `Task: Analyze transcription and solve every question. Return ONLY a JSON object. Transcription: ${text}`;
+  const prompt = `Task: Extract every question from this image into a structured JSON format.
   
+  Strict Instructions:
+  1. Exclude all garbage (page numbers, instructions like 'Time allowed', exam headers, blurry artifacts).
+  2. DO NOT leave anything out that is part of a question, even if blurry. Try your best to infer.
+  3. Preserve the original Question Number exactly as written (e.g., '1.', '4a', 'Question 5').
+  4. Categorize into types: 'mc' (multiple choice), 'tf' (true/false), 'fill' (fill in the blank), 'short' (short answer), 'workout' (complex calculation).
+  
+  JSON Schema:
+  {
+    "questions": [
+      {
+        "number": "string",
+        "type": "mc | tf | fill | short | workout",
+        "question_text": "full text of the question",
+        "options": ["A. ...", "B. ..."] // Only for mc
+      }
+    ]
+  }`;
+
   const res = await fetch(url, {
     method: 'POST',
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{ parts: [
+        { text: prompt },
+        { inline_data: { mime_type: mime, data: b64 } }
+      ] }],
       generationConfig: { response_mime_type: "application/json" }
     })
   });
+  const j = await res.json();
+  if (!j.candidates) throw new Error("Stage 1 Error: " + JSON.stringify(j));
+  return j.candidates[0].content.parts[0].text;
+}
 
-  const json = await res.json();
-  if (!res.ok || !json.candidates) {
-    console.error(`[${requestId}] Gemini Solver Error:`, JSON.stringify(json));
-    throw new Error(`GEMINI_SOLVER_API_ERROR: ${res.status}`);
-  }
+async function runGeminiSolver(transcriptionJson: string, key: string, rid: string) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+  const prompt = `Task: Solve the questions provided in the JSON transcription.
 
-  return JSON.parse(json.candidates[0].content.parts[0].text);
+  Strict Output Rules for TTS (Text-to-Speech):
+  1. NO mathematical symbols or notation (No x², no /, no √, no formulas).
+  2. Everything must be in NATURAL LANGUAGE. 
+     - Instead of 'x²', say 'x squared'.
+     - Instead of '1/2', say 'one half' or 'one divided by two'.
+     - Instead of '√9', say 'the square root of nine'.
+  3. For 'workout' types, provide extremely detailed step-by-step logic in plain English sentences.
+  4. For 'mc', return ONLY the correct option letter (e.g., 'C').
+
+  JSON Schema:
+  {
+    "solutions": [
+      {
+        "number": "string (matching the input)",
+        "answer": "The final answer (Choice letter for MC, True/False for TF, or the text)",
+        "explanation": "The detailed natural language steps for TTS"
+      }
+    ]
+  }`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { text: prompt },
+        { text: "Input Data: " + transcriptionJson }
+      ] }],
+      generationConfig: { response_mime_type: "application/json" }
+    })
+  });
+  const j = await res.json();
+  if (!j.candidates) throw new Error("Stage 2 Error: " + JSON.stringify(j));
+  return JSON.parse(j.candidates[0].content.parts[0].text);
 }
