@@ -125,7 +125,31 @@ async function runGeminiTranscription(base64: string, mime: string, key: string,
 
 async function runGeminiSolver(transcriptionJson: string, key: string, rid: string) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-  const prompt = `Task: Solve these questions for Text-to-Speech (TTS) usage.\n\nSTRICT RULES:\n1. NO MATH SYMBOLS (No symbols like x², √, /, +, =).\n2. Use NATURAL LANGUAGE (e.g., 'x squared', 'divided by', 'plus', 'is equal to').\n3. For 'workout' questions, provide step-by-step logic in full English sentences.\n4. For 'mc', return the letter answer (e.g., 'B').\n\nInput JSON: ${transcriptionJson}\n\nJSON Schema: { "solutions": [ { "number": "str", "answer": "str", "explanation": "str (natural language logic)" } ] }`;
+  const prompt = `Task: Act as an Exam Assistant. Solve the provided JSON questions for a Text-to-Speech (TTS) engine.
+
+  DICTATION RULES:
+  1. NO MATH SYMBOLS. Never use x², √, /, +, -, =, *, or parentheses. Use words ONLY (e.g., 'squared', 'divided by', 'plus', 'minus', 'equals').
+  2. NO ESSAYS. Keep it extremely brief and actionable.
+  3. FOR 'mc', 'tf', 'fill', 'short': Provide ONLY the direct answer.
+  4. FOR 'workout' (wo): Provide a list of steps. Each step must explain the action and then say 'Write: [Natural Language Content]'.
+
+  Example Workout Output:
+  Step 1: Move five to the right side. Write: x equals fifteen minus five.
+  Step 2: Subtract five from fifteen. Write: x equals ten.
+
+  Input Data: ${transcriptionJson}
+
+  JSON Schema:
+  {
+    "solutions": [
+      {
+        "number": "string",
+        "type": "string",
+        "answer": "string (Short result for mc/tf/fill)",
+        "steps": ["string", "string"] // ONLY for workout/wo, otherwise null
+      }
+    ]
+  }`;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -137,5 +161,8 @@ async function runGeminiSolver(transcriptionJson: string, key: string, rid: stri
 
   const json = await res.json();
   if (!res.ok || !json.candidates) throw new Error(`GEMINI_S_API_ERROR: ${res.status} - ${JSON.stringify(json)}`);
-  return JSON.parse(json.candidates[0].content.parts[0].text);
+  
+  const result = JSON.parse(json.candidates[0].content.parts[0].text);
+  console.log(`[${rid}] Solver generated ${result.solutions?.length} solutions.`);
+  return result;
 }
