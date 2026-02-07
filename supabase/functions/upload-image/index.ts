@@ -154,10 +154,23 @@ async function runGeminiTranscription(base64: string, mime: string, key: string)
     method: 'POST',
     body: JSON.stringify({
       contents: [{ parts: [{ text: OCR_PROMPT_TEMPLATE }, { inline_data: { mime_type: mime, data: base64 } }] }],
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      ],
       generationConfig: { response_mime_type: "application/json" }
     })
   });
+
   const data = await res.json();
+  
+  if (!data.candidates || !data.candidates[0]) {
+    console.error("GEMINI OCR ERROR:", JSON.stringify(data));
+    throw new Error(`Gemini OCR failed: ${data.error?.message || 'Empty response'}`);
+  }
+
   return data.candidates[0].content.parts[0].text;
 }
 
@@ -168,11 +181,23 @@ async function runGeminiSolver(friendlyText: string, key: string) {
     method: 'POST',
     body: JSON.stringify({
       contents: [{ parts: [{ text: SOLVER_PROMPT_TEMPLATE(friendlyText) }] }],
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      ],
       generationConfig: { response_mime_type: "application/json" }
     })
   });
   
-  const json = await res.json();
-  const rawText = json.candidates[0].content.parts[0].text;
+  const data = await res.json();
+
+  if (!data.candidates || !data.candidates[0]) {
+    console.error("GEMINI SOLVER ERROR:", JSON.stringify(data));
+    throw new Error(`Gemini Solver failed: ${data.error?.message || 'Empty response'}`);
+  }
+
+  const rawText = data.candidates[0].content.parts[0].text;
   return JSON.parse(extractJson(rawText));
 }
