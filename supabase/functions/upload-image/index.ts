@@ -61,11 +61,24 @@ function extractJson(raw: string): string {
 }
 
 function formatTranscriptionForAI(transcription: any): string {
+  let data = transcription;
+
+  // Handle case where transcription is a stringified JSON string
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+      // Sometimes it's double-encoded, try one more time if still a string
+      if (typeof data === 'string') data = JSON.parse(data);
+    } catch (e) {
+      console.error("Failed to parse transcription string:", e);
+    }
+  }
+
   // Robust extraction: support object with 'questions' key OR direct array
-  const qs = transcription?.questions || (Array.isArray(transcription) ? transcription : null);
+  const qs = data?.questions || (Array.isArray(data) ? data : null);
   
   if (!qs || !Array.isArray(qs) || qs.length === 0) {
-    console.error("TRANSCRIPTION_DATA_MISSING: The transcription object did not contain a valid questions array.", JSON.stringify(transcription));
+    console.error("TRANSCRIPTION_DATA_MISSING: The transcription object did not contain a valid questions array.", JSON.stringify(data));
     return "[ERROR: No questions were extracted from the image. Please try a clearer photo.]";
   }
   
