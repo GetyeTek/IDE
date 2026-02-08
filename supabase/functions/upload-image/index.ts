@@ -173,6 +173,10 @@ serve(async (req) => {
   }
 });
 
+// --- AI MODELS ---
+const PRIMARY_MODEL = "gemini-2.5-flash";
+const FALLBACK_MODEL = "gemini-3-flash-preview";
+
 // --- AI FUNCTIONS ---
 
 async function getGeminiKey(supabase: any) {
@@ -184,13 +188,18 @@ async function getGeminiKey(supabase: any) {
   return data.api_key;
 }
 
-async function runGeminiTranscription(base64: string, mime: string, key: string) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+async function callGeminiApi(model: string, key: string, prompt: string, mime?: string, base64?: string) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const parts: any[] = [{ text: prompt }];
   
+  if (mime && base64) {
+    parts.push({ inline_data: { mime_type: mime, data: base64 } });
+  }
+
   const res = await fetch(url, {
-    method: 'POST',
+    method: 'POST', 
     body: JSON.stringify({
-      contents: [{ parts: [{ text: OCR_PROMPT_TEMPLATE }, { inline_data: { mime_type: mime, data: base64 } }] }],
+      contents: [{ parts }],
       safetySettings: [
         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -201,55 +210,39 @@ async function runGeminiTranscription(base64: string, mime: string, key: string)
     })
   });
 
-  const data = await res.json();
-  
-  if (!data.candidates || !data.candidates[0]) {
-    console.error("GEMINI OCR ERROR:", JSON.stringify(data));
-    throw new Error(`Gemini OCR failed: ${data.error?.message || 'Empty response'}`);
+  // Check for Quota Exceeded (429)
+  if (res.status === 429 && model !== FALLBACK_MODEL) {
+    console.warn(`[QUOTA] ${model} exhausted. Retrying with ${FALLBACK_MODEL}...`);
+    return callGeminiApi(FALLBACK_MODEL, key, prompt, mime, base64);
   }
 
+  const data = await res.json();
+  if (!data.candidates || !data.candidates[0]) {
+    throw new Error(data.error?.message || "Empty Gemini response");
+  }
   return data.candidates[0].content.parts[0].text;
 }
 
-async function runGeminiSolver(friendlyText: string, key: string, requestId: string) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-  const prompt = SOLVER_PROMPT_TEMPLATE(friendlyText);
-  
-  console.log(`[${requestId}] CALLING GEMINI 2.5 FLASH SOLVER...`);
-  console.log(`[${requestId}] FULL PROMPT SENT TO AI:\n---BEGIN---\n${prompt}\n---END---`);
-  
-  const res = await fetch(url, {
-    method: 'POST',
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-      ],
-      generationConfig: { 
-          response_mime_type: "application/json"
-      }
-    })
-  });
-  
-  const data = await res.json();
-  console.log(`[${requestId}] RAW GEMINI RESPONSE:`, JSON.stringify(data));
-
-  if (!data.candidates || !data.candidates[0]) {
-    console.error(`[${requestId}] GEMINI SOLVER CRITICAL ERROR:`, JSON.stringify(data));
-    throw new Error(`Gemini Solver failed: ${data.error?.message || 'Empty response'}`);
-  }
-
-  const rawText = data.candidates[0].content.parts[0].text;
-  console.log(`[${requestId}] EXTRACTED TEXT FROM PART:`, rawText);
-  
+async function runGeminiTranscription(base64: string, mime: string, key: string) {
   try {
+    return await callGeminiApi(PRIMARY_MODEL, key, OCR_PROMPT_TEMPLATE, mime, base64);
+  } catch (err) {
+    console.error("Transcription Failure:", err.message);
+    throw err;
+  }
+}
+
+async function runGeminiSolver(friendlyText: string, key: string, requestId: string) {
+  const prompt = SOLVER_PROMPT_TEMPLATE(friendlyText);
+  console.log(`[${requestId}] CALLING SOLVER (with fallback logic)...`);
+
+  try {
+    const rawText = await callGeminiApi(PRIMARY_MODEL, key, prompt);
+    console.log(`[${requestId}] EXTRACTED TEXT:`, rawText);
     const cleanedJson = extractJson(rawText);
     return JSON.parse(cleanedJson);
   } catch (e) {
-    console.error(`[${requestId}] JSON PARSE ERROR. Raw text was:`, rawText);
+    console.error(`[${requestId}] SOLVER ERROR:`, e.message);
     throw e;
   }
 }
