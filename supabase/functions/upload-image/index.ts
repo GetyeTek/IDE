@@ -87,19 +87,32 @@ serve(async (req) => {
       const record = payload.record || payload;
       const { id, status, transcription } = record;
 
-      if (status !== 'transcribed') return new Response(JSON.stringify({ skipped: true }));
+      console.log(`[${requestId}] WEBHOOK RECEIVED: ID=${id}, Status=${status}`);
+      if (status !== 'transcribed') {
+          console.log(`[${requestId}] SKIPPING: Status is not 'transcribed'`);
+          return new Response(JSON.stringify({ skipped: true }));
+      }
 
-      console.log(`[${requestId}] SOLVING: ID ${id}`);
-      const friendlyText = formatTranscriptionForAI(transcription);
-      const geminiKey = await getGeminiKey(supabase);
+      console.log(`[${requestId}] RAW TRANSCRIPTION FROM DB:`, JSON.stringify(transcription));
       
-      const solutionJson = await runGeminiSolver(friendlyText, geminiKey);
+      const friendlyText = formatTranscriptionForAI(transcription);
+      console.log(`[${requestId}] FRIENDLY TEXT FOR AI:`, friendlyText);
+
+      const geminiKey = await getGeminiKey(supabase);
+      const solutionJson = await runGeminiSolver(friendlyText, geminiKey, requestId);
+
+      console.log(`[${requestId}] FINAL JSON TO SAVE:`, JSON.stringify(solutionJson));
 
       const { error: updateError } = await supabase.from('processed_images')
         .update({ solution_json: solutionJson, status: 'completed' })
         .eq('id', id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+          console.error(`[${requestId}] DB UPDATE ERROR:`, updateError);
+          throw updateError;
+      }
+      
+      console.log(`[${requestId}] SUCCESS: Record ${id} updated.`);
       return new Response(JSON.stringify({ success: true }));
     }
 
@@ -174,8 +187,10 @@ async function runGeminiTranscription(base64: string, mime: string, key: string)
   return data.candidates[0].content.parts[0].text;
 }
 
-async function runGeminiSolver(friendlyText: string, key: string) {
+async function runGeminiSolver(friendlyText: string, key: string, requestId: string) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+  
+  console.log(`[${requestId}] CALLING GEMINI 2.5 FLASH SOLVER...`);
   
   const res = await fetch(url, {
     method: 'POST',
@@ -187,17 +202,28 @@ async function runGeminiSolver(friendlyText: string, key: string) {
         { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
         { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
       ],
-      generationConfig: { response_mime_type: "application/json" }
+      generationConfig: { 
+          response_mime_type: "application/json"
+      }
     })
   });
   
   const data = await res.json();
+  console.log(`[${requestId}] RAW GEMINI RESPONSE:`, JSON.stringify(data));
 
   if (!data.candidates || !data.candidates[0]) {
-    console.error("GEMINI SOLVER ERROR:", JSON.stringify(data));
+    console.error(`[${requestId}] GEMINI SOLVER CRITICAL ERROR:`, JSON.stringify(data));
     throw new Error(`Gemini Solver failed: ${data.error?.message || 'Empty response'}`);
   }
 
   const rawText = data.candidates[0].content.parts[0].text;
-  return JSON.parse(extractJson(rawText));
+  console.log(`[${requestId}] EXTRACTED TEXT FROM PART:`, rawText);
+  
+  try {
+    const cleanedJson = extractJson(rawText);
+    return JSON.parse(cleanedJson);
+  } catch (e) {
+    console.error(`[${requestId}] JSON PARSE ERROR. Raw text was:`, rawText);
+    throw e;
+  }
 }
