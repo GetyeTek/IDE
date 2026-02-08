@@ -61,10 +61,21 @@ function extractJson(raw: string): string {
 }
 
 function formatTranscriptionForAI(transcription: any): string {
-  if (!transcription.questions) return "No questions found.";
-  return transcription.questions.map((q: any) => {
-    let text = `ID: ${q.number} | TYPE: ${q.type} | QUESTION: ${q.question_text}`;
-    if (q.options && q.options.length > 0) {
+  // Robust extraction: support object with 'questions' key OR direct array
+  const qs = transcription?.questions || (Array.isArray(transcription) ? transcription : null);
+  
+  if (!qs || !Array.isArray(qs) || qs.length === 0) {
+    console.error("TRANSCRIPTION_DATA_MISSING: The transcription object did not contain a valid questions array.", JSON.stringify(transcription));
+    return "[ERROR: No questions were extracted from the image. Please try a clearer photo.]";
+  }
+  
+  return qs.map((q: any) => {
+    const id = q.number || q.id || "?";
+    const type = q.type || "unknown";
+    const qText = q.question_text || q.text || "[Missing Text]";
+    
+    let text = `ID: ${id} | TYPE: ${type} | QUESTION: ${qText}`;
+    if (q.options && Array.isArray(q.options) && q.options.length > 0) {
       text += ` | OPTIONS: ${q.options.join(', ')}`;
     }
     return text;
@@ -189,13 +200,15 @@ async function runGeminiTranscription(base64: string, mime: string, key: string)
 
 async function runGeminiSolver(friendlyText: string, key: string, requestId: string) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+  const prompt = SOLVER_PROMPT_TEMPLATE(friendlyText);
   
   console.log(`[${requestId}] CALLING GEMINI 2.5 FLASH SOLVER...`);
+  console.log(`[${requestId}] FULL PROMPT SENT TO AI:\n---BEGIN---\n${prompt}\n---END---`);
   
   const res = await fetch(url, {
     method: 'POST',
     body: JSON.stringify({
-      contents: [{ parts: [{ text: SOLVER_PROMPT_TEMPLATE(friendlyText) }] }],
+      contents: [{ parts: [{ text: prompt }] }],
       safetySettings: [
         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
