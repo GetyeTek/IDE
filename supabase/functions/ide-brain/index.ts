@@ -1860,6 +1860,24 @@ When providing a payload, your response must follow this structure:
     if (action === "delete_history") { await supabase.from('conduit_history').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "delete_log") { await supabase.from('conduit_logs').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "delete_run") { await githubFetch(TARGET_REPO, `/actions/runs/${run_id}`, { method: "DELETE" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+
+    if (action === "toggle_favorite") {
+        const { target_id, category, metadata } = payload;
+        const { data: existing } = await supabase.from('conduit_favorites').select('id').eq('repo_name', TARGET_REPO).eq('target_id', String(target_id)).maybeSingle();
+        
+        if (existing) {
+            await supabase.from('conduit_favorites').delete().eq('id', existing.id);
+            return new Response(JSON.stringify({ success: true, favorited: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        } else {
+            await supabase.from('conduit_favorites').insert({ repo_name: TARGET_REPO, target_id: String(target_id), category, metadata });
+            return new Response(JSON.stringify({ success: true, favorited: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+    }
+
+    if (action === "fetch_favorites") {
+        const { data } = await supabase.from('conduit_favorites').select('*').eq('repo_name', TARGET_REPO).order('created_at', { ascending: false });
+        return new Response(JSON.stringify({ favorites: data || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (action === "create_checkpoint") {
         const note = payload.note || "Manual Checkpoint";
         const ref = await githubFetch(TARGET_REPO, `/git/ref/heads/${DEV_BRANCH}`);
