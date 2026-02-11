@@ -462,12 +462,33 @@
             </div>
             <div class="card">
                 <div class="flex-gap" style="margin-bottom: 12px;">
-                    <button class="btn btn-primary" style="flex:1" onclick="handleBriefing('copy')">Copy Brief</button>
-                    <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('import-file-input').click()">Upload Import</button>
-                    <button class="btn btn-dev" style="flex:1; color:black;" onclick="openExportModal()">Export Files</button>
-                </div>
-                <input type="file" id="import-file-input" class="hidden" accept=".zip,.txt" onchange="handleImportFileSelect(this)">
-                <div class="flex-between">
+    async function initCreateApp() {
+        if (!confirm("This will populate your repository root with Android Boilerplate files. Continue?")) return;
+        
+        toggleFabMenu();
+        const termId = addTerminalCard(null, { loading: true });
+        showGlobalToast("🏗️ Populating Boilerplate...");
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'populate_boilerplate' })
+            });
+            const data = await res.json();
+            
+            updateTerminalCard(termId, data, null, true);
+            
+            if (data.success) {
+                showGlobalToast("✨ Boilerplate Ready!");
+                setTimeout(() => {
+                    fetchFileList();
+                    fetchState(false, false);
+                }, 1500);
+            }
+        } catch(e) {
+            updateTerminalCard(termId, { error: e.message });
+        }
+    }
                      <div class="flex-gap">
                         <button class="btn-outline" style="width: auto; padding: 6px 10px; font-size: 11px; border-color: var(--ai-accent); color: var(--ai-accent);" onclick="document.getElementById('search-overlay').classList.add('active')">🔍 Global Find</button>
                         <button class="btn-outline" style="width: auto; padding: 6px 10px; font-size: 11px; border-color: var(--ai-accent); color: var(--ai-accent);" onclick="runDeepScan(true)">🧬 Scan Selected</button>
