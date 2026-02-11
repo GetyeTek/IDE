@@ -1086,7 +1086,7 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
 
     const success = !anyOpFailed;
     const finalCommitSha = success ? lastCommitSha : null;
-    const logData = { success, commit_sha: finalCommitSha, results: fileResults, ops: operations };
+    const logData = { success, commit_sha: finalCommitSha, sha_before: shaBeforePatch, results: fileResults, ops: operations };
 
     if (success && lastCommitSha) {
         const { data: newHistory, error } = await supabase.from('conduit_history')
