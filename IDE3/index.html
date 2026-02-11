@@ -3397,72 +3397,65 @@ async function downloadArtifact(runId) {
     }
 
     // --- NAVIGATION HELPER ---
-    function jumpToElement(element, tabId, navIndex) {
-        console.group(`[JumpEngine] Triggered: ${tabId}`);
-        if (!element) {
-            console.error("[JumpEngine] Failed: Element is null");
-            console.groupEnd();
-            return;
-        }
-
-        // 1. Force Tab Switch
+    async function jumpToElement(selector, tabId, navIndex, loadMoreFn) {
+        console.group(`[DeepJump] Target: ${selector} in ${tabId}`);
+        
         const navItems = document.querySelectorAll('.nav-item');
         switchTab(tabId, navItems[navIndex]);
-        console.log("[JumpEngine] Tab switched.");
 
         const scrollContainer = document.querySelector('.main-view');
-        
-        let attempts = 0;
-        const scrollLogic = () => {
-            attempts++;
+        let retryCount = 0;
+        const MAX_RETRIES = 5;
+
+        const attemptNavigation = async () => {
+            const element = document.querySelector(selector);
             
-            // Calculate position relative to the scroll container
-            // We iterate up the offsetParents until we hit the container
-            let offsetTop = 0;
-            let curr = element;
-            while (curr && curr !== scrollContainer) {
-                offsetTop += curr.offsetTop;
-                curr = curr.offsetParent;
-            }
+            if (element) {
+                console.log("[DeepJump] Element found. Scrolling...");
+                
+                // Wait for any tab transition animations
+                await new Promise(r => setTimeout(r, 300));
 
-            console.log(`[JumpEngine] Attempt ${attempts}: Calculated offsetTop as ${offsetTop}`);
+                let offsetTop = 0;
+                let curr = element;
+                while (curr && curr !== scrollContainer) {
+                    offsetTop += curr.offsetTop;
+                    curr = curr.offsetParent;
+                }
 
-            if (offsetTop > 0 || attempts > 3) {
-                // Center the element: targetTop = offsetTop - (containerHeight / 2) + (elementHeight / 2)
                 const targetScroll = offsetTop - (scrollContainer.clientHeight / 2) + (element.clientHeight / 2);
-                
-                console.log(`[JumpEngine] Executing scroll to: ${targetScroll}`);
-                
-                scrollContainer.scrollTo({
-                    top: targetScroll,
-                    behavior: 'smooth'
-                });
+                scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
 
-                // Visual Feedback
+                // Visual Highlight
                 element.style.transition = 'all 0.5s ease';
-                const oldBg = element.style.backgroundColor;
-                const oldShadow = element.style.boxShadow;
-                const oldBorder = element.style.border;
-
                 element.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
                 element.style.boxShadow = '0 0 30px rgba(59, 130, 246, 0.6)';
-                element.style.border = '2px solid var(--primary)';
-
                 setTimeout(() => {
-                    element.style.backgroundColor = oldBg;
-                    element.style.boxShadow = oldShadow;
-                    element.style.border = oldBorder;
+                    element.style.backgroundColor = '';
+                    element.style.boxShadow = '';
                 }, 3000);
-
+                
                 console.groupEnd();
-            } else {
-                // If offset is still 0, the tab content might still be hidden/rendering
-                setTimeout(scrollLogic, 150);
+                return true;
             }
+
+            if (retryCount < MAX_RETRIES && loadMoreFn) {
+                console.log(`[DeepJump] Not found. Triggering loadMore (Attempt ${retryCount + 1})...`);
+                retryCount++;
+                showGlobalToast("🔍 Searching deeper...");
+                
+                await loadMoreFn(); 
+                await new Promise(r => setTimeout(r, 800)); // Wait for render
+                return attemptNavigation();
+            }
+
+            console.error("[DeepJump] Failed: Element not found after retries.");
+            showGlobalToast("Entry not found in recent history.", true);
+            console.groupEnd();
+            return false;
         };
 
-        // Wait for tab transition animation before starting logic
-        setTimeout(scrollLogic, 250);
+        setTimeout(attemptNavigation, 100);
     }
 
     function renderHistory(historyData) {
@@ -3502,91 +3495,52 @@ async function downloadArtifact(runId) {
         }).join('');
     }
 
-    function traceHistoryToRun(sha) {
-        console.log(`[Trace] History -> Run | SHA: ${sha}`);
+    async function traceHistoryToRun(sha) {
         if (!sha) return showGlobalToast("No SHA linked to this entry", true);
-
-        const targetRun = document.querySelector(`#workflow-list div[data-commit-sha="${sha}"]`);
-
-        if (targetRun) {
-            jumpToElement(targetRun, 'tab-cicd', 4);
-            setTimeout(() => {
-                const headerEl = targetRun.querySelector('div[onclick]');
-                const runId = targetRun.dataset.runId;
-                const jobsContainer = document.getElementById(`wf-jobs-${runId}`);
-                if (headerEl && jobsContainer && jobsContainer.style.display === 'none') {
-                    toggleWorkflowJobs(runId, headerEl);
-                }
-            }, 500);
-        } else {
-            console.warn(`[Trace] Run not found for SHA: ${sha}. Current workflow count: ${document.querySelectorAll('#workflow-list > div').length}`);
-            showGlobalToast("Build not found in loaded workflows. Try loading more in CI/CD tab.");
+        const selector = `#workflow-list div[data-commit-sha="${sha}"]`;
+        
+        const success = await jumpToElement(selector, 'tab-cicd', 4, loadMoreWorkflows);
+        
+        if (success) {
+            const targetRun = document.querySelector(selector);
+            const runId = targetRun.dataset.runId;
+            const headerEl = targetRun.querySelector('div[onclick]');
+            if (headerEl) toggleWorkflowJobs(runId, headerEl);
         }
     }
 
     function traceRunToHistory(sha) {
-        console.log(`[Trace] Run -> History | SHA: ${sha}`);
         if (!sha) return showGlobalToast("No SHA linked to this run", true);
-
-        const targetHistoryItem = document.querySelector(`.version-item[data-commit-sha="${sha}"]`);
-
-        if (targetHistoryItem) {
-            jumpToElement(targetHistoryItem, 'tab-history', 3);
-        } else {
-            console.warn(`[Trace] History entry not found for SHA: ${sha}`);
-            showGlobalToast("History entry not found. Try loading more in History tab.");
-        }
+        jumpToElement(`.version-item[data-commit-sha="${sha}"]`, 'tab-history', 3, loadMoreHistory);
     }
 
     function traceRunToLog(sha) {
-        console.log(`[Trace] Run -> Log | SHA: ${sha}`);
         if (!sha) return showGlobalToast("No commit SHA linked to this run.", true);
-        const targetLog = document.querySelector(`.log-entry[data-commit-sha="${sha}"]`);
-        if (targetLog) {
-            jumpToElement(targetLog, 'tab-patcher', 1);
-        } else {
-            console.warn(`[Trace] Log entry not found for SHA: ${sha}`);
-            showGlobalToast("Could not find matching log in Terminal. Try loading more logs.");
-        }
+        jumpToElement(`.log-entry[data-commit-sha="${sha}"]`, 'tab-patcher', 1, loadMoreLogs);
     }
 
     function traceHistoryToLog(sha) {
         if (!sha) return showGlobalToast("No SHA linked to this entry", true);
-        const targetLog = document.querySelector(`.log-entry[data-commit-sha="${sha}"]`);
-
-        if (targetLog) {
-            jumpToElement(targetLog, 'tab-patcher', 1);
-        } else {
-            showGlobalToast("Log entry not found in terminal.");
-        }
+        jumpToElement(`.log-entry[data-commit-sha="${sha}"]`, 'tab-patcher', 1, loadMoreLogs);
     }
 
     function traceLogToHistory(sha) {
         if (!sha) return showGlobalToast("No commit SHA linked to this log entry.", true);
-        const targetHistoryItem = document.querySelector(`.version-item[data-commit-sha="${sha}"]`);
-        if (targetHistoryItem) {
-            jumpToElement(targetHistoryItem, 'tab-history', 3);
-        } else {
-            showGlobalToast("Could not find matching entry in History.");
-        }
+        jumpToElement(`.version-item[data-commit-sha="${sha}"]`, 'tab-history', 3, loadMoreHistory);
     }
 
   
-    function traceLogToRun(sha) {
+    async function traceLogToRun(sha) {
         if (!sha) return showGlobalToast("No commit SHA linked to this log entry.", true);
-        const targetRun = document.querySelector(`#workflow-list > div[data-commit-sha="${sha}"]`);
-        if (targetRun) {
-            jumpToElement(targetRun, 'tab-cicd', 4);
-            setTimeout(() => {
-                const headerEl = targetRun.querySelector('div[onclick]');
-                const runId = targetRun.dataset.runId;
-                const jobsContainer = document.getElementById(`wf-jobs-${runId}`);
-                if (headerEl && jobsContainer && jobsContainer.style.display === 'none') {
-                    toggleWorkflowJobs(runId, headerEl);
-                }
-            }, 200);
-        } else {
-            showGlobalToast("Could not find matching build run in CI/CD.");
+        const selector = `#workflow-list div[data-commit-sha="${sha}"]`;
+        
+        const success = await jumpToElement(selector, 'tab-cicd', 4, loadMoreWorkflows);
+        
+        if (success) {
+            const targetRun = document.querySelector(selector);
+            const runId = targetRun.dataset.runId;
+            const headerEl = targetRun.querySelector('div[onclick]');
+            if (headerEl) toggleWorkflowJobs(runId, headerEl);
         }
     }
 
