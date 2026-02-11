@@ -4303,36 +4303,37 @@ async function downloadArtifact(runId) {
         
         if (checked.length === 0) return alert("No files selected.");
 
-        // Init AbortController
         if (exportController) exportController.abort(); 
         exportController = new AbortController();
         const signal = exportController.signal;
 
         try {
             const fetchedFiles = [];
-            let count = 0;
-
-            for (const path of checked) {
+            const BATCH_SIZE = 8; // Optimal balance for browser concurrency and API stability
+            
+            for (let i = 0; i < checked.length; i += BATCH_SIZE) {
                 if (signal.aborted) throw new Error("Cancelled by user");
-                
-                count++;
-                statusEl.innerText = `Fetching ${count}/${checked.length}: ${path.split('/').pop()}...`;
-                statusEl.style.color = "var(--primary)";
-                
-                const res = await fetch(CONFIG.funcUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: apiBody({ action: 'preview_file', file_path: path }),
-                    signal: signal 
-                });
-                const data = await res.json();
-                if (data.content) fetchedFiles.push({
-                    path,
-                    content: b64DecodeUnicode(data.content)
-                });
+
+                const batch = checked.slice(i, i + BATCH_SIZE);
+                statusEl.innerText = `⚡ Parallel Fetching: ${i + 1}-${Math.min(i + BATCH_SIZE, checked.length)} of ${checked.length}...`;
+                statusEl.style.color = "var(--ai-accent)";
+
+                const batchResults = await Promise.all(batch.map(async (path) => {
+                    const res = await fetch(CONFIG.funcUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: apiBody({ action: 'preview_file', file_path: path }),
+                        signal: signal 
+                    });
+                    const data = await res.json();
+                    if (!data.content) return null;
+                    return { path, content: b64DecodeUnicode(data.content) };
+                }));
+
+                fetchedFiles.push(...batchResults.filter(f => f !== null));
             }
 
-            statusEl.innerText = "Generating Bundle...";
+            statusEl.innerText = "📦 Finalizing Bundle...";
 
             if (type === 'zip') {
                 const zip = new JSZip();
