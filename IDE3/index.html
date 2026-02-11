@@ -3018,8 +3018,8 @@ function addTerminalCard(data, options = {}) {
                 runStateCache[run.id] = currentState;
                 // ------------------------------
 
-                const color = run.conclusion === 'success' ? 'var(--prod)' : (run.conclusion === 'failure' ? 'var(--danger)' : '#eab308');
-                const icon = run.conclusion === 'success' ? '✔' : (run.conclusion === 'failure' ? '✖' : '●');
+                const color = run.conclusion === 'success' ? 'var(--prod)' : (run.conclusion === 'failure' ? 'var(--danger)' : (run.conclusion === 'cancelled' ? '#666' : '#eab308'));
+                const icon = run.conclusion === 'success' ? '✔' : (run.conclusion === 'failure' ? '✖' : (run.conclusion === 'cancelled' ? '⊘' : '●'));
                 const div = document.createElement('div');
                 div.style.borderBottom = '1px solid var(--border)';
                 div.dataset.commitSha = run.head_commit.id;
@@ -3056,6 +3056,11 @@ function addTerminalCard(data, options = {}) {
                                 ${new Date(run.created_at).toLocaleDateString()} ${new Date(run.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </div>
                             <div class="flex-gap">
+                                ${(run.status === 'in_progress' || run.status === 'queued') ? `
+                                <button class="icon-btn" style="color:var(--danger); border-color:rgba(239,68,68,0.3); padding: 4px 10px;"
+                                        onclick="event.stopPropagation(); cancelWorkflowRun(${run.id})" title="Cancel Run">
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>` : ''}
                                 ${run.conclusion === 'success' ? `
                                 <button class="icon-btn" style="color:var(--prod); border-color:rgba(34,197,94,0.3); padding: 4px 10px;" 
                                         onclick="event.stopPropagation(); downloadArtifact(${run.id})" title="Download Artifact">
@@ -4759,6 +4764,22 @@ async function downloadArtifact(runId) {
             el.style.opacity = '0';
             setTimeout(() => el.remove(), 300);
         }
+    }
+
+    async function cancelWorkflowRun(runId) {
+        if (!confirm("Stop this workflow execution?")) return;
+        showGlobalToast("🛑 Sending cancel request...");
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'cancel_run', run_id: runId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showGlobalToast("Cancellation requested");
+                setTimeout(() => loadWorkflows(true), 1500);
+            } else throw new Error(data.error || "Failed to cancel");
+        } catch(e) { showGlobalToast(e.message, true); }
     }
 
     async function deleteWorkflowRun(runId) {
