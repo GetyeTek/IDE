@@ -445,29 +445,29 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
     
     if (data.error) throw new Error(`Google AI Error: ${data.error.message || JSON.stringify(data.error)}`);
     
-    // --- RAW DEBUG LOG (Supabase Dashboard) ---
     console.log(`\n=== [AI RESPONSE RECEIVED] Provider: ${provider.name} (Google) ===`);
-    console.log(JSON.stringify(data, null, 2));
-    console.log("=== [END RESPONSE] ===\n");
-
-    const part = data.candidates?.[0]?.content?.parts?.[0];
-    let tool_calls = undefined;
     
-    if (part?.functionCall) {
-        // Map Gemini FunctionCall to OpenAI ToolCall format
-        tool_calls = [{
-            function: {
-                name: part.functionCall.name,
-                // Gemini args are objects, OpenAI expects JSON strings
-                arguments: JSON.stringify(part.functionCall.args)
-            }
-        }];
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    let combinedContent = "";
+    let tool_calls: any[] = [];
+
+    // Loop through all parts to catch both text and function calls
+    for (const p of parts) {
+        if (p.text) combinedContent += p.text;
+        if (p.functionCall) {
+            tool_calls.push({
+                function: {
+                    name: p.functionCall.name,
+                    arguments: JSON.stringify(p.functionCall.args)
+                }
+            });
+        }
     }
 
     return { 
       raw: data, 
-      content: part?.text || "",
-      tool_calls: tool_calls
+      content: combinedContent,
+      tool_calls: tool_calls.length > 0 ? tool_calls : undefined
     };
   }
 
