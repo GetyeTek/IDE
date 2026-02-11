@@ -1973,7 +1973,7 @@ When providing a payload, your response must follow this structure:
         await supabase.from('conduit_logs').delete().eq('id', data.id);
 
         return new Response(JSON.stringify({
-            token: Deno.env.get("SUPABASE_ACCESS_TOKEN"),
+            token: Deno.env.get("CONDUIT_ACCESS_TOKEN"),
             url: Deno.env.get("SUPABASE_URL")
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
