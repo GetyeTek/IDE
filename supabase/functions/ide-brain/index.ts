@@ -1862,6 +1862,7 @@ When providing a payload, your response must follow this structure:
     if (action === "delete_history") { await supabase.from('conduit_history').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "delete_log") { await supabase.from('conduit_logs').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "delete_run") { await githubFetch(TARGET_REPO, `/actions/runs/${run_id}`, { method: "DELETE" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+    if (action === "cancel_run") { await githubFetch(TARGET_REPO, `/actions/runs/${run_id}/cancel`, { method: "POST" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
 
     if (action === "toggle_favorite") {
         const { target_id, category, metadata } = payload;
