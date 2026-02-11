@@ -1560,8 +1560,10 @@ When providing a payload, your response must follow this structure:
     }
 
     if (action === "fetch_project_bundle") {
+      const scope = (payload.project_path || "").trim();
       const tree = await githubFetch(TARGET_REPO, `/git/trees/${ref_sha || DEV_BRANCH}?recursive=1`);
-      const files = tree.tree.filter((f: any) => f.type === "blob" && f.path.startsWith(payload.project_path || ""));
+      // Strict Filtering: Only blobs, and must start with project_path if defined
+      const files = tree.tree.filter((f: any) => f.type === "blob" && (!scope || f.path.startsWith(scope)));
       const fileData: Record<string, any> = {};
       const batchSize = 5; // Reduced from 10 to avoid GitHub rate limits/timeouts
       for (let i = 0; i < files.length; i += batchSize) {
