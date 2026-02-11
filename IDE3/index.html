@@ -166,8 +166,14 @@
         }
 
         /* EDITOR STYLES (FULL SCREEN UPDATE) */
-        .editor-toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; flex-shrink: 0; }
-        .icon-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+        .editor-toolbar {
+            display: flex; justify-content: flex-start; align-items: center; 
+            gap: 8px; margin-bottom: 8px; flex-shrink: 0; 
+            overflow-x: auto; white-space: nowrap; scrollbar-width: none; -ms-overflow-style: none;
+        }
+        .editor-toolbar::-webkit-scrollbar { display: none; }
+        .editor-toolbar span { flex-shrink: 0; }
+        .icon-btn { flex-shrink: 0; background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; }
         .icon-btn:active { background: var(--border); }
         
         .json-editor {
