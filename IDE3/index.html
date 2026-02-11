@@ -1040,17 +1040,37 @@
         // Listen for console sync from preview iframe
         window.addEventListener('message', (e) => {
             if (e.data && e.data.type === 'CONDUIT_CONSOLE') {
+                // Avoid spam: check if last log was the same
+                const lastLog = document.querySelector('.runtime-log');
+                if (lastLog && lastLog.dataset.msg === e.data.msg) {
+                    const countBadge = lastLog.querySelector('.log-count') || document.createElement('span');
+                    if (!lastLog.querySelector('.log-count')) {
+                        countBadge.className = 'log-count';
+                        countBadge.style.cssText = 'background:#444; color:#fff; padding:2px 6px; border-radius:10px; font-size:9px; margin-left:8px;';
+                        lastLog.querySelector('.log-meta').appendChild(countBadge);
+                    }
+                    lastLog.dataset.count = parseInt(lastLog.dataset.count || 1) + 1;
+                    countBadge.innerText = `x${lastLog.dataset.count}`;
+                    return;
+                }
+
                 const logId = addTerminalCard(null, {});
                 const color = e.data.method === 'error' ? 'var(--danger)' : (e.data.method === 'warn' ? 'var(--dev)' : 'var(--primary)');
                 const el = document.getElementById(logId);
                 if (!el) return;
+                
+                el.classList.add('runtime-log');
+                el.dataset.msg = e.data.msg;
                 el.innerHTML = '<div class="log-header expanded" style="border-left-color:' + color + ';">' +
                     '<div class="log-meta">' +
-                    '<span class="status-pill" style="background:' + color + '; color:white;">PREVIEW</span>' +
+                    '<span class="status-pill" style="background:' + color + '; color:white;">RUNTIME</span>' +
                     '<span style="font-size:11px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">' + escapeHtml(e.data.msg) + '</span>' +
                     '</div>' +
                     '<button class="btn-dev" style="width:auto; padding:4px 8px; font-size:10px; color:black;" onclick="fixPreviewError(\'' + escapeHtml(e.data.msg).replace(/'/g, "\\'") + '\')">✨ Fix</button>' +
                     '</div>';
+                
+                // Self-destruct after 60 seconds to keep terminal clean
+                setTimeout(() => { if(el.parentElement) el.remove(); }, 60000);
             }
         });
 
@@ -2270,6 +2290,9 @@ function addTerminalCard(data, options = {}) {
     // --- BUNDLER & PREVIEW ---
     async function bundleAndPreview(index) {
         if(!CONFIG.funcUrl) return;
+        // Clear temporary runtime logs on every new build
+        document.querySelectorAll('.runtime-log').forEach(el => el.remove());
+        
         console.group("🧬 WASM BUNDLER SCAN");
 
         let entry = (typeof index === 'number') ? dbHistory[index] : null;
