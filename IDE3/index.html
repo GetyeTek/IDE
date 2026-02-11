@@ -317,18 +317,43 @@
         /*      NEW AI CHAT STYLES      */
         /* ============================ */
         
-        /* Floating Action Button */
-        .fab-chat {
-            position: fixed; bottom: 100px; right: 20px;
+        /* Multi-Action FAB Group */
+        .fab-group {
+            position: fixed; bottom: 100px; right: 20px; z-index: 200;
+            display: flex; flex-direction: column; align-items: center; gap: 15px;
+        }
+        .fab-main {
             width: 56px; height: 56px; border-radius: 50%;
             background: var(--ai-accent); color: white; border: none;
             box-shadow: 0 4px 20px rgba(217, 70, 239, 0.4);
-            cursor: pointer; z-index: 200;
-            display: flex; align-items: center; justify-content: center;
-            transition: transform 0.2s, opacity 0.2s;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .fab-chat:active { transform: scale(0.95); }
-        .fab-chat.hidden { transform: scale(0); opacity: 0; pointer-events: none; }
+        .fab-group.active .fab-main { transform: rotate(135deg); background: #333; box-shadow: none; }
+        
+        .fab-sub-container {
+            display: flex; flex-direction: column; gap: 10px; align-items: center;
+            pointer-events: none; opacity: 0; transform: translateY(20px) scale(0.5);
+            transition: all 0.2s ease-out;
+        }
+        .fab-group.active .fab-sub-container {
+            pointer-events: auto; opacity: 1; transform: translateY(0) scale(1);
+        }
+
+        .fab-sub {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer;
+            display: flex; align-items: center; justify-content: center; position: relative;
+        }
+        .fab-sub:hover { background: var(--border); }
+        .fab-sub::after {
+            content: attr(data-label); position: absolute; right: 55px;
+            background: #222; color: white; padding: 4px 8px; border-radius: 4px;
+            font-size: 11px; white-space: nowrap; opacity: 0; transition: opacity 0.2s;
+            pointer-events: none; border: 1px solid var(--border);
+        }
+        .fab-sub:hover::after { opacity: 1; }
 
         /* Chat Overlay (Full Screen) */
         .chat-overlay {
@@ -888,10 +913,20 @@
         <div id="repo-selector-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
     </div>
 
-    <!-- NEW: AI CHAT FAB -->
-    <button class="fab-chat" onclick="toggleChat(true)">
-        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
-    </button>
+    <!-- NEW: MULTI-ACTION FAB -->
+    <div class="fab-group" id="main-fab-group">
+        <div class="fab-sub-container">
+            <button class="fab-sub" data-label="Create App" onclick="initCreateApp()">
+                <svg width="20" height="20" fill="none" stroke="var(--prod)" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            </button>
+            <button class="fab-sub" data-label="AI Chat" onclick="toggleFabMenu(); toggleChat(true);">
+                <svg width="20" height="20" fill="none" stroke="var(--ai-accent)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+            </button>
+        </div>
+        <button class="fab-main" onclick="toggleFabMenu()" id="fab-trigger">
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+        </button>
+    </div>
 
     <!-- NEW: CHAT OVERLAY -->
     <div id="chat-overlay" class="chat-overlay">
@@ -1162,8 +1197,18 @@
     }
 
     function toggleFab(show) {
-        const fab = document.querySelector('.fab-chat');
-        if (fab) fab.classList.toggle('hidden', !show);
+        const fab = document.getElementById('main-fab-group');
+        if (fab) fab.style.display = show ? 'flex' : 'none';
+    }
+
+    function toggleFabMenu() {
+        document.getElementById('main-fab-group').classList.toggle('active');
+    }
+
+    function initCreateApp() {
+        toggleFabMenu();
+        showGlobalToast("Ready to create. What kind of app should we build?");
+        // Next step: Population logic
     }
 
     function openEFManager() {
