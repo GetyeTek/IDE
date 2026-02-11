@@ -2208,6 +2208,18 @@ function addTerminalCard(data, options = {}) {
     function updateTerminalCard(id, response, originalPayload, isLive = false) {
         const el = document.getElementById(id);
         if(!el) return;
+
+        // Define patchTitle for favorites and UI display
+        let patchTitle = "Patch Operation";
+        if (Array.isArray(originalPayload)) {
+            const commentOp = originalPayload.find(p => p.action === 'comment');
+            if (commentOp && commentOp.text) {
+                patchTitle = commentOp.text.split('\n')[0].substring(0, 60);
+            } else {
+                const opCount = originalPayload.filter(p => p.action !== 'comment').length;
+                patchTitle = `Patch: ${opCount} operations`;
+            }
+        }
         
         // Ensure we capture the SHA if present
         if (response && response.commit_sha) {
