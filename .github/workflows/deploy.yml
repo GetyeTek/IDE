@@ -4,14 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       function_name:
-        description: 'Name of the function to deploy (must match folder name)'
+        description: 'Name of the function to deploy'
+        required: true
+        type: string
+      deploy_ticket:
+        description: 'Conduit Security Ticket'
         required: true
         type: string
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Restrict deployment to your conduit-dev branch
+    # Deployment restricted to the dev branch
     if: github.ref == 'refs/heads/conduit-dev'
 
     steps:
@@ -23,11 +27,30 @@ jobs:
         with:
           version: latest
 
-      - name: Extract Project Ref from URL
-        id: get_ref
+      - name: Fetch Secrets from Conduit Relay
         run: |
-          # Extracts 'abc' from 'https://abc.supabase.co'
-          URL="${{ secrets.SUPABASE_URL }}"
+          # Change the URL below ONLY if your IDE Brain function is at a different address
+          IDE_URL="https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/ide-brain"
+
+          RESPONSE=$(curl -s -X POST $IDE_URL \
+            -H "Content-Type: application/json" \
+            -d "{\"action\": \"claim_deploy_token\", \"ticket\": \"${{ github.event.inputs.deploy_ticket }}\"}")
+          
+          # Parse the response to extract the token and project URL
+          TOKEN=$(echo $RESPONSE | sed 's/.*"token":"\([^"]*\)".*/\1/')
+          URL=$(echo $RESPONSE | sed 's/.*"url":"\([^"]*\)".*/\1/')
+          
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then 
+            echo "❌ Error: Failed to claim token from Conduit Relay."
+            echo "Raw Response: $RESPONSE"
+            exit 1 
+          fi
+          
+          # Inject secrets into the environment for the next step
+          echo "SUPABASE_ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
+          echo "SUPABASE_URL=$URL" >> $GITHUB_ENV
+          
+          # Extract Project ID (e.g. 'abc' from 'https://abc.supabase.co')
           REF=$(echo $URL | sed -e 's|^[^/]*//||' -e 's|\..*||')
           echo "PROJECT_ID=$REF" >> $GITHUB_ENV
 
@@ -35,4 +58,4 @@ jobs:
         run: |
           supabase functions deploy ${{ github.event.inputs.function_name }} --project-ref ${{ env.PROJECT_ID }} --no-verify-jwt
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ env.SUPABASE_ACCESS_TOKEN }}
