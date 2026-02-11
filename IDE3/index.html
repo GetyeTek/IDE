@@ -465,7 +465,10 @@
 
         <!-- PATCHER TAB -->
         <div id="tab-patcher" class="tab-content">
-            <div class="header">Patcher</div>
+            <div class="header">
+                Patcher
+                <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
+            </div>
             
             <div>
                 <div class="editor-toolbar">
@@ -514,7 +517,13 @@
 
         <!-- HISTORY TAB -->
         <div id="tab-history" class="tab-content">
-            <div class="header">History <button class="icon-btn" onclick="resetHistoryAndSync()">Sync</button></div>
+            <div class="header">
+                History 
+                <div class="flex-gap">
+                    <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
+                    <button class="icon-btn" onclick="resetHistoryAndSync()">Sync</button>
+                </div>
+            </div>
              <div class="card" id="history-container" style="padding-bottom:0;"><div style="padding:10px; text-align:center;">Loading...</div></div>
              <button id="load-more-history-btn" class="btn btn-outline" style="margin-top: 10px; margin-bottom: 20px; font-size: 12px;" onclick="loadMoreHistory()">Load More History</button>
              <div class="bottom-spacer"></div>
@@ -602,6 +611,7 @@
             <div class="header">
                 Workflows
                 <div class="flex-gap">
+                    <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
                     <button class="icon-btn" onclick="triggerBuild()">▶ Trigger</button>
                     <button class="icon-btn" onclick="loadWorkflows(true); lastCicdRefresh=0; loadWorkflows(false)">Refresh</button>
                 </div>
@@ -745,6 +755,17 @@
     </div>
     
     <div id="toast-msg"></div>
+
+    <!-- FAVORITES HUB OVERLAY -->
+    <div id="favorites-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span class="viewer-title">Private Favorites & Bookmarks</span>
+            <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="document.getElementById('favorites-overlay').classList.remove('active')">Close</button>
+        </div>
+        <div id="favorites-list" style="padding:16px; flex:1; overflow-y:auto;">
+            <div style="text-align:center; padding:40px; color:#666;">No items saved yet.</div>
+        </div>
+    </div>
 
     <!-- AI MANAGER OVERLAY -->
     <div id="ai-manager-overlay" class="viewer-overlay">
@@ -2210,6 +2231,7 @@ function addTerminalCard(data, options = {}) {
             <div class="log-header" onclick="toggleLogBody('${id}')">
                 <div class="log-meta">
                     ${signatureHtml}
+                    <button class="menu-btn favorite-btn" onclick="event.stopPropagation(); toggleFavorite('${id}', 'Patch', {title: '${patchTitle}', sha: '${response.sha || ''}'})" style="padding:0 5px; color:#555;">★</button>
                     <span class="log-time">${new Date().toLocaleTimeString()}</span>
                     ${hasAI ? '<span class="status-pill" style="background:rgba(217,70,239,0.2); color:#d946ef; margin-right:4px;">✨ AI</span>' : ''}
                     <span class="status-pill ${isFail ? 'pill-fail' : 'pill-success'}">${isFail ? `${failCount} FAILED` : 'SUCCESS'}</span>
@@ -2998,7 +3020,10 @@ function addTerminalCard(data, options = {}) {
                          onmouseover="this.style.background='#161618'"
                          onmouseout="if(document.getElementById('wf-jobs-${run.id}').style.display === 'none') this.style.background='#111'; else this.style.background='#1a1a1c';">
                         
-                        <div style="color:${color}; font-size:18px; padding-top:2px;">${icon}</div>
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
+                            <div style="color:${color}; font-size:18px; padding-top:2px;">${icon}</div>
+                            <button class="menu-btn favorite-btn" onclick="event.stopPropagation(); toggleFavorite('${run.head_commit.id}', 'Build', {title: '${run.name} #${run.run_number}', run_id: '${run.id}'})" style="padding:0; color:#555; font-size:14px;">★</button>
+                        </div>
                         
                         <div style="flex:1; min-width: 0;">
                             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
@@ -3468,6 +3493,7 @@ async function downloadArtifact(runId) {
                 <div class="v-header">
                     <div class="flex-gap" style="align-items:center; flex:1; min-width:0;">
                         <input type="checkbox" class="history-check" value="${h.id}" onchange="toggleDeleteFab()" style="accent-color:var(--danger); flex-shrink:0;">
+                        <button class="menu-btn favorite-btn" onclick="event.stopPropagation(); toggleFavorite('${h.sha}', 'Commit', {title: '${h.title.replace(/'/g, "\\'")}', conduit_id: '${h.conduit_id}'})" style="padding:0 5px; color:#555;">★</button>
                         <div class="v-info" style="flex:1; min-width:0;">
                             <strong style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
                                 <span class="status-pill" style="background:var(--primary-dim); color:var(--primary); font-size:10px; padding: 2px 5px; border-radius: 5px; vertical-align: middle; margin-right: 6px;">#${h.conduit_id}</span>
@@ -4630,6 +4656,67 @@ async function downloadArtifact(runId) {
             } else throw new Error(data.error || "Rollback failed");
         } catch (e) {
             showGlobalToast(e.message, true);
+        }
+    }
+
+    async function toggleFavorite(targetId, category, metadata) {
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'toggle_favorite', target_id: targetId, category, metadata })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showGlobalToast(data.favorited ? "⭐ Added to Favorites" : "Removed from Favorites");
+                // Visual feedback in UI - simpler than full re-render
+                const btns = document.querySelectorAll(`.favorite-btn[onclick*="'${targetId}'"]`);
+                btns.forEach(btn => btn.style.color = data.favorited ? 'var(--dev)' : '#555');
+            }
+        } catch(e) { showGlobalToast("Error saving favorite", true); }
+    }
+
+    async function openFavorites() {
+        const overlay = document.getElementById('favorites-overlay');
+        const list = document.getElementById('favorites-list');
+        overlay.classList.add('active');
+        list.innerHTML = '<div style="text-align:center; padding:20px;">⭐ Loading Favourites...</div>';
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'fetch_favorites' })
+            });
+            const data = await res.json();
+            
+            if (!data.favorites || data.favorites.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">No items saved yet. Star items in Terminal, History, or CI/CD to see them here.</div>';
+                return;
+            }
+
+            list.innerHTML = data.favorites.map(fav => {
+                const m = fav.metadata;
+                const typeColor = fav.category === 'Patch' ? 'var(--ai-accent)' : (fav.category === 'Commit' ? 'var(--primary)' : 'var(--prod)');
+                return `
+                <div class="card" style="padding:12px; margin-bottom:10px; cursor:pointer;" onclick="jumpToFavorite('${fav.target_id}', '${fav.category}')">
+                    <div class="flex-between">
+                        <span class="status-pill" style="background:${typeColor}22; color:${typeColor};">${fav.category}</span>
+                        <small style="color:#666;">${new Date(fav.created_at).toLocaleDateString()}</small>
+                    </div>
+                    <div style="margin-top:8px; font-weight:600; font-size:13px; color:#eee;">${m.conduit_id ? '#' + m.conduit_id + ' ' : ''}${m.title}</div>
+                    <div style="font-size:10px; color:#444; font-family:'JetBrains Mono'; margin-top:4px;">${fav.target_id.substring(0, 10)}...</div>
+                </div>`;
+            }).join('');
+        } catch(e) { list.innerHTML = 'Error loading favorites.'; }
+    }
+
+    function jumpToFavorite(id, category) {
+        document.getElementById('favorites-overlay').classList.remove('active');
+        if (category === 'Patch') {
+            jumpToElement(`.log-entry[data-commit-sha="${id}"]`, 'tab-patcher', 1, loadMoreLogs);
+        } else if (category === 'Commit') {
+            jumpToElement(`.version-item[data-commit-sha="${id}"]`, 'tab-history', 3, loadMoreHistory);
+        } else if (category === 'Build') {
+            jumpToElement(`#workflow-list div[data-commit-sha="${id}"]`, 'tab-cicd', 4, loadMoreWorkflows);
         }
     }
 
