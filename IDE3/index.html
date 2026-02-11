@@ -1716,7 +1716,7 @@
         
         applyPreviewTabVisibility(); // Apply change immediately
 
-        alert("Settings Saved!");
+        showGlobalToast("Settings Saved & Synced");
         
         // Reset UI
         document.getElementById('file-list-container').innerHTML = '';
@@ -3111,7 +3111,7 @@ function addTerminalCard(data, options = {}) {
 
     function copySyntaxContext() {
         const text = document.getElementById('sr-code').innerText;
-        navigator.clipboard.writeText(text).then(() => alert("Copied code context!"));
+        navigator.clipboard.writeText(text).then(() => showGlobalToast("Code context copied!"));
     }
 
     let runStateCache = {};
@@ -3373,7 +3373,7 @@ async function downloadArtifact(runId) {
             toast.remove();
             if(data.analysis) {
                 document.getElementById('op-modal-title').innerText = `Failure Analysis: ${name}`;
-                document.getElementById('op-modal-body').innerHTML = `<div style="padding:15px; color:#ddd; font-size:13px; line-height:1.6; display:flex; flex-direction:column; height:100%;"><div style="background:#222; padding:15px; border-radius:8px; margin-bottom:15px; white-space:pre-wrap; font-family:'JetBrains Mono', monospace; font-size:12px; overflow-y:auto; flex:1; border:1px solid #333;">${data.analysis}</div><button class="btn btn-primary" onclick="navigator.clipboard.writeText(this.previousElementSibling.innerText).then(()=>alert('Copied!'))">📋 Copy</button></div>`;
+                document.getElementById('op-modal-body').innerHTML = `<div style="padding:15px; color:#ddd; font-size:13px; line-height:1.6; display:flex; flex-direction:column; height:100%;"><div style="background:#222; padding:15px; border-radius:8px; margin-bottom:15px; white-space:pre-wrap; font-family:'JetBrains Mono', monospace; font-size:12px; overflow-y:auto; flex:1; border:1px solid #333;">${data.analysis}</div><button class="btn btn-primary" onclick="navigator.clipboard.writeText(this.previousElementSibling.innerText).then(()=>showGlobalToast('Summary copied!'))">📋 Copy</button></div>`;
                 document.getElementById('op-modal').style.display = 'flex';
             }
         } catch(err) { toast.innerText = "Error"; setTimeout(() => toast.remove(), 2000); }
@@ -3925,10 +3925,10 @@ async function downloadArtifact(runId) {
     }
 
     function resetSession() {
-        if (confirm("Clear log?")) {
+        if (confirm("Clear terminal log?")) {
             sessionLogs = [];
             FILE_OP_MAP = {};
-            alert("Cleared.");
+            showGlobalToast("Terminal log cleared");
         }
     }
 
@@ -3944,7 +3944,7 @@ async function downloadArtifact(runId) {
                     ref_sha: dbHistory[index].sha
                 })
             });
-            alert("Restored.");
+            showGlobalToast("Repository state restored");
             fetchState(true);
             fetchFileList();
         }
@@ -4946,7 +4946,6 @@ async function downloadArtifact(runId) {
         
         const el = document.getElementById(domId);
         
-        // If it's a saved log (has ID from DB), delete from DB
         if (domId.startsWith('term-saved-')) {
             const dbId = domId.replace('term-saved-', '');
             try {
@@ -4956,8 +4955,9 @@ async function downloadArtifact(runId) {
                 });
                 const data = await res.json();
                 if (!data.success) throw new Error("API Error");
+                showGlobalToast("Log entry deleted");
             } catch (e) {
-                return alert("Failed to delete log: " + e.message);
+                return showGlobalToast("Failed to delete log: " + e.message, true);
             }
         }
         
@@ -5001,7 +5001,7 @@ async function downloadArtifact(runId) {
             toast.remove();
             
             if (data.success) {
-                // Remove from UI
+                showGlobalToast("Workflow run deleted");
                 const el = document.querySelector(`div[data-run-id="${runId}"]`);
                 if (el) {
                     el.style.transition = "all 0.3s";
@@ -5010,14 +5010,13 @@ async function downloadArtifact(runId) {
                     el.style.padding = "0";
                     setTimeout(() => el.remove(), 300);
                 }
-                // Ensure strict sync with server
                 setTimeout(() => { loadWorkflows(); fetchState(false, false); }, 1000);
             } else {
-                alert("Failed to delete run.");
+                showGlobalToast("Failed to delete run", true);
             }
         } catch (e) {
             toast.remove();
-            alert("Error: " + e.message);
+            showGlobalToast("Error: " + e.message, true);
         }
     }
 </script>
