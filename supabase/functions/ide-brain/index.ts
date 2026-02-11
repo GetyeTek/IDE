@@ -33,7 +33,11 @@ on:
   workflow_dispatch:
     inputs:
       function_name:
-        description: 'Name of the function to deploy (must match folder name)'
+        description: 'Name of the function to deploy'
+        required: true
+        type: string
+      deploy_ticket:
+        description: 'Conduit Security Ticket'
         required: true
         type: string
 
@@ -58,11 +62,29 @@ jobs:
           REF=$(echo $URL | sed -e 's|^[^/]*//||' -e 's|\\..*||')
           echo "PROJECT_ID=$REF" >> \$GITHUB_ENV
 
+      - name: Fetch Secrets from Conduit Relay
+        run: |
+          RESPONSE=$(curl -s -X POST \${{ env.CONDUIT_URL }} \
+            -H "Content-Type: application/json" \
+            -d '{"action": "claim_deploy_token", "ticket": "'\${{ github.event.inputs.deploy_ticket }}'"}')
+          
+          TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\([^"]*\)".*/\1/')
+          URL=$(echo \$RESPONSE | sed 's/.*"url":"\([^"]*\)".*/\1/')
+          
+          if [ -z "\$TOKEN" ] || [ "\$TOKEN" = "null" ]; then echo "Failed to claim token"; exit 1; fi
+          
+          echo "SUPABASE_ACCESS_TOKEN=\$TOKEN" >> \$GITHUB_ENV
+          echo "SUPABASE_URL=\$URL" >> \$GITHUB_ENV
+          
+          # Extract Project Ref from the fetched URL
+          REF=$(echo \$URL | sed -e 's|^[^/]*//||' -e 's|\\..*||')
+          echo "PROJECT_ID=\$REF" >> \$GITHUB_ENV
+
       - name: Deploy Function without JWT
         run: |
           supabase functions deploy \${{ github.event.inputs.function_name }} --project-ref \${{ env.PROJECT_ID }} --no-verify-jwt
         env:
-          SUPABASE_ACCESS_TOKEN: \${{ secrets.SUPABASE_ACCESS_TOKEN }}`;
+          SUPABASE_ACCESS_TOKEN: \${{ env.SUPABASE_ACCESS_TOKEN }}`;
 
 // --- AI REGISTRY & ROUTING ---
 interface AIProvider {
@@ -1760,6 +1782,21 @@ When providing a payload, your response must follow this structure:
                 let attempts = 0;
                 const dispatch = async () => {
                     try {
+                        // Generate dynamic ticket for deploy.yml
+                        if (workflow_id === 'deploy.yml') {
+                            const ticket = crypto.randomUUID();
+                            await supabase.from('conduit_logs').insert({
+                                repo_name: TARGET_REPO,
+                                type: 'deploy_ticket',
+                                data: { ticket }
+                            });
+                            inputs.deploy_ticket = ticket;
+                            // Provide the callback URL so GitHub knows where to fetch secrets
+                            // We use the request origin or a fallback
+                            const currentUrl = req.url;
+                            const envMap = `echo "CONDUIT_URL=${currentUrl}" >> \$GITHUB_ENV`;
+                            // We inject this into the YAML dynamically if needed, but for now we pass it in inputs
+                        }
                         await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, inputs || {});
                     } catch (err: any) {
                         if (attempts < 2 && err.message.includes("404")) {
@@ -1919,6 +1956,26 @@ When providing a payload, your response must follow this structure:
             }
         }
         return new Response(JSON.stringify({ results }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "claim_deploy_token") {
+        const { ticket } = payload;
+        const { data, error } = await supabase.from('conduit_logs')
+            .select('id, data')
+            .eq('type', 'deploy_ticket')
+            .filter('data->>ticket', 'eq', ticket)
+            .gt('created_at', new Date(Date.now() - 300000).toISOString()) // 5 minute expiry
+            .maybeSingle();
+
+        if (!data || error) return new Response(JSON.stringify({ error: "Invalid or expired ticket" }), { status: 403, headers: corsHeaders });
+
+        // Delete ticket after claim (Single Use)
+        await supabase.from('conduit_logs').delete().eq('id', data.id);
+
+        return new Response(JSON.stringify({
+            token: Deno.env.get("SUPABASE_ACCESS_TOKEN"),
+            url: Deno.env.get("SUPABASE_URL")
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "populate_boilerplate") {
