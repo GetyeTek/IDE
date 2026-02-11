@@ -2222,7 +2222,8 @@ function addTerminalCard(data, options = {}) {
                     <div id="${id}-menu" class="menu-dropdown">
                         <div class="menu-item" onclick="viewLogComment('${id}')">View Comment</div>
                         <div class="menu-item" onclick="viewLogData('${id}', false)">View Response JSON</div>
-                       <div class="menu-item" onclick="viewLogData('${id}', true)">View Payload JSON</div>
+                                               <div class="menu-item" onclick="viewLogData('${id}', true)">View Payload JSON</div>
+                        ${response.sha_before ? `<div class="menu-item" style="color:var(--dev); border-top: 1px solid #333;" onclick="undoLog('${id}', '${response.sha_before}')">Undo Patch</div>` : ''}
                         ${response.sha ? `
                             <div class="menu-item" style="border-top: 1px solid #333;" onclick="traceLogToHistory('${response.sha}')">View in History</div>
                             <div class="menu-item" onclick="traceLogToRun('${response.sha}')">View Build Log</div>
@@ -4645,6 +4646,36 @@ async function downloadArtifact(runId) {
             saveState();
         } catch (e) {
             alert("Failed to read clipboard: " + e.message);
+        }
+    }
+
+    async function undoLog(domId, shaBefore) {
+        if (!confirm("Undo this patch? The repository will be restored to its state before this operation.")) return;
+        
+        showGlobalToast("⏪ Rolling back...");
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'rollback', ref_sha: shaBefore })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                const el = document.getElementById(domId);
+                if (el) {
+                    el.style.transform = 'translateX(100%)';
+                    el.style.opacity = '0';
+                    el.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                    setTimeout(() => {
+                        el.remove();
+                        fetchFileList();
+                        fetchState(false, false);
+                        showGlobalToast("✨ Patch undone successfully");
+                    }, 400);
+                }
+            } else throw new Error(data.error || "Rollback failed");
+        } catch (e) {
+            showGlobalToast(e.message, true);
         }
     }
 
