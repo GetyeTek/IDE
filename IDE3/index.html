@@ -1211,10 +1211,32 @@
         document.getElementById('main-fab-group').classList.toggle('active');
     }
 
-    function initCreateApp() {
+    async function initCreateApp() {
+        if (!confirm("This will populate your repository root with Android Boilerplate files. Continue?")) return;
+        
         toggleFabMenu();
-        showGlobalToast("Ready to create. What kind of app should we build?");
-        // Next step: Population logic
+        const termId = addTerminalCard(null, { loading: true });
+        showGlobalToast("🏗️ Populating Boilerplate...");
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'populate_boilerplate' })
+            });
+            const data = await res.json();
+            
+            updateTerminalCard(termId, data, null, true);
+            
+            if (data.success) {
+                showGlobalToast("✨ Boilerplate Ready!");
+                setTimeout(() => {
+                    fetchFileList();
+                    fetchState(false, false);
+                }, 1500);
+            }
+        } catch(e) {
+            updateTerminalCard(termId, { error: e.message });
+        }
     }
 
     function openEFManager() {
