@@ -1989,6 +1989,26 @@
         } catch(e) { alert("Error: " + e.message); }
     }
 
+    function copyChatMsg(btn) {
+        const msgDiv = btn.closest('.msg');
+        // Clone to manipulate without affecting UI
+        const clone = msgDiv.cloneNode(true);
+        // Remove the actions container from the text we copy
+        const actions = clone.querySelector('.msg-actions');
+        if (actions) actions.remove();
+        
+        const text = clone.innerText.trim();
+        navigator.clipboard.writeText(text).then(() => {
+            const originalIcon = btn.innerText;
+            btn.innerText = '✔';
+            btn.style.color = 'var(--prod)';
+            setTimeout(() => {
+                btn.innerText = originalIcon;
+                btn.style.color = '';
+            }, 1500);
+        });
+    }
+
     function addChatMessage(role, text, isLoading = false, index = -1) {
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper';
@@ -2017,11 +2037,16 @@
             const actions = document.createElement('div');
             actions.className = 'msg-actions';
             
+            let actionHtml = '';
             if (role === 'user') {
-                actions.innerHTML = `<button class="action-mini-btn" onclick="editUserMsg(${index})" title="Edit">✎</button>`;
+                actionHtml += `<button class="action-mini-btn" onclick="editUserMsg(${index})" title="Edit">✎</button>`;
             } else if (role === 'ai') {
-                 actions.innerHTML = `<button class="action-mini-btn" onclick="retryChat()" title="Retry Response">↻</button>`;
+                actionHtml += `<button class="action-mini-btn" onclick="retryChat()" title="Retry Response">↻</button>`;
             }
+            // Common Copy Button
+            actionHtml += `<button class="action-mini-btn" onclick="copyChatMsg(this)" title="Copy Text">📋</button>`;
+            
+            actions.innerHTML = actionHtml;
             div.appendChild(actions);
         }
 
