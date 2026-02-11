@@ -1116,12 +1116,17 @@
                 
                 el.classList.add('runtime-log');
                 el.dataset.msg = e.data.msg;
+                const isError = e.data.method === 'error';
+                const actionBtn = isError 
+                    ? `<button class="btn-dev" style="width:auto; padding:4px 8px; font-size:10px; color:black;" onclick="fixPreviewError('${escapeHtml(e.data.msg).replace(/'/g, "\\'")}')">✨ Fix</button>`
+                    : `<button class="btn-outline" style="width:auto; padding:4px 8px; font-size:10px;" onclick="navigator.clipboard.writeText('${escapeHtml(e.data.msg).replace(/'/g, "\\'")}')">📋 Copy</button>`;
+
                 el.innerHTML = '<div class="log-header expanded" style="border-left-color:' + color + ';">' +
                     '<div class="log-meta">' +
                     '<span class="status-pill" style="background:' + color + '; color:white;">RUNTIME</span>' +
                     '<span style="font-size:11px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">' + escapeHtml(e.data.msg) + '</span>' +
                     '</div>' +
-                    '<button class="btn-dev" style="width:auto; padding:4px 8px; font-size:10px; color:black;" onclick="fixPreviewError(\'' + escapeHtml(e.data.msg).replace(/'/g, "\\'") + '\')">✨ Fix</button>' +
+                    actionBtn +
                     '</div>';
                 
                 // Self-destruct after 60 seconds to keep terminal clean
@@ -2402,7 +2407,8 @@ function addTerminalCard(data, options = {}) {
                     <div id="${id}-menu" class="menu-dropdown">
                         <div class="menu-item" onclick="viewLogComment('${id}')">View Comment</div>
                         <div class="menu-item" onclick="viewLogData('${id}', false)">View Response JSON</div>
-                                               <div class="menu-item" onclick="viewLogData('${id}', true)">View Payload JSON</div>
+                        <div class="menu-item" onclick="viewLogData('${id}', true)">View Payload JSON</div>
+                        <div class="menu-item" style="color:var(--primary);" onclick="loadLogToEditor('${id}')">Load into Editor</div>
                         ${response.sha_before ? `<div class="menu-item" style="color:var(--dev); border-top: 1px solid #333;" onclick="undoLog('${id}', '${response.sha_before}')">Undo Patch</div>` : ''}
                         ${response.sha ? `
                             <div class="menu-item" style="border-top: 1px solid #333;" onclick="traceLogToHistory('${response.sha}')">View in History</div>
@@ -4877,6 +4883,24 @@ async function downloadArtifact(runId) {
             jumpToElement(`.version-item[data-commit-sha="${id}"]`, 'tab-history', 3, loadMoreHistory);
         } else if (category === 'Build') {
             jumpToElement(`#workflow-list div[data-commit-sha="${id}"]`, 'tab-cicd', 4, loadMoreWorkflows);
+        }
+    }
+
+    function loadLogToEditor(id) {
+        const payloadStr = document.getElementById(id + '-payload-data').value;
+        try {
+            const parsed = JSON.parse(payloadStr);
+            // If it's a raw array or an operations object, normalize it
+            const ops = Array.isArray(parsed) ? parsed : (parsed.operations || []);
+            if (ops.length === 0) return showGlobalToast("No operations found in log", true);
+            
+            document.getElementById('json-input').value = JSON.stringify(ops, null, 2);
+            saveState();
+            showGlobalToast("📥 Payload loaded into Editor");
+            // Smooth scroll to top of editor
+            document.getElementById('json-input').scrollIntoView({ behavior: 'smooth' });
+        } catch(e) {
+            showGlobalToast("Failed to parse log payload", true);
         }
     }
 
