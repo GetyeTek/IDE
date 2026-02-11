@@ -27,6 +27,43 @@ const ANDROID_BOILERPLATE: Record<string, string> = {
   "settings.gradle": `pluginManagement {\n    repositories {\n        google()\n        mavenCentral()\n        gradlePluginPortal()\n    }\n}\ndependencyResolutionManagement {\n    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)\n    repositories {\n        google()\n        mavenCentral()\n    }\n}\n\nrootProject.name = "UniversalApp"\ninclude ':app'`
 };
 
+const AUTO_DEPLOY_YML = `name: Manual Edge Function Deploy (No JWT)
+
+on:
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Name of the function to deploy (must match folder name)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/conduit-dev'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Extract Project Ref from URL
+        id: get_ref
+        run: |
+          URL="\${{ secrets.SUPABASE_URL }}"
+          REF=$(echo $URL | sed -e 's|^[^/]*//||' -e 's|\\..*||')
+          echo "PROJECT_ID=$REF" >> \$GITHUB_ENV
+
+      - name: Deploy Function without JWT
+        run: |
+          supabase functions deploy \${{ github.event.inputs.function_name }} --project-ref \${{ env.PROJECT_ID }} --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: \${{ secrets.SUPABASE_ACCESS_TOKEN }}`;
+
 // --- AI REGISTRY & ROUTING ---
 interface AIProvider {
   name: string;
@@ -1707,7 +1744,33 @@ When providing a payload, your response must follow this structure:
 
         try {
             if (workflow_id) {
-                await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, inputs || {});
+                // AUTO-PROVISION deploy.yml if missing
+                if (workflow_id === 'deploy.yml') {
+                    try {
+                        await githubFetch(TARGET_REPO, `/contents/.github/workflows/deploy.yml?ref=${targetBranch}`);
+                    } catch (e) {
+                        console.log("[Trigger] deploy.yml missing. Provisioning...");
+                        await updateFile(TARGET_REPO, ".github/workflows/deploy.yml", AUTO_DEPLOY_YML, "", targetBranch, "Conduit: Provision deploy workflow");
+                        // Give GitHub 2 seconds to index the new file before triggering
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+
+                // Dispatch with simple retry logic for fresh files
+                let attempts = 0;
+                const dispatch = async () => {
+                    try {
+                        await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, inputs || {});
+                    } catch (err: any) {
+                        if (attempts < 2 && err.message.includes("404")) {
+                            attempts++;
+                            await new Promise(r => setTimeout(r, 3000));
+                            return dispatch();
+                        }
+                        throw err;
+                    }
+                };
+                await dispatch();
             } else {
                 await dispatchWorkflow(TARGET_REPO, "conduit_build_trigger", { version: version_name || "latest", source: "conduit-ide" });
             }
