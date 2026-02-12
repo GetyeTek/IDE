@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import MironChat from './MironChat.jsx';
 import UserChat from './UserChat.jsx';
 
-const Connect = () => {
+const Connect = ({ onOpenActivity }) => {
     const [activeView, setActiveView] = useState('messages'); // 'messages' or 'for-you'
     const [isMironOpen, setIsMironOpen] = useState(false);
     const [activeUser, setActiveUser] = useState(null);
@@ -23,7 +23,7 @@ const Connect = () => {
                 <div className="large-title-row">
                     <h2 className="large-title">Social Hub</h2>
                     <div className="header-actions">
-                        <button className="icon-button notification-btn">
+                        <button className="icon-button notification-btn" onClick={onOpenActivity}>
                             <i className="fas fa-bell"></i>
                             <span className="notification-badge">3</span>
                         </button>
