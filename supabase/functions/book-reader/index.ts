@@ -92,13 +92,17 @@ serve(async (req) => {
             return acc;
           }, {});
 
-          for (const [pageNum, qList] of Object.entries(pagesWithQuestions)) {
-            // Robust Regex: Finds aria-label="Page 128" or aria-label='Page 128' with any spacing
+          // Process pages in reverse order (high to low) to prevent index shifting when modifying string
+          const sortedPages = Object.entries(pagesWithQuestions).sort((a, b) => Number(b[0]) - Number(a[0]));
+
+          for (const [pageNum, qList] of sortedPages) {
+            // Robust Regex: Finds aria-label="Page 128"
             const regex = new RegExp(`aria-label\\s*=\\s*["']Page\\s+${pageNum}["']`, "i");
             const match = html.match(regex);
             
-            if (match && match.index) {
+            if (match && match.index !== undefined) {
               console.log(`[LOG] INJECTING: Found Page ${pageNum} marker at index ${match.index}`);
+              
               const questionsHtml = (qList as any[]).map(q => `
                 <div class="miron-question-card">
                   <div class="q-header"><span class="miron-orb-mini"></span><span class="q-label">MIRON CHALLENGE</span></div>
@@ -109,16 +113,30 @@ serve(async (req) => {
                   <button class="q-submit">Check Understanding</button>
                 </div>`).join('');
               
-              // Find the end of the section containing this marker
-              const sectionEnd = html.indexOf('</section>', match.index);
-              if (sectionEnd !== -1) {
-                html = html.slice(0, sectionEnd) + `<div class="miron-portal-container">${questionsHtml}</div>` + html.slice(sectionEnd);
-                console.log(`[LOG] SUCCESS: Injected ${qList.length} questions into Page ${pageNum}`);
+              // STRATEGY: Find the START of the NEXT page container to insert BEFORE it.
+              // This avoids relying on closing tags (</section>) which are often missing/mismatched in PDF-to-HTML.
+              const nextContainerRegex = /<div[^>]*class=["'][^"']*page-container[^"']*["']/gi;
+              nextContainerRegex.lastIndex = match.index; // Start searching AFTER the current page title
+              
+              const nextMatch = nextContainerRegex.exec(html);
+              let insertIdx = -1;
+
+              if (nextMatch) {
+                // Insert before the next page starts
+                insertIdx = nextMatch.index;
               } else {
-                 console.log(`[WARN] Could not find closing </section> for page ${pageNum}`);
+                // If no next page, we are at the end. Insert before body close or at end.
+                const bodyEnd = html.lastIndexOf("</body>");
+                insertIdx = bodyEnd !== -1 ? bodyEnd : html.length;
               }
+
+              // Inject wrapped in a relative container to ensure z-index works
+              const injection = `<div class="miron-portal-container" style="position:relative; z-index:100; margin: 20px auto; max-width: 900px;">${questionsHtml}</div>`;
+              html = html.slice(0, insertIdx) + injection + html.slice(insertIdx);
+              
+              console.log(`[LOG] SUCCESS: Injected ${qList.length} questions into Page ${pageNum} at index ${insertIdx}`);
             } else {
-               console.log(`[WARN] FAILED to find HTML marker for Page ${pageNum} using regex ${regex}`);
+               console.log(`[WARN] FAILED to find HTML marker for Page ${pageNum}`);
             }
           }
         } else {
