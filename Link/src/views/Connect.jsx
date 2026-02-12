@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import MironChat from './MironChat.jsx';
+import UserChat from './UserChat.jsx';
 
 const Connect = () => {
     const [activeView, setActiveView] = useState('messages'); // 'messages' or 'for-you'
     const [isMironOpen, setIsMironOpen] = useState(false);
+    const [activeUser, setActiveUser] = useState(null);
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
     const handleScroll = (e) => {
@@ -92,8 +94,8 @@ const Connect = () => {
                             <div className="message-meta"></div>
                         </div>
 
-                        <div className="messages-list-item">
-                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto-format=fit&crop&w=387&q=80" alt="Avatar" />
+                        <div className="messages-list-item" onClick={() => setActiveUser({ name: 'Marcus Grant', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto-format=fit&crop=w=387&q=80' })}>
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto-format=fit&crop=w=387&q=80" alt="Avatar" />
                             <div className="message-info">
                                 <div className="name">Marcus Grant</div>
                                 <div className="last-message">Hey, are you free to go over the lab notes?</div>
@@ -129,6 +131,7 @@ const Connect = () => {
                 </div>
             </div>
             {isMironOpen && <MironChat onClose={() => setIsMironOpen(false)} />}
+            {activeUser && <UserChat user={activeUser} onClose={() => setActiveUser(null)} />}
         </div>
     );
 };
