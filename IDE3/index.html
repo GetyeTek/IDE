@@ -3530,6 +3530,9 @@ async function downloadArtifact(runId) {
             const fileSize = formatBytes(file.size);
             const updated = timeAgo(file.last_updated);
 
+            const isExcluded = file.path.endsWith('index.ts') || file.path.includes('supabase/functions/');
+            const checkedAttr = isExcluded ? '' : 'checked';
+
             div.innerHTML = `
                 <div class="v-info" onclick="openFileViewer('${file.path}')" style="cursor:pointer; flex:1; min-width: 0; padding-right: 10px;">
                     <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 13px;">${fileName}</strong>
@@ -3545,7 +3548,7 @@ async function downloadArtifact(runId) {
                     <button class="menu-btn" onclick="runDeepScan('${file.path}')" style="color:var(--ai-accent);" title="Deep Syntax Scan">🧬</button>
                     <button class="menu-btn" onclick="downloadSingleFile('${file.path}', this)" style="color:var(--text-muted);" title="Download">⬇</button>
                     <button class="menu-btn" onclick="stageDeleteFile('${file.path}')" style="color:var(--danger)">🗑</button>
-                    <input type="checkbox" class="file-check" value="${file.path}" checked onchange="updateChatContextIndicator()" style="accent-color:var(--primary)">
+                    <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="updateChatContextIndicator()" style="accent-color:var(--primary)">
                 </div>`;
             container.appendChild(div);
         });
