@@ -3514,25 +3514,72 @@ async function downloadArtifact(runId) {
 
     function renderDiscoveryList(items, mode) {
         const list = document.getElementById('discovery-list');
-        list.innerHTML = items.map(item => `
-            <div class="model-item" onclick="${mode === 'source' 
-                ? (item.id === 'current_deep' ? `scanRepoForFunctions('current_deep', true)` : `scanRepoForFunctions('${item.name}', false)`) 
-                : `importFunction('${item.repo}', '${item.path}', '${item.name}')`}" style="cursor:pointer;">
-                <div style="display:flex; align-items:center; gap:10px;">
+        list.innerHTML = items.map(item => {
+            // Logic: Is this a foreign repo?
+            const isForeign = item.repo && item.repo !== CONFIG.repoName;
+            const isFunction = item.type === 'function';
+            
+            let actionBtn = '<span style="color:#666;">›</span>';
+            let clickAction = mode === 'source' 
+                ? (item.id === 'current_deep' ? `scanRepoForFunctions('current_deep', true)` : `scanRepoForFunctions('${item.name}', false)`)
+                : `importFunction('${item.repo}', '${item.path}', '${item.name}')`;
+
+            if (isFunction) {
+                if (isForeign) {
+                    // Foreign Repo: Show Remote Deploy Button
+                    actionBtn = `<button class="btn-prod" onclick="event.stopPropagation(); triggerRemoteDeploy('${item.repo}', '${item.name}')" style="padding:4px 10px; font-size:10px; height:auto; color:white;">🚀 Deploy Remote</button>`;
+                    // Clicking the row still imports for viewing, but button triggers deploy
+                } else {
+                    // Local Repo: Show Import
+                    actionBtn = `<button class="btn-primary" style="padding:2px 8px; font-size:10px; height:auto;">Import</button>`;
+                }
+            }
+
+            return `
+            <div class="model-item" onclick="${clickAction}" style="cursor:pointer;">
+                <div style="display:flex; align-items:center; gap:10px; flex:1;">
                     <span style="font-size:16px;">${item.type === 'function' ? '⚡' : (item.type === 'special' ? '🔍' : '📦')}</span>
                     <div style="display:flex; flex-direction:column;">
                         <span style="font-weight:500; color:#eee;">${item.name}</span>
                         ${item.path ? `<small style="color:#666; font-size:9px;">${item.path}</small>` : ''}
                     </div>
                 </div>
-                ${mode === 'source' ? '<span style="color:#666;">›</span>' : '<button class="btn-primary" style="padding:2px 8px; font-size:10px; height:auto;">Import</button>'}
-            </div>
-        `).join('');
+                ${actionBtn}
+            </div>`;
+        }).join('');
     }
 
     function filterDiscoveryList(q) {
         const filtered = currentDiscoveryItems.filter(i => i.name.toLowerCase().includes(q.toLowerCase()) || (i.path && i.path.toLowerCase().includes(q.toLowerCase())));
         renderDiscoveryList(filtered, currentDiscoveryItems[0]?.repo ? 'function' : 'source');
+    }
+
+    async function triggerRemoteDeploy(repo, funcName) {
+        if (!confirm(`🚀 Trigger deployment for '${funcName}' inside remote repo '${repo}'?`)) return;
+        
+        showGlobalToast(`Signaling ${repo}...`);
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'trigger_build', 
+                    repo_name: repo, // Target the foreign repo
+                    workflow_id: 'deploy.yml', 
+                    branch: 'conduit-dev', // Assuming standard convention
+                    inputs: { function_name: funcName }
+                })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                showGlobalToast("✅ Remote deployment triggered!");
+                // Optional: Switch to CI/CD? No, that would require switching repo context.
+            } else {
+                throw new Error(data.error || "Unknown error");
+            }
+        } catch(e) {
+            alert("Remote Deploy Failed: " + e.message);
+        }
     }
 
     async function importFunction(repo, path, name) {
