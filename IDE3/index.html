@@ -2529,19 +2529,47 @@ function addTerminalCard(data, options = {}) {
         const fileCache = {}; window.CURRENT_FILE_CACHE = fileCache;
 
         try {
-            const res = await fetch(CONFIG.funcUrl, { 
+            // 1. Fetch File List (Tree)
+            iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Scanning project structure...</div>`;
+            const treeRes = await fetch(CONFIG.funcUrl, { 
                 method: 'POST', headers: {'Content-Type': 'application/json'}, 
-                body: apiBody({ action: 'fetch_project_bundle', project_path: effectiveRoot, ref_sha: sha }) 
+                body: apiBody({ action: 'fetch_tree', project_path: effectiveRoot, ref_sha: sha }) 
             });
-            const data = await res.json();
-            const bundle = data.files || {};
+            const treeData = await treeRes.json();
+            const files = treeData.files || [];
             
-            Object.keys(bundle).forEach(path => {
-                const rawData = bundle[path];
-                const mime = getMime(path);
-                const content = mime === 'image' ? rawData.content : b64DecodeUnicode(rawData.content);
-                fileCache[path] = { content, mime, sha: rawData.sha };
-            });
+            // 2. Parallel Fetch Swarm
+            const BATCH_SIZE = 10; // High concurrency for speed
+            let completed = 0;
+            
+            for (let i = 0; i < files.length; i += BATCH_SIZE) {
+                const batch = files.slice(i, i + BATCH_SIZE);
+                
+                iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">
+                    Fetching files: ${completed}/${files.length}<br>
+                    <div style="width:200px; height:4px; background:#333; margin:10px auto; border-radius:2px;">
+                        <div style="width:${(completed/files.length)*100}%; height:100%; background:var(--primary); transition:width 0.2s;"></div>
+                    </div>
+                </div>`;
+
+                await Promise.all(batch.map(async (file) => {
+                    try {
+                        const res = await fetch(CONFIG.funcUrl, {
+                            method: 'POST', headers: {'Content-Type': 'application/json'},
+                            body: apiBody({ action: 'preview_file', file_path: file.path, ref_sha: sha })
+                        });
+                        const data = await res.json();
+                        if (data.content) {
+                            const mime = getMime(file.path);
+                            const content = mime === 'image' ? data.content : b64DecodeUnicode(data.content);
+                            fileCache[file.path] = { content, mime, sha: file.sha };
+                        }
+                    } catch(e) { console.error("Fetch fail", file.path); }
+                }));
+                completed += batch.length;
+            }
+            
+            iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Transpiling & Building...</div>`;
 
         } catch(e) { return iframe.srcdoc = `Error bundling project: ${e.message}`; }
 
