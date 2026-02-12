@@ -146,16 +146,7 @@ serve(async (req) => {
          console.log(`[LOG] No document ID found for query: ${baseName}`);
       }
 
-      const styles = `<style>
-        .miron-portal-container { padding: 60px 40px !important; background: #0c0c0c !important; border-top: 1px solid #42d7b833 !important; position: relative !important; z-index: 9999 !important; display: block !important; }
-        .miron-question-card { background: rgba(30, 30, 30, 0.95) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; border-radius: 28px !important; padding: 30px !important; margin-bottom: 40px !important; border-left: 6px solid #42d7b8 !important; color: white !important; font-family: sans-serif !important; }
-        .miron-orb-mini { display: inline-block; width: 12px; height: 12px; background: #42d7b8; border-radius: 50%; margin-right: 12px; }
-        .q-label { font-size: 0.8rem; font-weight: 900; color: #42d7b8; letter-spacing: 2px; }
-        .q-text { font-size: 1.3rem; margin: 20px 0; line-height: 1.5; }
-        .q-opt-btn { width: 100%; padding: 18px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; color: white; text-align: left; margin-bottom: 10px; cursor: pointer; }
-        .q-submit { margin-top: 20px; width: 100%; padding: 16px; background: #42d7b8; color: #0c0c0c; border: none; border-radius: 16px; font-weight: 800; cursor: pointer; }
-      </style>`;
-      html = html.replace('</head>', styles + '</head>');
+      // CSS is now handled by the frontend to ensure proper mobile scaling
 
       return new Response(html, { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } });
     }
