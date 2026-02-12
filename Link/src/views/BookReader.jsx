@@ -114,67 +114,78 @@ const BookReader = ({ book, onClose }) => {
                 docBody.style.padding = '0';
                 docBody.style.overflow = 'hidden';
 
-                // Inject Responsive Styles for Questions
-                // NOTE: We use large font sizes (1.5rem+) because the book content is likely 
-                // scaled down significantly (0.4x) on mobile screens to fit the width.
+                // --- DYNAMIC SCALING ENGINE ---
+                // Calculate the ratio between the Screen Width and the Book Content Width.
+                const fitScale = window.innerWidth / w;
+                
+                // We want the text to visually appear as ~18px on the user's screen, 
+                // regardless of how much the book is zoomed out.
+                // Formula: CSS_Size = Target_Visual_Size / Zoom_Level
+                const targetVisualSize = 18;
+                const baseFontSize = Math.max(16, targetVisualSize / fitScale);
+
                 const style = doc.createElement('style');
                 style.textContent = `
                     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap');
                     
+                    /* The Root Container sets the Base Font Size */
                     .miron-portal-container {
-                        width: 92%;
+                        width: 90%;
                         max-width: 800px;
-                        margin: 40px auto;
+                        margin: 3em auto;
                         font-family: 'Poppins', sans-serif;
+                        font-size: ${baseFontSize}px; /* Dynamic Base */
                         position: relative;
                         z-index: 100;
                     }
+
+                    /* All children use 'em' to scale relative to the dynamic base */
                     .miron-question-card {
                         background: #1a1a1a;
                         border: 1px solid rgba(66, 215, 184, 0.3);
-                        border-radius: 24px;
-                        padding: 32px;
-                        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+                        border-radius: 1.5em;
+                        padding: 2em;
+                        box-shadow: 0 1em 3em rgba(0,0,0,0.6);
                         color: #e0e0e0;
                     }
                     .q-header {
                         display: flex;
                         align-items: center;
-                        margin-bottom: 24px;
+                        margin-bottom: 1.5em;
                     }
                     .miron-orb-mini {
-                        width: 20px;
-                        height: 20px;
+                        width: 1em;
+                        height: 1em;
                         background: #42d7b8;
                         border-radius: 50%;
-                        margin-right: 16px;
-                        box-shadow: 0 0 15px rgba(66, 215, 184, 0.6);
+                        margin-right: 0.75em;
+                        box-shadow: 0 0 0.8em rgba(66, 215, 184, 0.6);
                     }
                     .q-label {
                         color: #42d7b8;
                         font-weight: 700;
-                        letter-spacing: 2px;
-                        font-size: 1.4rem; /* Scaled up for mobile readability */
+                        letter-spacing: 0.1em;
+                        font-size: 0.85em; 
                         text-transform: uppercase;
                     }
                     .q-text {
-                        font-size: 2.2rem; /* Large text to counteract zoom-out */
-                        line-height: 1.4;
-                        margin-bottom: 40px;
+                        font-size: 1.4em; 
+                        line-height: 1.5;
+                        margin-bottom: 1.5em;
                         font-weight: 500;
                     }
                     .q-options {
                         display: flex;
                         flex-direction: column;
-                        gap: 16px;
+                        gap: 0.75em;
                     }
                     .q-opt-btn {
                         background: rgba(255,255,255,0.05);
                         border: 2px solid rgba(255,255,255,0.1);
-                        padding: 24px;
-                        border-radius: 16px;
+                        padding: 1em 1.25em;
+                        border-radius: 0.8em;
                         color: #fff;
-                        font-size: 1.8rem;
+                        font-size: 1em;
                         font-family: inherit;
                         text-align: left;
                         cursor: pointer;
@@ -185,18 +196,18 @@ const BookReader = ({ book, onClose }) => {
                         border-color: #42d7b8;
                     }
                     .q-submit {
-                        margin-top: 32px;
+                        margin-top: 1.5em;
                         width: 100%;
-                        padding: 24px;
+                        padding: 1em;
                         background: #42d7b8;
                         color: #0c0c0c;
                         font-weight: 700;
-                        font-size: 1.8rem;
+                        font-size: 1.1em;
                         font-family: inherit;
                         border: none;
-                        border-radius: 16px;
+                        border-radius: 0.8em;
                         cursor: pointer;
-                        box-shadow: 0 4px 20px rgba(66, 215, 184, 0.4);
+                        box-shadow: 0 0.25em 1em rgba(66, 215, 184, 0.4);
                     }
                 `;
                 doc.head.appendChild(style);
