@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 // We need to import ColorThief if we want that logic, but for React it's better to use a library or skip for now.
 // Keeping structure identical to original.
 
-const Discover = () => {
+const Discover = ({ onOpenActivity }) => {
     const [activeSubTab, setActiveSubTab] = useState('explore'); // 'explore' or 'feeds'
     const [appsCollapsed, setAppsCollapsed] = useState(false);
     
@@ -28,7 +28,7 @@ const Discover = () => {
             <header id="discover-header">
                 <h1 className="discover-title">Discover</h1>
                 <div className="header-actions">
-                    <button className="icon-button notification-btn">
+                    <button className="icon-button notification-btn" onClick={onOpenActivity}>
                         <i className="fas fa-bell"></i>
                         <span className="notification-badge">3</span>
                     </button>
