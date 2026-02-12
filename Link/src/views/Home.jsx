@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Home = () => {
+const Home = ({ onOpenActivity }) => {
     const [greeting, setGreeting] = useState('Hello');
     const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
     const [isFading, setIsFading] = useState(false);
@@ -44,13 +44,19 @@ const Home = () => {
         <div className="tab-content active" id="home-content">
             <div className="scrollable-content">
                 <div className="hero-wrapper">
-                    <header className="app-header">
+<header className="app-header">
                         <div className="welcome-text"><h1>{greeting}, Alex</h1></div>
-                        <img 
-                            src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&auto-format&fit=crop&w=80&q=80" 
-                            alt="Profile" 
-                            className="profile-avatar" 
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <button className="icon-button notification-btn" onClick={onOpenActivity}>
+                                <i className="fas fa-bell"></i>
+                                <span className="notification-badge">3</span>
+                            </button>
+                            <img 
+                                src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&auto-format=fit&crop=w=80&q=80" 
+                                alt="Profile" 
+                                className="profile-avatar" 
+                            />
+                        </div>
                     </header>
                     <section 
                         className="welcome-hero" 
