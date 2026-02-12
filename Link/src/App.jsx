@@ -7,9 +7,12 @@ import Study from './views/Study.jsx';
 import Connect from './views/Connect.jsx';
 import Profile from './views/Profile.jsx';
 
+import ActivityHub from './views/ActivityHub.jsx';
+
 const App = () => {
   console.log("App Component Rendering...");
   const [activeTab, setActiveTab] = useState('home');
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
   
   // Maps tab IDs to their index for the mobile indicator animation
   const tabIndex = {
@@ -22,12 +25,12 @@ const App = () => {
 
   const renderContent = () => {
     switch(activeTab) {
-      case 'home': return <Home />;
-      case 'discover': return <Discover />;
-      case 'study': return <Study />;
-      case 'connect': return <Connect />;
-      case 'profile': return <Profile />;
-      default: return <Home />;
+      case 'home': return <Home onOpenActivity={() => setIsActivityOpen(true)} />;
+      case 'discover': return <Discover onOpenActivity={() => setIsActivityOpen(true)} />;
+      case 'study': return <Study onOpenActivity={() => setIsActivityOpen(true)} />;
+      case 'connect': return <Connect onOpenActivity={() => setIsActivityOpen(true)} />;
+      case 'profile': return <Profile onOpenActivity={() => setIsActivityOpen(true)} />;
+      default: return <Home onOpenActivity={() => setIsActivityOpen(true)} />;
     }
   };
 
@@ -36,6 +39,7 @@ const App = () => {
       <main className="main-content">
         {renderContent()}
       </main>
+      {isActivityOpen && <ActivityHub onClose={() => setIsActivityOpen(false)} />}
 
       <footer className="navigation-magic">
         <nav>
