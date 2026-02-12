@@ -1637,6 +1637,19 @@ If you already give a payload, assume it's already applied, and give the next pl
       return new Response(JSON.stringify({ files }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "fetch_tree") {
+        const ref = ref_sha || DEV_BRANCH;
+        const scope = (project_path || "").trim();
+        // Get the full tree structure
+        const treeData = await githubFetch(TARGET_REPO, `/git/trees/${ref}?recursive=1`);
+        // Filter strictly by scope
+        const files = (treeData.tree || [])
+            .filter((f: any) => f.type === "blob" && (!scope || f.path.startsWith(scope)))
+            .map((f: any) => ({ path: f.path, sha: f.sha, size: f.size }));
+            
+        return new Response(JSON.stringify({ files }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "fetch_project_bundle") {
       const scope = (payload.project_path || "").trim();
       const tree = await githubFetch(TARGET_REPO, `/git/trees/${ref_sha || DEV_BRANCH}?recursive=1`);
