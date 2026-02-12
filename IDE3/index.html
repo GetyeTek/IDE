@@ -1526,19 +1526,40 @@
 
         // 1. AUTO-FETCH if editor is empty/stale
         let isFreshCode = true;
-        if (!code || code === "Loading..." || code.startsWith("import { serve")) {
-             status.innerText = "📥 Fetching source for validation...";
+        const isDefaultTemplate = code.startsWith("import { serve");
+
+        if (!code || code === "Loading..." || isDefaultTemplate) {
+             status.innerText = "📥 Checking existing source...";
              try {
-                const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: `supabase/functions/${name}/index.ts` }) });
+                const res = await fetch(CONFIG.funcUrl, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: apiBody({ action: 'preview_file', file_path: `supabase/functions/${name}/index.ts` }) 
+                });
                 const data = await res.json();
+                
                 if (data.content) {
+                    // File exists on GitHub, sync it to ensure validation is accurate
                     code = b64DecodeUnicode(data.content);
-                    isFreshCode = false; // It matches server exactly, so no need to patch
+                    isFreshCode = false; 
                 } else {
-                    throw new Error("Function file not found.");
+                    // File doesn't exist, but we have boilerplate. This is a NEW function.
+                    if (isDefaultTemplate) {
+                        console.log("Detected new function creation from template.");
+                        status.innerText = "🆕 Preparing new function...";
+                        isFreshCode = true;
+                    } else {
+                        throw new Error("Source not found.");
+                    }
                 }
              } catch (e) {
-                 return alert(`Cannot deploy: Could not fetch code for '${name}'. ` + e.message);
+                // Handle total failure (like 404 or network error)
+                if (isDefaultTemplate) {
+                    console.log("File not found on GitHub, proceeding as new creation.");
+                    isFreshCode = true;
+                } else {
+                    return alert(`Cannot deploy: Could not verify '${name}'. ` + e.message);
+                }
              }
         }
 
