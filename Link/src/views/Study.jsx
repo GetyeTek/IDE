@@ -9,7 +9,7 @@ const Study = () => {
     const wavePathRef = useRef(null);
 
     useEffect(() => {
-        fetch('https://vlzgfaqrnyiqfxxxvtas.supabase.co/functions/v1/book-reader', {
+        fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'list_books' })
