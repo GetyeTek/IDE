@@ -99,33 +99,46 @@ const BookReader = ({ book, onClose }) => {
     // Handle Iframe Load & Sizing
     const handleIframeLoad = (e) => {
         const iframe = e.target;
-        try {
-            const doc = iframe.contentDocument;
-            const docBody = doc.body;
-            const docEl = doc.documentElement;
+        
+        // Small delay to ensure the blob document is fully parsed by the browser
+        setTimeout(() => {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                if (!doc) return;
 
-            docBody.style.margin = '0';
-            docBody.style.padding = '0';
-            docBody.style.overflow = 'hidden';
+                const docBody = doc.body;
+                const docEl = doc.documentElement;
 
-            const w = Math.max(docBody.scrollWidth, docBody.offsetWidth, docEl.clientWidth, docEl.scrollWidth);
-            const h = Math.max(docBody.scrollHeight, docBody.offsetHeight, docEl.clientHeight, docEl.scrollHeight);
+                // Standardize the iframe internal layout
+                docBody.style.margin = '0';
+                docBody.style.padding = '0';
+                docBody.style.overflow = 'hidden';
 
-            contentDims.current = { width: w, height: h };
-            
-            if (layerRef.current) {
-                layerRef.current.style.width = `${w}px`;
-                layerRef.current.style.height = `${h}px`;
+                // Measure the actual full content size
+                const w = Math.max(docBody.scrollWidth, docBody.offsetWidth, docEl.clientWidth, docEl.scrollWidth);
+                const h = Math.max(docBody.scrollHeight, docBody.offsetHeight, docEl.clientHeight, docEl.scrollHeight);
+
+                contentDims.current = { width: w, height: h };
+                
+                if (layerRef.current) {
+                    layerRef.current.style.width = `${w}px`;
+                    layerRef.current.style.height = `${h}px`;
+                }
+
+                // Calculate initial scale to fit width
+                const vw = window.innerWidth;
+                minScaleLimit.current = vw / w;
+                state.current.scale = minScaleLimit.current;
+                
+                // Centering initial view
+                state.current.x = 0;
+                state.current.y = 0;
+
+                console.log("Book Content Initialized:", w, "x", h);
+            } catch (err) {
+                console.error("Iframe Load Error:", err);
             }
-
-            const vw = window.innerWidth;
-            minScaleLimit.current = vw / w;
-            state.current.scale = minScaleLimit.current;
-            
-            renderFrame(); // Initial render
-        } catch (err) {
-            console.warn("Cross-origin iframe access restricted", err);
-        }
+        }, 100);
     };
 
     // --- OPTIMIZED PHYSICS ENGINE ---
