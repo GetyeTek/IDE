@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BookReader from './BookReader.jsx';
 
-const Study = () => {
+const Study = ({ onOpenActivity }) => {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
     const [activeBook, setActiveBook] = useState(null);
@@ -61,7 +61,7 @@ const Study = () => {
                 <header className="study-header">
                     <h2 className="large-title">Study Hub</h2>
                     <div className="header-actions">
-                        <button className="icon-button notification-btn">
+                        <button className="icon-button notification-btn" onClick={onOpenActivity}>
                             <i className="fas fa-bell"></i>
                             <span className="notification-badge">3</span>
                         </button>
