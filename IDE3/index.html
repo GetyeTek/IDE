@@ -64,9 +64,9 @@
             scrollbar-width: none;
             scroll-behavior: smooth;
         }
-        /* Safe space for the very bottom of any tab */
+        /* Safe space for the bottom navigation and FAB */
         .bottom-spacer {
-            height: var(--nav-height);
+            height: calc(var(--nav-height) + 100px);
             width: 100%;
             flex-shrink: 0;
         }
@@ -327,6 +327,7 @@
         .fab-group {
             position: fixed; bottom: 100px; right: 20px; z-index: 200;
             display: flex; flex-direction: column; align-items: center; gap: 15px;
+            pointer-events: none; /* Allow clicks to pass through empty spaces */
         }
         .fab-main {
             width: 56px; height: 56px; border-radius: 50%;
@@ -334,6 +335,7 @@
             box-shadow: 0 4px 20px rgba(217, 70, 239, 0.4);
             cursor: pointer; display: flex; align-items: center; justify-content: center;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto; /* Re-enable clicks for the button */
         }
         .fab-group.active .fab-main { transform: rotate(135deg); background: #333; box-shadow: none; }
         
@@ -351,6 +353,7 @@
             background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border);
             box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer;
             display: flex; align-items: center; justify-content: center; position: relative;
+            pointer-events: auto; /* Re-enable clicks for the button */
         }
         .fab-sub:hover { background: var(--border); }
         .fab-sub::after {
