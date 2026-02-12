@@ -114,6 +114,93 @@ const BookReader = ({ book, onClose }) => {
                 docBody.style.padding = '0';
                 docBody.style.overflow = 'hidden';
 
+                // Inject Responsive Styles for Questions
+                // NOTE: We use large font sizes (1.5rem+) because the book content is likely 
+                // scaled down significantly (0.4x) on mobile screens to fit the width.
+                const style = doc.createElement('style');
+                style.textContent = `
+                    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap');
+                    
+                    .miron-portal-container {
+                        width: 92%;
+                        max-width: 800px;
+                        margin: 40px auto;
+                        font-family: 'Poppins', sans-serif;
+                        position: relative;
+                        z-index: 100;
+                    }
+                    .miron-question-card {
+                        background: #1a1a1a;
+                        border: 1px solid rgba(66, 215, 184, 0.3);
+                        border-radius: 24px;
+                        padding: 32px;
+                        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+                        color: #e0e0e0;
+                    }
+                    .q-header {
+                        display: flex;
+                        align-items: center;
+                        margin-bottom: 24px;
+                    }
+                    .miron-orb-mini {
+                        width: 20px;
+                        height: 20px;
+                        background: #42d7b8;
+                        border-radius: 50%;
+                        margin-right: 16px;
+                        box-shadow: 0 0 15px rgba(66, 215, 184, 0.6);
+                    }
+                    .q-label {
+                        color: #42d7b8;
+                        font-weight: 700;
+                        letter-spacing: 2px;
+                        font-size: 1.4rem; /* Scaled up for mobile readability */
+                        text-transform: uppercase;
+                    }
+                    .q-text {
+                        font-size: 2.2rem; /* Large text to counteract zoom-out */
+                        line-height: 1.4;
+                        margin-bottom: 40px;
+                        font-weight: 500;
+                    }
+                    .q-options {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                    }
+                    .q-opt-btn {
+                        background: rgba(255,255,255,0.05);
+                        border: 2px solid rgba(255,255,255,0.1);
+                        padding: 24px;
+                        border-radius: 16px;
+                        color: #fff;
+                        font-size: 1.8rem;
+                        font-family: inherit;
+                        text-align: left;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .q-opt-btn:active, .q-opt-btn:hover {
+                        background: rgba(66, 215, 184, 0.1);
+                        border-color: #42d7b8;
+                    }
+                    .q-submit {
+                        margin-top: 32px;
+                        width: 100%;
+                        padding: 24px;
+                        background: #42d7b8;
+                        color: #0c0c0c;
+                        font-weight: 700;
+                        font-size: 1.8rem;
+                        font-family: inherit;
+                        border: none;
+                        border-radius: 16px;
+                        cursor: pointer;
+                        box-shadow: 0 4px 20px rgba(66, 215, 184, 0.4);
+                    }
+                `;
+                doc.head.appendChild(style);
+
                 // Measure the actual full content size
                 const w = Math.max(docBody.scrollWidth, docBody.offsetWidth, docEl.clientWidth, docEl.scrollWidth);
                 const h = Math.max(docBody.scrollHeight, docBody.offsetHeight, docEl.clientHeight, docEl.scrollHeight);
