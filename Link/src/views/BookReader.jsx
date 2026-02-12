@@ -8,8 +8,10 @@ const BookReader = ({ book, onClose }) => {
     const [iframeSrc, setIframeSrc] = useState(null);
     const [isUiVisible, setIsUiVisible] = useState(true);
     const [isFabActive, setIsFabActive] = useState(false);
+    const [currentTheme, setCurrentTheme] = useState('light'); // light, sepia, dark
     
     const viewportRef = useRef(null);
+    const iframeRef = useRef(null);
     const layerRef = useRef(null);
     const requestRef = useRef(null);
     const sliderRef = useRef(null);
@@ -99,6 +101,7 @@ const BookReader = ({ book, onClose }) => {
     // Handle Iframe Load & Sizing
     const handleIframeLoad = (e) => {
         const iframe = e.target;
+        iframeRef.current = iframe;
         
         // Small delay to ensure the blob document is fully parsed by the browser
         setTimeout(() => {
@@ -127,6 +130,47 @@ const BookReader = ({ book, onClose }) => {
                 const style = doc.createElement('style');
                 style.textContent = `
                     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap');
+
+                    /* --- THEME ENGINE --- */
+                    body { transition: background-color 0.3s ease, color 0.3s ease; }
+                    
+                    /* Dark Theme */
+                    body.theme-dark, 
+                    body.theme-dark .page, 
+                    body.theme-dark .page-container, 
+                    body.theme-dark .text-container {
+                        background-color: #121212 !important;
+                        color: #d0d0d0 !important;
+                    }
+                    body.theme-dark span, 
+                    body.theme-dark p, 
+                    body.theme-dark div {
+                        color: #d0d0d0 !important;
+                        background-color: transparent !important;
+                    }
+                    body.theme-dark img { opacity: 0.85; mix-blend-mode: normal; }
+
+                    /* Sepia Theme */
+                    body.theme-sepia, 
+                    body.theme-sepia .page, 
+                    body.theme-sepia .page-container {
+                        background-color: #f4ecd8 !important;
+                        color: #5b4636 !important;
+                    }
+                    body.theme-sepia span, 
+                    body.theme-sepia p {
+                        color: #5b4636 !important;
+                        background-color: transparent !important;
+                    }
+                    body.theme-sepia .miron-question-card {
+                        background: #eaddcf !important;
+                        border-color: #d3c4b1 !important;
+                        color: #5b4636 !important;
+                    }
+                    body.theme-sepia .q-label { color: #8a6a4b !important; }
+                    body.theme-sepia .miron-orb-mini { background: #8a6a4b !important; }
+                    body.theme-sepia .q-opt-btn { background: rgba(91, 70, 54, 0.05) !important; border-color: rgba(91, 70, 54, 0.15) !important; color: #5b4636 !important; }
+                    body.theme-sepia .q-submit { background: #8a6a4b !important; color: #f4ecd8 !important; }
                     
                     /* The Root Container sets the Base Font Size */
                     .miron-portal-container {
@@ -211,6 +255,9 @@ const BookReader = ({ book, onClose }) => {
                     }
                 `;
                 doc.head.appendChild(style);
+                
+                // Apply initial theme
+                doc.body.className = `theme-${currentTheme}`;
 
                 // Measure the actual full content size
                 const w = Math.max(docBody.scrollWidth, docBody.offsetWidth, docEl.clientWidth, docEl.scrollWidth);
@@ -237,6 +284,33 @@ const BookReader = ({ book, onClose }) => {
                 console.error("Iframe Load Error:", err);
             }
         }, 100);
+    };
+
+    // Apply Theme Changes
+    useEffect(() => {
+        if (iframeRef.current) {
+            const doc = iframeRef.current.contentDocument || iframeRef.current.contentWindow.document;
+            if (doc && doc.body) {
+                doc.body.className = `theme-${currentTheme}`;
+            }
+        }
+    }, [currentTheme]);
+
+    const toggleTheme = () => {
+        const themes = ['light', 'sepia', 'dark'];
+        const nextIndex = (themes.indexOf(currentTheme) + 1) % themes.length;
+        setCurrentTheme(themes[nextIndex]);
+        setIsFabActive(false);
+    };
+
+    const handleFitPage = () => {
+        // Reset Zoom to Width Fit
+        const currentRealY = state.current.y / state.current.scale;
+        state.current.scale = minScaleLimit.current;
+        state.current.x = 0;
+        state.current.y = currentRealY * state.current.scale; // Maintain relative Y position
+        velocity.current = { x: 0, y: 0 };
+        setIsFabActive(false);
     };
 
     // --- OPTIMIZED PHYSICS ENGINE ---
@@ -535,10 +609,10 @@ const BookReader = ({ book, onClose }) => {
                 {/* FAB MENU */}
                 <div className={`fab-container ${isFabActive ? 'active' : ''}`}>
                     <div className="fab-options">
-                        <div className="fab-mini" data-label="Theme">
+                        <div className="fab-mini" data-label="Theme: Light/Sepia/Dark" onClick={toggleTheme}>
                             <svg className="reader-svg" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
                         </div>
-                        <div className="fab-mini" data-label="Fit Page">
+                        <div className="fab-mini" data-label="Reset Zoom" onClick={handleFitPage}>
                             <svg className="reader-svg" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z"/></svg>
                         </div>
                     </div>
