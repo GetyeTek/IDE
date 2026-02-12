@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import MironChat from './MironChat.jsx';
 
 const Connect = () => {
     const [activeView, setActiveView] = useState('messages'); // 'messages' or 'for-you'
+    const [isMironOpen, setIsMironOpen] = useState(false);
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
     const handleScroll = (e) => {
@@ -76,7 +78,7 @@ const Connect = () => {
                     style={{ overflowY: 'auto', height: '100%' }}
                 >
                     <div className="messages-list">
-                        <div className="messages-list-item miron-chat-card">
+                        <div className="messages-list-item miron-chat-card" onClick={() => setIsMironOpen(true)}>
                             <div className="miron-avatar-orb">
                                 <span className="material-symbols-outlined">auto_awesome</span>
                             </div>
@@ -126,6 +128,7 @@ const Connect = () => {
                     </div>
                 </div>
             </div>
+            {isMironOpen && <MironChat onClose={() => setIsMironOpen(false)} />}
         </div>
     );
 };
