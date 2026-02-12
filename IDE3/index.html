@@ -498,7 +498,7 @@
                     <div class="flex-gap">
                         <button class="btn-outline" style="padding: 4px 8px; font-size: 11px; color: var(--danger); border-color: var(--danger);" onclick="stageDeleteSelectedFiles()">Delete Selected</button>
                         <label style="font-size: 12px; color: var(--primary); display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                            <input type="checkbox" onchange="toggleAllFiles(this)" checked style="accent-color: var(--primary);"> Select All
+                            <input type="checkbox" id="master-file-check" onchange="toggleAllFiles(this)" style="accent-color: var(--primary);"> Select All
                         </label>
                     </div>
                 </div>
@@ -3518,8 +3518,9 @@ async function downloadArtifact(runId) {
 
     function renderFileList(files) {
         const container = document.getElementById('file-list-container');
-        // Update chat context bar if files change
+        // Update chat context bar and master checkbox if files change
         updateChatContextIndicator();
+        setTimeout(syncSelectAllState, 50);
         container.innerHTML = '';
         if (!files || files.length === 0) return container.innerHTML = '<div style="padding:20px; text-align:center;">No files found.</div>';
         
@@ -3548,7 +3549,7 @@ async function downloadArtifact(runId) {
                     <button class="menu-btn" onclick="runDeepScan('${file.path}')" style="color:var(--ai-accent);" title="Deep Syntax Scan">🧬</button>
                     <button class="menu-btn" onclick="downloadSingleFile('${file.path}', this)" style="color:var(--text-muted);" title="Download">⬇</button>
                     <button class="menu-btn" onclick="stageDeleteFile('${file.path}')" style="color:var(--danger)">🗑</button>
-                    <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="updateChatContextIndicator()" style="accent-color:var(--primary)">
+                    <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="updateChatContextIndicator(); syncSelectAllState();" style="accent-color:var(--primary)">
                 </div>`;
             container.appendChild(div);
         });
@@ -3855,6 +3856,20 @@ async function downloadArtifact(runId) {
     function toggleAllFiles(s) {
         document.querySelectorAll('.file-check').forEach(cb => cb.checked = s.checked);
         updateChatContextIndicator();
+        syncSelectAllState();
+    }
+
+    function syncSelectAllState() {
+        const master = document.getElementById('master-file-check');
+        if (!master) return;
+        const checks = Array.from(document.querySelectorAll('#file-list-container .file-check'));
+        if (checks.length === 0) return;
+
+        const allChecked = checks.every(c => c.checked);
+        const someChecked = checks.some(c => c.checked);
+
+        master.indeterminate = someChecked && !allChecked;
+        master.checked = allChecked;
     }
 
     let lastCicdRefresh = 0;
