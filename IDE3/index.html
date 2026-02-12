@@ -3809,10 +3809,16 @@ async function downloadArtifact(runId) {
             const data = await res.json();
             if(!data.content) throw new Error("No content found");
             
+            const ts = new Date().toLocaleTimeString('en-GB').replace(/:/g, '');
+            const originalName = path.split('/').pop();
+            const parts = originalName.split('.');
+            const ext = parts.pop();
+            const nameWithoutExt = parts.join('.');
+            
             const blob = new Blob([b64DecodeUnicode(data.content)], { type: "application/octet-stream" });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = path.split('/').pop();
+            link.download = `${nameWithoutExt}_${ts}.${ext}`;
             link.click();
         } catch(e) { 
             alert("Download failed: " + e.message); 
@@ -4525,19 +4531,22 @@ async function downloadArtifact(runId) {
 
             statusEl.innerText = "📦 Finalizing Bundle...";
 
+            const ts = new Date().toLocaleTimeString('en-GB').replace(/:/g, '');
+            const finalBaseName = `${CONFIG.repoName}_${ts}`;
+
             if (type === 'zip') {
                 const zip = new JSZip();
                 fetchedFiles.forEach(f => zip.file(f.path, f.content));
                 const blob = await zip.generateAsync({ type: "blob" });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `${CONFIG.repoName}.zip`;
+                link.download = `${finalBaseName}.zip`;
                 link.click();
             } else {
                 const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
-                link.download = `${CONFIG.repoName}.txt`;
+                link.download = `${finalBaseName}.txt`;
                 link.click();
             }
             
