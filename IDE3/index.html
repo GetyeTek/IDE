@@ -855,6 +855,7 @@
                     <span style="font-size:11px; color:var(--text-muted); font-weight:bold; text-transform:uppercase;">Functions</span>
                     <div class="flex-gap">
                         <button class="icon-btn" onclick="createBareboneFunction()" title="New">+</button>
+                        <button class="icon-btn" onclick="openFunctionDiscovery()" title="Discover from other Repos/Folders">👁</button>
                         <button class="icon-btn" onclick="fetchEdgeFunctions(true)" title="Rescan Repo">↻</button>
                     </div>
                 </div>
@@ -934,6 +935,18 @@
             <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeRepoSelector()">Close</button>
         </div>
         <div id="repo-selector-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
+    </div>
+
+    <!-- FUNCTION DISCOVERY OVERLAY -->
+    <div id="discovery-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <div style="flex:1; display:flex; align-items:center; gap:10px;">
+                <span id="disc-title" class="viewer-title">Discover Functions</span>
+                <input type="text" id="disc-search" class="input-field" placeholder="Filter..." style="max-width:200px; height:32px; font-size:12px;" onkeyup="filterDiscoveryList(this.value)">
+            </div>
+            <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="document.getElementById('discovery-overlay').classList.remove('active')">Close</button>
+        </div>
+        <div id="discovery-list" style="flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:4px;"></div>
     </div>
 
     <!-- NEW: MULTI-ACTION FAB -->
@@ -3424,6 +3437,119 @@ async function downloadArtifact(runId) {
             saveCurrentChat();
             
         } catch (e) { toast.innerText = "Failed"; setTimeout(() => toast.remove(), 2000); }
+    }
+
+    // --- DISCOVERY LOGIC ---
+    let currentDiscoveryItems = [];
+
+    async function openFunctionDiscovery() {
+        document.getElementById('discovery-overlay').classList.add('active');
+        const list = document.getElementById('discovery-list');
+        document.getElementById('disc-title').innerText = "Select Source";
+        list.innerHTML = '<div style="padding:20px; text-align:center;">Fetching Repositories...</div>';
+
+        try {
+            // 1. Fetch Repos
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: apiBody({ action: 'fetch_repos' })
+            });
+            const data = await res.json();
+            
+            // 2. Build List with Special Options
+            const items = [
+                { name: "📂 Current Repo (Deep Scan)", type: "special", id: "current_deep" },
+                ...(data.repos || []).map(r => ({ name: r.name, type: "repo", id: r.name }))
+            ];
+            currentDiscoveryItems = items;
+            renderDiscoveryList(items, 'source');
+
+        } catch(e) { list.innerHTML = `<div style="color:var(--danger)">Error: ${e.message}</div>`; }
+    }
+
+    async function scanRepoForFunctions(repoName, isDeep) {
+        const list = document.getElementById('discovery-list');
+        document.getElementById('disc-title').innerText = `Scanning: ${repoName}`;
+        list.innerHTML = '<div style="padding:20px; text-align:center;">Scanning file tree...</div>';
+
+        try {
+            // Fetch tree for specific repo (or current)
+            const targetRepo = repoName === 'current_deep' ? CONFIG.repoName : repoName;
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: apiBody({ action: 'fetch', repo_name: targetRepo })
+            });
+            const data = await res.json();
+            
+            const functions = [];
+            (data.files || []).forEach(f => {
+                // Logic: If Deep, match any index.ts. If Standard, match supabase/functions/*/index.ts
+                const isMatch = isDeep 
+                    ? f.path.endsWith('index.ts')
+                    : (f.path.includes('supabase/functions/') && f.path.endsWith('index.ts'));
+                
+                if (isMatch) {
+                    // Extract name
+                    let name = "";
+                    if (f.path.includes('supabase/functions/')) {
+                        const parts = f.path.split('supabase/functions/')[1].split('/');
+                        name = parts[0];
+                    } else {
+                        // Fallback name for deep files: parent folder
+                        const parts = f.path.split('/');
+                        name = parts.length > 1 ? parts[parts.length - 2] : 'root';
+                    }
+                    functions.push({ name: name, path: f.path, repo: targetRepo, type: "function" });
+                }
+            });
+
+            if (functions.length === 0) list.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No functions found.</div>';
+            else {
+                currentDiscoveryItems = functions;
+                renderDiscoveryList(functions, 'function');
+            }
+
+        } catch(e) { list.innerHTML = `<div style="color:var(--danger)">Error: ${e.message}</div>`; }
+    }
+
+    function renderDiscoveryList(items, mode) {
+        const list = document.getElementById('discovery-list');
+        list.innerHTML = items.map(item => `
+            <div class="model-item" onclick="${mode === 'source' 
+                ? (item.id === 'current_deep' ? `scanRepoForFunctions('current_deep', true)` : `scanRepoForFunctions('${item.name}', false)`) 
+                : `importFunction('${item.repo}', '${item.path}', '${item.name}')`}" style="cursor:pointer;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:16px;">${item.type === 'function' ? '⚡' : (item.type === 'special' ? '🔍' : '📦')}</span>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-weight:500; color:#eee;">${item.name}</span>
+                        ${item.path ? `<small style="color:#666; font-size:9px;">${item.path}</small>` : ''}
+                    </div>
+                </div>
+                ${mode === 'source' ? '<span style="color:#666;">›</span>' : '<button class="btn-primary" style="padding:2px 8px; font-size:10px; height:auto;">Import</button>'}
+            </div>
+        `).join('');
+    }
+
+    function filterDiscoveryList(q) {
+        const filtered = currentDiscoveryItems.filter(i => i.name.toLowerCase().includes(q.toLowerCase()) || (i.path && i.path.toLowerCase().includes(q.toLowerCase())));
+        renderDiscoveryList(filtered, currentDiscoveryItems[0]?.repo ? 'function' : 'source');
+    }
+
+    async function importFunction(repo, path, name) {
+        showGlobalToast(`Importing ${name}...`);
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: apiBody({ action: 'preview_file', repo_name: repo, file_path: path })
+            });
+            const data = await res.json();
+            if (data.content) {
+                document.getElementById('ef-name').value = name;
+                document.getElementById('ef-code').value = b64DecodeUnicode(data.content);
+                document.getElementById('discovery-overlay').classList.remove('active');
+                document.getElementById('ef-status-msg').innerText = `Imported from ${repo}. Ready to deploy.`;
+            } else throw new Error("Content empty");
+        } catch(e) { alert("Import failed: " + e.message); }
     }
 
     async function downloadJobLogs(jobId, jobName) {
