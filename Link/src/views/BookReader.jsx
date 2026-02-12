@@ -39,7 +39,7 @@ const BookReader = ({ book, onClose }) => {
         const fetchBook = async () => {
             try {
                 setLoading(true);
-                const response = await fetch('https://vlzgfaqrnyiqfxxxvtas.supabase.co/functions/v1/book-reader', {
+                const response = await fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
