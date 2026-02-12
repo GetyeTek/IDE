@@ -69,6 +69,33 @@ const BookReader = ({ book, onClose }) => {
         };
     }, [book]);
 
+    // Handle interactions inside the iframe (since buttons are injected HTML)
+    useEffect(() => {
+        const handleIframeClick = (e) => {
+            const target = e.target;
+            if (target.classList.contains('q-opt-btn')) {
+                // Visual feedback for selection
+                const parent = target.parentElement;
+                parent.querySelectorAll('.q-opt-btn').forEach(btn => btn.style.borderColor = 'rgba(255,255,255,0.1)');
+                target.style.borderColor = '#42d7b8';
+                target.style.background = 'rgba(66, 215, 184, 0.1)';
+            }
+            if (target.classList.contains('q-submit')) {
+                target.innerText = "Correct! +5 Linkoins";
+                target.style.background = "#b1d34b";
+                // Future: Call Supabase to increment balance
+            }
+        };
+
+        const iframe = document.getElementById('book-iframe');
+        if (iframe) {
+            iframe.contentWindow.addEventListener('click', handleIframeClick);
+        }
+        return () => {
+            if (iframe && iframe.contentWindow) iframe.contentWindow.removeEventListener('click', handleIframeClick);
+        };
+    }, [iframeSrc]);
+
     // Handle Iframe Load & Sizing
     const handleIframeLoad = (e) => {
         const iframe = e.target;
