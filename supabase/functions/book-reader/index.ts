@@ -82,6 +82,21 @@ serve(async (req) => {
       });
     }
 
+    if (action === "list_exams") {
+      const { university_id } = await req.json();
+      const { data: exams, error } = await supabase
+        .from('exams')
+        .select('*')
+        .eq('university_id', university_id)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+
+      return new Response(JSON.stringify({ exams }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     if (action === "get_book_compressed") {
       const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${book_path}`;
       const resp = await fetch(rawUrl, { headers: { "Authorization": `token ${GITHUB_PAT}` } });
