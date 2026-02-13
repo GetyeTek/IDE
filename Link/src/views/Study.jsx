@@ -239,15 +239,14 @@ const Study = ({ onOpenActivity }) => {
                                                 {row.map((book, i) => (
                                                     <div className="book-group" key={i}>
                                                         <div 
-                                                            className="book-immersive" 
+                                                            className={`book-immersive ${book.isExamTrigger ? 'is-stack' : ''}`} 
                                                             style={{ 
                                                                 backgroundImage: book.cover_url ? `url("${book.cover_url}")` : 
-                                                                                 book.isExamTrigger ? 'linear-gradient(135deg, #FFD700, #B8860B)' : 
+                                                                                 book.isExamTrigger ? 'linear-gradient(135deg, #4d3a1f, #1a1a1a)' : 
                                                                                  getBookColor(book.title),
                                                                 backgroundSize: 'cover',
                                                                 backgroundPosition: 'center',
-                                                                backgroundRepeat: 'no-repeat',
-                                                                border: book.isExamTrigger ? '2px solid gold' : 'none'
+                                                                backgroundRepeat: 'no-repeat'
                                                             }}
                                                             onClick={() => {
                                                                 if (book.isExamTrigger) {
