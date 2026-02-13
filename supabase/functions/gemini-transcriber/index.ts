@@ -5,8 +5,8 @@ const SB_URL = Deno.env.get('SUPABASE_URL')!;
 const SB_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(SB_URL, SB_SERVICE_ROLE);
 
-// The Model requested (Gemini 2.5 Flash)
-const GEMINI_MODEL = "gemini-2.5-flash"; 
+// The Model requested (Gemini 3.0 Flash Preview)
+const GEMINI_MODEL = "gemini-3-flash-preview"; 
 
 serve(async (req) => {
   try {
@@ -74,10 +74,23 @@ serve(async (req) => {
         contents: [{
           parts: [
             { text: prompt },
-            { inlineData: { mimeType: "application/pdf", data: base64File } }
+            {
+              inlineData: {
+                mimeType: "application/pdf",
+                data: base64File
+              }
+            }
           ]
         }],
-        generationConfig: { temperature: 0.1, topP: 1, maxOutputTokens: 4096 }
+        generationConfig: {
+          temperature: 0.1,
+          topP: 1,
+          maxOutputTokens: 12000,
+          thinkingConfig: {
+            include_thoughts: false,
+            thinkingLevel: "HIGH"
+          }
+        }
       })
     });
 
@@ -91,7 +104,9 @@ serve(async (req) => {
         throw new Error("Rate limit hit. Key put on cooldown.");
     }
 
-    const transcribedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Gemini 3.0 may return multiple parts (thoughts, then text).
+    // We find the first part that contains actual text.
+    const transcribedText = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
 
     if (!transcribedText) {
       throw new Error(`AI response failed: ${JSON.stringify(result)}`);
