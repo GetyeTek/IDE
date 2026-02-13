@@ -379,58 +379,60 @@ body.library-open { overflow: hidden; }
 .book-group { display: flex; flex-direction: column; align-items: center; }
 .book-immersive { transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 0.4s cubic-bezier(0.19, 1, 0.22, 1); width: 100%; aspect-ratio: 3 / 4.2; background-size: cover; border-radius: 2px; box-shadow: 5px 5px 20px rgba(0,0,0,0.5); position: relative; }
 
-/* --- BOOK STACK EFFECT --- */
-.book-immersive.is-stack::before, 
-.book-immersive.is-stack::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: inherit;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    z-index: -1;
-    transition: transform 0.4s ease;
+/* --- ENHANCED VOLUMETRIC BOOK STACK --- */
+.book-immersive.is-stack {
+    background: linear-gradient(145deg, #3d2b1f, #1a1410) !important;
+    border: 1px solid rgba(255, 215, 0, 0.1);
+    /* Use multi-layered box shadows to simulate covers of books underneath */
+    box-shadow: 
+        2px -2px 0 0 #2a1f10, 
+        3px -3px 0 0 #eaddcf, /* Page edge 1 */
+        5px -5px 0 0 #3d2b1f, /* Cover 2 */
+        6px -6px 0 0 #eaddcf, /* Page edge 2 */
+        8px -8px 0 0 #2a1f10, /* Cover 3 */
+        10px -10px 25px rgba(0,0,0,0.6);
+    transform: translateZ(10px);
 }
 
-.book-immersive.is-stack::before {
-    transform: translate(4px, -4px);
-    filter: brightness(0.8);
-}
-
-.book-immersive.is-stack::after {
-    transform: translate(8px, -8px);
-    filter: brightness(0.6);
-}
-
-.book-group:hover .book-immersive.is-stack::before {
-    transform: translate(8px, -8px);
-}
-
-.book-group:hover .book-immersive.is-stack::after {
-    transform: translate(16px, -16px);
-}
-
-.book-immersive.is-stack::hidden-label {
-    display: none;
-}
-
-.book-immersive.is-stack::after {
-    /* Add a small decorative emblem to the top book */
-    content: 'EXAMS';
+.exam-stack-content {
+    height: 100%;
+    width: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-family: 'Cinzel', serif;
-    font-size: 0.6rem;
+    text-align: center;
+    padding: 1rem;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    background: radial-gradient(circle at center, rgba(255, 215, 0, 0.05) 0%, transparent 70%);
+}
+
+.exam-stack-content .emblem {
+    font-size: 1.5rem;
     color: var(--linkoin-gold);
-    opacity: 0.8;
-    letter-spacing: 2px;
-    z-index: 5;
-    background: none;
-    filter: none;
-    border: none;
-    transform: translate(0);
-    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    margin-bottom: 0.5rem;
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.3));
+}
+
+.exam-stack-content .stack-title {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--linkoin-gold);
+    letter-spacing: 1.5px;
+    line-height: 1.3;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.book-group:hover .book-immersive.is-stack {
+    transform: translate(-4px, 4px) translateZ(15px);
+    box-shadow: 
+        4px -4px 0 0 #2a1f10, 
+        6px -6px 0 0 #eaddcf,
+        10px -10px 0 0 #3d2b1f, 
+        12px -12px 0 0 #eaddcf,
+        16px -16px 0 0 #2a1f10, 
+        20px -20px 40px rgba(0,0,0,0.7);
 }
 .book-group:hover .book-immersive { transform: translateZ(35px) rotateY(-5deg) scale(1.05); box-shadow: 10px 20px 30px rgba(0,0,0,0.6); }
 .info-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); padding: 1rem; color: white; opacity: 0; transform: translateY(10px); transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1); }
