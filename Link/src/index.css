@@ -377,7 +377,61 @@ body.library-open { overflow: hidden; }
 .bookshelf-perspective { perspective: 1000px; }
 .book-container { transform-style: preserve-3d; display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 0.5rem; padding: 0 0.5rem; position: relative; z-index: 10; margin-bottom: -0.5rem; min-height: 20px; }
 .book-group { display: flex; flex-direction: column; align-items: center; }
-.book-immersive { transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 0.4s cubic-bezier(0.19, 1, 0.22, 1); width: 100%; aspect-ratio: 3 / 4.2; background-size: cover; border-radius: 0.125rem; box-shadow: 5px 5px 20px rgba(0,0,0,0.5); position: relative; }
+.book-immersive { transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 0.4s cubic-bezier(0.19, 1, 0.22, 1); width: 100%; aspect-ratio: 3 / 4.2; background-size: cover; border-radius: 2px; box-shadow: 5px 5px 20px rgba(0,0,0,0.5); position: relative; }
+
+/* --- BOOK STACK EFFECT --- */
+.book-immersive.is-stack::before, 
+.book-immersive.is-stack::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: -1;
+    transition: transform 0.4s ease;
+}
+
+.book-immersive.is-stack::before {
+    transform: translate(4px, -4px);
+    filter: brightness(0.8);
+}
+
+.book-immersive.is-stack::after {
+    transform: translate(8px, -8px);
+    filter: brightness(0.6);
+}
+
+.book-group:hover .book-immersive.is-stack::before {
+    transform: translate(8px, -8px);
+}
+
+.book-group:hover .book-immersive.is-stack::after {
+    transform: translate(16px, -16px);
+}
+
+.book-immersive.is-stack::hidden-label {
+    display: none;
+}
+
+.book-immersive.is-stack::after {
+    /* Add a small decorative emblem to the top book */
+    content: 'EXAMS';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    color: var(--linkoin-gold);
+    opacity: 0.8;
+    letter-spacing: 2px;
+    z-index: 5;
+    background: none;
+    filter: none;
+    border: none;
+    transform: translate(0);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
 .book-group:hover .book-immersive { transform: translateZ(35px) rotateY(-5deg) scale(1.05); box-shadow: 10px 20px 30px rgba(0,0,0,0.6); }
 .info-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); padding: 1rem; color: white; opacity: 0; transform: translateY(10px); transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1); }
 .book-group:hover .info-overlay { opacity: 1; transform: translateY(0); }
