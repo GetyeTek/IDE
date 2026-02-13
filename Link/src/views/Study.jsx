@@ -40,6 +40,8 @@ const universityIconMap = {
     "Wollo University": "fa-feather"
 };
 
+import ExamPavilion from './ExamPavilion.jsx';
+
 const Study = ({ onOpenActivity }) => {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
@@ -47,6 +49,7 @@ const Study = ({ onOpenActivity }) => {
     const [books, setBooks] = useState([]);
     const [universities, setUniversities] = useState([]);
     const [shelfLevel, setShelfLevel] = useState('main'); // 'main' or 'universities'
+    const [selectedUniversity, setSelectedUniversity] = useState(null);
     const wavePathRef = useRef(null);
 
     useEffect(() => {
@@ -303,29 +306,15 @@ const Study = ({ onOpenActivity }) => {
                                                             }}
                                                             onClick={handleClick}
                                                         >
-                                                            {isExamTrigger ? (
-                                                                <div className="exam-stack-content">
-                                                                    <div className="emblem"><i className="fas fa-university"></i></div>
-                                                                    <div className="stack-title">UNIVERSITY ARCHIVE</div>
-                                                                </div>
-                                                            ) : isUniversity ? (
-                                                                <>
-                                                                    <div className="tilet-border-sm"></div>
-                                                                    <div className="heritage-emblem">
-                                                                        <i className={`fa-solid ${universityIconMap[item.title] || 'fa-graduation-cap'}`}></i>
-                                                                    </div>
-                                                                    <div className="heritage-content">
-                                                                        <div className="heritage-label">Collection</div>
-                                                                        <div className="heritage-title">{item.title}</div>
-                                                                    </div>
-                                                                    <div className="tilet-border-sm bottom"></div>
-                                                                </>
-                                                            ) : (
-                                                                <div className="info-overlay">
-                                                                    <h3 className="title">{item.title}</h3>
-                                                                    <div className="progress-bar"><div className="progress" style={{ width: '0%' }}></div></div>
-                                                                </div>
-                                                            )}
+                                                            onClick={() => {
+                                                                if (book.isExamTrigger) {
+                                                                    setShelfLevel('universities');
+                                                                } else if (shelfLevel === 'main') {
+                                                                    setActiveBook(book);
+                                                                } else {
+                                                                    setSelectedUniversity(book);
+                                                                }
+                                                            }}
                                                         </div>
                                                     );
                                                 })}
@@ -341,6 +330,7 @@ const Study = ({ onOpenActivity }) => {
                 </div>
             </div>
             {activeBook && <BookReader book={activeBook} onClose={() => setActiveBook(null)} />}
+            {selectedUniversity && <ExamPavilion university={selectedUniversity} onClose={() => setSelectedUniversity(null)} />}
         </div>
     );
 };
