@@ -254,15 +254,21 @@ const Study = ({ onOpenActivity }) => {
                                                                 } else if (shelfLevel === 'main') {
                                                                     setActiveBook(book);
                                                                 } else {
-                                                                    // For now, universities just console log
                                                                     console.log("University Selected:", book.name);
                                                                 }
                                                             }}
                                                         >
-                                                            <div className="info-overlay">
-                                                                <h3 className="title">{book.title}</h3>
-                                                                <div className="progress-bar"><div className="progress" style={{ width: '0%' }}></div></div>
-                                                            </div>
+                                                            {book.isExamTrigger ? (
+                                                                <div className="exam-stack-content">
+                                                                    <div className="emblem"><i className="fas fa-university"></i></div>
+                                                                    <div className="stack-title">UNIVERSITY ARCHIVE</div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="info-overlay">
+                                                                    <h3 className="title">{book.title}</h3>
+                                                                    <div className="progress-bar"><div className="progress" style={{ width: '0%' }}></div></div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}
