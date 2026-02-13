@@ -192,7 +192,13 @@ const Study = ({ onOpenActivity }) => {
 {(() => {
                                     const rows = [];
                                     for (let i = 0; i < books.length; i += 3) rows.push(books.slice(i, i + 3));
-                                    if(rows.length === 0) return <div style={{color:'rgba(255,255,255,0.3)', textAlign:'center', padding:'2rem'}}>Library Empty</div>;
+                                    
+                                    if(rows.length === 0) return (
+                                        <div style={{ marginBottom: '1.5rem' }}>
+                                            <div style={{color:'rgba(255,255,255,0.2)', textAlign:'center', padding:'4rem 0', fontSize: '0.9rem'}}>No books discovered yet</div>
+                                            <div className="shelf-wood"></div>
+                                        </div>
+                                    );
                                     
                                     return rows.map((row, rowIndex) => (
                                         <div key={rowIndex} style={{ marginBottom: '1.5rem' }}>
