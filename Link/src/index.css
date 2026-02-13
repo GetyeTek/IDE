@@ -182,7 +182,7 @@ body.library-open { overflow: hidden; }
 .hub-view { display: none; height: 100%; }
 .hub-view.active { display: block; }
 .feed-container { height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; }
-.feed-slide { height: 100%; width: 100%; scroll-snap-align: start; position: relative; padding: 1rem; }
+.feed-slide { height: 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; position: relative; padding: 1rem; }
 .card-content-wrapper { width: 100%; height: 100%; border-radius: var(--radius-main); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 .action-slide-content { background-color: var(--surface-dark); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; width: 100%; height: 100%; }
 .action-slide-content .action-icon { font-size: 4rem; color: var(--accent-teal); margin-bottom: 24px; }
