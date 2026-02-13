@@ -61,6 +61,27 @@ serve(async (req) => {
        return new Response(JSON.stringify({ books }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "list_universities") {
+      const { data: universities, error } = await supabase
+        .from('universities')
+        .select('*')
+        .order('name', { ascending: true });
+        
+      if (error) throw error;
+
+      const universityBooks = universities.map(uni => ({
+        id: uni.id,
+        title: uni.name,
+        name: uni.name,
+        short_name: uni.short_name,
+        cover_url: null 
+      }));
+
+      return new Response(JSON.stringify({ universities: universityBooks }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     if (action === "get_book_compressed") {
       const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${book_path}`;
       const resp = await fetch(rawUrl, { headers: { "Authorization": `token ${GITHUB_PAT}` } });
