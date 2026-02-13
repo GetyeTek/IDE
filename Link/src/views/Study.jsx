@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BookReader from './BookReader.jsx';
+import ExamPavilion from './ExamPavilion.jsx';
 
 const universityIconMap = {
     "Adama Science and Technology University": "fa-atom",
@@ -39,8 +40,6 @@ const universityIconMap = {
     "Wollega University": "fa-coins",
     "Wollo University": "fa-feather"
 };
-
-import ExamPavilion from './ExamPavilion.jsx';
 
 const Study = ({ onOpenActivity }) => {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
@@ -275,12 +274,12 @@ const Study = ({ onOpenActivity }) => {
                                         </div>
                                     );
                                     
-                                    return rows.map((row, rowIndex) => (
+                                                                        return rows.map((row, rowIndex) => (
                                         <div key={rowIndex} style={{ marginBottom: '1.5rem' }}>
                                             <div className="book-container">
                                                 {row.map((item, index) => {
                                                     const isUniversity = shelfLevel === 'universities';
-                                                    const isExamTrigger = item.isExamTrigger; // Only true if shelfLevel === 'main' and it's the exam slot
+                                                    const isExamTrigger = item.isExamTrigger;
                                                     
                                                     const handleClick = () => {
                                                         if (isExamTrigger) {
@@ -288,33 +287,45 @@ const Study = ({ onOpenActivity }) => {
                                                         } else if (!isUniversity) {
                                                             setActiveBook(item);
                                                         } else {
-                                                            console.log("University Selected:", item.name);
+                                                            setSelectedUniversity(item);
                                                         }
                                                     };
 
                                                     return (
                                                         <div 
-                                                            key={index}
+                                                            key={index} 
                                                             className={`book-immersive ${isExamTrigger ? 'is-stack' : ''} ${isUniversity ? 'is-heritage' : ''}`}
                                                             style={{ 
-                                                                backgroundImage: isUniversity ? 'none' : 
-                                                                                 isExamTrigger ? 'linear-gradient(145deg, #4d3a1f, #1a1a1a)' : 
-                                                                                 `url("${item.cover_url}")`,
+                                                                backgroundImage: (isUniversity || isExamTrigger) ? 'none' : `url("${item.cover_url}")`,
                                                                 backgroundSize: 'cover',
                                                                 backgroundPosition: 'center',
                                                                 backgroundRepeat: 'no-repeat'
                                                             }}
                                                             onClick={handleClick}
                                                         >
-                                                            onClick={() => {
-                                                                if (book.isExamTrigger) {
-                                                                    setShelfLevel('universities');
-                                                                } else if (shelfLevel === 'main') {
-                                                                    setActiveBook(book);
-                                                                } else {
-                                                                    setSelectedUniversity(book);
-                                                                }
-                                                            }}
+                                                            {isExamTrigger ? (
+                                                                <div className="exam-stack-content">
+                                                                    <div className="emblem"><i className="fas fa-university"></i></div>
+                                                                    <div className="stack-title">UNIVERSITY ARCHIVE</div>
+                                                                </div>
+                                                            ) : isUniversity ? (
+                                                                <>
+                                                                    <div className="tilet-border-sm"></div>
+                                                                    <div className="heritage-emblem">
+                                                                        <i className={`fa-solid ${universityIconMap[item.title] || 'fa-graduation-cap'}`}></i>
+                                                                    </div>
+                                                                    <div className="heritage-content">
+                                                                        <div className="heritage-label">Collection</div>
+                                                                        <div className="heritage-title">{item.title}</div>
+                                                                    </div>
+                                                                    <div className="tilet-border-sm bottom"></div>
+                                                                </>
+                                                            ) : (
+                                                                <div className="info-overlay">
+                                                                    <h3 className="title">{item.title}</h3>
+                                                                    <div className="progress-bar"><div className="progress" style={{ width: '0%' }}></div></div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
