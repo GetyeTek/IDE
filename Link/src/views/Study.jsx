@@ -6,16 +6,39 @@ const Study = ({ onOpenActivity }) => {
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
     const [activeBook, setActiveBook] = useState(null);
     const [books, setBooks] = useState([]);
+    const [universities, setUniversities] = useState([]);
+    const [shelfLevel, setShelfLevel] = useState('main'); // 'main' or 'universities'
     const wavePathRef = useRef(null);
 
     useEffect(() => {
+        // Fetch Main Books
         fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'list_books' })
         })
         .then(res => res.json())
-        .then(data => { if(data.books) setBooks(data.books); })
+        .then(data => {
+            if(data.books) {
+                // Inject a special 'Exam' book at the start
+                const examBook = { 
+                    title: "University Exams", 
+                    isExamTrigger: true, 
+                    cover_url: null 
+                };
+                setBooks([examBook, ...data.books]);
+            }
+        })
+        .catch(err => console.error(err));
+
+        // Fetch Universities
+        fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'list_universities' })
+        })
+        .then(res => res.json())
+        .then(data => { if(data.universities) setUniversities(data.universities); })
         .catch(err => console.error(err));
     }, []);
 
@@ -168,14 +191,20 @@ const Study = ({ onOpenActivity }) => {
                 <div style={{ position: 'relative', display: 'flex', height: '100%', flexDirection: 'column' }}>
                     <header className="fullscreen-header">
                         <div className="header-main-row">
-                            <button className="icon-button" onClick={() => setIsLibraryOpen(false)}>
-                                <span className="material-symbols-outlined">arrow_back</span>
+                            <button className="icon-button" onClick={() => {
+                                if (shelfLevel === 'universities') {
+                                    setShelfLevel('main');
+                                } else {
+                                    setIsLibraryOpen(false);
+                                }
+                            }}>
+                                <span className="material-symbols-outlined">{shelfLevel === 'universities' ? 'arrow_back_ios' : 'arrow_back'}</span>
                             </button>
                             <div 
                                 className={`header-title-wrapper ${isHeaderExpanded ? 'expanded' : ''}`} 
                                 onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
                             >
-                                <h2>My Library</h2>
+                                <h2>{shelfLevel === 'main' ? 'My Library' : 'Select University'}</h2>
                                 <span className="material-symbols-outlined chevron-icon">expand_more</span>
                             </div>
                             <button className="icon-button"><span className="material-symbols-outlined">search</span></button>
@@ -191,7 +220,11 @@ const Study = ({ onOpenActivity }) => {
                             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'auto', paddingBottom: '2rem' }} className="bookshelf-perspective">
 {(() => {
                                     const rows = [];
-                                    for (let i = 0; i < books.length; i += 3) rows.push(books.slice(i, i + 3));
+                                    const itemsToRender = shelfLevel === 'main' ? books : universities;
+                                    
+                                    for (let i = 0; i < itemsToRender.length; i += 3) {
+                                        rows.push(itemsToRender.slice(i, i + 3));
+                                    }
                                     
                                     if(rows.length === 0) return (
                                         <div style={{ marginBottom: '1.5rem' }}>
@@ -208,12 +241,24 @@ const Study = ({ onOpenActivity }) => {
                                                         <div 
                                                             className="book-immersive" 
                                                             style={{ 
-                                                                backgroundImage: book.cover_url ? `url("${book.cover_url}")` : getBookColor(book.title),
+                                                                backgroundImage: book.cover_url ? `url("${book.cover_url}")` : 
+                                                                                 book.isExamTrigger ? 'linear-gradient(135deg, #FFD700, #B8860B)' : 
+                                                                                 getBookColor(book.title),
                                                                 backgroundSize: 'cover',
                                                                 backgroundPosition: 'center',
-                                                                backgroundRepeat: 'no-repeat'
+                                                                backgroundRepeat: 'no-repeat',
+                                                                border: book.isExamTrigger ? '2px solid gold' : 'none'
                                                             }}
-                                                            onClick={() => setActiveBook(book)}
+                                                            onClick={() => {
+                                                                if (book.isExamTrigger) {
+                                                                    setShelfLevel('universities');
+                                                                } else if (shelfLevel === 'main') {
+                                                                    setActiveBook(book);
+                                                                } else {
+                                                                    // For now, universities just console log
+                                                                    console.log("University Selected:", book.name);
+                                                                }
+                                                            }}
                                                         >
                                                             <div className="info-overlay">
                                                                 <h3 className="title">{book.title}</h3>
