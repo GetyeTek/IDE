@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import './ExamPavilion.css';
+import ExamSession from './ExamSession.jsx';
 
 const ExamPavilion = ({ university, onClose }) => {
     const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Midterm'); // 'Midterm', 'Final', 'Mock'
+    const [activeSession, setActiveSession] = useState(null);
 
     useEffect(() => {
         setLoading(true);
@@ -63,7 +65,12 @@ const ExamPavilion = ({ university, onClose }) => {
                     <div className="pav-empty">Calibrating focus...</div>
                 ) : filteredExams.length > 0 ? (
                     filteredExams.map((exam, idx) => (
-                        <div className="pav-exam-card" key={exam.id} style={{ animationDelay: `${idx * 0.1}s` }}>
+                        <div 
+                            className="pav-exam-card" 
+                            key={exam.id} 
+                            style={{ animationDelay: `${idx * 0.1}s` }}
+                            onClick={() => setActiveSession(exam)}
+                        >
                             <div className="pav-lume-gauge">
                                 <div className="pav-lume-fill" style={{ height: '0%' }}></div>
                             </div>
@@ -83,6 +90,7 @@ const ExamPavilion = ({ university, onClose }) => {
                     <div className="pav-empty">No {activeTab} exams found in this archive.</div>
                 )}
             </main>
+            {activeSession && <ExamSession exam={activeSession} onClose={() => setActiveSession(null)} />}
         </div>
     );
 };
