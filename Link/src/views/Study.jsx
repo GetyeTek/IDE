@@ -63,7 +63,7 @@ const Study = ({ onOpenActivity }) => {
             if(data.books) {
                 // Inject a special 'Exam' book at the start
                 const examBook = { 
-                    title: "University Exams", 
+                    title: "Exams", 
                     isExamTrigger: true, 
                     cover_url: null 
                 };
@@ -306,7 +306,7 @@ const Study = ({ onOpenActivity }) => {
                                                             {isExamTrigger ? (
                                                                 <div className="exam-stack-content">
                                                                     <div className="emblem"><i className="fas fa-university"></i></div>
-                                                                    <div className="stack-title">UNIVERSITY ARCHIVE</div>
+                                                                    <div className="stack-title">EXAMS</div>
                                                                 </div>
                                                             ) : isUniversity ? (
                                                                 <>
@@ -330,9 +330,7 @@ const Study = ({ onOpenActivity }) => {
                                                     );
                                                 })}
                                             </div>
-                                            {shelfLevel !== 'universities' && (
-                                                <div className="shelf-wood"></div>
-                                            )}
+                                            <div className="shelf-wood"></div>
                                         </div>
                                     ));                                })()}
                             </div>
