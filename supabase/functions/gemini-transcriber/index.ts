@@ -87,10 +87,10 @@ serve(async (req) => {
           topP: 1,
           maxOutputTokens: 15000,
           thinkingConfig: {
-            include_thoughts: false,
+            includeThoughts: false,
             thinkingLevel: "MINIMAL"
           },
-          media_resolution: "ultra_high"
+          mediaResolution: "MEDIA_RESOLUTION_HIGH"
         }
       })
     });
