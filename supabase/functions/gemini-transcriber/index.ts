@@ -52,7 +52,7 @@ serve(async (req) => {
       Your goal is to provide a high-fidelity, verbatim transcription of the provided image.
 
       ### CORE DIRECTIVES:
-      1. INTEGRITY & HONESTY: Transcribe every word exactly as written. Do not summarize, do not skip sections, and do not interpret. If the text is a Ge'ez verse followed by Amharic commentary, preserve that relationship.
+      1. INTEGRITY & HONESTY: Transcribe every word exactly as written. Preserve archaic spellings and specific Ge'ez characters (e.g., distinguish between 'ቆ' and 'ቁ') as they appear in the manuscript. Do not summarize, do not skip sections, and do not interpret.
       2. LAYOUT INTELLIGENCE: The layout may have inconsistent columns or nested commentary. Use your contextual understanding of Ethiopian liturgical texts to determine the correct logical reading order. 
       3. CONTEXTUAL CORRECTION: If a character is visually malformed, blurred, or faded, use your deep knowledge of Amharic grammar and Gospel context to resolve it. (e.g., distinguishing between similar-looking Fidels like 'ሀ' and 'ሃ' based on the surrounding word).
       4. NOISE FILTERING: Completely ignore and exclude:
@@ -97,10 +97,6 @@ serve(async (req) => {
 
     const result = await response.json();
 
-    // DEBUG: Log the full raw response for zigzag analysis
-    console.log("--- RAW GEMINI RESPONSE ---");
-    console.log(JSON.stringify(result, null, 2));
-
     if (response.status === 429) {
         // Rate limit hit: put key on 10-minute cooldown
         const cooldown = new Date(Date.now() + 10 * 60000).toISOString();
@@ -124,10 +120,11 @@ serve(async (req) => {
     }
 
     // 6. UPDATE DATABASE & ROTATE KEY
+    const isSuccess = finishReason === "STOP";
     await supabase.from('gospel_transcriptions').update({
       content: transcribedText,
-      status: 'completed',
-      error_log: `Finish Reason: ${finishReason}`,
+      status: isSuccess ? 'completed' : 'error',
+      error_log: isSuccess ? null : `Incomplete: ${finishReason}`,
       updated_at: new Date().toISOString()
     }).eq('id', page.id);
 
