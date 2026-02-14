@@ -52,9 +52,12 @@ serve(async (req) => {
       Your goal is to provide a high-fidelity, verbatim transcription of the provided image.
 
       ### CORE DIRECTIVES:
-      1. INTEGRITY & HONESTY: Transcribe every word exactly as written. Preserve archaic spellings and specific Ge'ez characters (e.g., distinguish between 'ቆ' and 'ቁ') as they appear in the manuscript. Do not summarize, do not skip sections, and do not interpret.
-      2. LAYOUT INTELLIGENCE: The layout may have inconsistent columns or nested commentary. Use your contextual understanding of Ethiopian liturgical texts to determine the correct logical reading order. 
-      3. CONTEXTUAL CORRECTION: If a character is visually malformed, blurred, or faded, use your deep knowledge of Amharic grammar and Gospel context to resolve it. (e.g., distinguishing between similar-looking Fidels like 'ሀ' and 'ሃ' based on the surrounding word).
+      ### CORE DIRECTIVES:
+      1. INTEGRITY & HONESTY: Transcribe every word exactly as written. Preserve archaic spellings and specific Ge'ez characters (e.g., distinguish between 'ቆ' and 'ቁ') as they appear in the manuscript. Do not summarize, do not skip sections, and do not interpret. 
+      2. CONTINUITY AWARENESS: This image is one page of a long, ongoing book. The text likely starts in the middle of a sentence and ends in the middle of another. Do NOT attempt to complete sentences, add missing punctuation, or 'fix' the start/end to make it look like a complete document. If a word is cut off at the page edge, transcribe only the visible part.
+      3. RELATIONSHIP PRESERVATION: If the text is a Ge'ez verse followed by Amharic commentary, preserve that relationship exactly.
+      4. LAYOUT INTELLIGENCE: The layout may have inconsistent columns or nested commentary. Use your contextual understanding of Ethiopian liturgical texts to determine the correct logical reading order. 
+      5. CONTEXTUAL CORRECTION: If a character is visually malformed, blurred, or faded, use your deep knowledge of Amharic grammar and Gospel context to resolve it. (e.g., distinguishing between similar-looking Fidels like 'ሀ' and 'ሃ' based on the surrounding word).
       4. NOISE FILTERING: Completely ignore and exclude:
          - Watermarks or scan artifacts.
          - Page numbers, footers, or headers.
