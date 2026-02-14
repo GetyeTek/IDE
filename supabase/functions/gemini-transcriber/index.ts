@@ -53,21 +53,16 @@ serve(async (req) => {
       Your goal is to provide a high-fidelity, verbatim transcription of the provided image.
 
       ### CORE DIRECTIVES:
-      ### CORE DIRECTIVES:
-      1. INTEGRITY & HONESTY: Transcribe every word exactly as written. Preserve archaic spellings and specific Ge'ez characters (e.g., distinguish between 'ቆ' and 'ቁ') as they appear in the manuscript. Do not summarize, do not skip sections, and do not interpret. 
-      2. CONTINUITY AWARENESS: This image is one page of a long, ongoing book. The text likely starts in the middle of a sentence and ends in the middle of another. Do NOT attempt to complete sentences, add missing punctuation, or 'fix' the start/end to make it look like a complete document. If a word is cut off at the page edge, transcribe only the visible part.
-      4. LAYOUT INTELLIGENCE: The layout may have inconsistent columns or nested commentary. Use your contextual understanding of Ethiopian liturgical texts to determine the correct logical reading order. 
-      5. CONTEXTUAL CORRECTION: If a character is visually malformed, blurred, or faded, use your deep knowledge of Amharic grammar and Gospel context to resolve it. (e.g., distinguishing between similar-looking Fidels like 'ሀ' and 'ሃ' based on the surrounding word).
-      5. CONTEXTUAL CORRECTION: If a character is visually malformed, blurred, or faded, use your deep knowledge of Amharic grammar and Gospel context to resolve it. (e.g., distinguishing between similar-looking Fidels like 'ሀ' and 'ሃ' based on the surrounding word).
-      4. NOISE FILTERING: Completely ignore and exclude:
-         - Watermarks or scan artifacts.
-         - Page numbers, footers, or headers.
-         - Any English text unless it is part of the original manuscript.
-      5. FORMATTING: Maintain paragraph breaks. Do not add any conversational filler like "Here is the text." Output ONLY the transcribed text.
+      1. INTEGRITY & HONESTY: Transcribe every word exactly as written. Preserve archaic spellings and specific Ge'ez characters (e.g., distinguish between 'ቆ' and 'ቁ') as they appear in the manuscript.
+      2. CONTINUITY AWARENESS: This is one page of a long book. The text may start/end mid-sentence. Do NOT add missing punctuation or 'fix' fragments. Transcribe only what is visible.
+      3. LAYOUT & RELATIONSHIP: Determine the correct reading order for nested commentary. If the text is a Ge'ez verse followed by Amharic commentary, preserve that relationship.
+      4. CONTEXTUAL CORRECTION: If a character is blurred, use your knowledge of Amharic grammar and Gospel context to resolve it (e.g., distinguishing 'ሀ' vs 'ሃ').
+      5. NOISE FILTERING: Exclude watermarks, scan artifacts, page numbers, and English text.
+      6. FORMATTING: Maintain paragraph breaks. Output ONLY the transcribed text. No conversational filler.
 
       ### UNEXPECTED SCENARIOS:
-      - If you encounter a badly damaged section, provide your best scholarly reconstruction based on the context of the Gospel passage.
-      - If the layout is ambiguous, prioritize the flow that maintains the theological meaning of the sentence.
+      - Damaged sections: Provide your best scholarly reconstruction based on context.
+      - Ambiguous layout: Prioritize the flow that maintains theological meaning.
     `;
 
     // 5. CALL GEMINI API
@@ -100,6 +95,10 @@ serve(async (req) => {
     });
 
     const result = await response.json();
+
+    if (result.error) {
+      throw new Error(`Gemini API Error: ${result.error.message}`);
+    }
 
     if (response.status === 429) {
         // Rate limit hit: put key on 10-minute cooldown
@@ -141,6 +140,14 @@ serve(async (req) => {
 
   } catch (err) {
     console.error("Transcription Error:", err.message);
+    
+    // Attempt to clear the 'processing' lock so the page can be retried
+    if (typeof page !== 'undefined' && page?.id) {
+      await supabase.from('gospel_transcriptions')
+        .update({ status: 'error', error_log: err.message })
+        .eq('id', page.id);
+    }
+
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 });
