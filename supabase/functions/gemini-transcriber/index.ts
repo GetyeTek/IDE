@@ -24,11 +24,12 @@ serve(async (req) => {
 
     if (keyError || !keyData) throw new Error("No available Gemini API keys found.");
 
-    // 2. FETCH PENDING PAGE
+    // 2. FETCH NEXT INCOMPLETE PAGE
+    // Prioritizes the lowest page_number that is not yet 'completed'
     const { data: page, error: pageError } = await supabase
       .from('gospel_transcriptions')
       .select('*')
-      .eq('status', 'pending')
+      .neq('status', 'completed')
       .order('page_number', { ascending: true })
       .limit(1)
       .single();
