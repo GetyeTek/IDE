@@ -85,16 +85,21 @@ serve(async (req) => {
         generationConfig: {
           temperature: 0.1,
           topP: 1,
-          maxOutputTokens: 12000,
+          maxOutputTokens: 15000,
           thinkingConfig: {
             include_thoughts: false,
-            thinkingLevel: "HIGH"
-          }
+            thinkingLevel: "MINIMAL"
+          },
+          media_resolution: "ultra_high"
         }
       })
     });
 
     const result = await response.json();
+
+    // DEBUG: Log the full raw response for zigzag analysis
+    console.log("--- RAW GEMINI RESPONSE ---");
+    console.log(JSON.stringify(result, null, 2));
 
     if (response.status === 429) {
         // Rate limit hit: put key on 10-minute cooldown
@@ -104,18 +109,25 @@ serve(async (req) => {
         throw new Error("Rate limit hit. Key put on cooldown.");
     }
 
-    // Gemini 3.0 may return multiple parts (thoughts, then text).
-    // We find the first part that contains actual text.
-    const transcribedText = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
+    // Gemini 3.0 fragments responses. We join ALL text parts to fix the 'zigzag' truncation.
+    const candidate = result.candidates?.[0];
+    const transcribedText = candidate?.content?.parts
+      ?.map(part => part.text)
+      .filter(Boolean)
+      .join("")
+      .trim();
 
-    if (!transcribedText) {
-      throw new Error(`AI response failed: ${JSON.stringify(result)}`);
+    const finishReason = candidate?.finishReason || "UNKNOWN";
+
+    if (!transcribedText || transcribedText.length < 5) {
+      throw new Error(`AI returned empty or truncated content. Finish Reason: ${finishReason}`);
     }
 
     // 6. UPDATE DATABASE & ROTATE KEY
     await supabase.from('gospel_transcriptions').update({
       content: transcribedText,
       status: 'completed',
+      error_log: `Finish Reason: ${finishReason}`,
       updated_at: new Date().toISOString()
     }).eq('id', page.id);
 
