@@ -109,7 +109,7 @@ serve(async (req) => {
       const { data: doc } = await supabase.from('documents').select('id, file_name').ilike('file_name', `%${baseName}%`).limit(1).single();
 
       if (doc) {
-        console.log(`[LOG] Found Document: ${doc.file_name} (ID: ${doc.id})`);
+        console.log(`[DOC_MATCH] Match Found: ${doc.file_name} | ID: ${doc.id}`);
         
         const { data: questions } = await supabase
           .from('book_question_links')
@@ -117,7 +117,7 @@ serve(async (req) => {
           .eq('chunks.document_id', doc.id);
 
         if (questions && questions.length > 0) {
-          console.log(`[LOG] Found ${questions.length} total questions linked.`);
+          console.log(`[DATA] Found ${questions.length} total questions for this document.`);
           
           const pagesWithQuestions = questions.reduce((acc: any, curr: any) => {
             if (curr.chunk && curr.chunk.page_number) {
@@ -211,8 +211,7 @@ serve(async (req) => {
          console.log(`[LOG] No document ID found for query: ${baseName}`);
       }
 
-      // CSS is now handled by the frontend to ensure proper mobile scaling
-
+      console.log(`[FINISH] HTML size: ${html.length} chars. Ready for frontend.`);
       return new Response(html, { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } });
     }
 
