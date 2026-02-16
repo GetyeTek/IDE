@@ -82,10 +82,10 @@ const ExamSession = ({ exam, onClose }) => {
                             <h3 style={{color: 'var(--accent-teal)'}}>{section.title}</h3>
                             <p style={{fontSize: '0.8rem', opacity: 0.6}}>{section.instructions}</p>
                         </div>
-                        {section.questions.map((q) => (
+                        {section.questions.map((q, idx) => (
                     <section className="q-row" key={q.id}>
                         <div className="q-meta">
-                            <span className="q-label">Question {q.id}</span>
+                            <span className="q-label">Question {idx + 1}</span>
                             <div className="q-actions">
                                 <button className="hint"><i className="fas fa-wand-magic-sparkles"></i></button>
                                 <button 
