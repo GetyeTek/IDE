@@ -8,6 +8,8 @@ const ExamSession = ({ exam, onClose }) => {
     const [sections, setSections] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const [examMeta, setExamMeta] = useState({ name: exam.course_name, code: exam.course_code });
+
     useEffect(() => {
         console.log("[SESSION] Fetching real questions from DB...");
         fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
@@ -18,8 +20,9 @@ const ExamSession = ({ exam, onClose }) => {
         .then(res => res.json())
         .then(data => {
             if (data.sections) {
-                console.log(`[SESSION] Loaded ${data.sections.length} sections`);
                 setSections(data.sections);
+                // Standardize title from joined data
+                setExamMeta({ name: data.course_name, code: data.course_code });
             }
             setLoading(false);
         })
@@ -65,8 +68,8 @@ const ExamSession = ({ exam, onClose }) => {
         <div className="exam-session-overlay">
             <header className="session-header">
                 <div className="session-title-box">
-                    <p>{exam.course_code || 'PHYS 101'}</p>
-                    <h1>{exam.course_name}</h1>
+                    <p>{examMeta.code}</p>
+                    <h1>{examMeta.name}</h1>
                 </div>
                 <div className="session-header-actions">
                     <div className={`timer-pill ${timeLeft < 300 ? 'urgent' : ''}`}>
