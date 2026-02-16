@@ -131,3 +131,39 @@
 }
 
 .pav-empty { text-align: center; padding: 4rem 2rem; color: #555; font-style: italic; }
+
+.pav-archive-end {
+    padding: 3rem 0 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    opacity: 0.6;
+}
+
+.pav-divider {
+    width: 40px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-teal), transparent);
+}
+
+.pav-end-seal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: #808080;
+}
+
+.pav-end-seal i {
+    font-size: 1.2rem;
+    color: var(--accent-teal);
+    filter: drop-shadow(0 0 5px rgba(66, 215, 184, 0.3));
+}
+
+.pav-end-seal span {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 500;
+}
