@@ -727,16 +727,18 @@ body.library-open { overflow: hidden; }
         justify-content: center;
         background-color: rgba(0, 0, 0, 0.85);
         clip-path: none !important;
-        z-index: 9999 !important; /* Above EVERYTHING */
+        z-index: 9999 !important;
         position: fixed;
         inset: 0;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.3s ease;
+        visibility: hidden; /* Failsafe: Completely ignore when hidden */
+        transition: opacity 0.3s ease, visibility 0.3s ease;
     }
     .fullscreen-overlay.is-active, .library-fullscreen.is-expanded {
         opacity: 1;
         pointer-events: auto;
+        visibility: visible;
     }
     .overlay-content, #library-fullscreen > div, .pavilion-overlay {
         width: 900px !important;
