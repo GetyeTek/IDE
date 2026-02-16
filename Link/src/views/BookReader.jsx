@@ -343,33 +343,45 @@ const BookReader = ({ book, onClose }) => {
 
                 console.log("Book Content Initialized:", w, "x", h);
 
-                // --- SMART SENTENCE LOGIC ---
-                if (win.CSS && win.CSS.highlights) {
-                    doc.addEventListener('click', (e) => {
-                        // Clear previous
+                // --- SMART SENTENCE LOGIC (PASS-THROUGH) ---
+                // We expose this function so the parent component can call it 
+                // even though the iframe has pointer-events: none
+                const win = iframe.contentWindow;
+                
+                win.highlightAt = (clientX, clientY) => {
+                    if (!win.CSS || !win.CSS.highlights) return false;
+
+                    let range;
+                    if (doc.caretRangeFromPoint) {
+                        range = doc.caretRangeFromPoint(clientX, clientY);
+                    } else if (doc.caretPositionFromPoint) {
+                        const pos = doc.caretPositionFromPoint(clientX, clientY);
+                        range = doc.createRange();
+                        range.setStart(pos.offsetNode, pos.offset);
+                        range.collapse(true);
+                    }
+
+                    // Check if we hit text
+                    if (!range || !docBody.contains(range.startContainer)) {
                         win.CSS.highlights.clear();
+                        return false;
+                    }
+                    if (range.startContainer.nodeType !== 3) {
+                        win.CSS.highlights.clear();
+                        return false;
+                    }
 
-                        let range;
-                        if (doc.caretRangeFromPoint) {
-                            range = doc.caretRangeFromPoint(e.clientX, e.clientY);
-                        } else if (doc.caretPositionFromPoint) {
-                            const pos = doc.caretPositionFromPoint(e.clientX, e.clientY);
-                            range = doc.createRange();
-                            range.setStart(pos.offsetNode, pos.offset);
-                            range.collapse(true);
-                        }
-
-                        // Ensure we clicked text
-                        if (!range || !docBody.contains(range.startContainer)) return;
-                        if (range.startContainer.nodeType !== 3) return; // 3 = Text Node
-
-                        const sentenceRange = findSentenceRange(doc, range.startContainer, range.startOffset);
-                        if (sentenceRange) {
-                            const highlight = new win.Highlight(sentenceRange);
-                            win.CSS.highlights.set("sentence-focus", highlight);
-                        }
-                    });
-                }
+                    const sentenceRange = findSentenceRange(doc, range.startContainer, range.startOffset);
+                    if (sentenceRange) {
+                        // Apply Highlight
+                        const highlight = new win.Highlight(sentenceRange);
+                        win.CSS.highlights.set("sentence-focus", highlight);
+                        return true; // Signal that we handled the tap
+                    }
+                    
+                    win.CSS.highlights.clear();
+                    return false;
+                };
 
                 function findSentenceRange(rootDoc, startNode, startOffset) {
                     const sentenceEndRegex = /[.!?]/;
@@ -692,13 +704,25 @@ const BookReader = ({ book, onClose }) => {
             const duration = Date.now() - input.current.touchStartTime;
             
             if (input.current.isDragging && duration < 300 && input.current.dragTotalDistance < 10) {
-                setIsUiVisible(prev => !prev);
-                setIsFabActive(false);
+                // PASS-THROUGH LOGIC
+                // 1. Calculate where the tap happened relative to the book content
+                const touch = e.changedTouches[0];
+                const ix = (touch.clientX - state.current.x) / state.current.scale;
+                const iy = (touch.clientY - state.current.y) / state.current.scale;
+
+                // 2. Attempt highlight in iframe
+                // If highlightAt returns true, we selected text -> Don't toggle UI
+                // If returns false, we tapped empty space -> Toggle UI
+                const handled = iframeRef.current?.contentWindow?.highlightAt?.(ix, iy);
+                
+                if (!handled) {
+                    setIsUiVisible(prev => !prev);
+                    setIsFabActive(false);
+                }
             }
             
             if (input.current.isDragging && e.touches.length === 0) {
                 input.current.isDragging = false;
-                // Loop continues automatically and will now pick up velocity
             }
         };
 
@@ -725,10 +749,17 @@ const BookReader = ({ book, onClose }) => {
             }
         };
 
-        const onMouseUp = () => {
+        const onMouseUp = (e) => {
             if (input.current.isDragging) {
                 const duration = Date.now() - input.current.touchStartTime;
-                if (duration < 300 && input.current.dragTotalDistance < 5) setIsUiVisible(prev => !prev);
+                if (duration < 300 && input.current.dragTotalDistance < 5) {
+                    // Mouse Pass-through
+                    const ix = (e.clientX - state.current.x) / state.current.scale;
+                    const iy = (e.clientY - state.current.y) / state.current.scale;
+                    
+                    const handled = iframeRef.current?.contentWindow?.highlightAt?.(ix, iy);
+                    if (!handled) setIsUiVisible(prev => !prev);
+                }
                 input.current.isDragging = false;
             }
         };
