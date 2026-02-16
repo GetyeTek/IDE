@@ -8,7 +8,8 @@ const BookReader = ({ book, onClose }) => {
     const [iframeSrc, setIframeSrc] = useState(null);
     const [isUiVisible, setIsUiVisible] = useState(true);
     const [isFabActive, setIsFabActive] = useState(false);
-    const [currentTheme, setCurrentTheme] = useState('light'); // light, sepia, dark
+    const [currentTheme, setCurrentTheme] = useState('light');
+    const [contextMenu, setContextMenu] = useState(null); // { x, y, text }
     
     const viewportRef = useRef(null);
     const iframeRef = useRef(null);
@@ -376,11 +377,18 @@ const BookReader = ({ book, onClose }) => {
                         // Apply Highlight
                         const highlight = new win.Highlight(sentenceRange);
                         win.CSS.highlights.set("sentence-focus", highlight);
-                        return true; // Signal that we handled the tap
+                        
+                        // Return Metadata for Context Menu
+                        const rect = sentenceRange.getBoundingClientRect();
+                        return {
+                            found: true,
+                            text: sentenceRange.toString(),
+                            rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+                        };
                     }
                     
                     win.CSS.highlights.clear();
-                    return false;
+                    return { found: false };
                 };
 
                 function findSentenceRange(rootDoc, startNode, startOffset) {
@@ -602,6 +610,33 @@ const BookReader = ({ book, onClose }) => {
         requestRef.current = requestAnimationFrame(loop);
     };
 
+    // --- CONTEXT MENU ACTIONS ---
+    const handleMenuAction = (action) => {
+        console.log("Menu Action:", action, contextMenu?.text);
+        if (action === 'ask_miron') {
+            // In real app, open MironChat overlay with context
+            alert("Asking Miron about: " + contextMenu.text.substring(0, 30) + "...");
+        }
+        if (action === 'copy') {
+            navigator.clipboard.writeText(contextMenu.text);
+        }
+        setContextMenu(null);
+    };
+
+    const changeHighlightColor = (color) => {
+        // In real app, we'd persist this or pass it to iframe to re-render custom highlights
+        // For now, visual feedback that color was clicked
+        console.log("Color changed to:", color);
+        // We could inject CSS into iframe to change ::highlight(sentence-focus) color
+        if (iframeRef.current) {
+            const doc = iframeRef.current.contentDocument;
+            const style = doc.getElementById('dynamic-highlight-style') || doc.createElement('style');
+            style.id = 'dynamic-highlight-style';
+            style.textContent = `::highlight(sentence-focus) { background-color: ${color}; color: #000; }`;
+            if (!style.isConnected) doc.head.appendChild(style);
+        }
+    };
+
     const onSliderInput = (e) => {
         const val = parseFloat(e.target.value);
         // We reverse the math: calculate Y based on unscaled percentage
@@ -705,20 +740,27 @@ const BookReader = ({ book, onClose }) => {
             
             if (input.current.isDragging && duration < 300 && input.current.dragTotalDistance < 10) {
                 // PASS-THROUGH LOGIC
-                // 1. Calculate where the tap happened relative to the book content
                 const touch = e.changedTouches[0];
                 const ix = (touch.clientX - state.current.x) / state.current.scale;
                 const iy = (touch.clientY - state.current.y) / state.current.scale;
 
-                // 2. Attempt highlight in iframe
-                // If highlightAt returns true, we selected text -> Don't toggle UI
-                // If returns false, we tapped empty space -> Toggle UI
-                const handled = iframeRef.current?.contentWindow?.highlightAt?.(ix, iy);
+                const result = iframeRef.current?.contentWindow?.highlightAt?.(ix, iy);
                 
-                if (!handled) {
-                    // If tap didn't hit text, just clear highlights.
-                    // We NO LONGER toggle UI here. The FAB handles that.
+                if (result && result.found) {
+                    // Calculate Screen Coordinates for Menu
+                    // Book Rect (Unscaled) -> Scale -> Translate -> Screen Coords
+                    const menuX = (result.rect.x * state.current.scale) + state.current.x + (result.rect.width * state.current.scale / 2);
+                    const menuY = (result.rect.y * state.current.scale) + state.current.y;
+                    
+                    setContextMenu({
+                        x: menuX,
+                        y: menuY,
+                        text: result.text
+                    });
+                } else {
+                    // Clicked whitespace
                     iframeRef.current?.contentWindow?.CSS?.highlights?.clear();
+                    setContextMenu(null);
                 }
             }
             
@@ -758,8 +800,16 @@ const BookReader = ({ book, onClose }) => {
                     const ix = (e.clientX - state.current.x) / state.current.scale;
                     const iy = (e.clientY - state.current.y) / state.current.scale;
                     
-                    const handled = iframeRef.current?.contentWindow?.highlightAt?.(ix, iy);
-                    if (!handled) iframeRef.current?.contentWindow?.CSS?.highlights?.clear();
+                    const result = iframeRef.current?.contentWindow?.highlightAt?.(ix, iy);
+                    
+                    if (result && result.found) {
+                        const menuX = (result.rect.x * state.current.scale) + state.current.x + (result.rect.width * state.current.scale / 2);
+                        const menuY = (result.rect.y * state.current.scale) + state.current.y;
+                        setContextMenu({ x: menuX, y: menuY, text: result.text });
+                    } else {
+                        iframeRef.current?.contentWindow?.CSS?.highlights?.clear();
+                        setContextMenu(null);
+                    }
                 }
                 input.current.isDragging = false;
             }
@@ -831,6 +881,36 @@ const BookReader = ({ book, onClose }) => {
                     <svg className="reader-svg" style={{width:'32px', height:'32px', fill:'#1a1a1a'}} viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 </div>
             </div>
+
+            {/* CONTEXT MENU LAYER */}
+            {contextMenu && (
+                <div 
+                    className="reader-ctx-menu"
+                    style={{ 
+                        left: Math.min(window.innerWidth - 290, Math.max(10, contextMenu.x - 140)), 
+                        top: Math.max(20, contextMenu.y - 240) 
+                    }}
+                >
+                    <div className="ctx-primary" onClick={() => handleMenuAction('ask_miron')}>
+                        <i className="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>Ask Miron</span>
+                    </div>
+                    <div className="ctx-colors">
+                        <div className="ctx-dot" style={{background: '#fde047'}} onClick={() => changeHighlightColor('#fde047')}></div>
+                        <div className="ctx-dot" style={{background: '#4ade80'}} onClick={() => changeHighlightColor('#4ade80')}></div>
+                        <div className="ctx-dot" style={{background: '#f472b6'}} onClick={() => changeHighlightColor('#f472b6')}></div>
+                        <div className="ctx-dot clear-dot" onClick={() => changeHighlightColor('transparent')}>
+                            <i className="fa-solid fa-ban" style={{fontSize:'0.7rem', color:'#777'}}></i>
+                        </div>
+                    </div>
+                    <div className="ctx-divider"></div>
+                    <div className="ctx-grid">
+                        <div className="ctx-btn" onClick={() => handleMenuAction('copy')}><i className="fa-regular fa-copy"></i><span>Copy</span></div>
+                        <div className="ctx-btn"><i className="fa-regular fa-note-sticky"></i><span>Note</span></div>
+                        <div className="ctx-btn"><i className="fa-solid fa-share-nodes"></i><span>Share</span></div>
+                    </div>
+                </div>
+            )}
 
             <div id="ui-layer" className={isUiVisible ? '' : 'hidden'}>
                 {/* HEADER */}
