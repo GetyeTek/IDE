@@ -97,7 +97,7 @@ const ExamSession = ({ exam, onClose }) => {
                             </div>
                         </div>
                         <div className="q-text">{q.text}</div>
-                        <div className="options-cluster">
+                        <div className={`options-cluster ${q.options?.some(o => (o.text || o).length > 45) ? 'vertical-layout' : ''}`}>
                             {q.options?.map((opt, idx) => (
                                 <div className="opt-wrapper" key={idx}>
                                     <input 
