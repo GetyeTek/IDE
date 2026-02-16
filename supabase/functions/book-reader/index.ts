@@ -142,42 +142,39 @@ serve(async (req) => {
               const questionsHtml = (qList as any[]).map(q => {
                 let optionsHtml = '';
 
-                // Handle Matching Type (Columns)
                 if (q.question_type === 'matching' && q.matching_data) {
                   const leftCol = q.matching_data.left_column || [];
                   const rightCol = q.matching_data.right_column || [];
                   optionsHtml = `
-                    <div class="q-matching-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                      <div class="q-match-list">
-                        ${leftCol.map((item: any) => `<div class="q-match-item" style="padding: 10px; border: 1px dashed rgba(255,255,255,0.2); margin-bottom: 8px; border-radius: 8px; font-size: 0.9em;">${item.text || item}</div>`).join('')}
+                    <div class="q-matching-container">
+                      <div class="q-match-column q-column-a">
+                        ${leftCol.map((item: any) => `<div class="q-match-item">${item.text || item}</div>`).join('')}
                       </div>
-                      <div class="q-match-list">
-                        ${rightCol.map((item: any) => `<div class="q-match-item" style="padding: 10px; border: 1px solid rgba(66, 215, 184, 0.3); margin-bottom: 8px; border-radius: 8px; font-size: 0.9em;">${item.text || item}</div>`).join('')}
+                      <div class="q-match-column q-column-b">
+                        ${rightCol.map((item: any) => `<div class="q-match-item">${item.text || item}</div>`).join('')}
                       </div>
                     </div>`;
-                } 
-                // Handle Standard MCQ/Choice Type
-                else if (q.options && Array.isArray(q.options)) {
+                } else if (q.options && Array.isArray(q.options)) {
                   optionsHtml = `
-                    <div class="q-options" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
-                      ${q.options.map((opt: any) => `<button class="q-opt-btn" style="width: 100%; text-align: left;">${opt.text || opt}</button>`).join('')}
+                    <div class="q-options">
+                      ${q.options.map((opt: any) => `<button class="q-opt-btn">${opt.text || opt}</button>`).join('')}
                     </div>`;
                 }
 
-                const mediaHtml = q.media && q.media.url ? `<img src="${q.media.url}" style="max-width: 100%; border-radius: 12px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1);" />` : '';
-                const pointsLabel = q.points ? `<span class="q-points" style="margin-left: auto; font-size: 0.7em; opacity: 0.5;">[${q.points} pts]</span>` : '';
+                const mediaHtml = q.media && q.media.url ? `<img src="${q.media.url}" class="q-media-content" />` : '';
+                const pointsLabel = q.points ? `<span class="q-points-badge">[${q.points} pts]</span>` : '';
 
                 return `
-                  <div class="miron-question-card" data-qtype="${q.question_type || 'mcq'}" style="margin-bottom: 40px; border-left: 4px solid var(--accent-teal);">
-                    <div class="q-header" style="display: flex; align-items: center; width: 100%;">
+                  <div class="miron-question-card" data-qtype="${q.question_type || 'mcq'}">
+                    <div class="q-header">
                       <span class="miron-orb-mini"></span>
                       <span class="q-label">MIRON CHALLENGE</span>
                       ${pointsLabel}
                     </div>
-                    <p class="q-text" style="font-size: 1.2em; margin: 15px 0;"><strong>${q.question_number ? q.question_number + '.' : ''}</strong> ${q.text}</p>
+                    <p class="q-text"><strong>${q.question_number ? q.question_number + '.' : ''}</strong> ${q.text}</p>
                     ${mediaHtml}
                     ${optionsHtml}
-                    <button class="q-submit" style="margin-top: 20px;">Check Understanding</button>
+                    <button class="q-submit">Check Understanding</button>
                   </div>`;
               }).join('');
               
