@@ -98,7 +98,7 @@ const ExamSession = ({ exam, onClose }) => {
                         </div>
                         <div className="q-text">{q.text}</div>
                         <div className="options-cluster">
-                            {q.options.map((opt, idx) => (
+                            {q.options?.map((opt, idx) => (
                                 <div className="opt-wrapper" key={idx}>
                                     <input 
                                         type="radio" 
@@ -115,13 +115,13 @@ const ExamSession = ({ exam, onClose }) => {
                                 </div>
                             ))}
 
-                            {q.question_type === 'matching' && q.matching_data && (
+                            {(q.question_type === 'matching' || q.matching_data) && (
                                 <div className="q-matching-container">
                                     <div className="q-match-column q-column-a">
-                                        {q.matching_data.left_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
+                                        {q.matching_data?.left_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
                                     </div>
                                     <div className="q-match-column q-column-b">
-                                        {q.matching_data.right_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
+                                        {q.matching_data?.right_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
                                     </div>
                                 </div>
                             )}
