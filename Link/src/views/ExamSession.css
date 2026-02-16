@@ -51,6 +51,23 @@
 
 .timer-pill.urgent { color: #ff5f5f; border-color: rgba(255, 95, 95, 0.3); background: rgba(255, 95, 95, 0.05); }
 
+.session-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.exit-session-btn {
+    color: #fff;
+    opacity: 0.5;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.exit-session-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
 /* --- QUICK NAV STRIP --- */
 .question-nav-strip {
     height: 50px;
