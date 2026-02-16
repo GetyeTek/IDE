@@ -716,8 +716,9 @@ const BookReader = ({ book, onClose }) => {
                 const handled = iframeRef.current?.contentWindow?.highlightAt?.(ix, iy);
                 
                 if (!handled) {
-                    setIsUiVisible(prev => !prev);
-                    setIsFabActive(false);
+                    // If tap didn't hit text, just clear highlights.
+                    // We NO LONGER toggle UI here. The FAB handles that.
+                    iframeRef.current?.contentWindow?.CSS?.highlights?.clear();
                 }
             }
             
@@ -758,7 +759,7 @@ const BookReader = ({ book, onClose }) => {
                     const iy = (e.clientY - state.current.y) / state.current.scale;
                     
                     const handled = iframeRef.current?.contentWindow?.highlightAt?.(ix, iy);
-                    if (!handled) setIsUiVisible(prev => !prev);
+                    if (!handled) iframeRef.current?.contentWindow?.CSS?.highlights?.clear();
                 }
                 input.current.isDragging = false;
             }
@@ -811,6 +812,26 @@ const BookReader = ({ book, onClose }) => {
                 {loading && <div className="loading-spinner">Loading Book...</div>}
             </div>
 
+            {/* FAB LIVES OUTSIDE UI LAYER TO STAY VISIBLE */}
+            <div id="main-fab" className={`fab-container ${isUiVisible ? 'active' : ''}`}>
+                <div className="fab-options">
+                    <div className="fab-mini" data-label="Theme" onClick={toggleTheme}>
+                        <svg className="reader-svg" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                    </div>
+                    <div className="fab-mini" data-label="Reset" onClick={handleFitPage}>
+                        <svg className="reader-svg" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z"/></svg>
+                    </div>
+                </div>
+                <div className="fab-main" onClick={(e) => { 
+                    e.stopPropagation(); 
+                    const newState = !isUiVisible;
+                    setIsUiVisible(newState);
+                    setIsFabActive(newState);
+                }}>
+                    <svg className="reader-svg" style={{width:'32px', height:'32px', fill:'#1a1a1a'}} viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </div>
+            </div>
+
             <div id="ui-layer" className={isUiVisible ? '' : 'hidden'}>
                 {/* HEADER */}
                 <div className="ui-bar reader-header">
@@ -827,20 +848,7 @@ const BookReader = ({ book, onClose }) => {
                     </div>
                 </div>
 
-                {/* FAB MENU */}
-                <div className={`fab-container ${isFabActive ? 'active' : ''}`}>
-                    <div className="fab-options">
-                        <div className="fab-mini" data-label="Theme: Light/Sepia/Dark" onClick={toggleTheme}>
-                            <svg className="reader-svg" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-                        </div>
-                        <div className="fab-mini" data-label="Reset Zoom" onClick={handleFitPage}>
-                            <svg className="reader-svg" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z"/></svg>
-                        </div>
-                    </div>
-                    <div className="fab-main" onClick={(e) => { e.stopPropagation(); setIsFabActive(!isFabActive); }}>
-                        <svg className="reader-svg" style={{width:'32px', height:'32px', fill:'#1a1a1a'}} viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    </div>
-                </div>
+
 
                 {/* FOOTER */}
                 <div className="ui-bar reader-footer">
