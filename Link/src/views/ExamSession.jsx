@@ -5,14 +5,26 @@ const ExamSession = ({ exam, onClose }) => {
     const [timeLeft, setTimeLeft] = useState(exam.time_allowed_minutes * 60 || 3600);
     const [answers, setAnswers] = useState({});
     const [flagged, setFlagged] = useState({});
+    const [sections, setSections] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Mock questions for demo
-    const questions = [
-        { id: 1, text: "What is the moment of a 50N force acting at a perpendicular distance of 2 meters from a pivot?", options: ["25 Nm", "50 Nm", "100 Nm", "200 Nm"] },
-        { id: 2, text: "Which law states that for every action there is an equal and opposite reaction?", options: ["Newton's 1st", "Newton's 2nd", "Newton's 3rd", "Hooke's Law"] },
-        { id: 3, text: "A 5kg block is pulled with 20N force across a frictionless surface. What is the acceleration?", options: ["2 m/s²", "4 m/s²", "10 m/s²", "5 m/s²"] },
-        { id: 4, text: "Define a 'couple' in static equilibrium.", options: ["Single Force", "Two parallel forces", "Opposite forces", "Torque pair"] }
-    ];
+    useEffect(() => {
+        console.log("[SESSION] Fetching real questions from DB...");
+        fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'get_exam_questions', exam_id: exam.id })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.sections) {
+                console.log(`[SESSION] Loaded ${data.sections.length} sections`);
+                setSections(data.sections);
+            }
+            setLoading(false);
+        })
+        .catch(err => console.error("[SESSION_ERROR]", err));
+    }, [exam.id]);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -62,7 +74,15 @@ const ExamSession = ({ exam, onClose }) => {
             </nav>
 
             <main className="exam-viewport">
-                {questions.map((q) => (
+                {loading ? (
+                    <div style={{padding: '2rem', textAlign: 'center'}}>Assembling Exam Papers...</div>
+                ) : sections.map((section) => (
+                    <div key={section.id} className="section-wrap">
+                        <div className="section-header-display" style={{padding: '1rem 0', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '1rem'}}>
+                            <h3 style={{color: 'var(--accent-teal)'}}>{section.title}</h3>
+                            <p style={{fontSize: '0.8rem', opacity: 0.6}}>{section.instructions}</p>
+                        </div>
+                        {section.questions.map((q) => (
                     <section className="q-row" key={q.id}>
                         <div className="q-meta">
                             <span className="q-label">Question {q.id}</span>
@@ -90,12 +110,25 @@ const ExamSession = ({ exam, onClose }) => {
                                     />
                                     <label htmlFor={`q-${q.id}-${idx}`} className="opt-btn">
                                         <div className="opt-indicator"></div>
-                                        <span>{opt}</span>
+                                        <span>{opt.text || opt}</span>
                                     </label>
                                 </div>
                             ))}
+
+                            {q.question_type === 'matching' && q.matching_data && (
+                                <div className="q-matching-container">
+                                    <div className="q-match-column q-column-a">
+                                        {q.matching_data.left_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
+                                    </div>
+                                    <div className="q-match-column q-column-b">
+                                        {q.matching_data.right_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </section>
+                ))}
+                </div>
                 ))}
             </main>
 
