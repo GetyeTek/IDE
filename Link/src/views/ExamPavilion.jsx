@@ -101,10 +101,10 @@ const ExamPavilion = ({ university, onClose }) => {
                     <div className="pav-empty">Calibrating focus...</div>
                 ) : filteredExams.length > 0 ? (
                     filteredExams.map((exam, idx) => {
-                        // NORMALIZE DATA: Map to public.exams schema with consistent placeholders
-                        // Even if null, we provide a string so the UI structure is preserved.
-                        const displayCode = exam.course_code || exam.exam_type || "EXAM";
-                        const displayTitle = exam.course_name || "Untitled Assessment";
+                        // NORMALIZE DATA: Smarter Fallbacks
+                        // If course_name is missing, we use exam_type as title since it's more descriptive than 'Untitled'
+                        const displayCode = exam.course_code || "EXAM";
+                        const displayTitle = exam.course_name || exam.exam_type || "General Assessment";
                         const displayDate = exam.date || "Unknown Date";
                         const displayTime = exam.time_allowed_minutes ? `${exam.time_allowed_minutes}m` : "N/A";
                         const displayMarks = exam.total_marks ? `${exam.total_marks}` : "---";
