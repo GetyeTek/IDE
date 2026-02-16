@@ -171,6 +171,15 @@ const BookReader = ({ book, onClose }) => {
                     body.theme-sepia .miron-orb-mini { background: #8a6a4b !important; }
                     body.theme-sepia .q-opt-btn { background: rgba(91, 70, 54, 0.05) !important; border-color: rgba(91, 70, 54, 0.15) !important; color: #5b4636 !important; }
                     body.theme-sepia .q-submit { background: #8a6a4b !important; color: #f4ecd8 !important; }
+                    body.theme-sepia .q-match-item {
+                        background: rgba(91, 70, 54, 0.05) !important;
+                        border-color: rgba(91, 70, 54, 0.2) !important;
+                        color: #5b4636 !important;
+                    }
+                    body.theme-sepia .q-column-b .q-match-item {
+                        background: rgba(138, 106, 75, 0.1) !important;
+                        border-color: #8a6a4b !important;
+                    }
                     
                     /* The Root Container sets the Base Font Size */
                     .miron-portal-container {
@@ -196,13 +205,13 @@ const BookReader = ({ book, onClose }) => {
                         display: flex;
                         align-items: center;
                         margin-bottom: 1.5em;
+                        gap: 0.75em;
                     }
                     .miron-orb-mini {
                         width: 1em;
                         height: 1em;
                         background: #42d7b8;
                         border-radius: 50%;
-                        margin-right: 0.75em;
                         box-shadow: 0 0 0.8em rgba(66, 215, 184, 0.6);
                     }
                     .q-label {
@@ -212,11 +221,51 @@ const BookReader = ({ book, onClose }) => {
                         font-size: 0.85em; 
                         text-transform: uppercase;
                     }
+                    .q-points-badge {
+                        margin-left: auto;
+                        font-size: 0.75em;
+                        opacity: 0.6;
+                        font-family: monospace;
+                    }
                     .q-text {
-                        font-size: 1.4em; 
+                        font-size: 1.3em; 
                         line-height: 1.5;
-                        margin-bottom: 1.5em;
+                        margin-bottom: 1.2em;
                         font-weight: 500;
+                    }
+                    .q-media-content {
+                        width: 100%;
+                        border-radius: 1em;
+                        margin-bottom: 1.5em;
+                        border: 1px solid rgba(255,255,255,0.1);
+                        display: block;
+                    }
+                    /* Matching Layout */
+                    .q-matching-container {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 1em;
+                        margin-bottom: 1.5em;
+                    }
+                    .q-match-column {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 0.6em;
+                    }
+                    .q-match-item {
+                        padding: 0.8em 1em;
+                        border-radius: 0.6em;
+                        font-size: 0.9em;
+                        background: rgba(255,255,255,0.03);
+                        border: 1px dashed rgba(255,255,255,0.1);
+                        min-height: 3em;
+                        display: flex;
+                        align-items: center;
+                    }
+                    .q-column-b .q-match-item {
+                        border-style: solid;
+                        border-color: rgba(66, 215, 184, 0.2);
+                        background: rgba(66, 215, 184, 0.02);
                     }
                     .q-options {
                         display: flex;
