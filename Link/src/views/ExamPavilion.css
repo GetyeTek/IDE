@@ -41,25 +41,28 @@
 
 .pav-segmented-control {
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 4px; border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    padding: 4px; border-radius: 16px;
     display: flex; position: relative;
 }
 
 .pav-segment {
-    flex: 1; padding: 10px 0; text-align: center;
-    font-size: 0.85rem; font-weight: 500; color: #808080;
-    cursor: pointer; z-index: 2; transition: color 0.3s;
+    flex: 1; padding: 12px 0; text-align: center;
+    font-size: 0.85rem; font-weight: 600; color: #808080;
+    cursor: pointer; z-index: 2; transition: color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.pav-segment.active { color: #080808; }
+.pav-segment.active {
+    color: #080808;
+}
 
 .pav-active-pill {
     position: absolute; top: 4px; left: 4px;
     width: calc(33.33% - 4px); height: calc(100% - 8px);
-    background: #42d7b8; border-radius: 10px;
-    z-index: 1; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 4px 15px rgba(66, 215, 184, 0.2);
+    background: var(--accent-teal);
+    border-radius: 12px; z-index: 1;
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 15px rgba(66, 215, 184, 0.3);
 }
 
 /* --- EXAM LIST --- */
