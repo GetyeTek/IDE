@@ -15,16 +15,15 @@ const Profile = () => {
     // Plexus Animation (Portal Card)
     useEffect(() => {
         const canvas = plexusRef.current;
+        let animationFrameId;
         if (canvas) {
             const ctx = canvas.getContext('2d');
             let w = canvas.width = 100;
             let h = canvas.height = 100;
             let points = [];
-            
             for(let i = 0; i < 15; i++) {
                 points.push({ x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5, r: Math.random() * 1.5 + 1 });
             }
-            
             const animate = () => {
                 ctx.clearRect(0, 0, w, h);
                 points.forEach(p => {
@@ -34,7 +33,6 @@ const Profile = () => {
                     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
                     ctx.fillStyle = 'rgba(66, 215, 184, 0.5)'; ctx.fill();
                 });
-                // Lines
                 for(let i = 0; i < points.length; i++) {
                     for(let j = i + 1; j < points.length; j++) {
                         const dist = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
@@ -44,10 +42,13 @@ const Profile = () => {
                         }
                     }
                 }
-                requestAnimationFrame(animate);
+                animationFrameId = requestAnimationFrame(animate);
             };
             animate();
         }
+        return () => {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        };
     }, []);
 
     // Stars Animation (Observatory Overlay)
