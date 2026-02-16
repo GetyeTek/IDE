@@ -57,7 +57,7 @@ const ExamPavilion = ({ university, onClose }) => {
 
             <div className="pav-selector-area">
                 <div className="pav-segmented-control">
-                    <div className="pav-active-pill" style={{ transform: `translateX(${getTabTranslate()})` }}></div>
+                    <div className="pav-active-pill" style={{ transform: `translateX(${activeTab === 'Midterm' ? '0%' : activeTab === 'Final' ? '100%' : '200%'})` }}></div>
                     <div className={`pav-segment ${activeTab === 'Midterm' ? 'active' : ''}`} onClick={() => setActiveTab('Midterm')}>Midterm</div>
                     <div className={`pav-segment ${activeTab === 'Final' ? 'active' : ''}`} onClick={() => setActiveTab('Final')}>Final</div>
                     <div className={`pav-segment ${activeTab === 'Mock' ? 'active' : ''}`} onClick={() => setActiveTab('Mock')}>Other</div>
