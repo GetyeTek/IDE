@@ -27,10 +27,14 @@ const ExamPavilion = ({ university, onClose }) => {
     }, [university.id]);
 
     const filteredExams = exams.filter(e => {
-        const type = (e.exam_type || '').toLowerCase();
+        // Fallback for missing exam_type metadata
+        const type = (e.exam_type || e.type || e.category || '').toLowerCase();
         if (activeTab === 'Midterm') return type.includes('mid');
         if (activeTab === 'Final') return type.includes('final');
-        if (activeTab === 'Mock') return !type.includes('mid') && !type.includes('final');
+        if (activeTab === 'Mock') {
+            // If type is empty, we treat it as a Mock/Other exam by default
+            return !type.includes('mid') && !type.includes('final');
+        }
         return false;
     });
 
@@ -68,28 +72,37 @@ const ExamPavilion = ({ university, onClose }) => {
                 {loading ? (
                     <div className="pav-empty">Calibrating focus...</div>
                 ) : filteredExams.length > 0 ? (
-                    filteredExams.map((exam, idx) => (
-                        <div 
-                            className="pav-exam-card" 
-                            key={exam.id} 
-                            style={{ animationDelay: `${idx * 0.1}s` }}
-                            onClick={() => setActiveSession(exam)}
-                        >
-                            <div className="pav-lume-gauge">
-                                <div className="pav-lume-fill" style={{ height: '0%' }}></div>
+                    filteredExams.map((exam, idx) => {
+                        // NORMALIZE DATA: Check for multiple field names and handle nulls
+                        const displayCode = exam.course_code || "EXAM";
+                        const displayTitle = exam.course_name || exam.title || displayCode || "Untitled Assessment";
+                        const displayDate = exam.date || exam.year || "2024";
+                        const displayTime = exam.time_allowed_minutes || "90";
+                        const displayMarks = exam.total_marks || "100";
+
+                        return (
+                            <div 
+                                className="pav-exam-card" 
+                                key={exam.id} 
+                                style={{ animationDelay: `${idx * 0.1}s` }}
+                                onClick={() => setActiveSession(exam)}
+                            >
+                                <div className="pav-lume-gauge">
+                                    <div className="pav-lume-fill" style={{ height: '0%' }}></div>
+                                </div>
+                                <div className="pav-card-top">
+                                    <span className="pav-course-code">{displayCode}</span>
+                                    <span className="pav-year">{displayDate}</span>
+                                </div>
+                                <h2 className="pav-exam-title">{displayTitle}</h2>
+                                <div className="pav-meta-ribbon">
+                                    <div className="pav-meta-item"><i className="far fa-clock"></i> {displayTime}m</div>
+                                    <div className="pav-meta-item"><i className="far fa-file-alt"></i> {displayMarks} Marks</div>
+                                    <div className="pav-meta-item"><i className="fas fa-bolt"></i> Practice</div>
+                                </div>
                             </div>
-                            <div className="pav-card-top">
-                                <span className="pav-course-code">{exam.course_code || 'EXAM'}</span>
-                                <span className="pav-year">{exam.date || '2024'}</span>
-                            </div>
-                            <h2 className="pav-exam-title">{exam.course_name}</h2>
-                            <div className="pav-meta-ribbon">
-                                <div className="pav-meta-item"><i className="far fa-clock"></i> {exam.time_allowed_minutes || '90'}m</div>
-                                <div className="pav-meta-item"><i className="far fa-file-alt"></i> {exam.total_marks || '100'} Marks</div>
-                                <div className="pav-meta-item"><i className="fas fa-bolt"></i> Practice</div>
-                            </div>
-                        </div>
-                    ))
+                        );
+                    })
                 ) : (
                     <div className="pav-empty">No {activeTab} exams found in this archive.</div>
                 )}
