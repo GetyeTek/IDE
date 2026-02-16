@@ -180,8 +180,16 @@ input[type=range]::-webkit-slider-thumb {
     transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
+/* FAB is now independent */
 #ui-layer.hidden .fab-container {
-    transform: scale(0.8) translateY(20px);
+    /* We keep the FAB visible even when UI is hidden */
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Only hide the options when UI is hidden */
+#ui-layer.hidden .fab-options {
     opacity: 0;
     pointer-events: none;
 }
@@ -218,7 +226,7 @@ input[type=range]::-webkit-slider-thumb {
     z-index: 2;
 }
 .fab-main:active { transform: scale(0.95); }
-.fab-container.active .fab-main { transform: rotate(45deg); background: #e0e0e0; }
+.fab-container.active .fab-main { transform: rotate(45deg); background: var(--accent-teal); color: #000; }
 
 .fab-mini {
     width: 44px; height: 44px;
