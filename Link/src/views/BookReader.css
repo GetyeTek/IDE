@@ -277,3 +277,102 @@ input[type=range]::-webkit-slider-thumb {
     color: white;
     font-size: 1.2rem;
 }
+
+/* --- CONTEXT MENU --- */
+.reader-ctx-menu {
+    position: absolute;
+    z-index: 2200;
+    width: 280px;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    
+    /* Transform origin helps animation look like it grows from the text */
+    transform-origin: bottom center;
+    animation: ctxPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes ctxPop {
+    from { opacity: 0; transform: scale(0.9) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.ctx-primary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, var(--accent-teal), #2e5a52);
+    color: #050505;
+    padding: 12px 16px;
+    border-radius: 14px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(66, 215, 184, 0.3);
+}
+
+.ctx-primary:active { transform: scale(0.97); }
+
+.ctx-primary i {
+    font-size: 1.1rem;
+    animation: spin-pulse 3s infinite linear;
+}
+
+.ctx-primary span {
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.3px;
+}
+
+@keyframes spin-pulse {
+    0% { transform: rotate(0deg); } 25% { transform: rotate(10deg); } 75% { transform: rotate(-10deg); } 100% { transform: rotate(0deg); }
+}
+
+.ctx-colors {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+}
+
+.ctx-dot {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.2s;
+}
+.ctx-dot:active { transform: scale(1.2); }
+.ctx-dot.clear-dot { border: 1px solid #555; display: flex; align-items: center; justify-content: center; }
+
+.ctx-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0; }
+
+.ctx-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.ctx-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 10px 0;
+    cursor: pointer;
+    color: #a0a0a0;
+}
+
+.ctx-btn:active { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.ctx-btn i { font-size: 1.1rem; }
+.ctx-btn span { font-size: 0.65rem; font-weight: 500; }
