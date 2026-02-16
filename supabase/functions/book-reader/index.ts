@@ -84,32 +84,52 @@ serve(async (req) => {
     }
 
     if (action === "list_exams") {
-      const { data: exams, error } = await supabase
+      const { data, error } = await supabase
         .from('exams')
-        .select('*')
+        .select(`
+          id, 
+          exam_type, 
+          date, 
+          time_allowed_minutes, 
+          total_marks,
+          courses (
+            code,
+            name
+          )
+        `)
         .eq('university_id', university_id)
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      console.log(`[EXAMS] Found ${exams?.length} exams for university ${university_id}`);
-      return new Response(JSON.stringify({ exams }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+      // Flatten the join so React sees 'course_name' and 'course_code' directly
+      const mappedExams = data.map(exam => ({
+        ...exam,
+        course_name: exam.courses?.name || 'General Assessment',
+        course_code: exam.courses?.code || 'EXAM'
+      }));
+
+      console.log(`[EXAMS] Found ${mappedExams.length} exams for university ${university_id}`);
+      return new Response(JSON.stringify({ exams: mappedExams }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "get_exam_questions") {
       const { exam_id } = body;
       console.log(`[SESSION] Fetching questions for exam: ${exam_id}`);
       
-      const { data: sections, error } = await supabase
-        .from('sections')
-        .select(`
-          *,
-          questions (*)
-        `)
-        .eq('exam_id', exam_id)
-        .order('section_order', { ascending: true });
+      // Fetch sections AND the course metadata through the exam
+      const [sectionsResp, metaResp] = await Promise.all([
+        supabase.from('sections').select('*, questions (*)').eq('exam_id', exam_id).order('section_order', { ascending: true }),
+        supabase.from('exams').select('courses(name, code)').eq('id', exam_id).single()
+      ]);
 
-      if (error) throw error;
-      return new Response(JSON.stringify({ sections }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (sectionsResp.error) throw sectionsResp.error;
+      
+      return new Response(JSON.stringify({
+        sections: sectionsResp.data,
+        course_name: metaResp.data?.courses?.name || 'General Assessment',
+        course_code: metaResp.data?.courses?.code || 'EXAM'
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "get_book_compressed") {
