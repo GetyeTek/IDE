@@ -39,6 +39,7 @@ const BookReader = ({ book, onClose }) => {
     // Fetch Book Data
     useEffect(() => {
         const fetchBook = async () => {
+            console.log("[READER] Initializing fetch for:", book.path);
             try {
                 setLoading(true);
                 const response = await fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
@@ -53,6 +54,7 @@ const BookReader = ({ book, onClose }) => {
                 if (!response.ok) throw new Error("Failed to fetch book");
                 
                 const blob = await response.blob();
+                console.log("[READER] Blob received, size:", blob.size);
                 const url = URL.createObjectURL(blob);
                 setIframeSrc(url);
             } catch (error) {
@@ -75,6 +77,7 @@ const BookReader = ({ book, onClose }) => {
     useEffect(() => {
         const handleIframeClick = (e) => {
             const target = e.target;
+            console.log("[IFRAME_CLICK]", target.tagName, target.className);
             if (target.classList.contains('q-opt-btn')) {
                 // Visual feedback for selection
                 const parent = target.parentElement;
@@ -100,6 +103,7 @@ const BookReader = ({ book, onClose }) => {
 
     // Handle Iframe Load & Sizing
     const handleIframeLoad = (e) => {
+        console.log("[IFRAME] Content Loaded");
         const iframe = e.target;
         iframeRef.current = iframe;
         
@@ -313,6 +317,9 @@ const BookReader = ({ book, onClose }) => {
                 const h = Math.max(docBody.scrollHeight, docBody.offsetHeight, docEl.clientHeight, docEl.scrollHeight);
 
                 contentDims.current = { width: w, height: h };
+
+                const mironCount = doc.querySelectorAll('.miron-question-card').length;
+                console.log(`[IFRAME] Dimensions: ${w}x${h}. Miron Challenges detected: ${mironCount}`);
                 
                 if (layerRef.current) {
                     layerRef.current.style.width = `${w}px`;
