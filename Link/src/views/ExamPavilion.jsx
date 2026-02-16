@@ -9,13 +9,14 @@ const ExamPavilion = ({ university, onClose }) => {
     const [activeSession, setActiveSession] = useState(null);
 
     useEffect(() => {
+        const controller = new AbortController();
         console.group(`%c ARCHIVE DIAGNOSTICS: ${university.name} `, 'background: #42d7b8; color: #000; font-weight: bold;');
-        console.log("University ID:", university.id);
         setLoading(true);
 
         fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
             body: JSON.stringify({ action: 'list_exams', university_id: university.id })
         })
         .then(res => res.json())
@@ -51,7 +52,14 @@ const ExamPavilion = ({ university, onClose }) => {
             console.error("NETWORK/SERVER FAILURE:", err);
             setLoading(false);
             console.groupEnd();
+        })
+        .catch(err => {
+            if (err.name === 'AbortError') return;
+            console.error("NETWORK/SERVER FAILURE:", err);
+            setLoading(false);
+            console.groupEnd();
         });
+        return () => controller.abort();
     }, [university.id]);
 
     const filteredExams = exams.filter(e => {
