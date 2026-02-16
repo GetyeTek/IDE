@@ -9,7 +9,10 @@ const ExamPavilion = ({ university, onClose }) => {
     const [activeSession, setActiveSession] = useState(null);
 
     useEffect(() => {
+        console.group(`%c ARCHIVE DIAGNOSTICS: ${university.name} `, 'background: #42d7b8; color: #000; font-weight: bold;');
+        console.log("University ID:", university.id);
         setLoading(true);
+
         fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -17,12 +20,37 @@ const ExamPavilion = ({ university, onClose }) => {
         })
         .then(res => res.json())
         .then(data => {
-            if (data.exams) setExams(data.exams);
+            if (data.exams) {
+                console.log(`Successfully fetched ${data.exams.length} exams.`);
+                console.log("Raw Sample Data (First Item):", data.exams[0]);
+                
+                // Comprehensive Schema Audit
+                const missingFields = [];
+                if (data.exams.length > 0) {
+                    const keys = Object.keys(data.exams[0]);
+                    ['course_name', 'course_code', 'exam_type', 'total_marks'].forEach(f => {
+                        if (!keys.includes(f)) missingFields.push(f);
+                    });
+                }
+                
+                if (missingFields.length > 0) {
+                    console.warn("SCHEMA DISCREPANCY: The following expected fields are missing from DB response:", missingFields);
+                    console.info("System: Fallback logic will be used to maintain Intended Design.");
+                } else {
+                    console.log("SCHEMA VALIDATED: Database metadata matches UI requirements.");
+                }
+
+                setExams(data.exams);
+            } else {
+                console.error("DATA FAILURE: Fetch succeeded but 'exams' array is missing from response.", data);
+            }
             setLoading(false);
+            console.groupEnd();
         })
         .catch(err => {
-            console.error(err);
+            console.error("NETWORK/SERVER FAILURE:", err);
             setLoading(false);
+            console.groupEnd();
         });
     }, [university.id]);
 
@@ -73,12 +101,17 @@ const ExamPavilion = ({ university, onClose }) => {
                     <div className="pav-empty">Calibrating focus...</div>
                 ) : filteredExams.length > 0 ? (
                     filteredExams.map((exam, idx) => {
-                        // NORMALIZE DATA: Check for multiple field names and handle nulls
-                        const displayCode = exam.course_code || "EXAM";
-                        const displayTitle = exam.course_name || exam.title || displayCode || "Untitled Assessment";
+                        // NORMALIZE DATA: Logic forced to match the visual 'Intended Design'
+                        const displayCode = exam.course_code || exam.code || "EXAM";
+                        const displayTitle = exam.course_name || exam.title || "Untitled Assessment";
                         const displayDate = exam.date || exam.year || "2024";
-                        const displayTime = exam.time_allowed_minutes || "90";
-                        const displayMarks = exam.total_marks || "100";
+                        const displayTime = exam.time_allowed_minutes || exam.duration || "90";
+                        const displayMarks = exam.total_marks || exam.marks || "100";
+
+                        // Diagnostic: Check why a card might look 'Old' or 'Broken'
+                        if (!exam.course_name && !exam.title) {
+                            console.warn(`Item [${idx}] is missing a title. Using fallback Code: ${displayCode}`);
+                        }
 
                         return (
                             <div 
