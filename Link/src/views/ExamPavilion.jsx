@@ -26,9 +26,13 @@ const ExamPavilion = ({ university, onClose }) => {
         });
     }, [university.id]);
 
-    const filteredExams = exams.filter(e => 
-        activeTab === 'Mock' ? (e.exam_type !== 'Midterm' && e.exam_type !== 'Final') : e.exam_type === activeTab
-    );
+    const filteredExams = exams.filter(e => {
+        const type = (e.exam_type || '').toLowerCase();
+        if (activeTab === 'Midterm') return type.includes('mid');
+        if (activeTab === 'Final') return type.includes('final');
+        if (activeTab === 'Mock') return !type.includes('mid') && !type.includes('final');
+        return false;
+    });
 
     const getTabTranslate = () => {
         if (activeTab === 'Midterm') return '0%';
