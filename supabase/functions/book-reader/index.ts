@@ -91,10 +91,25 @@ serve(async (req) => {
         .order('created_at', { ascending: false });
         
       if (error) throw error;
+      console.log(`[EXAMS] Found ${exams?.length} exams for university ${university_id}`);
+      return new Response(JSON.stringify({ exams }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-      return new Response(JSON.stringify({ exams }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+    if (action === "get_exam_questions") {
+      const { exam_id } = body;
+      console.log(`[SESSION] Fetching questions for exam: ${exam_id}`);
+      
+      const { data: sections, error } = await supabase
+        .from('sections')
+        .select(`
+          *,
+          questions (*)
+        `)
+        .eq('exam_id', exam_id)
+        .order('section_order', { ascending: true });
+
+      if (error) throw error;
+      return new Response(JSON.stringify({ sections }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "get_book_compressed") {
