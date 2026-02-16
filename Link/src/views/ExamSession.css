@@ -66,18 +66,35 @@
 .question-nav-strip::-webkit-scrollbar { display: none; }
 
 .nav-dot {
-    min-width: 32px; height: 32px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 34px; height: 34px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.75rem; color: #707070;
+    font-size: 0.8rem; font-weight: 600; color: #606060;
     cursor: pointer;
     flex-shrink: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.nav-dot.answered { background: rgba(66, 215, 184, 0.1); color: var(--accent-teal); border-color: var(--accent-teal); }
-.nav-dot.current { border-color: #fff; color: #fff; }
-.nav-dot.flagged { color: #ffab40; border-color: #ffab40; }
+.nav-dot:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
+
+.nav-dot.answered {
+    background: rgba(66, 215, 184, 0.15);
+    color: var(--accent-teal);
+    border-color: rgba(66, 215, 184, 0.4);
+    box-shadow: inset 0 0 10px rgba(66, 215, 184, 0.1);
+}
+
+.nav-dot.flagged {
+    border-color: #ffab40;
+    color: #ffab40;
+    box-shadow: 0 0 15px rgba(255, 171, 64, 0.2);
+}
+
+.nav-dot.answered.flagged {
+    background: linear-gradient(135deg, rgba(66, 215, 184, 0.2), rgba(255, 171, 64, 0.2));
+}
 
 /* --- THE WIDE FEED --- */
 .exam-viewport {
@@ -179,8 +196,9 @@
 
 .session-progress-block { flex: 1; margin-right: 2rem; }
 .p-text { display: flex; justify-content: space-between; font-size: 0.7rem; color: #707070; margin-bottom: 6px; }
-.p-track { height: 4px; background: rgba(255, 255, 255, 0.05); border-radius: 2px; }
-.p-bar-fill { height: 100%; background: var(--accent-teal); border-radius: 2px; box-shadow: 0 0 10px var(--accent-teal); transition: width 0.4s ease; }
+.p-track { height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; position: relative; overflow: hidden; }
+.p-bar-fill { height: 100%; background: var(--accent-teal); border-radius: 3px; box-shadow: 0 0 15px rgba(66, 215, 184, 0.4); transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); position: absolute; left: 0; top: 0; z-index: 2; }
+.p-bar-flagged { height: 100%; background: #ffab40; opacity: 0.4; transition: width 0.6s ease, left 0.6s ease; position: absolute; top: 0; z-index: 1; }
 
 .finish-exam-btn {
     background: var(--accent-teal);
