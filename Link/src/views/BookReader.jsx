@@ -306,6 +306,12 @@ const BookReader = ({ book, onClose }) => {
                         cursor: pointer;
                         box-shadow: 0 0.25em 1em rgba(66, 215, 184, 0.4);
                     }
+                    
+                    /* --- SMART HIGHLIGHT --- */
+                    ::highlight(sentence-focus) {
+                        background-color: #fde047;
+                        color: #000;
+                    }
                 `;
                 doc.head.appendChild(style);
                 
@@ -336,6 +342,134 @@ const BookReader = ({ book, onClose }) => {
                 state.current.y = 0;
 
                 console.log("Book Content Initialized:", w, "x", h);
+
+                // --- SMART SENTENCE LOGIC ---
+                if (win.CSS && win.CSS.highlights) {
+                    doc.addEventListener('click', (e) => {
+                        // Clear previous
+                        win.CSS.highlights.clear();
+
+                        let range;
+                        if (doc.caretRangeFromPoint) {
+                            range = doc.caretRangeFromPoint(e.clientX, e.clientY);
+                        } else if (doc.caretPositionFromPoint) {
+                            const pos = doc.caretPositionFromPoint(e.clientX, e.clientY);
+                            range = doc.createRange();
+                            range.setStart(pos.offsetNode, pos.offset);
+                            range.collapse(true);
+                        }
+
+                        // Ensure we clicked text
+                        if (!range || !docBody.contains(range.startContainer)) return;
+                        if (range.startContainer.nodeType !== 3) return; // 3 = Text Node
+
+                        const sentenceRange = findSentenceRange(doc, range.startContainer, range.startOffset);
+                        if (sentenceRange) {
+                            const highlight = new win.Highlight(sentenceRange);
+                            win.CSS.highlights.set("sentence-focus", highlight);
+                        }
+                    });
+                }
+
+                function findSentenceRange(rootDoc, startNode, startOffset) {
+                    const sentenceEndRegex = /[.!?]/;
+                    
+                    // Helper: TreeWalker for linear text traversal
+                    function createWalker(root) {
+                        return rootDoc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+                    }
+
+                    // 1. BACKWARD SCAN (Find start)
+                    let currentStartNode = startNode;
+                    let currentStartOffset = startOffset;
+                    let finalStartNode = startNode;
+                    let finalStartOffset = 0;
+
+                    // Check backwards inside the clicked node first
+                    let textBefore = currentStartNode.textContent.substring(0, currentStartOffset);
+                    let lastPuncIndex = -1;
+                    
+                    for(let i = textBefore.length - 1; i >= 0; i--) {
+                        if(sentenceEndRegex.test(textBefore[i])) {
+                            lastPuncIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (lastPuncIndex !== -1) {
+                        finalStartOffset = lastPuncIndex + 1;
+                        // Skip space if present right after dot
+                        if(currentStartNode.textContent[finalStartOffset] === ' ') finalStartOffset++;
+                    } else {
+                        // Walk backwards through DOM
+                        const walker = createWalker(docBody);
+                        walker.currentNode = currentStartNode;
+                        let prevNode = walker.previousNode();
+                        let foundStart = false;
+
+                        while (prevNode && !foundStart) {
+                            const text = prevNode.textContent;
+                            for (let i = text.length - 1; i >= 0; i--) {
+                                if (sentenceEndRegex.test(text[i])) {
+                                    finalStartNode = prevNode;
+                                    finalStartOffset = i + 1;
+                                    if(text[finalStartOffset] === ' ') finalStartOffset++;
+                                    foundStart = true;
+                                    break;
+                                }
+                            }
+                            if (!foundStart) {
+                                finalStartNode = prevNode;
+                                finalStartOffset = 0;
+                                prevNode = walker.previousNode();
+                            }
+                        }
+                    }
+
+                    // 2. FORWARD SCAN (Find end)
+                    let currentEndNode = startNode;
+                    let currentEndOffset = startOffset;
+                    let finalEndNode = startNode;
+                    let finalEndOffset = startNode.textContent.length;
+
+                    let textAfter = currentEndNode.textContent.substring(currentEndOffset);
+                    let nextPuncIndex = textAfter.search(sentenceEndRegex);
+
+                    if (nextPuncIndex !== -1) {
+                        finalEndOffset = currentEndOffset + nextPuncIndex + 1;
+                    } else {
+                        // Walk forwards through DOM
+                        const walker = createWalker(docBody);
+                        walker.currentNode = currentEndNode;
+                        let nextNode = walker.nextNode();
+                        let foundEnd = false;
+
+                        while (nextNode && !foundEnd) {
+                            const text = nextNode.textContent;
+                            const puncIdx = text.search(sentenceEndRegex);
+                            if (puncIdx !== -1) {
+                                finalEndNode = nextNode;
+                                finalEndOffset = puncIdx + 1;
+                                foundEnd = true;
+                            } else {
+                                finalEndNode = nextNode;
+                                finalEndOffset = text.length;
+                                nextNode = walker.nextNode();
+                            }
+                        }
+                    }
+
+                    // Create the final Range
+                    const r = rootDoc.createRange();
+                    try {
+                        r.setStart(finalStartNode, finalStartOffset);
+                        r.setEnd(finalEndNode, finalEndOffset);
+                        return r;
+                    } catch (e) {
+                        console.warn("Sentence Range Error:", e);
+                        return null;
+                    }
+                }
             } catch (err) {
                 console.error("Iframe Load Error:", err);
             }
