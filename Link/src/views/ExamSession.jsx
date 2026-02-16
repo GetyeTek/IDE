@@ -68,8 +68,13 @@ const ExamSession = ({ exam, onClose }) => {
                     <p>{exam.course_code || 'PHYS 101'}</p>
                     <h1>{exam.course_name}</h1>
                 </div>
-                <div className={`timer-pill ${timeLeft < 300 ? 'urgent' : ''}`}>
-                    {formatTime(timeLeft)}
+                <div className="session-header-actions">
+                    <div className={`timer-pill ${timeLeft < 300 ? 'urgent' : ''}`}>
+                        {formatTime(timeLeft)}
+                    </div>
+                    <button className="icon-button exit-session-btn" onClick={onClose} title="Exit Exam">
+                        <i className="fas fa-times"></i>
+                    </button>
                 </div>
             </header>
 
