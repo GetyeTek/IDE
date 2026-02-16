@@ -116,8 +116,12 @@
 
 .options-cluster {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* 2 Column wide view */
-    gap: 8px;
+    grid-template-columns: 1fr 1fr; 
+    gap: 12px;
+}
+
+.options-cluster.vertical-layout {
+    grid-template-columns: 1fr;
 }
 
 .opt-wrapper {
@@ -125,24 +129,29 @@
 }
 
 .opt-btn {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 12px;
-    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 14px 16px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     cursor: pointer;
-    transition: 0.2s;
+    transition: all 0.2s ease;
 }
 
-.opt-btn span { font-size: 0.85rem; color: #909090; }
+.opt-btn span {
+    font-size: 0.9rem;
+    color: #d0d0d0;
+    line-height: 1.4;
+}
 
 .opt-indicator {
-    width: 14px; height: 14px;
+    width: 16px; height: 16px;
     border-radius: 50%;
-    border: 2px solid #505050;
+    border: 2px solid #888;
     flex-shrink: 0;
+    background: rgba(0,0,0,0.2);
 }
 
 .opt-wrapper input:checked + .opt-btn {
@@ -186,7 +195,9 @@
 }
 
 @media (min-width: 900px) {
-    .exam-viewport { padding: 0 25%; }
-    .options-cluster { grid-template-columns: repeat(4, 1fr); }
+    .exam-viewport { padding: 0 20%; }
+    /* On desktop, still prefer 2 columns for better readability unless vertical is forced */
+    .options-cluster { grid-template-columns: 1fr 1fr; column-gap: 20px; }
+    .options-cluster.vertical-layout { grid-template-columns: 1fr; }
     .q-text { font-size: 1.25rem; }
 }
