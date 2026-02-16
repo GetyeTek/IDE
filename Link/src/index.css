@@ -721,7 +721,7 @@ body.library-open { overflow: hidden; }
     .settings-group { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; padding-bottom: 4rem; }
 
     /* 6. OVERLAYS (MODALS) - ULTIMATE FIX */
-    .fullscreen-overlay, .library-fullscreen {
+    .fullscreen-overlay, .library-fullscreen, .pavilion-overlay {
         display: flex !important;
         align-items: center;
         justify-content: center;
@@ -738,9 +738,12 @@ body.library-open { overflow: hidden; }
         opacity: 1;
         pointer-events: auto;
     }
-    .overlay-content, #library-fullscreen > div {
-        width: 900px;
-        height: 85vh;
+    .overlay-content, #library-fullscreen > div, .pavilion-overlay {
+        width: 900px !important;
+        height: 85vh !important;
+        margin: auto;
+        position: fixed !important;
+        inset: 0 !important;
         background: var(--bg-dark);
         border-radius: 24px;
         border: 1px solid var(--border-color);
