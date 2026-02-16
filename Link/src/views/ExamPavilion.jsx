@@ -142,6 +142,16 @@ const ExamPavilion = ({ university, onClose }) => {
                 ) : (
                     <div className="pav-empty">No {activeTab} exams found in this archive.</div>
                 )}
+                
+                {filteredExams.length > 0 && (
+                    <div className="pav-archive-end">
+                        <div className="pav-divider"></div>
+                        <div className="pav-end-seal">
+                            <i className="fas fa-scroll"></i>
+                            <span>End of Academic Archive</span>
+                        </div>
+                    </div>
+                )}
             </main>
             {activeSession && <ExamSession exam={activeSession} onClose={() => setActiveSession(null)} />}
         </div>
