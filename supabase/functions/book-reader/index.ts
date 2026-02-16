@@ -31,8 +31,9 @@ serve(async (req) => {
   }
 
   try {
-    const { action, book_path } = await req.json();
-    console.log(`[START] Action: ${action} | Path: ${book_path}`);
+    const body = await req.json();
+    const { action, book_path, university_id } = body;
+    console.log(`[START] Action: ${action} | Path: ${book_path || university_id}`);
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -83,7 +84,6 @@ serve(async (req) => {
     }
 
     if (action === "list_exams") {
-      const { university_id } = await req.json();
       const { data: exams, error } = await supabase
         .from('exams')
         .select('*')
