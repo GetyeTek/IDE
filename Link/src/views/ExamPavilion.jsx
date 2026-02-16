@@ -101,17 +101,13 @@ const ExamPavilion = ({ university, onClose }) => {
                     <div className="pav-empty">Calibrating focus...</div>
                 ) : filteredExams.length > 0 ? (
                     filteredExams.map((exam, idx) => {
-                        // NORMALIZE DATA: Logic forced to match the visual 'Intended Design'
-                        const displayCode = exam.course_code || exam.code || "EXAM";
-                        const displayTitle = exam.course_name || exam.title || "Untitled Assessment";
-                        const displayDate = exam.date || exam.year || "2024";
-                        const displayTime = exam.time_allowed_minutes || exam.duration || "90";
-                        const displayMarks = exam.total_marks || exam.marks || "100";
-
-                        // Diagnostic: Check why a card might look 'Old' or 'Broken'
-                        if (!exam.course_name && !exam.title) {
-                            console.warn(`Item [${idx}] is missing a title. Using fallback Code: ${displayCode}`);
-                        }
+                        // NORMALIZE DATA: Map to public.exams schema with consistent placeholders
+                        // Even if null, we provide a string so the UI structure is preserved.
+                        const displayCode = exam.course_code || exam.exam_type || "EXAM";
+                        const displayTitle = exam.course_name || "Untitled Assessment";
+                        const displayDate = exam.date || "Unknown Date";
+                        const displayTime = exam.time_allowed_minutes ? `${exam.time_allowed_minutes}m` : "N/A";
+                        const displayMarks = exam.total_marks ? `${exam.total_marks}` : "---";
 
                         return (
                             <div 
@@ -121,6 +117,7 @@ const ExamPavilion = ({ university, onClose }) => {
                                 onClick={() => setActiveSession(exam)}
                             >
                                 <div className="pav-lume-gauge">
+                                    {/* Calculated progress placeholder */}
                                     <div className="pav-lume-fill" style={{ height: '0%' }}></div>
                                 </div>
                                 <div className="pav-card-top">
@@ -129,9 +126,15 @@ const ExamPavilion = ({ university, onClose }) => {
                                 </div>
                                 <h2 className="pav-exam-title">{displayTitle}</h2>
                                 <div className="pav-meta-ribbon">
-                                    <div className="pav-meta-item"><i className="far fa-clock"></i> {displayTime}m</div>
-                                    <div className="pav-meta-item"><i className="far fa-file-alt"></i> {displayMarks} Marks</div>
-                                    <div className="pav-meta-item"><i className="fas fa-bolt"></i> Practice</div>
+                                    <div className="pav-meta-item">
+                                        <i className="far fa-clock"></i> {displayTime}
+                                    </div>
+                                    <div className="pav-meta-item">
+                                        <i className="far fa-file-alt"></i> {displayMarks} Marks
+                                    </div>
+                                    <div className="pav-meta-item">
+                                        <i className="fas fa-bolt"></i> Practice
+                                    </div>
                                 </div>
                             </div>
                         );
