@@ -55,9 +55,10 @@ serve(async (req) => {
 
     const text = await fileData.text();
     const allWords = text.split(/\r?\n/).filter(w => w.trim().length > 0);
+    console.log(`[MEMORY] Total words in file: ${allWords.length}. File string length: ${text.length}`);
+
     const batch = allWords.slice(progress.current_line_offset, progress.current_line_offset + BATCH_SIZE);
-    
-    console.log(`[BATCH] Sliced ${batch.length} words from file.`);
+    console.log(`[BATCH] Sliced ${batch.length} words (Offset: ${progress.current_line_offset}).`);
 
     if (batch.length === 0) {
       if (progress.current_file_index < TOTAL_FILES) {
@@ -90,18 +91,32 @@ ${batch.join(', ')}`;
     // Endpoint preserved as per instructions
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKeyData.api_key}`;
     
-    const aiResponse = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: "application/json"
-        }
-      })
-    });
+    // Added Timeout to prevent infinite hang
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 50000); // 50s timeout
 
+    let aiResponse;
+    try {
+      aiResponse = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+          }
+        }),
+        signal: controller.signal
+      });
+    } catch (fetchErr) {
+      if (fetchErr.name === 'AbortError') throw new Error("Gemini Request Timed Out (50s)");
+      throw fetchErr;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    console.log(`[AI] Response Status: ${aiResponse.status}`);
     if (!aiResponse.ok) {
       const errorBody = await aiResponse.text();
       throw new Error(`Gemini API Error: ${aiResponse.status} - ${errorBody}`);
