@@ -116,7 +116,17 @@ serve(async (req) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' }
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.1,
+            thinkingConfig: { includeThoughts: false, thinkingLevel: 'MINIMAL' }
+          },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+          ]
         }),
         signal: controller.signal
       }
@@ -132,13 +142,20 @@ serve(async (req) => {
     const result = await aiResponse.json();
     console.log('[DEBUG: AI_FULL_RESPONSE]', JSON.stringify(result));
 
-    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
-      const reason = result.promptFeedback?.blockReason || 'UNKNOWN_REASON';
-      throw new Error(`AI Response Malformed or Blocked. Reason: ${reason}`);
+    const candidate = result.candidates?.[0];
+    if (!candidate || !candidate.content) {
+      const blockReason = result.promptFeedback?.blockReason || 'UNKNOWN';
+      throw new Error(`AI Blocked the response. Reason: ${blockReason}. Check Safety Settings.`);
     }
 
-    const rawText = result.candidates[0].content.parts[0].text;
-    console.log('[DEBUG: AI_RAW_TEXT]', rawText);
+    // Fragment Stitching: Join all text parts in case the AI splits the response
+    const rawText = candidate.content.parts
+      .map((part: any) => part.text)
+      .filter(Boolean)
+      .join('')
+      .trim();
+
+    console.log('[DEBUG: AI_STITCHED_TEXT]', rawText);
 
     let cleanedWords: string[] = [];
     try {
