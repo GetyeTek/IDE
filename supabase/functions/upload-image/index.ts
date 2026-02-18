@@ -62,10 +62,40 @@ function extractJson(raw: string): string {
   return (match ? match[1].trim() : raw.trim());
 }
 
-function formatTranscriptionForAI(transcription: any): string {
-  const qs = transcription?.questions || transcription;
-  if (!Array.isArray(qs)) return "[Error formatting questions]";
-  return qs.map((q: any) => `ID: ${q.number} | TYPE: ${q.type} | Q: ${q.question_text} ${q.options ? '| OPTS: ' + q.options.join(', ') : ''}`).join('\n');
+function formatTranscriptionForAI(transcription: any, requestId: string): string {
+  console.log(`[${requestId}] [FORMATTER] Input type: ${typeof transcription}`);
+  
+  let data = transcription;
+
+  // 1. If it's a string, try to parse it first
+  if (typeof transcription === 'string') {
+    try {
+      data = JSON.parse(transcription);
+      console.log(`[${requestId}] [FORMATTER] Successfully parsed stringified JSON.`);
+    } catch (e) {
+      console.error(`[${requestId}] [FORMATTER] Failed to parse string transcription:`, transcription);
+      return `[Error: Transcription is a non-JSON string: ${transcription.substring(0, 100)}...]`;
+    }
+  }
+
+  // 2. Locate the array of questions
+  // Checks: data.questions, data.data.questions, or the object itself if it's an array
+  const qs = data?.questions || (Array.isArray(data) ? data : data?.data?.questions);
+
+  if (!Array.isArray(qs)) {
+    console.error(`[${requestId}] [FORMATTER] Could not find an array. Data structure:`, JSON.stringify(data));
+    return "[Error: Formatter could not find an array of questions in the provided data]";
+  }
+
+  console.log(`[${requestId}] [FORMATTER] Found ${qs.length} questions to format.`);
+
+  return qs.map((q: any, idx: number) => {
+    const id = q.number || q.id || `Ref-${idx}`;
+    const type = q.type || 'unknown';
+    const text = q.question_text || q.question || q.text || "[No text found]";
+    const opts = q.options ? ` | OPTS: ${Array.isArray(q.options) ? q.options.join(', ') : q.options}` : '';
+    return `ID: ${id} | TYPE: ${type} | Q: ${text}${opts}`;
+  }).join('\n');
 }
 
 serve(async (req) => {
@@ -89,7 +119,8 @@ serve(async (req) => {
         return new Response(JSON.stringify({ skipped: true }));
       }
 
-      const friendlyText = formatTranscriptionForAI(record.transcription);
+      console.log(`[${requestId}] [SOLVER_STAGE] Raw record.transcription:`, JSON.stringify(record.transcription));
+      const friendlyText = formatTranscriptionForAI(record.transcription, requestId);
       console.log(`[${requestId}] [SOLVER_STAGE] Formatted Transcription for Solver Input:\n--- START TRANSCRIPTION ---\n${friendlyText}\n--- END TRANSCRIPTION ---`);
 
       const geminiKey = await getGeminiKey(supabase, requestId);
