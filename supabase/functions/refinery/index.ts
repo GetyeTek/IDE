@@ -169,7 +169,13 @@ serve(async (req) => {
     }
 
     const result = await aiResponse.json();
-    console.log('[DEBUG: AI_FULL_RESPONSE]', JSON.stringify(result));
+    
+    if (result.error) {
+      console.error('[DEBUG: AI_ERROR_RESPONSE]', JSON.stringify(result.error));
+      throw new Error(`Gemini API Error: ${result.error.message}`);
+    }
+
+    console.log('[DEBUG: AI_FULL_RESPONSE_SUCCESS]');
 
     const candidate = result.candidates?.[0];
     if (!candidate || !candidate.content) {
@@ -202,20 +208,17 @@ serve(async (req) => {
     const cleanedWords = responseObj.data;
     const summary = responseObj.summary || 'No summary provided';
 
-    console.log(`[STAGE: PARSING] Processed ${cleanedWords.length} words.`);
     console.log(`[STAGE: AI_SUMMARY] ${summary}`);
     
-    console.log(`[STAGE: PARSING] Received ${cleanedWords.length} words.`);
-
-    // 5. Saving (Rich Batch Mode)
+    // 5. Saving (Rich Batch Mode with Upsert for idempotency)
     console.log(`[STAGE: DATABASE_SAVE] Archiving enriched batch (Size: ${cleanedWords.length}, Index: ${progress.last_offset})...`);
 
-    const { error: saveError } = await supabase.from('processed_words').insert({
+    const { error: saveError } = await supabase.from('processed_words').upsert({
       source_file: progress.file_path,
       batch_index: progress.last_offset,
-      words: cleanedWords, // Stores the array of objects {word, root, synonyms, importance}
-      summary: summary     // Stores the AI's executive summary
-    });
+      words: cleanedWords,
+      summary: summary
+    }, { onConflict: 'source_file,batch_index' });
 
     if (saveError) throw saveError;
 
