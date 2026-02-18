@@ -1,0 +1,42 @@
+name: Amharic Refinery Worker
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' 
+  workflow_dispatch: {}
+
+jobs:
+  refine:
+    strategy:
+      matrix:
+        worker_id: [1, 2, 3, 4] # Runs 4 parallel workers
+      fail-fast: false
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Run Refinery Script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          WORKER_ID: ${{ matrix.worker_id }}
+        run: deno run -A worker/refinery_script.ts
+
+      - name: Trigger Next Run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Only trigger if this is the first worker to finish to prevent 4x amplification
+          if [ "${{ matrix.worker_id }}" == "1" ]; then
+            gh workflow run refine.yml
+          fi
