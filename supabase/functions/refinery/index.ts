@@ -198,22 +198,27 @@ serve(async (req) => {
       throw new Error(`Gemini API Error: ${result.error.message}`);
     }
 
-    console.log('[DEBUG: AI_FULL_RESPONSE_SUCCESS]');
-
     const candidate = result.candidates?.[0];
     if (!candidate || !candidate.content) {
       const blockReason = result.promptFeedback?.blockReason || 'UNKNOWN';
       throw new Error(`AI Blocked the response. Reason: ${blockReason}. Check Safety Settings.`);
     }
 
-    // Fragment Stitching
+    const finishReason = candidate.finishReason;
+    console.log(`[DEBUG: AI_RESPONSE] Finish Reason: ${finishReason}`);
+
+    // Fragment Stitching (includes thoughts if provided by model)
     const rawText = candidate.content.parts
-      .map((part: any) => part.text)
+      .map((part: any) => part.text || part.thought)
       .filter(Boolean)
-      .join('')
+      .join('\n')
       .trim();
 
-    console.log('[DEBUG: AI_STITCHED_TEXT_PREVIEW]', rawText.substring(0, 200) + '...');
+    if (finishReason === 'MAX_TOKENS') {
+      console.warn('[WARNING] AI response was truncated due to token limits.');
+    }
+
+    console.log('[DEBUG: AI_STITCHED_TEXT_PREVIEW]', rawText.substring(0, 500) + '...');
 
     let responseObj: { summary: string, data: any[] };
     try {
@@ -242,7 +247,10 @@ serve(async (req) => {
         throw new Error('The parsed object is missing the "data" array.');
       }
     } catch (parseErr) {
-      console.error('[STAGE: PARSING] JSON Parse failed. Raw Text was:', rawText);
+      console.error('[STAGE: PARSING] JSON Parse failed.');
+      console.error('[FULL_RAW_OUTPUT_START]');
+      console.error(rawText);
+      console.error('[FULL_RAW_OUTPUT_END]');
       throw new Error(`AI returned invalid JSON: ${parseErr.message}`);
     }
 
