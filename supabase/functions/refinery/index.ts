@@ -91,9 +91,9 @@ ${batch.join(', ')}`;
     // Endpoint preserved as per instructions
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKeyData.api_key}`;
     
-    // Added Timeout to prevent infinite hang
+    // Extended Timeout to allow for heavy processing
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 50000); // 50s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 150000); // 150s timeout (2.5m)
 
     let aiResponse;
     try {
@@ -110,21 +110,24 @@ ${batch.join(', ')}`;
         signal: controller.signal
       });
     } catch (fetchErr) {
-      if (fetchErr.name === 'AbortError') throw new Error("Gemini Request Timed Out (50s)");
+      if (fetchErr.name === 'AbortError') throw new Error("Gemini Request Timed Out (150s)");
       throw fetchErr;
     } finally {
       clearTimeout(timeoutId);
     }
 
-    console.log(`[AI] Response Status: ${aiResponse.status}`);
+    // Read raw text first to ensure we log whatever the AI sends
+    const rawBody = await aiResponse.text();
+    console.log(`[AI] STATUS CODE: ${aiResponse.status}`);
+    console.log(`[AI] RAW RESPONSE: ${rawBody}`);
+
     if (!aiResponse.ok) {
-      const errorBody = await aiResponse.text();
-      throw new Error(`Gemini API Error: ${aiResponse.status} - ${errorBody}`);
+      throw new Error(`Gemini API Error: ${aiResponse.status} - ${rawBody}`);
     }
 
-    const aiData = await aiResponse.json();
+    const aiData = JSON.parse(rawBody);
     const rawJson = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    console.log(`[AI] Raw Response Received.`);
+    console.log(`[AI] JSON Content Extracted.`);
 
     const parsed = JSON.parse(rawJson);
     const cleanedWords = parsed.cleaned_words || [];
