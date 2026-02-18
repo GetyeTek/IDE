@@ -45,8 +45,8 @@ async function runRefinery() {
       }
 
       if (nextFileNumber > MAX_FILES) {
-        console.log('All files finished. Worker exiting.');
-        return;
+        console.log('--- ALL FILES FINISHED ---');
+        Deno.exit(0); // Exit cleanly, but we might want to prevent the next trigger
       }
 
       const nextFileName = `rare_words_${nextFileNumber}.txt`;
