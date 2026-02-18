@@ -204,8 +204,17 @@ serve(async (req) => {
 
     let responseObj: { summary: string, data: any[] };
     try {
-      const sanitizedText = rawText.replace(/```json|```/g, '').trim();
-      responseObj = JSON.parse(sanitizedText);
+      // Surgical Extraction: Find the outer boundaries of the JSON object
+      const firstOpen = rawText.indexOf('{');
+      const lastClose = rawText.lastIndexOf('}');
+
+      if (firstOpen === -1 || lastClose === -1) {
+        throw new Error('No JSON object structure found in response.');
+      }
+
+      // Extract only the valid JSON substring, discarding preambles/postscripts
+      const jsonString = rawText.substring(firstOpen, lastClose + 1);
+      responseObj = JSON.parse(jsonString);
       
       if (!responseObj.data || !Array.isArray(responseObj.data)) {
         throw new Error('Missing "data" array in AI response');
