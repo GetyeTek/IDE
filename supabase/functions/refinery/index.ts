@@ -63,14 +63,17 @@ serve(async (req) => {
     const { data: keyRecord, error: keyError } = await supabase
       .from('api_keys')
       .select('*')
+      .eq('service', 'gemini')
       .eq('is_active', true)
       .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
       .order('last_used_at', { ascending: true, nullsFirst: true })
       .limit(1)
       .single();
 
-    if (keyError || !keyRecord) throw new Error('No available API keys.');
-    console.log(`[STAGE: KEY_ROTATION] Using key ID: ${keyRecord.id}`);
+    if (keyError || !keyRecord) throw new Error('No available Gemini API keys found. Ensure service is set to "gemini" in the database.');
+    
+    const cleanKey = keyRecord.api_key.trim();
+    console.log(`[STAGE: KEY_ROTATION] Using key ID: ${keyRecord.id} (Starts with: ${cleanKey.substring(0, 4)}...)`);
 
     // 3. Gathering Material
     const { data: fileData, error: fileError } = await supabase.storage
@@ -107,7 +110,7 @@ serve(async (req) => {
     5. OUTPUT: Return ONLY a raw JSON array of strings. No commentary.`;
 
     const aiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${keyRecord.api_key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${cleanKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
