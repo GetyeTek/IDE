@@ -99,54 +99,24 @@ serve(async (req) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-    const prompt = `
-    ROLE: You are the "Amharic Refinery Master," an elite linguistic engine specialized in Ethiopic script restoration, morphological analysis, and lexicographical enrichment.
-    INPUT BATCH: ${JSON.stringify(batch)}
+    const systemInstruction = `
+    ROLE: You are the "Amharic Refinery Master." 
+    MISSION: Clean OCR noise and perform deep morphological lemmatization.
 
-    YOUR MISSION: Process the messy OCR input through these 6 STRICT SCHOLARLY PROTOCOLS and return a structured dataset.
+    PROTOCOLS:
+    1. SPLITTER: Separate merged words (e.g., "ሰለባቀጠና" -> "ሰለባ", "ቀጠና").
+    2. JUDGE: Discard non-Amharic noise/gibberish.
+    3. CORRECTOR: Fix visual OCR errors (e.g., confusing 'ሀ' for 'ሃ').
+    4. LEMMATIZER: Identify the GLOBAL CITATION FORM (Infinitive/መነሻ ቃል). 
+       - CRITICAL: Do NOT just strip prefixes. Find the dictionary entry form.
+       - EXAMPLE: "እንድናጓጉዘው" must have the root "ማጓጓዝ" (To transport), NOT "ጓጓዘ".
+       - EXAMPLE: "የሚመጡት" must have the root "መምጣት".
+    5. TRANSLATOR: Provide nuanced English synonyms.
+    6. SUMMARY: Explain splits and scholarly guesses.
 
-    1. PROTOCOL: THE SPLITTER (De-cluttering)
-       - ANALYZE every string for merged words. Identify impossible morphological transitions (e.g., a word-ending suffix followed immediately by a word-starting prefix).
-       - ACTION: Split them into separate valid words.
-       - EXAMPLE: "ጨምሯልለሶስተኛ" ➔ "ጨምሯል", "ለሶስተኛ".
+    OUTPUT: You MUST return ONLY a single JSON object. No conversation, no preamble.`;
 
-    2. PROTOCOL: THE JUDGE (Nonsense Removal)
-       - DETECT gibberish, non-Amharic noise, and unfixable OCR errors.
-       - CRITERIA: DELETE strings that are pure Latin characters, pure numbers, or random Ethiopic characters with no semantic meaning (e.g., "ድድድድ", "ቅቅቅ").
-       - DECISION: If a word cannot be corrected to a valid dictionary entry, DISCARD it.
-
-    3. PROTOCOL: THE CORRECTOR (Visual Repair)
-       - FIX visual OCR confusions based on linguistic context (e.g., confusing 'ሀ' for 'ሃ' or 'ለ' for 'ሉ'). 
-       - STRIP attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
-
-    4. PROTOCOL: THE ROOT ANALYST (Morphology)
-       - For every valid word, identify its base Lexeme/Root.
-       - Logic: Strip conjugations and declensions to find the core root (e.g., "የሚመጡት" ➔ Root: "መጣ").
-
-    5. PROTOCOL: THE TRANSLATOR (Nuance Expansion)
-       - Provide comprehensive English synonyms. 
-       - RULE: If a word has a high semantic match or multiple nuances, list them all to capture the full breadth of the Amharic word.
-
-    6. PROTOCOL: EXECUTIVE SUMMARY
-       - Reflect on your decisions. Write a summary explaining:
-         * Which words were identified as merged and split?
-         * Which strings were discarded as nonsense?
-         * Highlight any "Scholarly Guesses" where OCR was ambiguous but you reconstructed based on context.
-
-    OUTPUT FORMAT (STRICT JSON ONLY):
-    Return a single JSON Object (NO Markdown blocks, NO preamble):
-    {
-      "summary": "The Executive Summary of linguistic decisions...",
-      "data": [
-        {
-          "word": "[Cleaned Original Word]",
-          "root": "[Linguistic Root]",
-          "synonyms": ["Nuanced Synonym 1", "Nuanced Synonym 2", ...],
-          "importance": [1-10 Scale: 1=Archaic, 10=Daily Core]
-        }
-      ]
-    }
-    `;
+    const userPrompt = `INPUT BATCH: ${JSON.stringify(batch)}`;
 
     const aiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${cleanKey}`,
@@ -154,10 +124,11 @@ serve(async (req) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents: [{ parts: [{ text: userPrompt }] }],
           generationConfig: {
             responseMimeType: 'application/json',
-            temperature: 0.2,
+            temperature: 0.1,
             thinkingConfig: { includeThoughts: true, thinkingLevel: 'HIGH' }
           },
           safetySettings: [
@@ -204,16 +175,14 @@ serve(async (req) => {
 
     let responseObj: { summary: string, data: any[] };
     try {
-      // Surgical Extraction: Find the outer boundaries of the JSON object
-      const firstOpen = rawText.indexOf('{');
-      const lastClose = rawText.lastIndexOf('}');
-
-      if (firstOpen === -1 || lastClose === -1) {
+      // Greedy Extraction: Find the widest possible JSON object
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      
+      if (!jsonMatch) {
         throw new Error('No JSON object structure found in response.');
       }
 
-      // Extract only the valid JSON substring, discarding preambles/postscripts
-      const jsonString = rawText.substring(firstOpen, lastClose + 1);
+      const jsonString = jsonMatch[0];
       responseObj = JSON.parse(jsonString);
       
       if (!responseObj.data || !Array.isArray(responseObj.data)) {
