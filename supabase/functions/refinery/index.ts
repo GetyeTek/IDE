@@ -99,15 +99,46 @@ serve(async (req) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-    const prompt = `You are a scholarly Amharic linguist. 
-    TASK: Clean these OCR words. 
-    DATA: ${JSON.stringify(batch)}
-    RULES:
-    1. FIX OCR errors (visual similarity).
-    2. SPLIT merged words (e.g., 'ጨምሯልለሶስተኛ' -> ['ጨምሯል', 'ለሶስተኛ']).
-    3. FILTER non-Amharic gibberish.
-    4. PRESERVE already correct words.
-    5. OUTPUT: Return ONLY a raw JSON array of strings. No commentary.`;
+    const prompt = `
+    ROLE: You are the "Amharic Refinery," an elite linguistic engine specialized in Ethiopic script restoration.
+    INPUT BATCH: ${JSON.stringify(batch)}
+
+    Your Goal: Produce a pristine list of Amharic words by processing the input through these 5 STRICT PROTOCOLS:
+
+    1. PROTOCOL: THE SPLITTER (Crucial)
+       - DETECT strings that are actually multiple words smashed together by OCR.
+       - LOGIC: Identify impossible morphological transitions (e.g., a word-ending suffix followed immediately by a word-starting prefix).
+       - ACTION: Split them into separate strings.
+       - EXAMPLE: "ጨምሯልለሶስተኛ" ➔ MUST BE SPLIT into "ጨምሯል", "ለሶስተኛ".
+       - EXAMPLE: "እናሰላም" ➔ "እና", "ሰላም".
+
+    2. PROTOCOL: THE PURIFIER (Filter)
+       - DETECT non-Amharic noise.
+       - ACTION: DELETE any string that matches these criteria:
+         * Contains ONLY Latin characters (A-Z) or numbers.
+         * Is less than 2 characters long (UNLESS it is a valid preposition like "ስለ" or "ወደ").
+         * Consists only of punctuation (e.g., "::", "!!").
+       - EXAMPLE: "Page12", "----", "Abc" ➔ DELETE.
+
+    3. PROTOCOL: THE JUDGE (Nonsense Removal)
+       - DETECT gibberish that resembles Amharic but has no meaning (random character sequences).
+       - ACTION: If a word cannot be corrected to a valid dictionary word or name, DELETE IT.
+       - EXAMPLE: "asdf", "ድድድድድ" (repetition), "ቅቅቅ" ➔ DELETE.
+
+    4. PROTOCOL: THE CORRECTOR (Repair)
+       - DETECT visual OCR artifacts.
+       - ACTION: Fix characters that look similar but are wrong (e.g., confusing 'ሀ' for 'ሃ' or 'ለ' for 'ሉ' based on context).
+       - ACTION: Strip attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
+
+    5. PROTOCOL: THE PRESERVER (Integrity)
+       - IF a word is already valid Amharic, DO NOT CHANGE IT.
+       - DO NOT stem words (keep "የሚመጡት" as "የሚመጡት", do not reduce to "መጣ").
+
+    OUTPUT FORMAT:
+    - Respond with a SINGLE, FLAT JSON ARRAY of strings.
+    - NO Markdown code blocks (no \`\`\`json).
+    - NO commentary.
+    `;
 
     const aiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${cleanKey}`,
