@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const BATCH_SIZE = 30;
 const MAX_FILES = 26;
-const AI_TIMEOUT = 300000; // 5 Minutes for High Thinking
+const AI_TIMEOUT = 120000; // 2 Minutes
 const COOLDOWN_DURATION = 10 * 60 * 1000;
 
 async function runRefinery() {
@@ -144,10 +144,11 @@ async function runRefinery() {
 
     let responseObj: { summary: string, data: any[] } | null = null;
     const MAX_RETRIES = 3;
-    
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const attemptStart = Date.now();
       try {
-        console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES}...`);
+        console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES} starting...`);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
@@ -159,8 +160,8 @@ async function runRefinery() {
             body: JSON.stringify({
               system_instruction: { parts: [{ text: systemInstruction }] },
               contents: [{ parts: [{ text: `INPUT BATCH: ${JSON.stringify(batch)}` }] }],
-              generationConfig: { 
-                responseMimeType: 'application/json', 
+              generationConfig: {
+                responseMimeType: 'application/json',
                 temperature: 0.1,
                 thinkingConfig: { includeThoughts: true, thinkingLevel: 'HIGH' }
               },
@@ -174,10 +175,13 @@ async function runRefinery() {
             signal: controller.signal
           }
         );
-        
+
         clearTimeout(timeoutId);
+        const duration = Date.now() - attemptStart;
+        console.log(`[PERF] AI Request received response in ${duration}ms`);
 
         if (aiResp.status === 429) {
+          console.warn(`[RATE LIMIT] 429 encountered after ${duration}ms`);
           await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
           throw new Error('Rate limit hit');
         }
@@ -187,7 +191,7 @@ async function runRefinery() {
 
         const candidate = result.candidates?.[0];
         if (!candidate) throw new Error('AI Blocked the response or returned no candidates.');
-        
+
         console.log(`[DEBUG: AI_RESPONSE] Finish Reason: ${candidate.finishReason}`);
         const rawText = candidate.content?.parts?.map((p: any) => p.text || p.thought).filter(Boolean).join('\n').trim() || '';
         console.log('[DEBUG: PREVIEW]', rawText.substring(0, 200) + '...');
@@ -198,6 +202,7 @@ async function runRefinery() {
         const startIndex = rawText.lastIndexOf('{', lastDataKey);
 
         if (lastDataKey === -1 || lastClosingBrace === -1 || startIndex === -1) {
+          console.error('[PARSE ERROR] Raw text dump:', rawText);
           throw new Error('Could not locate valid JSON block in AI response');
         }
 
@@ -207,11 +212,20 @@ async function runRefinery() {
 
         responseObj = JSON.parse(sanitizedJson);
         if (!responseObj?.data || !Array.isArray(responseObj.data)) throw new Error('Parsed JSON missing data array');
-        
+
         break; // Success!
 
       } catch (err) {
-        console.error(`Attempt ${attempt} failed: ${err.message}`);
+        const duration = Date.now() - attemptStart;
+        const isTimeout = err.name === 'AbortError' || (err instanceof DOMException && err.name === 'AbortError');
+        
+        console.error(`[AI FAIL] Attempt ${attempt} failed after ${duration}ms. Type: ${err.name}`);
+        if (isTimeout) {
+             console.error(`[TIMEOUT] The AI exceeded the ${AI_TIMEOUT}ms limit. Batch Size: ${JSON.stringify(batch).length} chars.`);
+        } else {
+             console.error(`[ERROR MSG] ${err.message}`);
+        }
+
         if (err.message.includes('Rate limit hit') || attempt === MAX_RETRIES) throw err;
         await new Promise(r => setTimeout(r, 2000 * attempt));
       }
