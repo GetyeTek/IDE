@@ -102,7 +102,10 @@ serve(async (req) => {
     const systemInstruction = `
     ROLE: You are the "Amharic Refinery Master," an elite linguistic engine specialized in Ethiopic script restoration, morphological analysis, and lexicographical enrichment.
 
-    CRITICAL: Your output MUST be a single, final JSON object. Do NOT include partial JSON snippets or examples in your explanation. 
+    CRITICAL: Your final output MUST be a single JSON object. 
+    - Do NOT include partial JSON snippets or code blocks in your thoughts.
+    - If you must explain your work, use plain text only. 
+    - Do NOT use curly braces {} anywhere except in the final JSON structure.`
 
     YOUR MISSION: Process messy OCR input through these 6 STRICT SCHOLARLY PROTOCOLS and return a structured dataset.
 
@@ -214,23 +217,29 @@ serve(async (req) => {
 
     let responseObj: { summary: string, data: any[] };
     try {
-      // Step 1: Find all JSON blocks in the text
-      const allBlocks = rawText.match(/\{[\s\S]*?\}/g);
-      
-      if (!allBlocks || allBlocks.length === 0) {
-        throw new Error('No JSON structure found in AI output.');
+      // Step 1: Find the boundaries of the main JSON object by looking for the required 'data' key
+      const lastDataKey = rawText.lastIndexOf('"data"');
+      const lastClosingBrace = rawText.lastIndexOf('}');
+
+      if (lastDataKey === -1 || lastClosingBrace === -1) {
+        throw new Error('Could not locate the final JSON data block.');
       }
 
-      // Step 2: Pick the VERY LAST block (usually the final intended output)
-      const lastBlock = allBlocks[allBlocks.length - 1];
+      // Find the opening brace that starts this specific object
+      const startIndex = rawText.lastIndexOf('{', lastDataKey);
+      if (startIndex === -1) throw new Error('Could not locate the start of the JSON block.');
 
-      // Step 3: Sanitize control characters that break JSON parsing (OCR common issue)
-      const sanitizedJson = lastBlock.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+      const jsonString = rawText.substring(startIndex, lastClosingBrace + 1);
+
+      // Step 2: Sanitize - Remove control characters and trailing commas
+      const sanitizedJson = jsonString
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Control characters
+        .replace(/,\s*([\}\]])/g, '$1');              // Trailing commas
       
       responseObj = JSON.parse(sanitizedJson);
 
       if (!responseObj.data || !Array.isArray(responseObj.data)) {
-        throw new Error('Extracted JSON is missing the "data" array.');
+        throw new Error('The parsed object is missing the "data" array.');
       }
       
       if (!responseObj.data || !Array.isArray(responseObj.data)) {
