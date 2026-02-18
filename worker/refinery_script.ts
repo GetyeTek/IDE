@@ -64,7 +64,7 @@ async function runRefinery() {
       .eq('service', 'gemini')
       .eq('is_active', true)
       .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
-      .order('last_used_at', { ascending: true })
+      .order('last_used_at', { ascending: true, nullsFirst: true })
       .limit(1)
       .single();
 
@@ -129,7 +129,7 @@ async function runRefinery() {
     let responseObj: { summary: string, data: any[] } | null = null;
     const MAX_RETRIES = 3;
     
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES}...`);
         const controller = new AbortController();
@@ -147,7 +147,13 @@ async function runRefinery() {
                 responseMimeType: 'application/json', 
                 temperature: 0.1,
                 thinkingConfig: { includeThoughts: true, thinkingLevel: 'HIGH' }
-              }
+              },
+              safetySettings: [
+                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+              ]
             }),
             signal: controller.signal
           }
@@ -161,22 +167,30 @@ async function runRefinery() {
         }
 
         const result = await aiResp.json();
+        if (result.error) throw new Error(`Gemini API Error: ${result.error.message}`);
+
         const candidate = result.candidates?.[0];
-        const rawText = candidate?.content?.parts?.map((p: any) => p.text || p.thought).join('\n').trim() || '';
+        if (!candidate) throw new Error('AI Blocked the response or returned no candidates.');
+        
+        console.log(`[DEBUG: AI_RESPONSE] Finish Reason: ${candidate.finishReason}`);
+        const rawText = candidate.content?.parts?.map((p: any) => p.text || p.thought).filter(Boolean).join('\n').trim() || '';
+        console.log('[DEBUG: PREVIEW]', rawText.substring(0, 200) + '...');
 
         // Targeted Reverse Search Parsing
         const lastDataKey = rawText.lastIndexOf('"data"');
         const lastClosingBrace = rawText.lastIndexOf('}');
         const startIndex = rawText.lastIndexOf('{', lastDataKey);
 
-        if (lastDataKey === -1 || lastClosingBrace === -1 || startIndex === -1) throw new Error('Invalid JSON structure in AI response');
+        if (lastDataKey === -1 || lastClosingBrace === -1 || startIndex === -1) {
+          throw new Error('Could not locate valid JSON block in AI response');
+        }
 
         const sanitizedJson = rawText.substring(startIndex, lastClosingBrace + 1)
           .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
           .replace(/,\s*([\}\]])/g, '$1');
 
         responseObj = JSON.parse(sanitizedJson);
-        if (!responseObj?.data) throw new Error('Parsed JSON missing data array');
+        if (!responseObj?.data || !Array.isArray(responseObj.data)) throw new Error('Parsed JSON missing data array');
         
         break; // Success!
 
