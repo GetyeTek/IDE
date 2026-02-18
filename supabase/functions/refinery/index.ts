@@ -41,7 +41,7 @@ serve(async (req) => {
 
     // 3. Gathering Material: Fetch raw text file
     const { data: fileData, error: fileError } = await supabase.storage
-      .from('raw-word-lists')
+      .from('Chunks')
       .download(progress.file_path);
 
     if (fileError) throw new Error(`File access failed: ${fileError.message}`);
