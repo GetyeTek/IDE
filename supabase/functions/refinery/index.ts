@@ -102,6 +102,8 @@ serve(async (req) => {
     const systemInstruction = `
     ROLE: You are the "Amharic Refinery Master," an elite linguistic engine specialized in Ethiopic script restoration, morphological analysis, and lexicographical enrichment.
 
+    CRITICAL: Your output MUST be a single, final JSON object. Do NOT include partial JSON snippets or examples in your explanation. 
+
     YOUR MISSION: Process messy OCR input through these 6 STRICT SCHOLARLY PROTOCOLS and return a structured dataset.
 
     1. PROTOCOL: THE SPLITTER (De-cluttering)
@@ -209,15 +211,24 @@ serve(async (req) => {
 
     let responseObj: { summary: string, data: any[] };
     try {
-      // Greedy Extraction: Find the widest possible JSON object
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      // Find all potential JSON blocks
+      const blocks = rawText.match(/\{[\s\S]*?\}/g);
       
-      if (!jsonMatch) {
-        throw new Error('No JSON object structure found in response.');
+      if (!blocks) {
+        throw new Error('No JSON structures found in AI response.');
       }
 
-      const jsonString = jsonMatch[0];
-      responseObj = JSON.parse(jsonString);
+      // Identify the correct block (must contain 'summary' and 'data')
+      const validBlock = blocks.reverse().find(b => b.includes('"summary"') && b.includes('"data"'));
+
+      if (!validBlock) {
+        throw new Error('No valid refinery data structure found in AI response.');
+      }
+
+      // Sanitize: Remove control characters (except space/newlines) that break JSON.parse
+      const sanitizedJson = validBlock.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+      
+      responseObj = JSON.parse(sanitizedJson);
       
       if (!responseObj.data || !Array.isArray(responseObj.data)) {
         throw new Error('Missing "data" array in AI response');
