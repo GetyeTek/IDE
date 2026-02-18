@@ -130,14 +130,17 @@ async function runRefinery() {
     5. PROTOCOL: THE TRANSLATOR (Nuance Expansion)
        - Provide comprehensive English synonyms capture the full breadth of the word.
 
-    6. PROTOCOL: EXECUTIVE SUMMARY
+    6. PROTOCOL: THE GRAMMARIAN (Linguistic Tagging)
+       - Identify the Part of Speech (POS) for the word (e.g., Noun, Verb, Adjective, Adverb, Conjunction, Preposition).
+
+    7. PROTOCOL: EXECUTIVE SUMMARY
        - Explain splits, discards, and "Scholarly Guesses."
 
     OUTPUT FORMAT (STRICT JSON ONLY):
     Return a single JSON Object. NO Markdown. "summary" MUST come AFTER the "data" array.
     {
       "data": [
-        { "word": "[Cleaned]", "root": "[Citation Form]", "synonyms": [], "importance": 1-10 }
+        { "word": "[Cleaned]", "root": "[Citation Form]", "pos": "[Part of Speech]", "synonyms": [], "importance": 1-10 }
       ],
       "summary": "Reflective summary..."
     }`;
