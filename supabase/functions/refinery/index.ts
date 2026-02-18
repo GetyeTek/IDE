@@ -200,15 +200,15 @@ serve(async (req) => {
     
     console.log(`[STAGE: PARSING] Received ${cleanedWords.length} words.`);
 
-    // 5. Saving (Satisfying NOT NULL constraint for batch_index)
-    console.log(`[STAGE: DATABASE_SAVE] Writing ${cleanedWords.length} words with batch_index ${progress.last_offset}...`);
-    const { error: saveError } = await supabase.from('processed_words').insert(
-      cleanedWords.map((word: string) => ({
-        word,
-        source_file: progress.file_path,
-        batch_index: progress.last_offset
-      }))
-    );
+    // 5. Saving (Batch Mode: JSONB)
+    console.log(`[STAGE: DATABASE_SAVE] Archiving batch of ${cleanedWords.length} words (Index: ${progress.last_offset})...`);
+    
+    // We store the entire array in one row. 'word' column is now null.
+    const { error: saveError } = await supabase.from('processed_words').insert({
+      source_file: progress.file_path,
+      batch_index: progress.last_offset,
+      words: cleanedWords // Storing as JSONB array
+    });
 
     if (saveError) throw saveError;
 
