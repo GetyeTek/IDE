@@ -127,9 +127,26 @@ serve(async (req) => {
     }
 
     const result = await aiResponse.json();
-    const rawText = result.candidates[0].content.parts[0].text;
-    const cleanedWords = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+    console.log('[DEBUG: AI_FULL_RESPONSE]', JSON.stringify(result));
 
+    if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
+      const reason = result.promptFeedback?.blockReason || 'UNKNOWN_REASON';
+      throw new Error(`AI Response Malformed or Blocked. Reason: ${reason}`);
+    }
+
+    const rawText = result.candidates[0].content.parts[0].text;
+    console.log('[DEBUG: AI_RAW_TEXT]', rawText);
+
+    let cleanedWords: string[] = [];
+    try {
+      // Strip markdown code blocks if present
+      const sanitizedText = rawText.replace(/```json|```/g, '').trim();
+      cleanedWords = JSON.parse(sanitizedText);
+    } catch (parseErr) {
+      console.error('[STAGE: PARSING] JSON Parse failed. Raw Text was:', rawText);
+      throw new Error(`AI returned invalid JSON: ${parseErr.message}`);
+    }
+    
     console.log(`[STAGE: PARSING] Received ${cleanedWords.length} words.`);
 
     // 5. Saving (Only after successful AI response)
