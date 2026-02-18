@@ -6,12 +6,17 @@ const AI_TIMEOUT = 300000; // 5 Minutes for High Thinking
 const COOLDOWN_DURATION = 10 * 60 * 1000;
 
 async function runRefinery() {
-  console.log('--- REFINERY WORKER START ---');
+  const WORKER_ID = Deno.env.get('WORKER_ID') || '1';
+  console.log(`--- REFINERY WORKER ${WORKER_ID} START ---`);
   
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
+
+  // Loop to process 5 batches per worker run to maximize runtime
+  for (let batchLoop = 0; batchLoop < 5; batchLoop++) {
+    console.log(`[LOOP ${batchLoop + 1}/5] Processing next available batch...`);
 
   try {
     // 1. Progress Tracking
@@ -25,7 +30,7 @@ async function runRefinery() {
       .single();
 
     if (!progress) {
-      console.log('[STAGE: INITIALIZATION] Checking for next file...');
+      console.log('[STAGE: INITIALIZATION] No active file. Determining next file...');
       const { data: lastTask } = await supabase
         .from('refinery_progress')
         .select('file_path')
@@ -40,7 +45,7 @@ async function runRefinery() {
       }
 
       if (nextFileNumber > MAX_FILES) {
-        console.log('All files processed.');
+        console.log('All files finished. Worker exiting.');
         return;
       }
 
@@ -55,7 +60,18 @@ async function runRefinery() {
       progress = newProgress;
     }
 
-    console.log(`[STAGE: BOOKMARK] File: ${progress.file_path} | Offset: ${progress.last_offset}`);
+    // ATOMIC CLAIM: Increment offset immediately to "reserve" this batch for this worker
+    const { data: claim, error: claimErr } = await supabase.rpc('increment_refinery_offset', { 
+      row_id: progress.id, 
+      amount: BATCH_SIZE 
+    });
+
+    if (claimErr || !claim?.[0]) throw new Error(`Claim failed: ${claimErr?.message}`);
+    
+    const currentBatchOffset = claim[0].old_offset;
+    const currentFilePath = claim[0].target_file;
+
+    console.log(`[STAGE: CLAIMED] Worker ${WORKER_ID} reserved ${currentFilePath} at offset ${currentBatchOffset}`);
 
     // 2. Resource Management
     const { data: keyRecord, error: keyError } = await supabase
@@ -72,17 +88,17 @@ async function runRefinery() {
     const cleanKey = keyRecord.api_key.trim();
 
     // 3. Gathering Material
-    const { data: fileData, error: fileError } = await supabase.storage.from('Chunks').download(progress.file_path);
+    const { data: fileData, error: fileError } = await supabase.storage.from('Chunks').download(currentFilePath);
     if (fileError) throw fileError;
 
     const text = await fileData.text();
     const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-    const batch = lines.slice(progress.last_offset, progress.last_offset + BATCH_SIZE);
+    const batch = lines.slice(currentBatchOffset, currentBatchOffset + BATCH_SIZE);
 
     if (batch.length === 0) {
-      console.log('File complete.');
+      console.log(`[STAGE: FINISHED] File ${currentFilePath} is empty at this offset. Marking as finished.`);
       await supabase.from('refinery_progress').update({ is_finished: true }).eq('id', progress.id);
-      return;
+      continue; // Move to next iteration or next file
     }
 
     // 4. AI Logic with Retry Wrapper
@@ -203,23 +219,23 @@ async function runRefinery() {
 
     if (!responseObj) throw new Error('AI processing failed after retries.');
 
-    // 5. Save & State Update
-    console.log(`[STAGE: SAVE] Archiving ${responseObj.data.length} words...`);
+    // 5. Save
+    console.log(`[STAGE: SAVE] Archiving ${responseObj.data.length} words for offset ${currentBatchOffset}...`);
     const { error: saveErr } = await supabase.from('processed_words').upsert({
-      source_file: progress.file_path,
-      batch_index: progress.last_offset,
+      source_file: currentFilePath,
+      batch_index: currentBatchOffset,
       words: responseObj.data,
       summary: responseObj.summary
     }, { onConflict: 'source_file,batch_index' });
 
     if (saveErr) throw saveErr;
 
-    await Promise.all([
-      supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id),
-      supabase.from('refinery_progress').update({ last_offset: progress.last_offset + BATCH_SIZE }).eq('id', progress.id)
-    ]);
+    await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
+    
+    console.log(`[SUCCESS] Batch at ${currentBatchOffset} completed.`);
+  }
 
-    console.log('--- SUCCESS ---');
+  console.log('--- WORKER CYCLE COMPLETE ---');
 
   } catch (err) {
     console.error('--- CRITICAL FAILURE ---');
