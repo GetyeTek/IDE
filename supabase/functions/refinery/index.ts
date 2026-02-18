@@ -107,7 +107,7 @@ serve(async (req) => {
     - If you must explain your work, use plain text only. 
     - Do NOT use curly braces {} anywhere except in the final JSON structure.
 
-    YOUR MISSION: Process messy OCR input through these 6 STRICT SCHOLARLY PROTOCOLS and return a structured dataset.`
+    YOUR MISSION: Process messy OCR input through these 6 STRICT SCHOLARLY PROTOCOLS and return a structured dataset.
 
     1. PROTOCOL: THE SPLITTER (De-cluttering)
        - ANALYZE every string for merged words. Identify impossible morphological transitions (e.g., a word-ending suffix followed immediately by a word-starting prefix).
