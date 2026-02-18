@@ -233,15 +233,12 @@ async function runRefinery() {
     await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
     
     console.log(`[SUCCESS] Batch at ${currentBatchOffset} completed.`);
+    } catch (err) {
+      console.error(`[BATCH ERROR] ${err.message}`);
+      if (err.message.includes('No available Gemini keys')) break;
+    }
   }
-
   console.log('--- WORKER CYCLE COMPLETE ---');
-
-  } catch (err) {
-    console.error('--- CRITICAL FAILURE ---');
-    console.error(err.message);
-    Deno.exit(1);
-  }
 }
 
 runRefinery();
