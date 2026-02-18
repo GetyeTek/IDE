@@ -138,17 +138,20 @@ serve(async (req) => {
          * Highlight any "Scholarly Guesses" where OCR was ambiguous but you reconstructed based on context.
 
     OUTPUT FORMAT (STRICT JSON ONLY):
-    Return a single JSON Object. NO Markdown blocks, NO preamble, NO conversational text outside the JSON structure:
+    Return a single JSON Object. NO Markdown blocks, NO preamble. 
+    CRITICAL: The "summary" field MUST come AFTER the "data" array.
+    
+    FORMAT STRUCTURE:
     {
-      "summary": "The Executive Summary of linguistic decisions...",
       "data": [
         {
-          "word": "[Cleaned Original Word]",
-          "root": "[Linguistic Root/Citation Form]",
-          "synonyms": ["Nuanced Synonym 1", "Nuanced Synonym 2", ...],
-          "importance": [1-10 Scale: 1=Archaic, 10=Daily Core]
+          "word": "[Cleaned Word]",
+          "root": "[Citation Form/መነሻ ቃል]",
+          "synonyms": ["Synonym 1", "Synonym 2"],
+          "importance": 1-10
         }
-      ]
+      ],
+      "summary": "Reflective executive summary of decisions made above..."
     }
     `;
 
@@ -211,24 +214,24 @@ serve(async (req) => {
 
     let responseObj: { summary: string, data: any[] };
     try {
-      // Find all potential JSON blocks
-      const blocks = rawText.match(/\{[\s\S]*?\}/g);
+      // Step 1: Find all JSON blocks in the text
+      const allBlocks = rawText.match(/\{[\s\S]*?\}/g);
       
-      if (!blocks) {
-        throw new Error('No JSON structures found in AI response.');
+      if (!allBlocks || allBlocks.length === 0) {
+        throw new Error('No JSON structure found in AI output.');
       }
 
-      // Identify the correct block (must contain 'summary' and 'data')
-      const validBlock = blocks.reverse().find(b => b.includes('"summary"') && b.includes('"data"'));
+      // Step 2: Pick the VERY LAST block (usually the final intended output)
+      const lastBlock = allBlocks[allBlocks.length - 1];
 
-      if (!validBlock) {
-        throw new Error('No valid refinery data structure found in AI response.');
-      }
-
-      // Sanitize: Remove control characters (except space/newlines) that break JSON.parse
-      const sanitizedJson = validBlock.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+      // Step 3: Sanitize control characters that break JSON parsing (OCR common issue)
+      const sanitizedJson = lastBlock.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
       
       responseObj = JSON.parse(sanitizedJson);
+
+      if (!responseObj.data || !Array.isArray(responseObj.data)) {
+        throw new Error('Extracted JSON is missing the "data" array.');
+      }
       
       if (!responseObj.data || !Array.isArray(responseObj.data)) {
         throw new Error('Missing "data" array in AI response');
