@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 30;
 const MAX_FILES = 26;
 const AI_TIMEOUT = 150000;
 const COOLDOWN_DURATION = 10 * 60 * 1000;
@@ -100,44 +100,42 @@ serve(async (req) => {
     const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
     const prompt = `
-    ROLE: You are the "Amharic Refinery," an elite linguistic engine specialized in Ethiopic script restoration.
+    ROLE: You are the "Amharic Lexicographer," an elite linguistic engine specialized in Ethiopic script restoration and enrichment.
     INPUT BATCH: ${JSON.stringify(batch)}
 
-    Your Goal: Produce a pristine list of Amharic words by processing the input through these 5 STRICT PROTOCOLS:
+    Your Goal: Transform the raw input into a Structured Lexical Dataset using these STRICT PROTOCOLS:
 
-    1. PROTOCOL: THE SPLITTER (Crucial)
-       - DETECT strings that are actually multiple words smashed together by OCR.
-       - LOGIC: Identify impossible morphological transitions (e.g., a word-ending suffix followed immediately by a word-starting prefix).
-       - ACTION: Split them into separate strings.
-       - EXAMPLE: "ጨምሯልለሶስተኛ" ➔ MUST BE SPLIT into "ጨምሯል", "ለሶስተኛ".
-       - EXAMPLE: "እናሰላም" ➔ "እና", "ሰላም".
+    1. PROTOCOL: CLEANING & SPLITTING
+       - SPLIT merged words (e.g., "ጨምሯልለሶስተኛ" -> "ጨምሯል", "ለሶስተኛ").
+       - REMOVE gibberish/noise (e.g., "Page12", "----", "ድድድድ").
+       - FIX OCR errors (visual confusions like 'ሀ' vs 'ሃ').
 
-    2. PROTOCOL: THE PURIFIER (Filter)
-       - DETECT non-Amharic noise.
-       - ACTION: DELETE any string that matches these criteria:
-         * Contains ONLY Latin characters (A-Z) or numbers.
-         * Is less than 2 characters long (UNLESS it is a valid preposition like "ስለ" or "ወደ").
-         * Consists only of punctuation (e.g., "::", "!!").
-       - EXAMPLE: "Page12", "----", "Abc" ➔ DELETE.
+    2. PROTOCOL: ENRICHMENT (The Core Task)
+       - For every valid word found, analyze it deeply:
+         * ROOT: Extract the linguistic root (Lexeme).
+         * SYNONYMS (English): Provide a comprehensive list of English meanings. If the match is high, list many nuances.
+         * IMPORTANCE: Score from 1 (Archaic/Rare) to 10 (Daily/Core Vocabulary).
 
-    3. PROTOCOL: THE JUDGE (Nonsense Removal)
-       - DETECT gibberish that resembles Amharic but has no meaning (random character sequences).
-       - ACTION: If a word cannot be corrected to a valid dictionary word or name, DELETE IT.
-       - EXAMPLE: "asdf", "ድድድድድ" (repetition), "ቅቅቅ" ➔ DELETE.
-
-    4. PROTOCOL: THE CORRECTOR (Repair)
-       - DETECT visual OCR artifacts.
-       - ACTION: Fix characters that look similar but are wrong (e.g., confusing 'ሀ' for 'ሃ' or 'ለ' for 'ሉ' based on context).
-       - ACTION: Strip attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
-
-    5. PROTOCOL: THE PRESERVER (Integrity)
-       - IF a word is already valid Amharic, DO NOT CHANGE IT.
-       - DO NOT stem words (keep "የሚመጡት" as "የሚመጡት", do not reduce to "መጣ").
+    3. PROTOCOL: BATCH SUMMARY
+       - Write a detailed "Executive Summary" of your job on this batch.
+       - Explicitly mention: Which words were split? Which were deleted? Any ambiguous words you had to guess? Any difficult morphology?
 
     OUTPUT FORMAT:
-    - Respond with a SINGLE, FLAT JSON ARRAY of strings.
-    - NO Markdown code blocks (no \`\`\`json).
-    - NO commentary.
+    Respond with a single JSON Object in this EXACT structure:
+    {
+      "summary": "Detailed notes on decisions made...",
+      "data": [
+        {
+          "word": "የሚመጡት",
+          "root": "መጣ",
+          "synonyms": ["those who come", "comers", "approaching ones"],
+          "importance": 9
+        },
+        ...
+      ]
+    }
+    
+    NO Markdown code blocks. Just the raw JSON object.
     `;
 
     const aiResponse = await fetch(
@@ -149,8 +147,8 @@ serve(async (req) => {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             responseMimeType: 'application/json',
-            temperature: 0.1,
-            thinkingConfig: { includeThoughts: false, thinkingLevel: 'MINIMAL' }
+            temperature: 0.2,
+            thinkingConfig: { includeThoughts: true, thinkingLevel: 'HIGH' }
           },
           safetySettings: [
             { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -179,35 +177,44 @@ serve(async (req) => {
       throw new Error(`AI Blocked the response. Reason: ${blockReason}. Check Safety Settings.`);
     }
 
-    // Fragment Stitching: Join all text parts in case the AI splits the response
+    // Fragment Stitching
     const rawText = candidate.content.parts
       .map((part: any) => part.text)
       .filter(Boolean)
       .join('')
       .trim();
 
-    console.log('[DEBUG: AI_STITCHED_TEXT]', rawText);
+    console.log('[DEBUG: AI_STITCHED_TEXT_PREVIEW]', rawText.substring(0, 200) + '...');
 
-    let cleanedWords: string[] = [];
+    let responseObj: { summary: string, data: any[] };
     try {
-      // Strip markdown code blocks if present
       const sanitizedText = rawText.replace(/```json|```/g, '').trim();
-      cleanedWords = JSON.parse(sanitizedText);
+      responseObj = JSON.parse(sanitizedText);
+      
+      if (!responseObj.data || !Array.isArray(responseObj.data)) {
+        throw new Error('Missing "data" array in AI response');
+      }
     } catch (parseErr) {
       console.error('[STAGE: PARSING] JSON Parse failed. Raw Text was:', rawText);
       throw new Error(`AI returned invalid JSON: ${parseErr.message}`);
     }
+
+    const cleanedWords = responseObj.data;
+    const summary = responseObj.summary || 'No summary provided';
+
+    console.log(`[STAGE: PARSING] Processed ${cleanedWords.length} words.`);
+    console.log(`[STAGE: AI_SUMMARY] ${summary}`);
     
     console.log(`[STAGE: PARSING] Received ${cleanedWords.length} words.`);
 
-    // 5. Saving (Batch Mode: JSONB)
-    console.log(`[STAGE: DATABASE_SAVE] Archiving batch of ${cleanedWords.length} words (Index: ${progress.last_offset})...`);
-    
-    // We store the entire array in one row. 'word' column is now null.
+    // 5. Saving (Rich Batch Mode)
+    console.log(`[STAGE: DATABASE_SAVE] Archiving enriched batch (Size: ${cleanedWords.length}, Index: ${progress.last_offset})...`);
+
     const { error: saveError } = await supabase.from('processed_words').insert({
       source_file: progress.file_path,
       batch_index: progress.last_offset,
-      words: cleanedWords // Storing as JSONB array
+      words: cleanedWords, // Stores the array of objects {word, root, synonyms, importance}
+      summary: summary     // Stores the AI's executive summary
     });
 
     if (saveError) throw saveError;
