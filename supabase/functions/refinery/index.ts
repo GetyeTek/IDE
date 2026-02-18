@@ -100,42 +100,52 @@ serve(async (req) => {
     const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
     const prompt = `
-    ROLE: You are the "Amharic Lexicographer," an elite linguistic engine specialized in Ethiopic script restoration and enrichment.
+    ROLE: You are the "Amharic Refinery Master," an elite linguistic engine specialized in Ethiopic script restoration, morphological analysis, and lexicographical enrichment.
     INPUT BATCH: ${JSON.stringify(batch)}
 
-    Your Goal: Transform the raw input into a Structured Lexical Dataset using these STRICT PROTOCOLS:
+    YOUR MISSION: Process the messy OCR input through these 6 STRICT SCHOLARLY PROTOCOLS and return a structured dataset.
 
-    1. PROTOCOL: CLEANING & SPLITTING
-       - SPLIT merged words (e.g., "ጨምሯልለሶስተኛ" -> "ጨምሯል", "ለሶስተኛ").
-       - REMOVE gibberish/noise (e.g., "Page12", "----", "ድድድድ").
-       - FIX OCR errors (visual confusions like 'ሀ' vs 'ሃ').
+    1. PROTOCOL: THE SPLITTER (De-cluttering)
+       - ANALYZE every string for merged words. Identify impossible morphological transitions (e.g., a word-ending suffix followed immediately by a word-starting prefix).
+       - ACTION: Split them into separate valid words.
+       - EXAMPLE: "ጨምሯልለሶስተኛ" ➔ "ጨምሯል", "ለሶስተኛ".
 
-    2. PROTOCOL: ENRICHMENT (The Core Task)
-       - For every valid word found, analyze it deeply:
-         * ROOT: Extract the linguistic root (Lexeme).
-         * SYNONYMS (English): Provide a comprehensive list of English meanings. If the match is high, list many nuances.
-         * IMPORTANCE: Score from 1 (Archaic/Rare) to 10 (Daily/Core Vocabulary).
+    2. PROTOCOL: THE JUDGE (Nonsense Removal)
+       - DETECT gibberish, non-Amharic noise, and unfixable OCR errors.
+       - CRITERIA: DELETE strings that are pure Latin characters, pure numbers, or random Ethiopic characters with no semantic meaning (e.g., "ድድድድ", "ቅቅቅ").
+       - DECISION: If a word cannot be corrected to a valid dictionary entry, DISCARD it.
 
-    3. PROTOCOL: BATCH SUMMARY
-       - Write a detailed "Executive Summary" of your job on this batch.
-       - Explicitly mention: Which words were split? Which were deleted? Any ambiguous words you had to guess? Any difficult morphology?
+    3. PROTOCOL: THE CORRECTOR (Visual Repair)
+       - FIX visual OCR confusions based on linguistic context (e.g., confusing 'ሀ' for 'ሃ' or 'ለ' for 'ሉ'). 
+       - STRIP attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
 
-    OUTPUT FORMAT:
-    Respond with a single JSON Object in this EXACT structure:
+    4. PROTOCOL: THE ROOT ANALYST (Morphology)
+       - For every valid word, identify its base Lexeme/Root.
+       - Logic: Strip conjugations and declensions to find the core root (e.g., "የሚመጡት" ➔ Root: "መጣ").
+
+    5. PROTOCOL: THE TRANSLATOR (Nuance Expansion)
+       - Provide comprehensive English synonyms. 
+       - RULE: If a word has a high semantic match or multiple nuances, list them all to capture the full breadth of the Amharic word.
+
+    6. PROTOCOL: EXECUTIVE SUMMARY
+       - Reflect on your decisions. Write a summary explaining:
+         * Which words were identified as merged and split?
+         * Which strings were discarded as nonsense?
+         * Highlight any "Scholarly Guesses" where OCR was ambiguous but you reconstructed based on context.
+
+    OUTPUT FORMAT (STRICT JSON ONLY):
+    Return a single JSON Object (NO Markdown blocks, NO preamble):
     {
-      "summary": "Detailed notes on decisions made...",
+      "summary": "The Executive Summary of linguistic decisions...",
       "data": [
         {
-          "word": "የሚመጡት",
-          "root": "መጣ",
-          "synonyms": ["those who come", "comers", "approaching ones"],
-          "importance": 9
-        },
-        ...
+          "word": "[Cleaned Original Word]",
+          "root": "[Linguistic Root]",
+          "synonyms": ["Nuanced Synonym 1", "Nuanced Synonym 2", ...],
+          "importance": [1-10 Scale: 1=Archaic, 10=Daily Core]
+        }
       ]
     }
-    
-    NO Markdown code blocks. Just the raw JSON object.
     `;
 
     const aiResponse = await fetch(
