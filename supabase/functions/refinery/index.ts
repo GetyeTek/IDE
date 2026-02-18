@@ -5,13 +5,12 @@ const BATCH_SIZE = 50;
 const BUCKET_NAME = 'Chunks';
 const TOTAL_FILES = 26;
 
+const SB_URL = Deno.env.get('SUPABASE_URL')!;
+const SB_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(SB_URL, SB_SERVICE_ROLE);
+
 serve(async (req) => {
   console.log("--- REFINERY PINGED ---");
-  
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
 
   try {
     // 1. Fetch Progress
@@ -28,21 +27,19 @@ serve(async (req) => {
       return new Response(JSON.stringify({ message: "Finished" }), { status: 200 });
     }
 
-    // 2. Select API Key (Load Balanced)
+    // 2. SMART KEY ROTATION (Synced with Gospel logic)
     const { data: apiKeyData, error: keyErr } = await supabase
       .from('api_keys')
       .select('id, api_key')
       .eq('service', 'gemini')
       .eq('is_active', true)
+      .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
       .order('last_used_at', { ascending: true, nullsFirst: true })
       .limit(1)
       .single();
 
-    if (keyErr || !apiKeyData) throw new Error("No active Gemini API keys available.");
+    if (keyErr || !apiKeyData) throw new Error("No available Gemini API keys found or all on cooldown.");
     console.log(`[AUTH] Using API Key ID: ${apiKeyData.id}`);
-
-    // Update key usage timestamp
-    await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', apiKeyData.id);
 
     // 3. Fetch Source File
     const fileName = `rare_words_${progress.current_file_index}.txt`;
@@ -91,14 +88,14 @@ ${batch.join(', ')}`;
     // Endpoint preserved as per instructions
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKeyData.api_key}`;
     
-    // Extended Timeout to allow for heavy processing
+    // Extended Timeout (150s)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 150000); // 150s timeout (2.5m)
+    const timeoutId = setTimeout(() => controller.abort(), 150000);
 
     let aiResponse;
     try {
       aiResponse = await fetch(geminiUrl, {
-        method: 'POST',
+        method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
@@ -116,22 +113,32 @@ ${batch.join(', ')}`;
       clearTimeout(timeoutId);
     }
 
-    // Read raw text first to ensure we log whatever the AI sends
-    const rawBody = await aiResponse.text();
-    console.log(`[AI] STATUS CODE: ${aiResponse.status}`);
-    console.log(`[AI] RAW RESPONSE: ${rawBody}`);
-
-    if (!aiResponse.ok) {
-      throw new Error(`Gemini API Error: ${aiResponse.status} - ${rawBody}`);
+    if (aiResponse.status === 429) {
+      const cooldown = new Date(Date.now() + 10 * 60000).toISOString();
+      await supabase.from('api_keys').update({ cooldown_until: cooldown }).eq('id', apiKeyData.id);
+      throw new Error("Rate limit hit. Key put on 10m cooldown.");
     }
 
-    const aiData = JSON.parse(rawBody);
-    const rawJson = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    console.log(`[AI] JSON Content Extracted.`);
+    const rawBody = await aiResponse.text();
+    if (!aiResponse.ok) throw new Error(`Gemini API Error: ${aiResponse.status} - ${rawBody}`);
 
-    const parsed = JSON.parse(rawJson);
+    const aiData = JSON.parse(rawBody);
+    
+    // CRITICAL: Join all parts to handle response fragmentation
+    const fullAiText = aiData.candidates?.[0]?.content?.parts
+      ?.map((p: any) => p.text)
+      .join("")
+      .trim() || "{}";
+    
+    console.log(`[AI] FULL JOINED TEXT: ${fullAiText}`);
+
+    const parsed = JSON.parse(fullAiText);
     const cleanedWords = parsed.cleaned_words || [];
+
     console.log(`[AI] Successfully parsed ${cleanedWords.length} words.`);
+
+    // Update the key usage timestamp AFTER success
+    await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', apiKeyData.id);
 
     // 5. Store Results
     if (cleanedWords.length > 0) {
