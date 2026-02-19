@@ -49,11 +49,6 @@ const ExamPavilion = ({ university, onClose }) => {
             console.groupEnd();
         })
         .catch(err => {
-            console.error("NETWORK/SERVER FAILURE:", err);
-            setLoading(false);
-            console.groupEnd();
-        })
-        .catch(err => {
             if (err.name === 'AbortError') return;
             console.error("NETWORK/SERVER FAILURE:", err);
             setLoading(false);
@@ -73,12 +68,6 @@ const ExamPavilion = ({ university, onClose }) => {
         }
         return false;
     });
-
-    const getTabTranslate = () => {
-        if (activeTab === 'Midterm') return '0%';
-        if (activeTab === 'Final') return '100%';
-        return '200%';
-    };
 
     return (
         <div className="pavilion-overlay">
