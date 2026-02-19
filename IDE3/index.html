@@ -629,6 +629,10 @@
                     <input type="text" id="setting-func-url" class="input-field" placeholder="https://...supabase.co/functions/v1/ide-brain">
                 </div>
                 <div class="input-group">
+                    <label class="input-label">Supabase Personal Access Token (PAT)</label>
+                    <input type="password" id="setting-supabase-pat" class="input-field" placeholder="sbp_...">
+                </div>
+                <div class="input-group">
                     <label class="input-label">GitHub Repo Name</label>
                     <div style="position: relative; display: flex; align-items: center;">
                         <input type="text" id="setting-repo-name" class="input-field" placeholder="IDE" style="padding-right: 40px;">
@@ -921,6 +925,7 @@
                     <div class="flex-between" style="margin-bottom: 6px;">
                         <label class="input-label" style="margin-bottom:0;">index.ts</label>
                         <div class="flex-gap">
+                            <button class="icon-btn" style="padding: 3px 10px; font-size: 10px; color:var(--ai-accent);" onclick="openEFLogs()" title="View Live Logs">👁 Logs</button>
                             <button class="icon-btn" style="padding: 3px 10px; font-size: 10px;" onclick="copyEFCode()">Copy</button>
                             <button class="icon-btn" style="padding: 3px 10px; font-size: 10px;" onclick="pasteEFCode()">Paste</button>
                             <button class="icon-btn" style="padding: 3px 10px; font-size: 10px; color:var(--danger);" onclick="clearEFCode()">Clear</button>
@@ -1012,6 +1017,24 @@
             <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeModelSelector()">Close</button>
         </div>
         <div id="model-selector-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
+    </div>
+
+    <!-- EDGE FUNCTION LOGS OVERLAY -->
+    <div id="ef-logs-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span id="ef-logs-title" class="viewer-title">Function Logs</span>
+            <div class="flex-gap">
+                <button class="icon-btn" onclick="copyAllEFLogs()">📋 Copy All</button>
+                <button class="icon-btn" onclick="fetchEFLogs(false)">↻ Refresh</button>
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="document.getElementById('ef-logs-overlay').classList.remove('active')">Close</button>
+            </div>
+        </div>
+        <div id="ef-logs-container" style="flex:1; overflow-y:auto; background:#050505; padding:12px; font-family:'JetBrains Mono', monospace; font-size:11px;">
+            <div style="text-align:center; padding:40px; color:#444;">Select a function to see logs.</div>
+        </div>
+        <div id="ef-logs-footer" style="padding:10px; border-top:1px solid var(--border); display:none;">
+            <button class="btn btn-outline" style="padding:8px; font-size:11px;" onclick="fetchEFLogs(true)">Load Older Logs</button>
+        </div>
     </div>
 
     <!-- REPO SELECTOR OVERLAY -->
@@ -1424,6 +1447,7 @@
 
         // Load Settings into UI
         document.getElementById('setting-func-url').value = CONFIG.funcUrl;
+        document.getElementById('setting-supabase-pat').value = localStorage.getItem('conduit_supabase_pat') || '';
         document.getElementById('setting-repo-name').value = CONFIG.repoName;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
         document.getElementById('setting-auto-fix').checked = CONFIG.autoFix;
@@ -2075,6 +2099,7 @@
         
         const autoFix = document.getElementById('setting-auto-fix').checked;
         const autoSanity = document.getElementById('setting-auto-sanity').checked;
+        const supabasePat = document.getElementById('setting-supabase-pat').value.trim();
         const showPreview = document.getElementById('setting-show-preview').checked;
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
@@ -2092,6 +2117,7 @@
         sessionStorage.setItem('conduit_projectPath', projectPath);
         sessionStorage.setItem('conduit_auto_fix', autoFix);
         sessionStorage.setItem('conduit_auto_sanity', autoSanity);
+        localStorage.setItem('conduit_supabase_pat', supabasePat);
 
         // Also update localStorage as a fallback for new tabs
         localStorage.setItem('conduit_repoName', repoName);
@@ -3391,10 +3417,7 @@ function addTerminalCard(data, options = {}) {
         } catch(e) { showGlobalToast("Paste failed: Check permissions", true); }
     }
     function clearEFCode() {
-        const area = document.getElementById('ef-code');
-        if(area.value && confirm("Clear function editor?")) {
-            area.value = '';
-        }
+        document.getElementById('ef-code').value = '';
     }
 
     // --- WORKFLOWS & CI/CD ---
@@ -6040,6 +6063,89 @@ async function downloadArtifact(runId) {
     }
 
     function clearSqlEditor() { document.getElementById('sqlEditor').value = ''; }
+
+    // --- EF LOGS LOGIC ---
+    let efLogNextTimestamp = null;
+
+    function openEFLogs() {
+        const name = document.getElementById('ef-name').value.trim();
+        if (!name) return alert("Select or name a function first.");
+        
+        const pat = localStorage.getItem('conduit_supabase_pat');
+        if (!pat) return alert("Add your Supabase PAT in Settings first.");
+
+        document.getElementById('ef-logs-overlay').classList.add('active');
+        document.getElementById('ef-logs-title').innerText = 'Logs: ' + name;
+        fetchEFLogs(false);
+    }
+
+    async function fetchEFLogs(isAppend) {
+        const name = document.getElementById('ef-name').value.trim();
+        const container = document.getElementById('ef-logs-container');
+        const footer = document.getElementById('ef-logs-footer');
+        const pat = localStorage.getItem('conduit_supabase_pat');
+
+        if (!isAppend) {
+            container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--ai-accent); animation:pulse 1s infinite;">Fetching Live Cloud Logs...</div>';
+            efLogNextTimestamp = null;
+        }
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'fetch_ef_logs', 
+                    function_slug: name, 
+                    supabase_pat: pat, 
+                    before: efLogNextTimestamp 
+                })
+            });
+            const data = await res.json();
+            
+            if (data.error) throw new Error(data.error);
+
+            if (!isAppend) container.innerHTML = '';
+            
+            if (!data.logs || data.logs.length === 0) {
+                if (!isAppend) container.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">No logs found for this function.</div>';
+                footer.style.display = 'none';
+                return;
+            }
+
+            data.logs.forEach(log => {
+                const row = document.createElement('div');
+                const isError = log.level === 'error' || log.status >= 400;
+                row.className = 'ins-row';
+                row.style.borderLeft = '3px solid ' + (isError ? 'var(--danger)' : 'var(--prod)');
+                row.innerHTML = `
+                    <div class="flex-between">
+                        <span style="color:#555">${new Date(log.timestamp).toLocaleString()}</span>
+                        <button class="action-mini-btn" onclick="copyText('${log.event_message.replace(/'/g, "\\'")}')">Copy</button>
+                    </div>
+                    <div style="margin-top:4px; white-space:pre-wrap; word-break:break-all; color:${isError ? '#ffcdcd' : '#eee'}">${log.event_message}</div>
+                `;
+                container.appendChild(row);
+                efLogNextTimestamp = log.timestamp; // Track for next fetch
+            });
+
+            footer.style.display = data.logs.length >= 20 ? 'block' : 'none';
+
+        } catch(e) {
+            container.innerHTML = '<div style="padding:20px; color:var(--danger);">Failed to fetch logs: ' + e.message + '</div>';
+        }
+    }
+
+    function copyAllEFLogs() {
+        const container = document.getElementById('ef-logs-container');
+        const text = Array.from(container.querySelectorAll('.ins-row')).map(row => row.innerText.replace('Copy', '').trim()).join('\n---\n');
+        if (text) {
+            navigator.clipboard.writeText(text).then(() => showGlobalToast("All logs copied"));
+        }
+    }
+
+    function copyText(txt) {
+        navigator.clipboard.writeText(txt).then(() => showGlobalToast("Copied to clipboard"));
+    }
 
     function convertToCSV(data) {
         if (!data || !data.length) return '';
