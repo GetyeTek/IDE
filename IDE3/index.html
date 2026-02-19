@@ -135,6 +135,24 @@
         }
         .v-note.has-content { display: block; }
 
+        /* INSPECTOR STYLES */
+        .ins-row { padding: 8px 12px; border-bottom: 1px solid #1a1a1c; font-family: 'JetBrains Mono'; font-size: 11px; position: relative; animation: fadeUp 0.1s; }
+        .ins-row:hover .ins-copy-btn { opacity: 1; }
+        .ins-copy-btn { position: absolute; right: 8px; top: 8px; opacity: 0; background: #222; border: 1px solid #444; color: #888; padding: 2px 6px; border-radius: 4px; cursor: pointer; z-index: 10; }
+        .ins-copy-btn:hover { color: white; border-color: var(--primary); }
+        
+        .ins-log-info { border-left: 3px solid var(--primary); }
+        .ins-log-warn { border-left: 3px solid var(--dev); background: rgba(234, 179, 8, 0.05); }
+        .ins-log-error { border-left: 3px solid var(--danger); background: rgba(239, 68, 68, 0.05); }
+        
+        .ins-net-grid { display: grid; grid-template-columns: 50px 45px 1fr 60px; gap: 8px; cursor: pointer; align-items: center; }
+        .ins-net-details { background: #050505; margin: 8px -12px -8px -12px; padding: 12px; border-top: 1px solid #222; display: none; }
+        .ins-net-details.open { display: block; }
+        
+        .json-key { color: var(--ai-accent); }
+        .json-string { color: var(--prod); }
+        .json-number { color: #60a5fa; }
+
         /* NEW UI COMPONENTS */
         .stage-item { background: #1a1a1c; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
         .stage-header { padding: 10px; display: flex; align-items: center; gap: 10px; font-size: 12px; cursor: pointer; overflow: hidden; }
@@ -562,6 +580,7 @@
                 Preview
                 <div class="flex-gap">
                     <button class="icon-btn" onclick="bundleAndPreview(null)">Refresh</button>
+                    <button class="icon-btn" onclick="openInspector()" style="color:var(--ai-accent); border-color:var(--ai-accent);">📟 Logs</button>
                     <button class="icon-btn" onclick="openPopOut()">↗ Pop-out</button>
                     <button class="icon-btn" onclick="toggleFullscreen(true)">Expand</button>
                 </div>
@@ -987,6 +1006,28 @@
         <div id="repo-selector-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
     </div>
 
+    <!-- CONDUIT INSPECTOR OVERLAY -->
+    <div id="inspector-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <div class="ins-tabs" style="display:flex; gap:10px;">
+                <button class="ins-tab active btn-outline" onclick="switchInsTab('console', this)" style="width:auto; padding:6px 15px;">Console</button>
+                <button class="ins-tab btn-outline" onclick="switchInsTab('network', this)" style="width:auto; padding:6px 15px;">Network</button>
+            </div>
+            <div class="flex-gap">
+                <button class="icon-btn" onclick="copyActiveInspectorData()">Copy All</button>
+                <button class="icon-btn" style="color:var(--danger)" onclick="clearInspector()">Clear</button>
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeInspector()">Close</button>
+            </div>
+        </div>
+        <div id="ins-view-console" class="ins-content active" style="flex:1; overflow-y:auto; background:#0a0a0c;"></div>
+        <div id="ins-view-network" class="ins-content" style="flex:1; overflow-y:auto; background:#0a0a0c; display:none;">
+            <div style="padding:10px 12px; font-size:10px; color:#444; border-bottom:1px solid #222; display:grid; grid-template-columns:50px 45px 1fr 60px; gap:8px;">
+                <span>METHOD</span><span>STATUS</span><span>URL</span><span style="text-align:right">TIME</span>
+            </div>
+            <div id="ins-net-list"></div>
+        </div>
+    </div>
+
     <!-- FUNCTION DISCOVERY OVERLAY -->
     <div id="discovery-overlay" class="viewer-overlay">
         <div class="viewer-header">
@@ -1177,45 +1218,49 @@
 
         if(typeof acorn === 'undefined') console.warn("Acorn missing. Syntax checking disabled.");
 
-        // Listen for console sync from preview iframe
+        // --- CONDUIT INSPECTOR BUS ---
+        let inspectorLogData = [];
+        let inspectorNetData = [];
+
         window.addEventListener('message', (e) => {
-            if (e.data && e.data.type === 'CONDUIT_CONSOLE') {
-                // Avoid spam: check if last log was the same
-                const lastLog = document.querySelector('.runtime-log');
-                if (lastLog && lastLog.dataset.msg === e.data.msg) {
-                    const countBadge = lastLog.querySelector('.log-count') || document.createElement('span');
-                    if (!lastLog.querySelector('.log-count')) {
-                        countBadge.className = 'log-count';
-                        countBadge.style.cssText = 'background:#444; color:#fff; padding:2px 6px; border-radius:10px; font-size:9px; margin-left:8px;';
-                        lastLog.querySelector('.log-meta').appendChild(countBadge);
-                    }
-                    lastLog.dataset.count = parseInt(lastLog.dataset.count || 1) + 1;
-                    countBadge.innerText = `x${lastLog.dataset.count}`;
-                    return;
-                }
-
-                const logId = addTerminalCard(null, {});
-                const color = e.data.method === 'error' ? 'var(--danger)' : (e.data.method === 'warn' ? 'var(--dev)' : 'var(--primary)');
-                const el = document.getElementById(logId);
-                if (!el) return;
+            if (!e.data || !e.data.type) return;
+            
+            if (e.data.type === 'CONDUIT_LOG') {
+                const { method, args, time } = e.data;
+                const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
+                inspectorLogData.push({ method, msg, time });
                 
-                el.classList.add('runtime-log');
-                el.dataset.msg = e.data.msg;
-                const isError = e.data.method === 'error';
-                const actionBtn = isError 
-                    ? `<button class="btn-dev" style="width:auto; padding:4px 8px; font-size:10px; color:black;" onclick="fixPreviewError('${escapeHtml(e.data.msg).replace(/'/g, "\\'")}')">✨ Fix</button>`
-                    : `<button class="btn-outline" style="width:auto; padding:4px 8px; font-size:10px;" onclick="navigator.clipboard.writeText('${escapeHtml(e.data.msg).replace(/'/g, "\\'")}')">📋 Copy</button>`;
+                const container = document.getElementById('ins-view-console');
+                const row = document.createElement('div');
+                row.className = `ins-row ins-log-${method}`;
+                row.innerHTML = `<button class="ins-copy-btn" onclick="copyInsEntry(this)">Copy</button>` +
+                                `<span style="color:#555; margin-right:10px;">${time}</span>` +
+                                `<span style="white-space:pre-wrap; word-break:break-all;">${escapeHtml(msg)}</span>`;
+                container.appendChild(row);
+                if (container.scrollHeight - container.scrollTop < 1000) container.scrollTop = container.scrollHeight;
+            }
 
-                el.innerHTML = '<div class="log-header expanded" style="border-left-color:' + color + ';">' +
-                    '<div class="log-meta">' +
-                    '<span class="status-pill" style="background:' + color + '; color:white;">RUNTIME</span>' +
-                    '<span style="font-size:11px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">' + escapeHtml(e.data.msg) + '</span>' +
-                    '</div>' +
-                    actionBtn +
-                    '</div>';
+            if (e.data.type === 'CONDUIT_NETWORK') {
+                const req = e.data.payload;
+                inspectorNetData.push(req);
+                const list = document.getElementById('ins-net-list');
+                const id = 'net-' + Date.now() + Math.random().toString(36).substr(2, 5);
                 
-                // Self-destruct after 60 seconds to keep terminal clean
-                setTimeout(() => { if(el.parentElement) el.remove(); }, 60000);
+                const row = document.createElement('div');
+                row.className = 'ins-row';
+                row.innerHTML = `
+                    <div class="ins-net-grid" onclick="document.getElementById('${id}').classList.toggle('open')">
+                        <span style="font-weight:bold; color:var(--ai-accent)">${req.method}</span>
+                        <span style="color:${req.status >= 400 ? 'var(--danger)' : 'var(--prod)'}">${req.status}</span>
+                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${req.url}</span>
+                        <span style="text-align:right; color:#666;">${req.duration}ms</span>
+                    </div>
+                    <div id="${id}" class="ins-net-details">
+                        <button class="ins-copy-btn" onclick="copyInsEntry(this)" style="opacity:1; top:12px; right:12px;">Copy JSON</button>
+                        <div style="margin-bottom:10px;"><b style="color:#555">REQUEST:</b><br>${renderJsonHighlight(req.requestBody)}</div>
+                        <div><b style="color:#555">RESPONSE:</b><br>${renderJsonHighlight(req.responseBody)}</div>
+                    </div>`;
+                list.appendChild(row);
             }
         });
 
@@ -2636,7 +2681,66 @@ function addTerminalCard(data, options = {}) {
 
             const doc = new DOMParser().parseFromString(fileCache[entryFile].content, 'text/html');
             const baseScript = doc.createElement('script');
-            baseScript.textContent = 'window.IS_CONDUIT_PREVIEW = true; window.process = { env: { NODE_ENV: "development" } };';
+            baseScript.textContent = `
+                window.IS_CONDUIT_PREVIEW = true;
+                window.process = { env: { NODE_ENV: "development" } };
+                
+                // --- CIRCULAR SAFE SERIALIZER ---
+                const safeStringify = (obj) => {
+                    const cache = new Set();
+                    return JSON.stringify(obj, (key, value) => {
+                        if (typeof value === 'object' && value !== null) {
+                            if (cache.has(value)) return '[Circular]';
+                            cache.add(value);
+                        }
+                        if (value instanceof HTMLElement) return value.outerHTML.substring(0, 100) + '...';
+                        return value;
+                    }, 2);
+                };
+
+                // --- CONSOLE INTERCEPTOR ---
+                ['log', 'warn', 'error', 'debug', 'info'].forEach(method => {
+                    const original = console[method];
+                    console[method] = (...args) => {
+                        window.parent.postMessage({ 
+                            type: 'CONDUIT_LOG', 
+                            method, 
+                            args: args.map(a => typeof a === 'object' ? JSON.parse(safeStringify(a)) : a),
+                            time: new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'})
+                        }, '*');
+                        original.apply(console, args);
+                    };
+                });
+
+                // --- NETWORK INTERCEPTOR (FETCH) ---
+                const originalFetch = window.fetch;
+                window.fetch = async (...args) => {
+                    const start = Date.now();
+                    const url = args[0];
+                    const options = args[1] || {};
+                    try {
+                        const response = await originalFetch(...args);
+                        const clone = response.clone();
+                        const duration = Date.now() - start;
+                        let resBody = '[Binary Data]';
+                        try { resBody = await clone.json(); } catch(e) { try { resBody = await clone.text(); } catch(e2){} }
+                        
+                        window.parent.postMessage({
+                            type: 'CONDUIT_NETWORK',
+                            payload: {
+                                url, method: options.method || 'GET',
+                                status: response.status, duration,
+                                requestBody: options.body || null,
+                                responseBody: resBody
+                            }
+                        }, '*');
+                        return response;
+                    } catch(err) {
+                        window.parent.postMessage({ type: 'CONDUIT_LOG', method: 'error', args: ['Fetch Failed: ' + url, err.message], time: '' }, '*');
+                        throw err;
+                    }
+                };
+            `;
             doc.head.prepend(baseScript);
 
             doc.querySelectorAll('script[src]').forEach(el => {
@@ -5369,40 +5473,51 @@ async function downloadArtifact(runId) {
         } catch(e) { showGlobalToast(e.message, true); }
     }
 
-    async function deleteWorkflowRun(runId) {
-        if (!confirm("⚠️ Are you sure you want to delete this workflow run from GitHub?\nThis action cannot be undone.")) return;
-        
-        const toast = document.createElement('div');
-        toast.innerText = "Deleting Run...";
-        toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:var(--danger); color:white; padding:10px 20px; border-radius:30px; z-index:9999;";
-        document.body.appendChild(toast);
+    // --- INSPECTOR ACTIONS ---
+    function openInspector() { document.getElementById('inspector-overlay').classList.add('active'); toggleFab(false); }
+    function closeInspector() { document.getElementById('inspector-overlay').classList.remove('active'); toggleFab(true); }
+    function clearInspector() {
+        inspectorLogData = []; inspectorNetData = [];
+        document.getElementById('ins-view-console').innerHTML = '';
+        document.getElementById('ins-net-list').innerHTML = '';
+    }
+    function switchInsTab(tab, btn) {
+        document.querySelectorAll('.ins-tab').forEach(t => {
+            t.classList.remove('active'); t.style.background = 'transparent'; t.style.borderColor = 'var(--border)';
+        });
+        document.querySelectorAll('.ins-content').forEach(c => c.style.display = 'none');
+        btn.classList.add('active'); btn.style.background = 'rgba(59,130,246,0.1)'; btn.style.borderColor = 'var(--primary)';
+        document.getElementById('ins-view-' + tab).style.display = 'block';
+    }
 
-        try {
-            const res = await fetch(CONFIG.funcUrl, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'delete_run', run_id: runId })
-            });
-            const data = await res.json();
-            toast.remove();
-            
-            if (data.success) {
-                showGlobalToast("Workflow run deleted");
-                const el = document.querySelector(`div[data-run-id="${runId}"]`);
-                if (el) {
-                    el.style.transition = "all 0.3s";
-                    el.style.height = "0";
-                    el.style.opacity = "0";
-                    el.style.padding = "0";
-                    setTimeout(() => el.remove(), 300);
-                }
-                setTimeout(() => { loadWorkflows(); fetchState(false, false); }, 1000);
-            } else {
-                showGlobalToast("Failed to delete run", true);
-            }
-        } catch (e) {
-            toast.remove();
-            showGlobalToast("Error: " + e.message, true);
+    function copyInsEntry(btn) {
+        const row = btn.closest('.ins-row');
+        // If network detail is open, copy the JSON inside it, otherwise the text of the row
+        const details = row.querySelector('.ins-net-details.open');
+        const text = details ? details.innerText.replace('Copy JSON', '') : row.innerText.replace('Copy', '');
+        navigator.clipboard.writeText(text.trim()).then(() => {
+            btn.innerText = 'Copied'; setTimeout(() => btn.innerText = 'Copy', 1000);
+        });
+    }
+
+    function copyActiveInspectorData() {
+        const activeTab = document.querySelector('.ins-tab.active').innerText.toLowerCase();
+        let text = "";
+        if(activeTab === 'console') {
+            text = inspectorLogData.map(l => `[${l.time}] ${l.msg}`).join('\n');
+        } else {
+            text = inspectorNetData.map(n => `${n.method} ${n.status} ${n.url} (${n.duration}ms)`).join('\n');
         }
+        navigator.clipboard.writeText(text).then(() => showGlobalToast(`Copied all ${activeTab} data`));
+    }
+
+    function renderJsonHighlight(obj) {
+        if (!obj) return '<span style="color:#444">null</span>';
+        const str = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+        const html = escapeHtml(str).replace(/"(\w+)":/g, '<span class="json-key">"$1"</span>:')
+                         .replace(/: "(.*?)"/g, ': <span class="json-string">"$1"</span>')
+                         .replace(/: (\d+)/g, ': <span class="json-number">$1</span>');
+        return `<pre style="margin:0; font-size:10px; color:#ccc;">${html}</pre>`;
     }
 </script>
 </body>
