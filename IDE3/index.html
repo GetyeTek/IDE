@@ -1243,6 +1243,7 @@
     window.inspectorLogData = [];
     window.ideLogData = [];
     window.inspectorNetData = [];
+    window.ideNetData = [];
     window.currentLogSource = 'app';
 
     // --- HOST IDE LOG & NET INTERCEPTOR ---
@@ -1271,12 +1272,14 @@
             let resBody = '[Binary Data]';
             try { resBody = await clone.json(); } catch(e) { try { resBody = await clone.text(); } catch(e2){} }
             
-            renderNetworkRow('ide', {
+            const netEntry = {
                 url, method: options.method || 'GET',
                 status: response.status, duration,
                 requestBody: options.body || null,
                 responseBody: resBody
-            });
+            };
+            window.ideNetData.push(netEntry);
+            renderNetworkRow('ide', netEntry);
             return response;
         } catch(err) { throw err; }
     };
@@ -5637,15 +5640,17 @@ async function downloadArtifact(runId) {
 
     function clearInspector() {
         if (window.currentLogSource === 'app') {
-            inspectorLogData = [];
-            inspectorNetData = [];
+            window.inspectorLogData = [];
+            window.inspectorNetData = [];
             document.getElementById('ins-console-app').innerHTML = '';
             document.getElementById('ins-net-app').innerHTML = '';
         } else {
-            ideLogData = [];
+            window.ideLogData = [];
+            window.ideNetData = [];
             document.getElementById('ins-console-ide').innerHTML = '';
             document.getElementById('ins-net-ide').innerHTML = '';
         }
+        showGlobalToast('Logs cleared for ' + window.currentLogSource.toUpperCase());
     }
     function switchInsTab(tab, btn) {
         document.querySelectorAll('.ins-tab').forEach(t => {
@@ -5670,13 +5675,22 @@ async function downloadArtifact(runId) {
 
     function copyActiveInspectorData() {
         const activeTab = document.querySelector('.ins-tab.active').innerText.toLowerCase();
-        let text = "";
-        if(activeTab === 'console') {
-            text = window.inspectorLogData.map(l => `[${l.time}] ${l.msg}`).join('\n');
+        const isApp = window.currentLogSource === 'app';
+        let text = '';
+
+        if (activeTab === 'console') {
+            const data = isApp ? window.inspectorLogData : window.ideLogData;
+            text = data.map(l => '[' + l.time + '] ' + l.msg).join('\n');
         } else {
-            text = window.inspectorNetData.map(n => `${n.method} ${n.status} ${n.url} (${n.duration}ms)`).join('\n');
+            const data = isApp ? window.inspectorNetData : window.ideNetData;
+            text = data.map(n => n.method + ' ' + n.status + ' ' + n.url + ' (' + n.duration + 'ms)').join('\n');
         }
-        navigator.clipboard.writeText(text).then(() => showGlobalToast(`Copied all ${activeTab} data`));
+
+        if (!text) return showGlobalToast('No ' + activeTab + ' data to copy', true);
+
+        navigator.clipboard.writeText(text).then(() => {
+            showGlobalToast('Copied ' + (isApp ? 'App ' : 'IDE ') + activeTab + ' logs');
+        });
     }
 
     function renderJsonHighlight(obj) {
