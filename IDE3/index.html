@@ -1124,9 +1124,14 @@
                 <div id="sqlStatusDot" class="w-1.5 h-1.5 rounded-full bg-slate-600"></div>
                 <span id="sqlStatusText" class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Ready</span>
             </div>
-            <button id="sqlCopyBtn" onclick="copySqlResults()" class="hidden text-[10px] font-black bg-blue-500/10 text-blue-400 px-3 py-1 rounded border border-blue-500/20 active:bg-blue-500 active:text-white">
-                COPY JSON
-            </button>
+            <div class="flex gap-2">
+                <button id="sqlCopyBtn" onclick="copySqlResults()" class="hidden text-[10px] font-black bg-blue-500/10 text-blue-400 px-3 py-1 rounded border border-blue-500/20 active:bg-blue-500 active:text-white">
+                    COPY CSV
+                </button>
+                <button id="sqlDownloadBtn" onclick="downloadSqlCsv()" class="hidden text-[10px] font-black bg-green-500/10 text-green-400 px-3 py-1 rounded border border-green-500/20 active:bg-green-500 active:text-white">
+                    DOWNLOAD CSV
+                </button>
+            </div>
         </section>
 
         <!-- Results Display -->
@@ -5863,22 +5868,36 @@ async function downloadArtifact(runId) {
         const statusText = document.getElementById('sqlStatusText');
         const statusDot = document.getElementById('sqlStatusDot');
         const copyBtn = document.getElementById('sqlCopyBtn');
+        const dlBtn = document.getElementById('sqlDownloadBtn');
+        
         if (!sql.trim()) return;
+
         loader.classList.remove('hidden');
         copyBtn.classList.add('hidden');
+        dlBtn.classList.add('hidden');
         statusDot.className = "w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse";
         statusText.innerText = "Running...";
+
         try {
             const result = await callSqlEdgeFunction(sql);
             lastSqlResultData = result.data;
             renderSqlResultTable(result.data);
+            
             statusText.innerText = 'Success: ' + (result.count || result.data.length) + ' rows';
             statusDot.className = "w-1.5 h-1.5 rounded-full bg-green-500";
+            
+            copyBtn.innerText = 'COPY CSV';
             copyBtn.classList.remove('hidden');
+            dlBtn.classList.remove('hidden');
         } catch (err) {
+            lastSqlResultData = { isError: true, message: err.message };
             output.innerHTML = '<div class="p-6 bg-red-500/5 text-red-400 m-4 rounded-xl border border-red-500/20 font-mono text-xs"><p class="font-bold mb-1 uppercase">[Error]</p>' + err.message + '</div>';
             statusText.innerText = "Query Failed";
             statusDot.className = "w-1.5 h-1.5 rounded-full bg-red-500";
+            
+            // Allow copying the error message
+            copyBtn.innerText = 'COPY ERROR';
+            copyBtn.classList.remove('hidden');
         } finally {
             loader.classList.add('hidden');
         }
@@ -5922,15 +5941,57 @@ async function downloadArtifact(runId) {
 
     function clearSqlEditor() { document.getElementById('sqlEditor').value = ''; }
 
+    function convertToCSV(data) {
+        if (!data || !data.length) return '';
+        const headers = Object.keys(data[0]);
+        const rows = data.map(row => 
+            headers.map(header => {
+                let cell = row[header] === null || row[header] === undefined ? '' : row[header];
+                if (typeof cell === 'object') cell = JSON.stringify(cell);
+                // Escape quotes and wrap in quotes
+                return '"' + String(cell).replace(/"/g, '""') + '"';
+            }).join(',')
+        );
+        return [headers.join(','), ...rows].join('\n');
+    }
+
     function copySqlResults() {
         if (!lastSqlResultData) return;
         const btn = document.getElementById('sqlCopyBtn');
-        const text = JSON.stringify(lastSqlResultData, (k,v) => typeof v === 'bigint' ? v.toString() : v, 2);
+        
+        let text = '';
+        if (lastSqlResultData.isError) {
+            text = lastSqlResultData.message;
+        } else {
+            text = convertToCSV(lastSqlResultData);
+        }
+
         navigator.clipboard.writeText(text).then(() => {
-            const oldText = btn.innerText; btn.innerText = "COPIED!";
-            btn.classList.add('bg-green-500', 'text-white');
-            setTimeout(() => { btn.innerText = oldText; btn.classList.remove('bg-green-500', 'text-white'); }, 2000);
+            const oldText = btn.innerText;
+            btn.innerText = "COPIED!";
+            btn.classList.add('bg-blue-500', 'text-white');
+            setTimeout(() => {
+                btn.innerText = oldText;
+                btn.classList.remove('bg-blue-500', 'text-white');
+            }, 2000);
         });
+    }
+
+    function downloadSqlCsv() {
+        if (!lastSqlResultData || lastSqlResultData.isError) return;
+        const csvContent = convertToCSV(lastSqlResultData);
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'query_export_' + timestamp + '.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showGlobalToast('CSV Download Started');
     }
 </script>
 </body>
