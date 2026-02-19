@@ -123,8 +123,7 @@ serve(async (req) => {
       const friendlyText = formatTranscriptionForAI(record.transcription, requestId);
       console.log(`[${requestId}] [SOLVER_STAGE] Formatted Transcription for Solver Input:\n--- START TRANSCRIPTION ---\n${friendlyText}\n--- END TRANSCRIPTION ---`);
 
-      const geminiKey = await getGeminiKey(supabase, requestId);
-      const solutionRaw = await callGeminiApi(PRIMARY_MODEL, geminiKey, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, requestId);
+      const solutionRaw = await callGeminiApi(supabase, PRIMARY_MODEL, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, requestId);
       
       const extracted = extractJson(solutionRaw);
       try {
@@ -172,8 +171,7 @@ serve(async (req) => {
         });
     }
 
-    const geminiKey = await getGeminiKey(supabase, requestId);
-    const ocrRaw = await callGeminiApi(PRIMARY_MODEL, geminiKey, null, geminiParts, requestId);
+    const ocrRaw = await callGeminiApi(supabase, PRIMARY_MODEL, null, geminiParts, requestId);
     const ocrExtracted = extractJson(ocrRaw);
     
     try {
@@ -202,20 +200,38 @@ serve(async (req) => {
 // --- AI FUNCTIONS ---
 
 async function getGeminiKey(supabase: any, requestId: string) {
-  const { data, error } = await supabase.from('api_keys').select('api_key').eq('service', 'gemini').eq('is_active', true).limit(1).single();
-  if (error || !data) throw new Error("No active Gemini key found in database");
-  return data.api_key;
+  // Fetch the key that hasn't been used for the longest time and isn't cooling down
+  const { data, error } = await supabase.from('api_keys')
+    .select('id, api_key')
+    .eq('service', 'gemini')
+    .eq('is_active', true)
+    .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
+    .order('last_used_at', { ascending: true, nullsFirst: true })
+    .limit(1)
+    .single();
+
+  if (error || !data) throw new Error("No available Gemini keys (all may be on cooldown or inactive)");
+
+  // Update last_used_at immediately to push it to the end of the rotation
+  await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', data.id);
+  
+  return { id: data.id, key: data.api_key };
 }
 
-async function callGeminiApi(model: string, key: string, prompt: string | null, parts?: any[], requestId?: string): Promise<string> {
+async function markKeyCooldown(supabase: any, keyId: number, requestId: string) {
+  console.warn(`[${requestId}] [COOLDOWN] Marking key ID ${keyId} for 60s cooldown due to 429.`);
+  const cooldownTime = new Date(Date.now() + 60000).toISOString();
+  await supabase.from('api_keys').update({ cooldown_until: cooldownTime }).eq('id', keyId);
+}
+
+async function callGeminiApi(supabase: any, model: string, prompt: string | null, parts?: any[], requestId?: string, retryCount = 0): Promise<string> {
+  if (retryCount > 5) throw new Error("Exceeded maximum key rotation retries due to persistent 429s.");
+
+  const { id: keyId, key } = await getGeminiKey(supabase, requestId || "");
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const payloadParts = parts || [{ text: prompt }];
   
-  console.log(`[${requestId}] [AI_REQUEST] Model: ${model}. Payload Parts Count: ${payloadParts.length}`);
-  // Log the exact prompt being sent (if it's text-based solver stage)
-  if (prompt) {
-    console.log(`[${requestId}] [AI_REQUEST_PROMPT]:\n${prompt}`);
-  }
+  console.log(`[${requestId}] [AI_REQUEST] Model: ${model} | KeyID: ${keyId} | Retry: ${retryCount}`);
 
   const res = await fetch(url, {
     method: 'POST',
@@ -226,9 +242,12 @@ async function callGeminiApi(model: string, key: string, prompt: string | null, 
     })
   });
 
-  if (res.status === 429 && model !== FALLBACK_MODEL) {
-    console.warn(`[${requestId}] [QUOTA_429] ${model} exhausted. Retrying with ${FALLBACK_MODEL}...`);
-    return callGeminiApi(FALLBACK_MODEL, key, prompt, parts, requestId);
+  if (res.status === 429) {
+    await markKeyCooldown(supabase, keyId, requestId || "");
+    // If Primary fails, try Fallback with a fresh key. If Fallback fails, try Primary again with a fresh key.
+    const nextModel = model === PRIMARY_MODEL ? FALLBACK_MODEL : PRIMARY_MODEL;
+    console.warn(`[${requestId}] [RETRY] Key ${keyId} rate limited. Rotating to new key and model ${nextModel}...`);
+    return callGeminiApi(supabase, nextModel, prompt, parts, requestId, retryCount + 1);
   }
 
   const data = await res.json();
@@ -239,13 +258,10 @@ async function callGeminiApi(model: string, key: string, prompt: string | null, 
 
   const responseParts = data.candidates?.[0]?.content?.parts;
   if (!responseParts || responseParts.length === 0) {
-    console.error(`[${requestId}] [AI_RESPONSE_EMPTY] Full Response:`, JSON.stringify(data));
     throw new Error("No content returned from AI");
   }
   
   const finalResponse = responseParts.map((p: any) => p.text || "").join('');
-  
-  console.log(`[${requestId}] [AI_RAW_RESPONSE_START]\n${finalResponse}\n[AI_RAW_RESPONSE_END]`);
-  
+  console.log(`[${requestId}] [AI_RAW_RESPONSE_SUCCESS] Length: ${finalResponse.length}`);
   return finalResponse;
 }
