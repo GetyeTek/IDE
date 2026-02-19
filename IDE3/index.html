@@ -2664,8 +2664,9 @@ function addTerminalCard(data, options = {}) {
             if (match && match[1]) rootPrefix = match[1];
         }
         
-        let effectiveRoot = (rootPrefix || CONFIG.projectPath || "").replace(/^\/+/, "");
-        if (effectiveRoot && !effectiveRoot.endsWith('/')) effectiveRoot += '/';
+        // Normalize project root: remove leading/trailing slashes
+        let effectiveRoot = (rootPrefix || CONFIG.projectPath || "").trim().replace(/^\/+|\/+$/g, "");
+        if (effectiveRoot) effectiveRoot += '/';
 
         const entryFile = effectiveRoot + 'index.html';
         const iframe = document.getElementById('preview-frame');
@@ -2706,7 +2707,12 @@ function addTerminalCard(data, options = {}) {
                 }));
             }
 
-            if(!fileCache[entryFile]) throw new Error(`Entry file ${entryFile} not found.`);
+            // Robust lookup: check exact path, and path with/without leading slash
+            const entryContent = fileCache[entryFile] || fileCache['/' + entryFile] || fileCache[entryFile.replace(/^\//, '')];
+            if(!entryContent) {
+                console.error("❌ [Bundler] Entry missing. EntryPath:", entryFile, "Cache Keys:", Object.keys(fileCache));
+                throw new Error(`Entry file "${entryFile}" not found in scope "${effectiveRoot || 'root'}". Check your Project Path settings.`);
+            }
 
             const importMap = { imports: { "react": "https://esm.sh/react@18.2.0", "react-dom/client": "https://esm.sh/react-dom@18.2.0/client" } };
 
@@ -2746,7 +2752,8 @@ function addTerminalCard(data, options = {}) {
                 importMap.imports['./' + virtualPath] = file.blobUrl;
             }
 
-            const doc = new DOMParser().parseFromString(fileCache[entryFile].content, 'text/html');
+            const finalEntryContent = fileCache[entryFile] || fileCache['/' + entryFile] || fileCache[entryFile.replace(/^\//, '')];
+            const doc = new DOMParser().parseFromString(finalEntryContent.content, 'text/html');
             const baseScript = doc.createElement('script');
             baseScript.textContent = `
                 window.IS_CONDUIT_PREVIEW = true;
