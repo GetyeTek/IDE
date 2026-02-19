@@ -235,8 +235,9 @@
         .log-header {
             padding: 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
             background: #151517; border-bottom: 1px solid transparent; transition: all 0.2s;
-            border-left: 3px solid transparent;
+            border-left: 3px solid transparent; position: relative;
         }
+        .log-header.expanded { z-index: 60; }
         .log-header:active { background: #222; }
         .log-header.expanded { 
             background: #1e1e20; border-bottom: 1px solid #333; 
@@ -307,7 +308,7 @@
             background: rgba(21, 21, 23, 0.9); backdrop-filter: blur(10px);
             border-top: 1px solid var(--border);
             display: flex; justify-content: space-around; align-items: center;
-            padding-bottom: 15px; z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 100;
         }
         .nav-item {
             background: none; border: none; color: var(--text-muted);
@@ -1219,8 +1220,8 @@
         if(typeof acorn === 'undefined') console.warn("Acorn missing. Syntax checking disabled.");
 
         // --- CONDUIT INSPECTOR BUS ---
-        let inspectorLogData = [];
-        let inspectorNetData = [];
+    window.inspectorLogData = [];
+    window.inspectorNetData = [];
 
         window.addEventListener('message', (e) => {
             if (!e.data || !e.data.type) return;
@@ -1228,7 +1229,7 @@
             if (e.data.type === 'CONDUIT_LOG') {
                 const { method, args, time } = e.data;
                 const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
-                inspectorLogData.push({ method, msg, time });
+                window.inspectorLogData.push({ method, msg, time });
                 
                 const container = document.getElementById('ins-view-console');
                 const row = document.createElement('div');
@@ -1242,7 +1243,7 @@
 
             if (e.data.type === 'CONDUIT_NETWORK') {
                 const req = e.data.payload;
-                inspectorNetData.push(req);
+                window.inspectorNetData.push(req);
                 const list = document.getElementById('ins-net-list');
                 const id = 'net-' + Date.now() + Math.random().toString(36).substr(2, 5);
                 
@@ -3300,11 +3301,11 @@ function addTerminalCard(data, options = {}) {
 
             if (!isAppend) container.innerHTML = '';
             if (isAppend) cicdDataRaw = cicdDataRaw.concat(data.runs); else cicdDataRaw = data.runs;
-            applyFiltersToCicd();
+            applyFiltersToCicd(expandedIds);
         } catch(e) {}
     }
 
-    function applyFiltersToCicd() {
+    function applyFiltersToCicd(expandedIds = []) {
         const container = document.getElementById('workflow-list');
         const filtered = filterDataset(cicdDataRaw, 'cicd');
         container.innerHTML = '';
@@ -5504,9 +5505,9 @@ async function downloadArtifact(runId) {
         const activeTab = document.querySelector('.ins-tab.active').innerText.toLowerCase();
         let text = "";
         if(activeTab === 'console') {
-            text = inspectorLogData.map(l => `[${l.time}] ${l.msg}`).join('\n');
+            text = window.inspectorLogData.map(l => `[${l.time}] ${l.msg}`).join('\n');
         } else {
-            text = inspectorNetData.map(n => `${n.method} ${n.status} ${n.url} (${n.duration}ms)`).join('\n');
+            text = window.inspectorNetData.map(n => `${n.method} ${n.status} ${n.url} (${n.duration}ms)`).join('\n');
         }
         navigator.clipboard.writeText(text).then(() => showGlobalToast(`Copied all ${activeTab} data`));
     }
