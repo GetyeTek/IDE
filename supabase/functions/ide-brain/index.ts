@@ -1885,10 +1885,10 @@ If you already give a payload, assume it's already applied, and give the next pl
     if (action === "fetch_ef_logs") {
         const { function_slug, before } = payload;
         const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
-        const cloudKey = Deno.env.get("CONDUIT_CLOUD_KEY");
+        const cloudKey = Deno.env.get("CONDUIT_ACCESS_TOKEN");
 
         if (!projectRef) throw new Error("Could not resolve Supabase Project Ref");
-        if (!cloudKey) throw new Error("Cloud Access Key (CONDUIT_CLOUD_KEY) not configured in Supabase secrets");
+        if (!cloudKey) throw new Error("Cloud Access Key (CONDUIT_ACCESS_TOKEN) not configured in Supabase secrets");
 
         const sql = `SELECT timestamp, event_message, level FROM edge_logs WHERE function_id = '${function_slug}' ${before ? `AND timestamp < '${before}'` : ''} ORDER BY timestamp DESC LIMIT 20`;
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
