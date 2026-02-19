@@ -1103,10 +1103,18 @@
                 <header class="mb-8 flex justify-between items-end">
                     <div>
                         <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">Gemini 2.5 Flash</h1>
-                        <p class="text-slate-400 text-sm">Key Validation Dashboard</p>
+                        <div class="flex gap-3 mt-1">
+                           <button onclick="openTesterPaste()" class="text-blue-400 text-[10px] font-bold uppercase tracking-wider underline underline-offset-4">Paste Keys</button>
+                           <select id="tester-source-select" onchange="loadTesterKeys()" class="bg-transparent text-slate-500 text-[10px] font-bold uppercase border-none outline-none cursor-pointer">
+                               <option value="database">Source: Database</option>
+                               <option value="manual">Source: Manual Paste</option>
+                           </select>
+                        </div>
                     </div>
                     <div class="text-right">
-                        <button onclick="fetchAllTesterKeys()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-full text-xs font-bold transition-all transform active:scale-95 shadow-lg shadow-blue-900/20">RESCAN ALL</button>
+                        <button onclick="runBatchTest()" id="tester-start-batch-btn" class="bg-teal-600 hover:bg-teal-500 text-white px-6 py-2.5 rounded-full text-xs font-black transition-all transform active:scale-95 shadow-lg shadow-teal-900/20 tracking-widest">
+                            START TEST
+                        </button>
                     </div>
                 </header>
                 <div class="grid grid-cols-2 gap-4 mb-8">
@@ -1127,6 +1135,16 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- TESTER PASTE OVERLAY -->
+    <div id="tester-paste-overlay" style="display:none; position:fixed; inset:0; background:rgba(15, 23, 42, 0.95); z-index:400; flex-direction:column; padding:20px;">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-blue-400 font-bold uppercase tracking-widest text-sm">Paste Manual Keys</h2>
+            <button onclick="saveTesterPaste()" class="kt-btn px-6">Save & Close</button>
+        </div>
+        <p class="text-slate-500 text-[10px] mb-4 uppercase">One API key per line. All whitespace will be trimmed.</p>
+        <textarea id="tester-paste-area" class="flex-1 w-full bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-300 font-mono text-sm focus:border-blue-500 outline-none" placeholder="Alz...\nAlz..."></textarea>
     </div>
 
     <!-- SQL EXECUTOR OVERLAY -->
@@ -6131,64 +6149,116 @@ async function downloadArtifact(runId) {
         return div;
     }
 
+    let activeKeysToTest = [];
+
     function toggleTesterMode() {
         const isBatch = document.getElementById('tester-batch-toggle').checked;
         document.getElementById('tester-view-manual').style.display = isBatch ? 'none' : 'flex';
         document.getElementById('tester-view-batch').style.display = isBatch ? 'block' : 'none';
-        if (isBatch) fetchAllTesterKeys();
+        if (isBatch) loadTesterKeys();
     }
 
-    async function fetchAllTesterKeys() {
-        const SB_URL = "https://xvldfsmxskhemkslsbym.supabase.co";
-        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU";
+    function openTesterPaste() {
+        document.getElementById('tester-paste-overlay').style.display = 'flex';
+        const saved = localStorage.getItem('conduit_manual_batch_keys');
+        if (saved) document.getElementById('tester-paste-area').value = saved;
+    }
+
+    function saveTesterPaste() {
+        const val = document.getElementById('tester-paste-area').value;
+        localStorage.setItem('conduit_manual_batch_keys', val);
+        document.getElementById('tester-paste-overlay').style.display = 'none';
+        if (document.getElementById('tester-source-select').value === 'manual') loadTesterKeys();
+    }
+
+    async function loadTesterKeys() {
+        const source = document.getElementById('tester-source-select').value;
         const container = document.getElementById('key-validation-container');
         const totalLabel = document.getElementById('count-total-keys');
         const validLabel = document.getElementById('count-valid-keys');
         
-        container.innerHTML = '';
+        container.innerHTML = '<div class="text-center py-20 text-slate-500">Preparing list...</div>';
         validLabel.innerText = '0';
-        let validCount = 0;
+        activeKeysToTest = [];
 
         try {
-            const response = await fetch(SB_URL + '/rest/v1/api_keys?service=eq.gemini&select=*', {
-                headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
-            });
-            const keys = await response.json();
+            let keys = [];
+            if (source === 'database') {
+                const SB_URL = "https://xvldfsmxskhemkslsbym.supabase.co";
+                const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU";
+                const res = await fetch(SB_URL + '/rest/v1/api_keys?service=eq.gemini&select=*', { headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY } });
+                keys = await res.json();
+            } else {
+                const raw = localStorage.getItem('conduit_manual_batch_keys') || '';
+                keys = raw.split('\n').map(k => k.trim()).filter(k => k).map((k, i) => ({ name: 'Manual Key ' + (i+1), api_key: k }));
+            }
+
+            activeKeysToTest = keys;
             totalLabel.innerText = keys.length;
+            container.innerHTML = '';
 
             if (keys.length === 0) {
-                container.innerHTML = '<p class="text-center text-slate-500">No Gemini keys found.</p>';
+                container.innerHTML = '<p class="text-center text-slate-500 py-10">No keys found in ' + source + '.</p>';
                 return;
             }
 
-            keys.forEach(async (keyData) => {
+            keys.forEach((keyData, idx) => {
                 const row = document.createElement('div');
+                row.id = 'tester-row-' + idx;
                 row.className = "bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-sm";
                 row.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div class="flex-1 overflow-hidden mr-4">
-                            <h3 class="font-bold text-slate-200 truncate">${keyData.name || 'Unnamed Key'}</h3>
+                            <h3 class="font-bold text-slate-200 truncate">${keyData.name}</h3>
                             <p class="text-xs text-slate-500 font-mono mt-1">${keyData.api_key.substring(0, 12)}...</p>
                         </div>
-                        <div class="status-badge px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter bg-slate-700 text-slate-400">PENDING</div>
+                        <div class="flex gap-2 items-center">
+                            <button onclick="validateTesterKey('${keyData.api_key}', document.getElementById('tester-row-${idx}'), true)" class="p-1 text-slate-500 hover:text-blue-400 active:scale-90" title="Re-test single">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </button>
+                            <div class="status-badge px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter bg-slate-700 text-slate-400">READY</div>
+                        </div>
                     </div>
-                    <div class="result-area"><p class="text-[10px] text-slate-600 mt-2">Pinging Gemini 2.5 Flash...</p></div>`;
+                    <div class="result-area"></div>`;
                 container.appendChild(row);
-
-                const success = await validateTesterKey(keyData.api_key, row);
-                if (success) {
-                    validCount++;
-                    validLabel.innerText = validCount;
-                }
             });
-        } catch (err) {
-            container.innerHTML = '<div class="p-4 bg-red-900/20 text-red-200 rounded-xl">Error: ' + err.message + '</div>';
-        }
+        } catch (err) { container.innerHTML = '<div class="p-4 bg-red-900/20 text-red-200 rounded-xl">Error: ' + err.message + '</div>'; }
     }
 
-    async function validateTesterKey(apiKey, element) {
+    async function runBatchTest() {
+        if (activeKeysToTest.length === 0) return alert("Load some keys first.");
+        const btn = document.getElementById('tester-start-batch-btn');
+        const validLabel = document.getElementById('count-valid-keys');
+        
+        btn.disabled = true; 
+        btn.innerText = "TESTING...";
+        validLabel.innerText = '0';
+        let validCount = 0;
+
+        // Concurrent run
+        const promises = activeKeysToTest.map(async (keyData, idx) => {
+            const row = document.getElementById('tester-row-' + idx);
+            const success = await validateTesterKey(keyData.api_key, row);
+            if (success) {
+                validCount++;
+                validLabel.innerText = validCount;
+            }
+        });
+
+        await Promise.all(promises);
+        btn.disabled = false;
+        btn.innerText = "START TEST";
+        showGlobalToast("Batch Test Complete");
+    }
+
+    async function validateTesterKey(apiKey, element, isSingle = false) {
         const resultArea = element.querySelector('.result-area');
         const badge = element.querySelector('.status-badge');
+
+        badge.innerText = "PINGING...";
+        badge.className = "status-badge px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter bg-slate-700 text-blue-400";
+        if (isSingle) resultArea.innerHTML = '';
+
         try {
             const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey, {
                 method: 'POST',
