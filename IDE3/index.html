@@ -19,6 +19,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <style>
+        .filter-pill-container { display: flex; gap: 8px; overflow-x: auto; padding: 8px 16px; background: #0a0a0a; border-bottom: 1px solid var(--border); scrollbar-width: none; }
+        .filter-pill-container::-webkit-scrollbar { display: none; }
+        .filter-pill { flex-shrink: 0; padding: 4px 10px; border-radius: 20px; background: #1a1a1c; border: 1px solid var(--border); font-size: 10px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+        .filter-pill.active { border-color: var(--ai-accent); color: var(--ai-accent); background: rgba(217, 70, 239, 0.05); }
+        .filter-checkbox-item { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid #222; cursor: pointer; }
+        .filter-checkbox-item:last-child { border-bottom: none; }
+        .filter-checkbox-item span { font-family: 'JetBrains Mono'; font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .model-item {
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px; border-bottom: 1px solid var(--border); transition: background 0.2s;
@@ -524,6 +531,7 @@
                     <span style="font-size:11px; color:#666; margin-right:auto;">JSON Operation Editor</span>
                     <button class="icon-btn" onclick="pasteToEditor()">Paste</button>
                     <button class="icon-btn" onclick="fetchState(true)">Refresh Logs</button>
+                    <button class="icon-btn" onclick="openFilterOverlay('patcher')">🔍 Filter</button>
                     <button class="icon-btn" onclick="editorUndo()">Undo</button>
                     <button class="icon-btn" onclick="editorRedo()">Redo</button>
                     <button class="icon-btn" style="color:var(--danger)" onclick="clearEditor()">Clear</button>
@@ -571,6 +579,7 @@
                 <div class="flex-gap">
                     <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
                     <button class="icon-btn" onclick="resetHistoryAndSync()">Sync</button>
+                    <button class="icon-btn" onclick="openFilterOverlay('history')">🔍 Filter</button>
                 </div>
             </div>
              <div class="card" id="history-container" style="padding-bottom:0;"><div style="padding:10px; text-align:center;">Loading...</div></div>
@@ -663,6 +672,7 @@
                     <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
                     <button class="icon-btn" onclick="triggerBuild()">▶ Trigger</button>
                     <button class="icon-btn" onclick="loadWorkflows(true); lastCicdRefresh=0; loadWorkflows(false)">Refresh</button>
+                    <button class="icon-btn" onclick="openFilterOverlay('cicd')">🔍 Filter</button>
                 </div>
             </div>
             <div class="card" style="padding:0; overflow:hidden;">
@@ -918,6 +928,35 @@
         </div>
     </div>
 
+    <!-- FILTER OVERLAY -->
+    <div id="filter-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span id="filter-title" class="viewer-title">Filter Logs</span>
+            <div class="flex-gap">
+                <button class="btn btn-primary" style="width:auto; padding:6px 14px;" onclick="applyActiveFilters()">Apply</button>
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeFilterOverlay()">Close</button>
+            </div>
+        </div>
+        <div style="padding:16px; overflow-y:auto; flex:1;">
+            <div class="input-label">Time Range</div>
+            <div class="flex-gap" style="margin: 10px 0 20px 0; overflow-x: auto; padding-bottom: 5px;">
+                <button class="filter-pill time-opt" data-time="all" onclick="setTimeFilter('all', this)">All Time</button>
+                <button class="filter-pill time-opt" data-time="hour" onclick="setTimeFilter('hour', this)">Last Hour</button>
+                <button class="filter-pill time-opt" data-time="today" onclick="setTimeFilter('today', this)">Today</button>
+                <button class="filter-pill time-opt" data-time="week" onclick="setTimeFilter('week', this)">This Week</button>
+            </div>
+
+            <div class="flex-between" style="margin-bottom:10px;">
+                <div class="input-label" style="margin:0;">Files Involved</div>
+                <div class="flex-gap">
+                    <button class="btn-outline" style="padding:2px 8px; font-size:10px;" onclick="toggleAllFilterFiles(true)">All</button>
+                    <button class="btn-outline" style="padding:2px 8px; font-size:10px;" onclick="toggleAllFilterFiles(false)">None</button>
+                </div>
+            </div>
+            <div id="filter-file-list" class="card" style="padding:0; max-height: 400px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
     <!-- DELETE HISTORY FAB -->
     <button id="delete-history-fab" class="btn btn-danger" onclick="deleteSelectedHistory()" style="position:fixed; bottom:100px; right:20px; width:auto; padding:12px 16px; border-radius:16px; z-index:150; display:none; box-shadow:0 5px 20px rgba(0,0,0,0.4);">Delete Selected</button>
 
@@ -1047,6 +1086,13 @@
     let logOffset = 0;
     let historyOffset = 0;
     let workflowPage = 1;
+    let currentFilterTab = null;
+    let filters = {
+        patcher: { time: 'all', files: [] },
+        history: { time: 'all', files: [] },
+        cicd: { time: 'all', files: [] }
+    };
+    let cicdDataRaw = []; // Store raw runs for local filtering
 
     // --- AI CONFIG STATE ---
     const DEFAULT_AI_CONFIG = {
@@ -1757,11 +1803,11 @@
             const data = await res.json();
             
             if(data.history) { 
-                const filteredHistory = data.history.filter(h => h.type !== 'Chat');
-                if (isAppend) dbHistory = dbHistory.concat(filteredHistory);
-                else dbHistory = filteredHistory;
-                renderHistory(dbHistory);
-                if (filteredHistory.length < 10) document.getElementById('load-more-history-btn').style.display = 'none';
+                const validHistory = data.history.filter(h => h.type !== 'Chat');
+                if (isAppend) dbHistory = dbHistory.concat(validHistory);
+                else dbHistory = validHistory;
+                applyFiltersToHistory();
+                if (validHistory.length < 10) document.getElementById('load-more-history-btn').style.display = 'none';
                 else document.getElementById('load-more-history-btn').style.display = 'block';
             }
 
@@ -3146,7 +3192,16 @@ function addTerminalCard(data, options = {}) {
                 .map(el => el.id);
 
             if (!isAppend) container.innerHTML = '';
-            data.runs.forEach(run => {
+            if (isAppend) cicdDataRaw = cicdDataRaw.concat(data.runs); else cicdDataRaw = data.runs;
+            applyFiltersToCicd();
+        } catch(e) {}
+    }
+
+    function applyFiltersToCicd() {
+        const container = document.getElementById('workflow-list');
+        const filtered = filterDataset(cicdDataRaw, 'cicd');
+        container.innerHTML = '';
+        filtered.forEach(run => {
                 // --- STATE TRACKING & TOAST ---
                 const currentState = run.conclusion || run.status;
                 const cachedState = runStateCache[run.id];
@@ -3383,6 +3438,135 @@ async function downloadArtifact(runId) {
             saveCurrentChat();
             
         } catch (e) { toast.innerText = "Failed"; setTimeout(() => toast.remove(), 2000); }
+    }
+
+    // --- FILTER LOGIC ---
+    function openFilterOverlay(tab) {
+        currentFilterTab = tab;
+        document.getElementById('filter-overlay').classList.add('active');
+        document.getElementById('filter-title').innerText = `Filter ${tab.toUpperCase()}`;
+        
+        // Set active time pill
+        document.querySelectorAll('.time-opt').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.time === filters[tab].time);
+        });
+
+        // Extract files from context
+        let dataset = [];
+        if (tab === 'patcher') {
+            // Scan visible logs in DOM since sessionLogs is transient
+            document.querySelectorAll('#terminal-list .log-entry').forEach(el => {
+                const response = JSON.parse(el.querySelector('textarea[id$="-response-data"]').value);
+                if (response.results) dataset.push(...response.results.map(r => r.file));
+            });
+        } else if (tab === 'history') {
+            dbHistory.forEach(h => { if(h.ops) h.ops.forEach(op => { if(op.file_path) dataset.push(op.file_path); })});
+        } else if (tab === 'cicd') {
+            cicdDataRaw.forEach(r => {
+                const match = dbHistory.find(h => h.sha === r.head_commit.id);
+                if (match && match.ops) match.ops.forEach(op => dataset.push(op.file_path));
+            });
+        }
+
+        const uniqueFiles = [...new Set(dataset)].sort();
+        const listContainer = document.getElementById('filter-file-list');
+        
+        if (uniqueFiles.length === 0) {
+            listContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No files detected in current results.</div>';
+        } else {
+            listContainer.innerHTML = uniqueFiles.map(f => `
+                <label class="filter-checkbox-item">
+                    <input type="checkbox" class="filter-file-check" value="${f}" ${filters[tab].files.includes(f) || filters[tab].files.length === 0 ? 'checked' : ''}>
+                    <span>${f}</span>
+                </label>
+            `).join('');
+        }
+    }
+
+    function setTimeFilter(val, btn) {
+        filters[currentFilterTab].time = val;
+        document.querySelectorAll('.time-opt').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    function toggleAllFilterFiles(checked) {
+        document.querySelectorAll('.filter-file-check').forEach(cb => cb.checked = checked);
+    }
+
+    function applyActiveFilters() {
+        const selectedFiles = Array.from(document.querySelectorAll('.filter-file-check:checked')).map(cb => cb.value);
+        const allChecks = document.querySelectorAll('.filter-file-check');
+        
+        // If all are checked, we treat it as "No Filter"
+        filters[currentFilterTab].files = (selectedFiles.length === allChecks.length) ? [] : selectedFiles;
+        
+        if (currentFilterTab === 'history') applyFiltersToHistory();
+        else if (currentFilterTab === 'cicd') applyFiltersToCicd();
+        else if (currentFilterTab === 'patcher') applyFiltersToPatcher();
+
+        closeFilterOverlay();
+    }
+
+    function closeFilterOverlay() { document.getElementById('filter-overlay').classList.remove('active'); }
+
+    function filterDataset(items, tab) {
+        const f = filters[tab];
+        const now = Date.now();
+
+        return items.filter(item => {
+            // 1. Time Filter
+            if (f.time !== 'all') {
+                const ts = new Date(item.created_at).getTime();
+                const diff = now - ts;
+                if (f.time === 'hour' && diff > 3600000) return false;
+                if (f.time === 'today' && diff > 86400000) return false;
+                if (f.time === 'week' && diff > 604800000) return false;
+            }
+
+            // 2. File Filter
+            if (f.files.length > 0) {
+                let touchedFiles = [];
+                if (tab === 'history') touchedFiles = (item.ops || []).map(o => o.file_path);
+                if (tab === 'cicd') {
+                    const match = dbHistory.find(h => h.sha === item.head_commit.id);
+                    touchedFiles = match ? (match.ops || []).map(o => o.file_path) : [];
+                }
+                if (!touchedFiles.some(tf => f.files.includes(tf))) return false;
+            }
+            return true;
+        });
+    }
+
+    function applyFiltersToHistory() {
+        renderHistory(filterDataset(dbHistory, 'history'));
+    }
+
+    function applyFiltersToPatcher() {
+        const f = filters.patcher;
+        const now = Date.now();
+        document.querySelectorAll('#terminal-list .log-entry').forEach(el => {
+            // Skip runtime logs
+            if (el.classList.contains('runtime-log')) return;
+            
+            const respData = el.querySelector('textarea[id$="-response-data"]')?.value;
+            if (!respData) return;
+            const resp = JSON.parse(respData);
+            
+            let visible = true;
+            // Time Filter
+            if (f.time !== 'all') {
+                const ts = el.id.startsWith('term-saved-') ? new Date(resp.created_at).getTime() : parseInt(el.id.replace('term-', ''));
+                const diff = now - ts;
+                if (f.time === 'hour' && diff > 3600000) visible = false;
+                else if (f.time === 'today' && diff > 86400000) visible = false;
+            }
+            // File Filter
+            if (visible && f.files.length > 0) {
+                const files = resp.results ? resp.results.map(r => r.file) : [];
+                if (!files.some(path => f.files.includes(path))) visible = false;
+            }
+            el.style.display = visible ? 'block' : 'none';
+        });
     }
 
     // --- DISCOVERY LOGIC ---
