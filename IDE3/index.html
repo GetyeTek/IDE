@@ -3060,8 +3060,9 @@ function addTerminalCard(data, options = {}) {
     }
 
     let runStateCache = {};
+    window.WORKFLOW_JOB_CACHE = {}; // Cache for job list HTML
 
-        async function loadWorkflows(silent = false, isAppend = false) {
+    async function loadWorkflows(silent = false, isAppend = false) {
         const container = document.getElementById('workflow-list');
         if (!isAppend) workflowPage = 1;
 
@@ -3153,6 +3154,7 @@ function addTerminalCard(data, options = {}) {
                 
                 const historyMatch = dbHistory.find(h => h.sha === run.head_commit.id);
                 const isExpanded = expandedIds.includes(`wf-jobs-${run.id}`);
+                const cachedJobs = window.WORKFLOW_JOB_CACHE[run.id] || null;
 
                 div.innerHTML = `
                     <div style="padding:16px; display:flex; align-items:flex-start; gap:14px; cursor:pointer; background:${isExpanded ? '#1a1a1c' : '#111'}; transition: background 0.2s;" 
@@ -3208,7 +3210,7 @@ function addTerminalCard(data, options = {}) {
                         </div>
                     </div>
                     <div id="wf-jobs-${run.id}" style="display:${isExpanded ? 'block' : 'none'}; background:#000; border-top:1px solid #222; animation: fadeUp 0.2s;">
-                        ${isExpanded ? '<div style="padding:12px; text-align:center; font-size:11px; color:#666;">Refreshing details...</div>' : '<div style="padding:12px; text-align:center; font-size:11px; color:#666;">Loading jobs...</div>'}
+                        ${isExpanded ? (cachedJobs || '<div style="padding:12px; text-align:center; font-size:11px; color:#666;">Refreshing details...</div>') : '<div style="padding:12px; text-align:center; font-size:11px; color:#666;">Loading jobs...</div>'}
                     </div>
                 `;
                 container.appendChild(div);
@@ -3216,7 +3218,7 @@ function addTerminalCard(data, options = {}) {
                 // Re-fetch jobs if this row was expanded
                 if (isExpanded) {
                     const headerEl = div.firstElementChild;
-                    toggleWorkflowJobs(run.id, headerEl);
+                    toggleWorkflowJobs(run.id, headerEl, true);
                 }
             });
 
@@ -3279,18 +3281,37 @@ async function downloadArtifact(runId) {
         }
     }
 
-    async function toggleWorkflowJobs(runId, headerEl) {
+    async function toggleWorkflowJobs(runId, headerEl, isSilent = false) {
         const container = document.getElementById(`wf-jobs-${runId}`);
         const isClosed = container.style.display === 'none';
-        if(isClosed) {
+
+        // If we are auto-refreshing (isSilent) and it's already visible, skip the toggle logic
+        if (isSilent && !isClosed) {
+            // Background update
+        } else if (isClosed) {
             container.style.display = 'block';
             headerEl.style.background = '#1a1a1c';
-            try {
-                const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch_workflow_jobs', run_id: runId }) });
-                const data = await res.json();
-                if(!data.jobs || data.jobs.length === 0) return container.innerHTML = '<div style="padding:10px; text-align:center; font-size:11px;">No jobs found.</div>';
-                
-                container.innerHTML = data.jobs.map(job => {
+        } else {
+            container.style.display = 'none';
+            headerEl.style.background = '#111';
+            return;
+        }
+
+        try {
+            // Only show loader if we have NO cached data
+            if (!window.WORKFLOW_JOB_CACHE[runId]) {
+                container.innerHTML = '<div style="padding:12px; text-align:center; font-size:11px; color:#666;">Loading jobs...</div>';
+            }
+
+            const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch_workflow_jobs', run_id: runId }) });
+            const data = await res.json();
+            
+            if(!data.jobs || data.jobs.length === 0) {
+                container.innerHTML = '<div style="padding:10px; text-align:center; font-size:11px;">No jobs found.</div>';
+                return;
+            }
+            
+            const html = data.jobs.map(job => {
                     const statusColor = job.conclusion === 'success' ? 'var(--prod)' : (job.conclusion === 'failure' ? 'var(--danger)' : '#888');
                     const isFail = job.conclusion === 'failure';
                     return `
@@ -3305,8 +3326,12 @@ async function downloadArtifact(runId) {
                         </div>
                     </div>`;
                 }).join('');
-            } catch(e) { container.innerHTML = `<div style="padding:10px; color:var(--danger); font-size:11px;">Error loading jobs.</div>`; }
-        } else { container.style.display = 'none'; headerEl.style.background = '#111'; }
+                
+                container.innerHTML = html;
+                window.WORKFLOW_JOB_CACHE[runId] = html; // Store for auto-refresh cycles
+            } catch(e) {
+                if (!isSilent) container.innerHTML = `<div style="padding:10px; color:var(--danger); font-size:11px;">Error loading jobs.</div>`;
+            }
     }
 
     async function viewJobSummary(id, name, e) {
