@@ -2414,11 +2414,20 @@ function addTerminalCard(data, options = {}) {
              // Handle Build Trigger Logs (The Automator)
              opHtml = `<div class="op-row"><div class="op-details" style="color:#eab308">⚡ ${escapeHtml(response.trigger)}</div></div>`;
         } else if (response.message) {
-             // Handle Generic Messages (Rollbacks, etc)
-             opHtml = `<div class="op-row"><div class="op-details" style="color:var(--prod)">${escapeHtml(response.message)}</div></div>`;
+             // Handle Generic Messages (Rollbacks, Syncs, etc)
+             const isSystem = response.message.toLowerCase().includes('sync') || response.message.toLowerCase().includes('fetch');
+             const tag = isSystem ? 'SYSTEM' : 'EVENT';
+             const color = isSystem ? 'var(--text-muted)' : 'var(--primary)';
+             
+             opHtml = `
+                <div class="op-row">
+                    <div class="op-title" style="color:${color}">📡 ${tag}</div>
+                    <div class="op-details" style="color:#ccc">${escapeHtml(response.message)}</div>
+                </div>`;
         }
 
         const isFail = failCount > 0;
+        const isEvent = !response.results && response.message && !isFail;
         
         // --- UPDATED SIGNATURE LOGIC ---
         const historyEntry = response.sha ? dbHistory.find(h => h.sha === response.sha) : null;
@@ -2443,7 +2452,11 @@ function addTerminalCard(data, options = {}) {
                     <button class="menu-btn favorite-btn" onclick="event.stopPropagation(); toggleFavorite('${id}', 'Patch', {title: '${patchTitle}', sha: '${response.sha || ''}'})" style="padding:0 5px; color:#555;">★</button>
                     <span class="log-time">${new Date().toLocaleTimeString()}</span>
                     ${hasAI ? '<span class="status-pill" style="background:rgba(217,70,239,0.2); color:#d946ef; margin-right:4px;">✨ AI</span>' : ''}
-                    <span class="status-pill ${isFail ? 'pill-fail' : 'pill-success'}">${isFail ? `${failCount} FAILED` : 'SUCCESS'}</span>
+                    <span class="status-pill ${isFail ? 'pill-fail' : (isEvent ? 'pill-event' : 'pill-success')}" 
+                          style="${isEvent ? 'background:rgba(59,130,246,0.1); color:var(--primary); border:1px solid rgba(59,130,246,0.2);' : ''}">
+                        ${isFail ? `${failCount} FAILED` : (isEvent ? 'EVENT' : 'SUCCESS')}
+                    </span>
+                    ${isEvent ? `<span style="font-size:11px; color:#666; margin-left:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px;">${escapeHtml(response.message)}</span>` : ''}
                 </div>
                 <div class="flex-gap" style="position: relative;">
                     <div style="cursor:pointer; padding: 4px; display: flex; align-items: center;" onclick="toggleLogBody('${id}')">
