@@ -148,6 +148,14 @@
         .ins-net-grid { display: grid; grid-template-columns: 50px 45px 1fr 60px; gap: 8px; cursor: pointer; align-items: center; }
         .ins-net-details { background: #050505; margin: 8px -12px -8px -12px; padding: 12px; border-top: 1px solid #222; display: none; }
         .ins-net-details.open { display: block; }
+
+        /* No Logs Feedback */
+        [id^="ins-console-"]:empty::after, [id^="ins-net-"]:empty::after {
+            content: "No logs found";
+            display: block; text-align: center; padding: 40px; 
+            color: #444; font-size: 11px; font-style: italic;
+            font-family: 'Inter', sans-serif;
+        }
         
         .json-key { color: var(--ai-accent); }
         .json-string { color: var(--prod); }
@@ -1028,11 +1036,12 @@
             <div id="ins-console-app" style="flex:1; overflow-y:auto;"></div>
             <div id="ins-console-ide" style="flex:1; overflow-y:auto; display:none;"></div>
         </div>
-        <div id="ins-view-network" class="ins-content" style="flex:1; overflow-y:auto; background:#0a0a0c; display:none;">
+        <div id="ins-view-network" class="ins-content" style="flex:1; overflow-y:auto; background:#0a0a0c; display:none; flex-direction:column;">
             <div style="padding:10px 12px; font-size:10px; color:#444; border-bottom:1px solid #222; display:grid; grid-template-columns:50px 45px 1fr 60px; gap:8px;">
                 <span>METHOD</span><span>STATUS</span><span>URL</span><span style="text-align:right">TIME</span>
             </div>
-            <div id="ins-net-list"></div>
+            <div id="ins-net-app" style="flex:1; overflow-y:auto;"></div>
+            <div id="ins-net-ide" style="flex:1; overflow-y:auto; display:none;"></div>
         </div>
     </div>
 
@@ -1232,7 +1241,7 @@
     window.inspectorNetData = [];
     window.currentLogSource = 'app';
 
-    // --- HOST IDE LOG INTERCEPTOR ---
+    // --- HOST IDE LOG & NET INTERCEPTOR ---
     const originalConsole = { ...console };
     ['log', 'warn', 'error', 'info', 'debug'].forEach(method => {
         console[method] = (...args) => {
@@ -1246,6 +1255,28 @@
         };
     });
 
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+        const start = Date.now();
+        const url = args[0];
+        const options = args[1] || {};
+        try {
+            const response = await originalFetch(...args);
+            const clone = response.clone();
+            const duration = Date.now() - start;
+            let resBody = '[Binary Data]';
+            try { resBody = await clone.json(); } catch(e) { try { resBody = await clone.text(); } catch(e2){} }
+            
+            renderNetworkRow('ide', {
+                url, method: options.method || 'GET',
+                status: response.status, duration,
+                requestBody: options.body || null,
+                responseBody: resBody
+            });
+            return response;
+        } catch(err) { throw err; }
+    };
+
     function renderLogLine(container, method, msg, time) {
         const row = document.createElement('div');
         row.className = `ins-row ins-log-${method}`;
@@ -1256,41 +1287,45 @@
         if (container.scrollHeight - container.scrollTop < 1000) container.scrollTop = container.scrollHeight;
     }
 
-    window.addEventListener('message', (e) => {
-            if (!e.data || !e.data.type) return;
-            
-            if (e.data.type === 'CONDUIT_LOG') {
-                const { method, args, time } = e.data;
-                const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
-                window.inspectorLogData.push({ method, msg, time });
-                
-                const container = document.getElementById('ins-console-app');
-                if (container) renderLogLine(container, method, msg, time);
-            }
+        function renderNetworkRow(source, req) {
+        const list = document.getElementById(`ins-net-${source}`);
+        if (!list) return;
+        const id = 'net-' + Date.now() + Math.random().toString(36).substr(2, 5);
+        const row = document.createElement('div');
+        row.className = 'ins-row';
+        row.innerHTML = `
+            <div class="ins-net-grid" onclick="document.getElementById('${id}').classList.toggle('open')">
+                <span style="font-weight:bold; color:var(--ai-accent)">${req.method}</span>
+                <span style="color:${req.status >= 400 ? 'var(--danger)' : 'var(--prod)'}">${req.status}</span>
+                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${req.url}</span>
+                <span style="text-align:right; color:#666;">${req.duration}ms</span>
+            </div>
+            <div id="${id}" class="ins-net-details">
+                <button class="ins-copy-btn" onclick="copyInsEntry(this)" style="opacity:1; top:12px; right:12px;">Copy JSON</button>
+                <div style="margin-bottom:10px;"><b style="color:#555">REQUEST:</b><br>${renderJsonHighlight(req.requestBody)}</div>
+                <div><b style="color:#555">RESPONSE:</b><br>${renderJsonHighlight(req.responseBody)}</div>
+            </div>`;
+        list.appendChild(row);
+        if (list.parentElement.scrollHeight - list.parentElement.scrollTop < 1000) list.parentElement.scrollTop = list.parentElement.scrollHeight;
+    }
 
-            if (e.data.type === 'CONDUIT_NETWORK') {
-                const req = e.data.payload;
-                window.inspectorNetData.push(req);
-                const list = document.getElementById('ins-net-list');
-                const id = 'net-' + Date.now() + Math.random().toString(36).substr(2, 5);
-                
-                const row = document.createElement('div');
-                row.className = 'ins-row';
-                row.innerHTML = `
-                    <div class="ins-net-grid" onclick="document.getElementById('${id}').classList.toggle('open')">
-                        <span style="font-weight:bold; color:var(--ai-accent)">${req.method}</span>
-                        <span style="color:${req.status >= 400 ? 'var(--danger)' : 'var(--prod)'}">${req.status}</span>
-                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${req.url}</span>
-                        <span style="text-align:right; color:#666;">${req.duration}ms</span>
-                    </div>
-                    <div id="${id}" class="ins-net-details">
-                        <button class="ins-copy-btn" onclick="copyInsEntry(this)" style="opacity:1; top:12px; right:12px;">Copy JSON</button>
-                        <div style="margin-bottom:10px;"><b style="color:#555">REQUEST:</b><br>${renderJsonHighlight(req.requestBody)}</div>
-                        <div><b style="color:#555">RESPONSE:</b><br>${renderJsonHighlight(req.responseBody)}</div>
-                    </div>`;
-                list.appendChild(row);
-            }
-        });
+    window.addEventListener('message', (e) => {
+        if (!e.data || !e.data.type) return;
+        
+        if (e.data.type === 'CONDUIT_LOG') {
+            const { method, args, time } = e.data;
+            const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
+            window.inspectorLogData.push({ method, msg, time });
+            const container = document.getElementById('ins-console-app');
+            if (container) renderLogLine(container, method, msg, time);
+        }
+
+        if (e.data.type === 'CONDUIT_NETWORK') {
+            const req = e.data.payload;
+            window.inspectorNetData.push(req);
+            renderNetworkRow('app', req);
+        }
+    });
 
         if(CONFIG.funcUrl) {
             await fetchState();
@@ -5505,8 +5540,11 @@ async function downloadArtifact(runId) {
     function switchLogSource(source) {
         window.currentLogSource = source;
         const isApp = source === 'app';
+        
         document.getElementById('ins-console-app').style.display = isApp ? 'block' : 'none';
         document.getElementById('ins-console-ide').style.display = isApp ? 'none' : 'block';
+        document.getElementById('ins-net-app').style.display = isApp ? 'block' : 'none';
+        document.getElementById('ins-net-ide').style.display = isApp ? 'none' : 'block';
         
         document.getElementById('log-src-app').style.background = isApp ? 'var(--primary)' : 'transparent';
         document.getElementById('log-src-app').style.color = isApp ? 'white' : 'var(--text-muted)';
@@ -5517,13 +5555,14 @@ async function downloadArtifact(runId) {
     function clearInspector() {
         if (window.currentLogSource === 'app') {
             inspectorLogData = [];
+            inspectorNetData = [];
             document.getElementById('ins-console-app').innerHTML = '';
+            document.getElementById('ins-net-app').innerHTML = '';
         } else {
             ideLogData = [];
             document.getElementById('ins-console-ide').innerHTML = '';
+            document.getElementById('ins-net-ide').innerHTML = '';
         }
-        inspectorNetData = [];
-        document.getElementById('ins-net-list').innerHTML = '';
     }
     function switchInsTab(tab, btn) {
         document.querySelectorAll('.ins-tab').forEach(t => {
@@ -5531,8 +5570,9 @@ async function downloadArtifact(runId) {
         });
         document.querySelectorAll('.ins-content').forEach(c => c.style.display = 'none');
         btn.classList.add('active'); btn.style.background = 'rgba(59,130,246,0.1)'; btn.style.borderColor = 'var(--primary)';
-        document.getElementById('ins-view-' + tab).style.display = 'block';
-        document.getElementById('ins-source-toggle').style.display = tab === 'console' ? 'flex' : 'none';
+        document.getElementById('ins-view-' + tab).style.display = 'flex';
+        // Toggle remains visible for both Console and Network
+        document.getElementById('ins-source-toggle').style.display = 'flex';
     }
 
     function copyInsEntry(btn) {
