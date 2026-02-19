@@ -1669,7 +1669,9 @@ If you already give a payload, assume it's already applied, and give the next pl
     }
 
     if (action === "preview_file") {
+        console.log('[Action: preview_file] File: ' + file_path + ' Ref: ' + (ref_sha || 'HEAD'));
         const { content, sha } = await getFileRaw(TARGET_REPO, file_path || 'index.html', ref_sha || DEV_BRANCH);
+        if (!content) console.warn('[Action: preview_file] 404 or Empty: ' + file_path);
         return new Response(JSON.stringify({ content, sha }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
