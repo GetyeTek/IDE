@@ -287,9 +287,13 @@
         .viewer-overlay.active { transform: translateX(0); }
         .viewer-header {
             height: 60px; border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 16px; background: var(--card-bg); flex-shrink: 0;
+            display: flex; align-items: center; justify-content: flex-start;
+            gap: 16px; padding: 0 16px; background: var(--card-bg); flex-shrink: 0;
+            overflow-x: auto; white-space: nowrap; scrollbar-width: none; -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
         }
+        .viewer-header::-webkit-scrollbar { display: none; }
+        .viewer-header > * { flex-shrink: 0; }
         .viewer-title { font-weight: 600; font-size: 14px; font-family: 'JetBrains Mono', monospace; }
         #ace-container { flex: 1; width: 100%; position: relative; }
 
@@ -1026,7 +1030,7 @@
                 </div>
                 <button class="ins-tab btn-outline" onclick="switchInsTab('network', this)" style="width:auto; padding:6px 15px;">Network</button>
             </div>
-            <div class="flex-gap">
+            <div class="flex-gap" style="margin-left: auto;">
                 <button class="icon-btn" onclick="copyActiveInspectorData()">Copy All</button>
                 <button class="icon-btn" style="color:var(--danger)" onclick="clearInspector()">Clear</button>
                 <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeInspector()">Close</button>
