@@ -122,6 +122,10 @@ const BookReader = ({ book, onClose }) => {
                 docBody.style.padding = '0';
                 docBody.style.overflow = 'hidden';
 
+                // Measure the actual full content size - MOVE THIS UP TO AVOID REFERENCE ERROR
+                const w = Math.max(docBody.scrollWidth, docBody.offsetWidth, docEl.clientWidth, docEl.scrollWidth);
+                const h = Math.max(docBody.scrollHeight, docBody.offsetHeight, docEl.clientHeight, docEl.scrollHeight);
+
                 // --- DYNAMIC SCALING ENGINE ---
                 // Calculate the ratio between the Screen Width and the Book Content Width.
                 const fitScale = window.innerWidth / w;
@@ -318,10 +322,6 @@ const BookReader = ({ book, onClose }) => {
                 
                 // Apply initial theme
                 doc.body.className = `theme-${currentTheme}`;
-
-                // Measure the actual full content size
-                const w = Math.max(docBody.scrollWidth, docBody.offsetWidth, docEl.clientWidth, docEl.scrollWidth);
-                const h = Math.max(docBody.scrollHeight, docBody.offsetHeight, docEl.clientHeight, docEl.scrollHeight);
 
                 contentDims.current = { width: w, height: h };
 
