@@ -3397,8 +3397,6 @@ function addTerminalCard(data, options = {}) {
                     toggleWorkflowJobs(run.id, headerEl, true);
                 }
             });
-
-        } catch(e) { if(!silent) container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger)">Error: ${e.message}</div>`; }
     }
 
 async function downloadArtifact(runId) {
