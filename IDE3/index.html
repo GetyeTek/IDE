@@ -1075,17 +1075,58 @@
 
         <header class="kt-header">
             <button onclick="closeKeyTester()" style="background:transparent; color:#fff; border:1px solid #444; width:auto; padding: 8px 12px; margin-right: 10px;">← Back</button>
-            <input type="password" id="tester-apiKey" class="kt-input" placeholder="Paste Gemini API Key" oninput="localStorage.setItem('conduit_tester_gemini_key', this.value)">
-            <button onclick="fetchTesterModels()" id="tester-loadBtn" class="kt-btn">Load Models</button>
-            <select id="tester-modelList" class="kt-select"><option value="">Select a model...</option></select>
+            <div style="flex:1; display:flex; gap:10px; align-items:center;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; background:#0f172a; padding:8px 12px; border-radius:6px; border:1px solid #475569;">
+                    <input type="checkbox" id="tester-batch-toggle" onchange="toggleTesterMode()"> 
+                    <span style="font-weight:bold; color:#38bdf8;">BATCH TEST</span>
+                </label>
+            </div>
         </header>
 
-        <div id="tester-chat-container"></div>
+        <!-- MANUAL MODE CONTAINER -->
+        <div id="tester-view-manual" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+            <div style="padding:10px; background:#1e293b; display:flex; gap:10px; border-bottom:1px solid #334155;">
+                <input type="password" id="tester-apiKey" class="kt-input" placeholder="Paste Gemini API Key" oninput="localStorage.setItem('conduit_tester_gemini_key', this.value)" style="flex:1;">
+                <button onclick="fetchTesterModels()" id="tester-loadBtn" class="kt-btn">Load Models</button>
+                <select id="tester-modelList" class="kt-select" style="flex:1;"><option value="">Select a model...</option></select>
+            </div>
+            <div id="tester-chat-container"></div>
+            <footer class="kt-footer">
+                <input type="text" id="tester-userInput" class="kt-input" placeholder="Ask something..." onkeypress="if(event.key==='Enter') sendTesterMessage()">
+                <button onclick="sendTesterMessage()" id="tester-sendBtn" class="kt-btn">Send</button>
+            </footer>
+        </div>
 
-        <footer class="kt-footer">
-            <input type="text" id="tester-userInput" class="kt-input" placeholder="Ask something..." onkeypress="if(event.key==='Enter') sendTesterMessage()">
-            <button onclick="sendTesterMessage()" id="tester-sendBtn" class="kt-btn">Send</button>
-        </footer>
+        <!-- BATCH MODE CONTAINER -->
+        <div id="tester-view-batch" style="display:none; flex:1; overflow-y:auto; background:#0f172a;">
+            <div class="max-w-xl mx-auto px-4 py-8">
+                <header class="mb-8 flex justify-between items-end">
+                    <div>
+                        <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent">Gemini 2.5 Flash</h1>
+                        <p class="text-slate-400 text-sm">Key Validation Dashboard</p>
+                    </div>
+                    <div class="text-right">
+                        <button onclick="fetchAllTesterKeys()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-full text-xs font-bold transition-all transform active:scale-95 shadow-lg shadow-blue-900/20">RESCAN ALL</button>
+                    </div>
+                </header>
+                <div class="grid grid-cols-2 gap-4 mb-8">
+                    <div class="bg-slate-800/50 border border-slate-700 p-4 rounded-2xl">
+                        <span class="text-slate-500 text-xs uppercase font-bold tracking-wider">Total Keys</span>
+                        <div id="count-total-keys" class="text-2xl font-mono">0</div>
+                    </div>
+                    <div class="bg-slate-800/50 border border-slate-700 p-4 rounded-2xl">
+                        <span class="text-slate-500 text-xs uppercase font-bold tracking-wider">Active</span>
+                        <div id="count-valid-keys" class="text-2xl font-mono text-teal-400">0</div>
+                    </div>
+                </div>
+                <div id="key-validation-container" class="space-y-3">
+                    <div id="tester-loading-state" class="text-center py-20">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-blue-500 mb-4"></div>
+                        <p class="text-slate-500">Connecting to database...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- SQL EXECUTOR OVERLAY -->
@@ -6088,6 +6129,89 @@ async function downloadArtifact(runId) {
         div.innerText = text;
         document.getElementById('tester-chat-container').appendChild(div);
         return div;
+    }
+
+    function toggleTesterMode() {
+        const isBatch = document.getElementById('tester-batch-toggle').checked;
+        document.getElementById('tester-view-manual').style.display = isBatch ? 'none' : 'flex';
+        document.getElementById('tester-view-batch').style.display = isBatch ? 'block' : 'none';
+        if (isBatch) fetchAllTesterKeys();
+    }
+
+    async function fetchAllTesterKeys() {
+        const SB_URL = "https://xvldfsmxskhemkslsbym.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU";
+        const container = document.getElementById('key-validation-container');
+        const totalLabel = document.getElementById('count-total-keys');
+        const validLabel = document.getElementById('count-valid-keys');
+        
+        container.innerHTML = '';
+        validLabel.innerText = '0';
+        let validCount = 0;
+
+        try {
+            const response = await fetch(SB_URL + '/rest/v1/api_keys?service=eq.gemini&select=*', {
+                headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
+            });
+            const keys = await response.json();
+            totalLabel.innerText = keys.length;
+
+            if (keys.length === 0) {
+                container.innerHTML = '<p class="text-center text-slate-500">No Gemini keys found.</p>';
+                return;
+            }
+
+            keys.forEach(async (keyData) => {
+                const row = document.createElement('div');
+                row.className = "bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-sm";
+                row.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1 overflow-hidden mr-4">
+                            <h3 class="font-bold text-slate-200 truncate">${keyData.name || 'Unnamed Key'}</h3>
+                            <p class="text-xs text-slate-500 font-mono mt-1">${keyData.api_key.substring(0, 12)}...</p>
+                        </div>
+                        <div class="status-badge px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter bg-slate-700 text-slate-400">PENDING</div>
+                    </div>
+                    <div class="result-area"><p class="text-[10px] text-slate-600 mt-2">Pinging Gemini 2.5 Flash...</p></div>`;
+                container.appendChild(row);
+
+                const success = await validateTesterKey(keyData.api_key, row);
+                if (success) {
+                    validCount++;
+                    validLabel.innerText = validCount;
+                }
+            });
+        } catch (err) {
+            container.innerHTML = '<div class="p-4 bg-red-900/20 text-red-200 rounded-xl">Error: ' + err.message + '</div>';
+        }
+    }
+
+    async function validateTesterKey(apiKey, element) {
+        const resultArea = element.querySelector('.result-area');
+        const badge = element.querySelector('.status-badge');
+        try {
+            const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Hello, respond with exactly one word: 'OK'." }] }] })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                badge.innerText = "SUCCESS";
+                badge.className = "status-badge px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter bg-teal-900/40 text-teal-400";
+                resultArea.innerHTML = `<p style="color:#10b981; font-size:12px; margin-top:4px;">✓ Response: ${data.candidates[0].content.parts[0].text.trim()}</p>`;
+                return true;
+            } else {
+                badge.innerText = data.error?.status || "ERROR";
+                badge.className = "status-badge px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter bg-red-900/40 text-red-400";
+                resultArea.innerHTML = `<p style="color:#ef4444; font-size:11px; margin-top:4px; font-family:monospace;">✕ ${data.error?.message || 'API Error'}</p>`;
+                return false;
+            }
+        } catch (err) {
+            badge.innerText = "FAILED";
+            resultArea.innerHTML = '<p style="color:#ef4444; font-size:11px; margin-top:4px;">✕ Network Error</p>';
+            return false;
+        }
     }
 
     function downloadSqlCsv() {
