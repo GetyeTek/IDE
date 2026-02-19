@@ -949,11 +949,14 @@
             <div class="flex-between" style="margin-bottom:10px;">
                 <div class="input-label" style="margin:0;">Files Involved</div>
                 <div class="flex-gap">
-                    <button class="btn-outline" style="padding:2px 8px; font-size:10px;" onclick="toggleAllFilterFiles(true)">All</button>
-                    <button class="btn-outline" style="padding:2px 8px; font-size:10px;" onclick="toggleAllFilterFiles(false)">None</button>
+                    <button class="btn-outline" style="padding:2px 8px; font-size:10px;" onclick="toggleAllFilterFiles(true)">Select All</button>
+                    <button class="btn-outline" style="padding:2px 8px; font-size:10px;" onclick="toggleAllFilterFiles(false)">Clear All</button>
                 </div>
             </div>
-            <div id="filter-file-list" class="card" style="padding:0; max-height: 400px; overflow-y: auto;"></div>
+            <div class="input-group" style="margin-bottom:10px;">
+                <input type="text" id="filter-search-input" class="input-field" placeholder="Search files to toggle..." onkeyup="filterFilterList(this.value)" style="height:34px; font-size:12px;">
+            </div>
+            <div id="filter-file-list" class="card" style="padding:0; max-height: 350px; overflow-y: auto;"></div>
         </div>
     </div>
 
@@ -3490,7 +3493,21 @@ async function downloadArtifact(runId) {
     }
 
     function toggleAllFilterFiles(checked) {
-        document.querySelectorAll('.filter-file-check').forEach(cb => cb.checked = checked);
+        // Only toggle files that are currently visible in the search filter
+        document.querySelectorAll('.filter-checkbox-item').forEach(item => {
+            if (item.style.display !== 'none') {
+                const cb = item.querySelector('.filter-file-check');
+                if (cb) cb.checked = checked;
+            }
+        });
+    }
+
+    function filterFilterList(q) {
+        const query = q.toLowerCase();
+        document.querySelectorAll('.filter-checkbox-item').forEach(item => {
+            const text = item.querySelector('span').innerText.toLowerCase();
+            item.style.display = text.includes(query) ? 'flex' : 'none';
+        });
     }
 
     function applyActiveFilters() {
@@ -3526,12 +3543,18 @@ async function downloadArtifact(runId) {
             // 2. File Filter
             if (f.files.length > 0) {
                 let touchedFiles = [];
-                if (tab === 'history') touchedFiles = (item.ops || []).map(o => o.file_path);
+                if (tab === 'history') touchedFiles = (item.ops || []).map(o => o.file_path || '');
+                if (tab === 'patcher') {
+                    // Patcher logic is handled by applyFiltersToPatcher, but we add safety here
+                    touchedFiles = (item.results || []).map(r => r.file);
+                }
                 if (tab === 'cicd') {
                     const match = dbHistory.find(h => h.sha === item.head_commit.id);
-                    touchedFiles = match ? (match.ops || []).map(o => o.file_path) : [];
+                    touchedFiles = match ? (match.ops || []).map(o => o.file_path || '') : [];
                 }
-                if (!touchedFiles.some(tf => f.files.includes(tf))) return false;
+                // Filter out empty paths
+                touchedFiles = touchedFiles.filter(p => p !== '');
+                if (touchedFiles.length > 0 && !touchedFiles.some(tf => f.files.includes(tf))) return false;
             }
             return true;
         });
