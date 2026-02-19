@@ -868,7 +868,14 @@
                     <input type="text" id="ef-name" class="input-field" placeholder="e.g. stripe-webhook">
                 </div>
                 <div style="flex:1; display:flex; flex-direction:column; overflow: hidden;">
-                    <label class="input-label">index.ts</label>
+                    <div class="flex-between" style="margin-bottom: 6px;">
+                        <label class="input-label" style="margin-bottom:0;">index.ts</label>
+                        <div class="flex-gap">
+                            <button class="icon-btn" style="padding: 3px 10px; font-size: 10px;" onclick="copyEFCode()">Copy</button>
+                            <button class="icon-btn" style="padding: 3px 10px; font-size: 10px;" onclick="pasteEFCode()">Paste</button>
+                            <button class="icon-btn" style="padding: 3px 10px; font-size: 10px; color:var(--danger);" onclick="clearEFCode()">Clear</button>
+                        </div>
+                    </div>
                     <textarea id="ef-code" class="json-editor" style="flex:1; margin-bottom:0; font-family:'JetBrains Mono'; resize:none;" placeholder="Paste function code here..."></textarea>
                 </div>
                 <div class="flex-between ef-controls" style="background:var(--card-bg); padding:12px; border-radius:12px; border:1px solid var(--border);">
@@ -2884,6 +2891,24 @@ function addTerminalCard(data, options = {}) {
                 currentChatId = data.chat_id; // Set ID if it was a new chat
             }
         } catch (e) { console.error("Auto-save failed", e); }
+    }
+
+    function copyEFCode() {
+        const code = document.getElementById('ef-code').value;
+        if(!code) return;
+        navigator.clipboard.writeText(code).then(() => showGlobalToast("Code copied!"));
+    }
+    async function pasteEFCode() {
+        try {
+            const text = await navigator.clipboard.readText();
+            if(text) document.getElementById('ef-code').value = text;
+        } catch(e) { showGlobalToast("Paste failed: Check permissions", true); }
+    }
+    function clearEFCode() {
+        const area = document.getElementById('ef-code');
+        if(area.value && confirm("Clear function editor?")) {
+            area.value = '';
+        }
     }
 
     // --- WORKFLOWS & CI/CD ---
