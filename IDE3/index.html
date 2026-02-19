@@ -4325,6 +4325,8 @@ async function downloadArtifact(runId) {
             showGlobalToast("Repository state restored");
             fetchState(true);
             fetchFileList();
+            // Auto-rebuild preview to match restored state
+            setTimeout(() => bundleAndPreview(index), 800);
         }
     }
 
@@ -5235,6 +5237,8 @@ async function downloadArtifact(runId) {
                         fetchFileList();
                         fetchState(false, false);
                         showGlobalToast("✨ Patch undone successfully");
+                        // Auto-rebuild preview to match state after undo
+                        setTimeout(() => bundleAndPreview(null), 800);
                     }, 400);
                 }
             } else throw new Error(data.error || "Rollback failed");
