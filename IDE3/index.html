@@ -1941,63 +1941,43 @@
         let code = document.getElementById('ef-code').value.trim();
         const status = document.getElementById('ef-status-msg');
 
-        if (!name) return alert("Enter a function name.");
-        if (!code || code === "Loading...") return alert("Editor is empty or still loading.");
+        if (!name) return showGlobalToast("Function name is required", true);
+        if (code === "Loading...") return showGlobalToast("Please wait, function is still loading", false);
         
         localStorage.setItem('conduit_last_ef', name);
 
-        // Dirty checking: Compare current editor with what was fetched
-        const isModified = code !== window.EF_ORIGINAL_SOURCE;
-        const isDefaultTemplate = code.startsWith("import { serve");
+        const isEmpty = !code;
+        const isModified = !isEmpty && code !== window.EF_ORIGINAL_SOURCE;
 
-        // 2. VALIDATION (Always run this on the code we just resolved)
-        status.innerText = "🧬 Validating Syntax...";
-        status.style.color = "var(--ai-accent)";
+        if (isModified) {
+            status.innerText = "🧬 Validating Syntax...";
+            status.style.color = "var(--ai-accent)";
+            try {
+                const scanRes = await fetch(CONFIG.funcUrl, { 
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'validate_syntax_deep', code_block: code, file_path: 'index.ts' })
+                });
+                const scanData = await scanRes.json();
 
-        // --- STEP 0: PRE-FLIGHT VALIDATION ---
-        try {
-            const scanRes = await fetch(CONFIG.funcUrl, { 
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'validate_syntax_deep', code_block: code, file_path: 'index.ts' })
-            });
-            const scanData = await scanRes.json();
-
-            if (!scanData.valid) {
-                console.log("Validation Failed:", scanData.errors);
-                status.innerText = `❌ ${scanData.errors.length} Syntax Errors Found`;
-                status.style.color = "var(--danger)";
-                
-                // Render Errors
-                const errorListStr = scanData.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
-                
-                if (confirm(`Syntax Errors Detected:\n\n${errorListStr}\n\nAttempt Auto-Fix?`)) {
-                    const fixed = await runAutoFixLoop(name, code, scanData.errors);
-                    if (!fixed) {
-                        status.innerText = "❌ Deployment Aborted (Syntax)";
-                        return;
-                    }
-                    // If fixed, proceed with deployment using the NEW code
-                } else {
-                    return;
+                if (!scanData.valid) {
+                    const errorListStr = scanData.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
+                    if (confirm(`Syntax Errors Detected:\n\n${errorListStr}\n\nAttempt Auto-Fix?`)) {
+                        const fixed = await runAutoFixLoop(name, code, scanData.errors);
+                        if (!fixed) return;
+                        code = document.getElementById('ef-code').value; // Update code ref after fix
+                    } else return;
                 }
+            } catch(e) {
+                if(!confirm("Syntax check unavailable. Deploy anyway?")) return;
             }
-        } catch(e) {
-            console.error("Validation check failed", e);
-            if(!confirm("Syntax check failed to run. Deploy anyway?")) return;
         }
-
-        // Use the (potentially updated) code from DOM
-        // Note: If we auto-fetched, 'code' variable holds the content, but DOM might be empty. 
-        // We use the 'code' variable we resolved earlier.
-        const finalCode = code;
 
         status.innerText = "⏳ Processing...";
         status.style.color = "var(--ai-accent)";
 
         try {
-            // Step 1: Commit code ONLY if it's different from GitHub
             if (isModified) {
-                status.innerText = "💾 Syncing local changes to GitHub...";
+                status.innerText = "💾 Syncing local changes...";
                 const patchRes = await fetch(CONFIG.funcUrl, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: apiBody({ action: 'patch', operations: [{
@@ -6062,10 +6042,7 @@ async function downloadArtifact(runId) {
 
     function openEFLogs() {
         const name = document.getElementById('ef-name').value.trim();
-        if (!name) return alert("Select or name a function first.");
-        
-        const pat = localStorage.getItem('conduit_supabase_pat');
-        if (!pat) return alert("Add your Supabase PAT in Settings first.");
+        if (!name) return showGlobalToast("Select or name a function first", true);
 
         document.getElementById('ef-logs-overlay').classList.add('active');
         document.getElementById('ef-logs-title').innerText = 'Logs: ' + name;
@@ -6195,13 +6172,12 @@ async function downloadArtifact(runId) {
     async function fetchTesterModels() {
         let key = document.getElementById('tester-apiKey').value;
         
-        // If key is missing in manual input, try to grab the first key from the active batch list
         if (!key && activeKeysToTest.length > 0) {
             key = activeKeysToTest[0].api_key;
-            showGlobalToast("Using first key in list to fetch registry...");
+            showGlobalToast("Using list key for registry...");
         }
 
-        if (!key) return alert("Enter an API key in 'Manual Mode' or load a list in 'Batch Mode' first to fetch models.");
+        if (!key) return showGlobalToast("Enter an API key or load a list first", true);
         
         const modelSelect = document.getElementById('tester-modelList');
         const batchSelect = document.getElementById('tester-batch-modelList');
@@ -6234,7 +6210,7 @@ async function downloadArtifact(runId) {
         const container = document.getElementById('tester-chat-container');
         const text = input.value.trim();
 
-        if (!key || !model || !text) return alert("Key, Model, and Message are all required.");
+        if (!key || !model || !text) return showGlobalToast("Check Key, Model, and Message", true);
 
         appendTesterMsg(text, 'tester-user');
         input.value = '';
