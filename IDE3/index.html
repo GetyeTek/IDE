@@ -2506,52 +2506,42 @@ function addTerminalCard(data, options = {}) {
     }
 
     // --- BUNDLER & PREVIEW ---
-    async function bundleAndPreview(index) {
+        async function bundleAndPreview(index) {
         if(!CONFIG.funcUrl) return;
-        // Clear temporary runtime logs on every new build
         document.querySelectorAll('.runtime-log').forEach(el => el.remove());
         
-        console.group("🧬 WASM BUNDLER SCAN");
-
         let entry = (typeof index === 'number') ? dbHistory[index] : null;
         let sha = entry ? entry.sha : null;
         let rootPrefix = ''; 
         if (entry && entry.type === 'Prod') {
             const match = entry.title.match(/Deployed\s+(.+)/);
-            if (match && match[1]) rootPrefix = `${match[1]}/`;
+            if (match && match[1]) rootPrefix = match[1];
         }
         
-        const effectiveRoot = rootPrefix || CONFIG.projectPath;
+        let effectiveRoot = (rootPrefix || CONFIG.projectPath || "").replace(/^\/+/, "");
+        if (effectiveRoot && !effectiveRoot.endsWith('/')) effectiveRoot += '/';
+
         const entryFile = effectiveRoot + 'index.html';
         const iframe = document.getElementById('preview-frame');
-        iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Fetching & Building ${entryFile}...</div>`;
+        iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Initializing Environment...</div>`;
 
         const fileCache = {}; window.CURRENT_FILE_CACHE = fileCache;
 
         try {
-            // 1. Fetch File List (Tree)
-            iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Scanning project structure...</div>`;
-            const treeRes = await fetch(CONFIG.funcUrl, { 
-                method: 'POST', headers: {'Content-Type': 'application/json'}, 
-                body: apiBody({ action: 'fetch_tree', project_path: effectiveRoot, ref_sha: sha }) 
+            const treeRes = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'fetch_tree', project_path: effectiveRoot, ref_sha: sha })
             });
             const treeData = await treeRes.json();
-            const files = treeData.files || [];
+            const files = (treeData.files || []).filter(f => f.path.startsWith(effectiveRoot));
             
-            // 2. Parallel Fetch Swarm
-            const BATCH_SIZE = 10; // High concurrency for speed
-            let completed = 0;
-            
+            if (files.length === 0) throw new Error(`No files found in scope: ${effectiveRoot}`);
+            console.log("📦 [Bundler] Files in Scope:", files.map(f => f.path));
+
+            const BATCH_SIZE = 12;
             for (let i = 0; i < files.length; i += BATCH_SIZE) {
                 const batch = files.slice(i, i + BATCH_SIZE);
-                
-                iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">
-                    Fetching files: ${completed}/${files.length}<br>
-                    <div style="width:200px; height:4px; background:#333; margin:10px auto; border-radius:2px;">
-                        <div style="width:${(completed/files.length)*100}%; height:100%; background:var(--primary); transition:width 0.2s;"></div>
-                    </div>
-                </div>`;
-
+                iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Fetching Module: ${i}/${files.length}...</div>`;
                 await Promise.all(batch.map(async (file) => {
                     try {
                         const res = await fetch(CONFIG.funcUrl, {
@@ -2560,186 +2550,86 @@ function addTerminalCard(data, options = {}) {
                         });
                         const data = await res.json();
                         if (data.content) {
-                            const mime = getMime(file.path);
-                            const content = mime === 'image' ? data.content : b64DecodeUnicode(data.content);
-                            fileCache[file.path] = { content, mime, sha: file.sha };
+                            const ext = file.path.split('.').pop().toLowerCase();
+                            fileCache[file.path] = { 
+                                content: (['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico'].includes(ext)) ? data.content : b64DecodeUnicode(data.content),
+                                ext, sha: file.sha 
+                            };
                         }
                     } catch(e) { console.error("Fetch fail", file.path); }
                 }));
-                completed += batch.length;
             }
-            
-            iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Transpiling & Building...</div>`;
 
-        } catch(e) { return iframe.srcdoc = `Error bundling project: ${e.message}`; }
+            if(!fileCache[entryFile]) throw new Error(`Entry file ${entryFile} not found.`);
 
-        function getMime(path) {
-            if (path.endsWith('.html')) return 'text/html';
-            if (path.endsWith('.js') || path.endsWith('.mjs')) return 'text/javascript';
-            if (path.endsWith('.jsx') || path.endsWith('.tsx') || path.endsWith('.ts')) return 'text/jsx';
-            if (path.endsWith('.css')) return 'text/css';
-            if (path.endsWith('.json')) return 'application/json';
-            if (path.match(/\.(png|jpg|jpeg|gif|svg|ico)$/)) return 'image';
-            return 'application/octet-stream';
-        }
+            const importMap = { imports: { "react": "https://esm.sh/react@18.2.0", "react-dom/client": "https://esm.sh/react-dom@18.2.0/client" } };
 
-        if(!fileCache[entryFile]) return iframe.srcdoc = `Error: ${entryFile} not found (Check Project Path settings)`;
+            for (const fullPath in fileCache) {
+                const file = fileCache[fullPath];
+                const virtualPath = fullPath.substring(effectiveRoot.length);
+                const isJs = ['js', 'mjs', 'ts', 'jsx', 'tsx'].includes(file.ext);
 
-        let syntaxErrors = [];
-        const filesToScan = Object.keys(fileCache).filter(path => 
-            path.match(/\.(js|ts|jsx|tsx|html|css)$/) && path.startsWith(effectiveRoot)
-        );
-
-        // Concurrent WASM Scan via Backend (If enabled)
-        if (CONFIG.wasmValidation) {
-            await Promise.all(filesToScan.map(async (path) => {
-            try {
-                const res = await fetch(CONFIG.funcUrl, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ action: 'validate_syntax_deep', code_block: fileCache[path].content, file_path: path })
-                });
-                const data = await res.json();
-                if (data.valid === false && data.errors) {
-                    data.errors.forEach(err => {
-                        syntaxErrors.push({ path, message: err.message, line: err.line });
-                        console.error(`🛑 WASM Found Error in ${path}:`, err);
+                if (isJs) {
+                    file.content = file.content.replace(/(import|export)([\s\S]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
+                        if (importPath.startsWith('http') || importPath === 'react' || importPath.startsWith('react-dom')) return match;
+                        if (importPath.startsWith('.')) {
+                            const resolvedFull = resolvePath(fullPath, importPath);
+                            if (resolvedFull.startsWith(effectiveRoot)) return `${keyword}${mid}${q1}${resolvedFull.substring(effectiveRoot.length)}${q2}`;
+                        }
+                        return match;
                     });
-                }
-            } catch(e) { console.warn("WASM scan failed for", path); }
-            }));
-        } else {
-            console.log("🧬 WASM Scan Disabled via Settings");
-        }
 
-        // Import Rewrite Logic
-        function rewriteImports(code, currentPath) {
-            return code.replace(/(import|export)([\s\S]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
-                if(importPath === 'react' || importPath === 'react-dom' || importPath === 'react-dom/client') return match;
-                if(importPath.startsWith('.')) {
-                    const resolved = resolvePath(currentPath, importPath);
-                    const cleanKey = resolved.startsWith(effectiveRoot) ? resolved.substring(effectiveRoot.length) : resolved;
-                    return `${keyword}${mid}${q1}${cleanKey}${q2}`;
-                }
-                return match;
-            });
-        }
-
-        const importMap = { imports: { "react": "https://esm.sh/react@18.2.0", "react-dom/client": "https://esm.sh/react-dom@18.2.0/client" } };
-
-        Object.keys(fileCache).forEach(path => {
-            // Ghost Protection: Ignore files outside the project root
-            if (effectiveRoot && !path.startsWith(effectiveRoot)) return;
-
-            const mime = fileCache[path].mime;
-            const isJsx = path.endsWith('.jsx') || path.endsWith('.tsx') || mime === 'text/jsx' || mime === 'text/typescript-jsx';
-            const isJs = path.endsWith('.js') || path.endsWith('.mjs') || path.endsWith('.ts') || mime === 'text/javascript';
-
-            if(isJs || isJsx) {
-                fileCache[path].content = rewriteImports(fileCache[path].content, path);
-            }
-
-            const mapKey = path.startsWith(effectiveRoot) ? path.substring(effectiveRoot.length) : path;
-            const cacheKey = path;
-            const currentSha = fileCache[path].sha;
-            
-            if (isJsx) {
-                if (window.BUILD_CACHE[cacheKey] && window.BUILD_CACHE[cacheKey].sha === currentSha) {
-                    fileCache[path].content = window.BUILD_CACHE[cacheKey].code;
-                    fileCache[path].mime = 'text/javascript';
-                } else {
-                    try {
-                        const res = Babel.transform(fileCache[path].content, { presets: [['env', { modules: false }], 'react'], filename: path });
-                        fileCache[path].content = res.code;
-                        fileCache[path].mime = 'text/javascript'; 
-                        window.BUILD_CACHE[cacheKey] = { sha: currentSha, code: res.code };
-                    } catch (e) {
-                        return iframe.srcdoc = `<div style="color:red; font-family:monospace; padding:20px;"><strong>Build Error in ${path}:</strong><br>${e.message}</div>`;
+                    if (['jsx', 'tsx'].includes(file.ext)) {
+                        try {
+                            const res = Babel.transform(file.content, { presets: [['env', { modules: false }], 'react'], filename: fullPath });
+                            file.content = res.code;
+                        } catch (e) { throw new Error(`Babel Error in ${fullPath}: ${e.message}`); }
                     }
                 }
-            }
 
-            if (fileCache[path].mime === 'text/css') {
-                 const cleanCss = fileCache[path].content.replace(/`/g, '\\`').replace(/\\/g, '\\\\');
-                 fileCache[path].content = `const style = document.createElement('style'); style.textContent = \`${cleanCss}\`; document.head.appendChild(style);`;
-                 fileCache[path].mime = 'text/javascript';
-            }
-            if (fileCache[path].mime === 'application/json') {
-                fileCache[path].content = `export default ${fileCache[path].content};`;
-                fileCache[path].mime = 'text/javascript';
-            }
-            if (fileCache[path].mime === 'image') {
-                const ext = path.split('.').pop();
-                let imgMime = 'image/png';
-                if(ext === 'svg') imgMime = 'image/svg+xml';
-                const dataUri = `data:${imgMime};base64,${fileCache[path].content}`;
-                fileCache[path].content = `export default "${dataUri}";`;
-                fileCache[path].mime = 'text/javascript';
-            }
-
-            const blob = new Blob([fileCache[path].content], { type: fileCache[path].mime });
-            fileCache[path].blobUrl = URL.createObjectURL(blob);
-            importMap.imports[mapKey] = fileCache[path].blobUrl;
-        });
-
-        let html = fileCache[entryFile].content;
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-
-        const flagScript = doc.createElement('script');
-        flagScript.textContent = 'window.IS_CONDUIT_PREVIEW = true; window.process = { env: { NODE_ENV: "development" } };' + 
-            '\n\n// --- PREVIEW CONSOLE SYNC ---\n' +
-            'const sendToConduit = (type, args) => { ' +
-            '  window.parent.postMessage({ type: "CONDUIT_CONSOLE", method: type, msg: Array.from(args).map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ") }, "*"); ' +
-            '};\n' +
-            'const originalLog = console.log; const originalError = console.error;\n' +
-            'console.log = function() { sendToConduit("log", arguments); originalLog.apply(console, arguments); };\n' +
-            'console.error = function() { sendToConduit("error", arguments); originalError.apply(console, arguments); };\n' +
-            'console.warn = function() { sendToConduit("warn", arguments); };\n' +
-            'window.onerror = function(msg, url, line, col, error) { ' +
-            '  sendToConduit("error", ["RUNTIME ERROR: " + msg + " at " + line + ":" + col]); ' +
-            '};';
-        doc.head.insertBefore(flagScript, doc.head.firstChild);
-
-        const babelScript = doc.createElement('script');
-        babelScript.src = "https://unpkg.com/@babel/standalone/babel.min.js";
-        doc.head.appendChild(babelScript);
-
-        doc.querySelectorAll('script[src]').forEach(el => {
-            const src = el.getAttribute('src');
-            if(!src) return;
-            const repoPath = src.startsWith('./') ? resolvePath(entryFile, src) : (effectiveRoot + src);
-            if(fileCache[repoPath]) {
-                if(fileCache[repoPath].mime === 'text/jsx') {
-                    const inlineScript = doc.createElement('script');
-                    inlineScript.type = 'text/babel';
-                    inlineScript.setAttribute('data-presets', 'react,env');
-                    inlineScript.textContent = fileCache[repoPath].content;
-                    el.replaceWith(inlineScript);
-                } else if(fileCache[repoPath].mime === 'text/javascript') {
-                    const cleanKey = repoPath.startsWith(effectiveRoot) ? repoPath.substring(effectiveRoot.length) : repoPath;
-                    const inlineScript = doc.createElement('script');
-                    inlineScript.type = 'module';
-                    inlineScript.textContent = `import "${cleanKey}";`;
-                    el.replaceWith(inlineScript);
-                } else {
-                    el.src = fileCache[repoPath].blobUrl;
+                if (file.ext === 'css') {
+                    const cleanCss = file.content.replace(/`/g, '\\`').replace(/\\/g, '\\\\');
+                    file.content = `const s = document.createElement('style'); s.textContent = \`${cleanCss}\`; document.head.appendChild(s);`;
+                    file.ext = 'js';
                 }
+
+                const mime = file.ext === 'js' ? 'text/javascript' : (file.ext === 'html' ? 'text/html' : 'application/octet-stream');
+                const blob = new Blob([file.content], { type: mime });
+                file.blobUrl = URL.createObjectURL(blob);
+                importMap.imports[virtualPath] = file.blobUrl;
+                importMap.imports['./' + virtualPath] = file.blobUrl;
             }
-        });
 
-        const mapTag = doc.createElement('script');
-        mapTag.type = "importmap";
-        mapTag.textContent = JSON.stringify(importMap);
-        doc.head.insertBefore(mapTag, doc.head.firstChild);
+            const doc = new DOMParser().parseFromString(fileCache[entryFile].content, 'text/html');
+            const baseScript = doc.createElement('script');
+            baseScript.textContent = 'window.IS_CONDUIT_PREVIEW = true; window.process = { env: { NODE_ENV: "development" } };';
+            doc.head.prepend(baseScript);
 
-        const finalHtml = doc.documentElement.outerHTML;
-        iframe.srcdoc = finalHtml;
-        
-        if(window.PREVIEW_BLOB_URL) URL.revokeObjectURL(window.PREVIEW_BLOB_URL);
-        const blob = new Blob([finalHtml], { type: 'text/html' });
-        window.PREVIEW_BLOB_URL = URL.createObjectURL(blob);
-        if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
-        document.getElementById('preview-url-display').innerText = sha ? `Viewing: ${entry.title}` : `Viewing: Live Dev (${CONFIG.repoName})`;
+            doc.querySelectorAll('script[src]').forEach(el => {
+                const src = el.getAttribute('src');
+                if (src && !src.startsWith('http')) {
+                    const resolved = resolvePath(entryFile, src);
+                    if (fileCache[resolved]) {
+                        const inline = doc.createElement('script');
+                        inline.type = 'module';
+                        inline.textContent = `import "${resolved.substring(effectiveRoot.length)}";`;
+                        el.replaceWith(inline);
+                    }
+                }
+            });
+
+            const mapTag = doc.createElement('script');
+            mapTag.type = "importmap";
+            mapTag.textContent = JSON.stringify(importMap);
+            doc.head.prepend(mapTag);
+
+            iframe.srcdoc = doc.documentElement.outerHTML;
+            if(window.PREVIEW_BLOB_URL) URL.revokeObjectURL(window.PREVIEW_BLOB_URL);
+            window.PREVIEW_BLOB_URL = URL.createObjectURL(new Blob([iframe.srcdoc], { type: 'text/html' }));
+            if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
+            document.getElementById('preview-url-display').innerText = sha ? `Viewing: ${entry.title}` : `Viewing: Live Dev (${CONFIG.repoName})`;
+
+        } catch(e) { iframe.srcdoc = `<div style="color:red; padding:20px;"><b>Preview Error:</b><br>${e.message}</div>`; }
     }
 
     // --- VISUAL ERROR BLAMING ---
