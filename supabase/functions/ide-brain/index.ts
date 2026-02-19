@@ -1882,6 +1882,28 @@ If you already give a payload, assume it's already applied, and give the next pl
       return new Response(JSON.stringify({ logs: await res.text() }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "fetch_ef_logs") {
+        const { function_slug, supabase_pat, before } = payload;
+        const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
+        
+        if (!projectRef) throw new Error("Could not resolve Supabase Project Ref");
+
+        let url = `https://api.supabase.com/v1/projects/${projectRef}/functions/${function_slug}/logs?limit=20`;
+        if (before) url += `&before=${before}`;
+
+        const res = await fetch(url, {
+            headers: { "Authorization": `Bearer ${supabase_pat}` }
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || "Supabase Management API error");
+        }
+
+        const logs = await res.json();
+        return new Response(JSON.stringify({ logs }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "commit_prod") {
         const scopePath = project_path || "";
         const tree = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
