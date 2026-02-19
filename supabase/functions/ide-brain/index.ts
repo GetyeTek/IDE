@@ -1888,12 +1888,13 @@ If you already give a payload, assume it's already applied, and give the next pl
         
         if (!projectRef) throw new Error("Could not resolve Supabase Project Ref");
 
-        // The Management API requires querying the Analytics endpoint for function logs
-        const sql = `SELECT timestamp, event_message, level FROM function_logs WHERE metadata.function_slug = '${function_slug}' ${before ? `AND timestamp < '${before}'` : ''} ORDER BY timestamp DESC LIMIT 20`;
+        // The official CLI and Dashboard use 'edge_logs' as the primary table for Edge Functions
+        // The unique identifier is 'function_id'
+        const sql = `SELECT timestamp, event_message, level FROM edge_logs WHERE function_id = '${function_slug}' ${before ? `AND timestamp < '${before}'` : ''} ORDER BY timestamp DESC LIMIT 20`;
         
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
 
-        console.log(`[Logs] Fetching for ${function_slug} via Analytics API`);
+        console.log(`[Logs] Fetching for ${function_slug} via edge_logs table`);
 
         const res = await fetch(url, {
             headers: { 
