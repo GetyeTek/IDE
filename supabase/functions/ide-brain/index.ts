@@ -1888,20 +1888,30 @@ If you already give a payload, assume it's already applied, and give the next pl
         
         if (!projectRef) throw new Error("Could not resolve Supabase Project Ref");
 
-        let url = `https://api.supabase.com/v1/projects/${projectRef}/functions/${function_slug}/logs?limit=20`;
-        if (before) url += `&before=${before}`;
+        // The Management API requires querying the Analytics endpoint for function logs
+        const sql = `SELECT timestamp, event_message, level FROM function_logs WHERE metadata.function_slug = '${function_slug}' ${before ? `AND timestamp < '${before}'` : ''} ORDER BY timestamp DESC LIMIT 20`;
+        
+        const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
+
+        console.log(`[Logs] Fetching for ${function_slug} via Analytics API`);
 
         const res = await fetch(url, {
-            headers: { "Authorization": `Bearer ${supabase_pat}` }
+            headers: { 
+                "Authorization": `Bearer ${supabase_pat}`,
+                "Content-Type": "application/json"
+            }
         });
 
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || "Supabase Management API error");
+            const text = await res.text();
+            let msg = "Supabase API Error";
+            try { msg = JSON.parse(text).message || msg; } catch(e) {}
+            throw new Error(msg);
         }
 
-        const logs = await res.json();
-        return new Response(JSON.stringify({ logs }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const result = await res.json();
+        // Analytics API returns logs in a 'data' array
+        return new Response(JSON.stringify({ logs: result.data || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "commit_prod") {
