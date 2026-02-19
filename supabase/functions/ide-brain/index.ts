@@ -1883,22 +1883,19 @@ If you already give a payload, assume it's already applied, and give the next pl
     }
 
     if (action === "fetch_ef_logs") {
-        const { function_slug, supabase_pat, before } = payload;
+        const { function_slug, before } = payload;
         const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
-        
+        const cloudKey = Deno.env.get("CONDUIT_CLOUD_KEY");
+
         if (!projectRef) throw new Error("Could not resolve Supabase Project Ref");
+        if (!cloudKey) throw new Error("Cloud Access Key (CONDUIT_CLOUD_KEY) not configured in Supabase secrets");
 
-        // The official CLI and Dashboard use 'edge_logs' as the primary table for Edge Functions
-        // The unique identifier is 'function_id'
         const sql = `SELECT timestamp, event_message, level FROM edge_logs WHERE function_id = '${function_slug}' ${before ? `AND timestamp < '${before}'` : ''} ORDER BY timestamp DESC LIMIT 20`;
-        
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
-
-        console.log(`[Logs] Fetching for ${function_slug} via edge_logs table`);
 
         const res = await fetch(url, {
             headers: { 
-                "Authorization": `Bearer ${supabase_pat}`,
+                "Authorization": `Bearer ${cloudKey}`,
                 "Content-Type": "application/json"
             }
         });
