@@ -1374,10 +1374,13 @@
             const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
             const data = await res.json();
             if (data.content) {
-                codeArea.value = b64DecodeUnicode(data.content);
+                const decoded = b64DecodeUnicode(data.content);
+                codeArea.value = decoded;
+                window.EF_ORIGINAL_SOURCE = decoded; // Store for dirty checking
                 status.innerText = `Ready: ${name}`;
             } else {
                 codeArea.value = "";
+                window.EF_ORIGINAL_SOURCE = "";
                 status.innerText = "index.ts missing in folder.";
             }
         } catch (e) { status.innerText = "Error loading code."; }
@@ -1538,50 +1541,14 @@
         let code = document.getElementById('ef-code').value.trim();
         const status = document.getElementById('ef-status-msg');
 
-        console.log("Target Function:", name);
         if (!name) return alert("Enter a function name.");
+        if (!code || code === "Loading...") return alert("Editor is empty or still loading.");
         
-        // Save preference
         localStorage.setItem('conduit_last_ef', name);
 
-        // 1. AUTO-FETCH if editor is empty/stale
-        let isFreshCode = true;
+        // Dirty checking: Compare current editor with what was fetched
+        const isModified = code !== window.EF_ORIGINAL_SOURCE;
         const isDefaultTemplate = code.startsWith("import { serve");
-
-        if (!code || code === "Loading..." || isDefaultTemplate) {
-             status.innerText = "📥 Checking existing source...";
-             try {
-                const res = await fetch(CONFIG.funcUrl, { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: apiBody({ action: 'preview_file', file_path: `supabase/functions/${name}/index.ts` }) 
-                });
-                const data = await res.json();
-                
-                if (data.content) {
-                    // File exists on GitHub, sync it to ensure validation is accurate
-                    code = b64DecodeUnicode(data.content);
-                    isFreshCode = false; 
-                } else {
-                    // File doesn't exist, but we have boilerplate. This is a NEW function.
-                    if (isDefaultTemplate) {
-                        console.log("Detected new function creation from template.");
-                        status.innerText = "🆕 Preparing new function...";
-                        isFreshCode = true;
-                    } else {
-                        throw new Error("Source not found.");
-                    }
-                }
-             } catch (e) {
-                // Handle total failure (like 404 or network error)
-                if (isDefaultTemplate) {
-                    console.log("File not found on GitHub, proceeding as new creation.");
-                    isFreshCode = true;
-                } else {
-                    return alert(`Cannot deploy: Could not verify '${name}'. ` + e.message);
-                }
-             }
-        }
 
         // 2. VALIDATION (Always run this on the code we just resolved)
         status.innerText = "🧬 Validating Syntax...";
@@ -1628,9 +1595,9 @@
         status.style.color = "var(--ai-accent)";
 
         try {
-            // Step 1: Commit code (ONLY if it's user-edited code)
-            if (isFreshCode) {
-                status.innerText = "💾 Syncing to GitHub...";
+            // Step 1: Commit code ONLY if it's different from GitHub
+            if (isModified) {
+                status.innerText = "💾 Syncing local changes to GitHub...";
                 const patchRes = await fetch(CONFIG.funcUrl, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: apiBody({ action: 'patch', operations: [{
@@ -1640,20 +1607,9 @@
                     }]})
                 });
                 const patchData = await patchRes.json();
-                
-                if (!patchData.success) {
-                    // Overwrite logic
-                     await fetch(CONFIG.funcUrl, {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ action: 'patch', operations: [{
-                        file_path: `supabase/functions/${name}/index.ts`,
-                        action: "create_file",
-                        content: finalCode // Force overwrite if replace fails, simpler logic
-                    }]})
-                });
-                }
+                if (!patchData.success) throw new Error("GitHub sync failed. Check connectivity.");
             } else {
-                console.log("Skipping patch step - Deploying existing GitHub content.");
+                console.log("No local changes detected. Deploying direct from GitHub.");
             }
 
             // Step 2: Trigger Workflow
