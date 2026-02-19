@@ -2775,7 +2775,7 @@ function addTerminalCard(data, options = {}) {
                     file.ext = 'js';
                 }
 
-                const mimeMap = { 'js': 'text/javascript', 'html': 'text/html', 'css': 'text/css', 'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'svg': 'image/svg+xml' };
+                const mimeMap = { 'js': 'text/javascript', 'jsx': 'text/javascript', 'ts': 'text/javascript', 'tsx': 'text/javascript', 'html': 'text/html', 'css': 'text/css', 'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'svg': 'image/svg+xml' };
                 const mime = mimeMap[file.ext] || 'application/octet-stream';
                 const blob = new Blob([file.content], { type: mime });
                 file.blobUrl = URL.createObjectURL(blob);
@@ -2785,13 +2785,14 @@ function addTerminalCard(data, options = {}) {
                 importMap.imports[virtualPath] = file.blobUrl;
                 importMap.imports['./' + virtualPath] = file.blobUrl;
 
-                // Register path without extension for smart resolution (e.g. src/App -> src/App.jsx)
-                if (virtualPath.includes('.')) {
+                // Register path without extension ONLY for scripts (standard ESM behavior)
+                const scriptExts = ['js', 'jsx', 'ts', 'tsx', 'mjs'];
+                if (virtualPath.includes('.') && scriptExts.includes(file.ext)) {
                     const noExt = virtualPath.split('.').slice(0, -1).join('.');
                     if (!importMap.imports[noExt]) {
                         importMap.imports[noExt] = file.blobUrl;
                         importMap.imports['./' + noExt] = file.blobUrl;
-                        console.log('  Extensionless Alias: ' + noExt + ' -> ' + file.blobUrl);
+                        console.log('  Script Alias: ' + noExt + ' -> ' + file.blobUrl);
                     }
                 }
             }
