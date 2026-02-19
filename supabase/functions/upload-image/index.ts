@@ -112,11 +112,13 @@ serve(async (req) => {
     if (contentType.includes("application/json")) {
       console.log(`[${requestId}] [SOLVER_STAGE] Processing JSON Payload...`);
       const payload = await req.json();
+      // Handle Supabase Webhook payload structure (payload.record) or direct calls
       const record = payload.record || payload;
       
+      // We only solve if status is 'transcribed'
       if (record.status !== 'transcribed') {
-        console.log(`[${requestId}] [SOLVER_STAGE] Skipping: Record ${record.id} status is ${record.status}`);
-        return new Response(JSON.stringify({ skipped: true }));
+        console.log(`[${requestId}] [SOLVER_STAGE] Ignoring record ${record.id} with status ${record.status}`);
+        return new Response(JSON.stringify({ success: false, reason: 'Not transcribed' }));
       }
 
       console.log(`[${requestId}] [SOLVER_STAGE] Raw record.transcription:`, JSON.stringify(record.transcription));
@@ -228,19 +230,20 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
   if (retryCount > 5) throw new Error("Exceeded maximum key rotation retries due to persistent 429s.");
 
   const { id: keyId, key } = await getGeminiKey(supabase, requestId || "");
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-  const payloadParts = parts || [{ text: prompt }];
-  
-  console.log(`[${requestId}] [AI_REQUEST] Model: ${model} | KeyID: ${keyId} | Retry: ${retryCount}`);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    // Ensure we are passing parts correctly for Multimodal (Images + Text)
+    const payloadParts = parts || [{ text: prompt }];
+    
+    console.log(`[${requestId}] [AI_REQUEST] Model: ${model} | Parts: ${payloadParts.length} | Retry: ${retryCount}`);
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      contents: [{ parts: payloadParts }], 
-      generationConfig: { response_mime_type: "application/json" } 
-    })
-  });
+    const res = await fetch(url, {
+      method: 'POST', // Corrected: Using POST to send the body
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        contents: [{ parts: payloadParts }], 
+        generationConfig: { response_mime_type: "application/json" } 
+      })
+    });
 
   if (res.status === 429) {
     await markKeyCooldown(supabase, keyId, requestId || "");
