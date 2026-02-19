@@ -96,9 +96,12 @@ const Study = ({ onOpenActivity }) => {
 
         let animationFrameId;
         const size = 140;
-        // Get progress from CSS variable or default to 0.76
-        const progress = 0.76;
-        const surfaceLevel = size * (1 - progress);
+        // Sync with CSS variable --progress-percentage (e.g., '76%')
+        const rootStyle = getComputedStyle(document.documentElement);
+        const cssProgress = rootStyle.getPropertyValue('--progress-percentage').trim() || '76%';
+        const progressValue = parseFloat(cssProgress) / 100;
+        
+        const surfaceLevel = size * (1 - progressValue);
         let time = 0;
         const waves = [{ freq: 10, amp: 1.5, speed: 0.05 }, { freq: 6, amp: 0.8, speed: -0.03 }];
 
