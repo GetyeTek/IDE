@@ -1027,11 +1027,12 @@
   // --- CONFIG & STATE ---
     let CONFIG = { 
         funcUrl: localStorage.getItem('conduit_funcUrl') || '',
-        repoName: localStorage.getItem('conduit_repoName') || 'IDE',
-        projectPath: localStorage.getItem('conduit_projectPath') || '',
+        // Project context prefers sessionStorage for tab isolation
+        repoName: sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE',
+        projectPath: sessionStorage.getItem('conduit_projectPath') || localStorage.getItem('conduit_projectPath') || '',
         autoFix: localStorage.getItem('conduit_auto_fix') === 'true',
         autoSanity: localStorage.getItem('conduit_auto_sanity') === 'true',
-        showPreview: localStorage.getItem('conduit_showPreview') !== 'false', // Default to true
+        showPreview: localStorage.getItem('conduit_showPreview') !== 'false',
         efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false'
     };
@@ -1117,8 +1118,8 @@
         renderAIConfigUI(); // Render AI Settings
         applyPreviewTabVisibility(); // Apply visibility on load
 
-        // Restore Editor State
-        const savedJson = localStorage.getItem('conduit_autosave');
+        // Restore Editor State (Tab-specific)
+        const savedJson = sessionStorage.getItem('conduit_autosave') || localStorage.getItem('conduit_autosave');
         if(savedJson) {
             document.getElementById('json-input').value = savedJson;
             editHistory.push(savedJson);
@@ -1701,14 +1702,21 @@
 
         if(!funcUrl) return alert("Function URL is required");
         
+        // Global Preferences
         localStorage.setItem('conduit_funcUrl', funcUrl);
-        localStorage.setItem('conduit_repoName', repoName);
-        localStorage.setItem('conduit_projectPath', projectPath);
         localStorage.setItem('conduit_auto_fix', autoFix);
         localStorage.setItem('conduit_auto_sanity', autoSanity);
         localStorage.setItem('conduit_showPreview', showPreview);
         localStorage.setItem('conduit_wasm_validation', wasmValidation);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
+
+        // Tab-Specific Context (Session)
+        sessionStorage.setItem('conduit_repoName', repoName);
+        sessionStorage.setItem('conduit_projectPath', projectPath);
+
+        // Also update localStorage as a fallback for new tabs
+        localStorage.setItem('conduit_repoName', repoName);
+        localStorage.setItem('conduit_projectPath', projectPath);
         
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
@@ -4018,7 +4026,11 @@ async function downloadArtifact(runId) {
 
     function saveState() {
         const val = document.getElementById('json-input').value;
+        // Isolated tab save
+        sessionStorage.setItem('conduit_autosave', val);
+        // Global fallback for persistence
         localStorage.setItem('conduit_autosave', val);
+        
         if (historyIndex === -1 || editHistory[historyIndex] !== val) {
             editHistory = editHistory.slice(0, historyIndex + 1);
             editHistory.push(val);
