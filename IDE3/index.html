@@ -1012,6 +1012,10 @@
         <div class="viewer-header">
             <div class="ins-tabs" style="display:flex; gap:10px;">
                 <button class="ins-tab active btn-outline" onclick="switchInsTab('console', this)" style="width:auto; padding:6px 15px;">Console</button>
+                <div id="ins-source-toggle" style="display:flex; background:#111; border-radius:8px; padding:2px; border:1px solid var(--border);">
+                    <button id="log-src-app" class="btn-outline active" onclick="switchLogSource('app')" style="font-size:10px; padding:4px 8px; border:none; border-radius:6px; background:var(--primary); color:white;">APP</button>
+                    <button id="log-src-ide" class="btn-outline" onclick="switchLogSource('ide')" style="font-size:10px; padding:4px 8px; border:none; border-radius:6px; background:transparent;">IDE</button>
+                </div>
                 <button class="ins-tab btn-outline" onclick="switchInsTab('network', this)" style="width:auto; padding:6px 15px;">Network</button>
             </div>
             <div class="flex-gap">
@@ -1020,7 +1024,10 @@
                 <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeInspector()">Close</button>
             </div>
         </div>
-        <div id="ins-view-console" class="ins-content active" style="flex:1; overflow-y:auto; background:#0a0a0c;"></div>
+        <div id="ins-view-console" class="ins-content active" style="flex:1; overflow-y:auto; background:#0a0a0c; display:flex; flex-direction:column;">
+            <div id="ins-console-app" style="flex:1; overflow-y:auto;"></div>
+            <div id="ins-console-ide" style="flex:1; overflow-y:auto; display:none;"></div>
+        </div>
         <div id="ins-view-network" class="ins-content" style="flex:1; overflow-y:auto; background:#0a0a0c; display:none;">
             <div style="padding:10px 12px; font-size:10px; color:#444; border-bottom:1px solid #222; display:grid; grid-template-columns:50px 45px 1fr 60px; gap:8px;">
                 <span>METHOD</span><span>STATUS</span><span>URL</span><span style="text-align:right">TIME</span>
@@ -1221,9 +1228,35 @@
 
         // --- CONDUIT INSPECTOR BUS ---
     window.inspectorLogData = [];
+    window.ideLogData = [];
     window.inspectorNetData = [];
+    window.currentLogSource = 'app';
 
-        window.addEventListener('message', (e) => {
+    // --- HOST IDE LOG INTERCEPTOR ---
+    const originalConsole = { ...console };
+    ['log', 'warn', 'error', 'info', 'debug'].forEach(method => {
+        console[method] = (...args) => {
+            const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ');
+            const time = new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+            window.ideLogData.push({ method, msg, time });
+            
+            const container = document.getElementById('ins-console-ide');
+            if (container) renderLogLine(container, method, msg, time);
+            originalConsole[method].apply(console, args);
+        };
+    });
+
+    function renderLogLine(container, method, msg, time) {
+        const row = document.createElement('div');
+        row.className = `ins-row ins-log-${method}`;
+        row.innerHTML = `<button class="ins-copy-btn" onclick="copyInsEntry(this)">Copy</button>` +
+                        `<span style="color:#555; margin-right:10px;">${time}</span>` +
+                        `<span style="white-space:pre-wrap; word-break:break-all;">${escapeHtml(msg)}</span>`;
+        container.appendChild(row);
+        if (container.scrollHeight - container.scrollTop < 1000) container.scrollTop = container.scrollHeight;
+    }
+
+    window.addEventListener('message', (e) => {
             if (!e.data || !e.data.type) return;
             
             if (e.data.type === 'CONDUIT_LOG') {
@@ -1231,14 +1264,8 @@
                 const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
                 window.inspectorLogData.push({ method, msg, time });
                 
-                const container = document.getElementById('ins-view-console');
-                const row = document.createElement('div');
-                row.className = `ins-row ins-log-${method}`;
-                row.innerHTML = `<button class="ins-copy-btn" onclick="copyInsEntry(this)">Copy</button>` +
-                                `<span style="color:#555; margin-right:10px;">${time}</span>` +
-                                `<span style="white-space:pre-wrap; word-break:break-all;">${escapeHtml(msg)}</span>`;
-                container.appendChild(row);
-                if (container.scrollHeight - container.scrollTop < 1000) container.scrollTop = container.scrollHeight;
+                const container = document.getElementById('ins-console-app');
+                if (container) renderLogLine(container, method, msg, time);
             }
 
             if (e.data.type === 'CONDUIT_NETWORK') {
@@ -5475,9 +5502,27 @@ async function downloadArtifact(runId) {
     // --- INSPECTOR ACTIONS ---
     function openInspector() { document.getElementById('inspector-overlay').classList.add('active'); toggleFab(false); }
     function closeInspector() { document.getElementById('inspector-overlay').classList.remove('active'); toggleFab(true); }
+    function switchLogSource(source) {
+        window.currentLogSource = source;
+        const isApp = source === 'app';
+        document.getElementById('ins-console-app').style.display = isApp ? 'block' : 'none';
+        document.getElementById('ins-console-ide').style.display = isApp ? 'none' : 'block';
+        
+        document.getElementById('log-src-app').style.background = isApp ? 'var(--primary)' : 'transparent';
+        document.getElementById('log-src-app').style.color = isApp ? 'white' : 'var(--text-muted)';
+        document.getElementById('log-src-ide').style.background = isApp ? 'transparent' : 'var(--primary)';
+        document.getElementById('log-src-ide').style.color = isApp ? 'var(--text-muted)' : 'white';
+    }
+
     function clearInspector() {
-        inspectorLogData = []; inspectorNetData = [];
-        document.getElementById('ins-view-console').innerHTML = '';
+        if (window.currentLogSource === 'app') {
+            inspectorLogData = [];
+            document.getElementById('ins-console-app').innerHTML = '';
+        } else {
+            ideLogData = [];
+            document.getElementById('ins-console-ide').innerHTML = '';
+        }
+        inspectorNetData = [];
         document.getElementById('ins-net-list').innerHTML = '';
     }
     function switchInsTab(tab, btn) {
@@ -5487,6 +5532,7 @@ async function downloadArtifact(runId) {
         document.querySelectorAll('.ins-content').forEach(c => c.style.display = 'none');
         btn.classList.add('active'); btn.style.background = 'rgba(59,130,246,0.1)'; btn.style.borderColor = 'var(--primary)';
         document.getElementById('ins-view-' + tab).style.display = 'block';
+        document.getElementById('ins-source-toggle').style.display = tab === 'console' ? 'flex' : 'none';
     }
 
     function copyInsEntry(btn) {
