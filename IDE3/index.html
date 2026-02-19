@@ -693,6 +693,9 @@
                     <button class="btn btn-outline" onclick="openSQLExecutor()">
                         🗄️ SQL Executor
                     </button>
+                    <button class="btn btn-outline" onclick="openKeyTester()">
+                        🔑 Key Tester
+                    </button>
                     <p style="font-size: 10px; color: var(--text-muted); text-align: center; margin: 0;">Deploy Functions or mark current state without commit.</p>
                 </div>
 
@@ -1051,6 +1054,38 @@
             <div id="ins-net-app" style="flex:1; overflow-y:auto;"></div>
             <div id="ins-net-ide" style="flex:1; overflow-y:auto; display:none;"></div>
         </div>
+    </div>
+
+    <!-- KEY TESTER OVERLAY -->
+    <div id="key-tester-overlay" class="viewer-overlay" style="background: #0f172a; color: #f8fafc; display: none; flex-direction: column;">
+        <style>
+            .kt-panel { background: #1e293b; }
+            .kt-accent { color: #38bdf8; }
+            .kt-header { padding: 1rem; background: #1e293b; border-bottom: 1px solid #334155; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+            .kt-input, .kt-select, .kt-btn { padding: 8px 12px; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: white; outline: none; font-size: 13px; }
+            .kt-btn { background: #38bdf8; color: #000; font-weight: bold; cursor: pointer; border: none; }
+            .kt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+            #tester-chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+            .tester-msg { max-width: 80%; padding: 12px; border-radius: 12px; line-height: 1.5; font-size: 14px; }
+            .tester-user { align-self: flex-end; background: #38bdf8; color: #000; }
+            .tester-bot { align-self: flex-start; background: #1e293b; border: 1px solid #334155; }
+            .kt-footer { padding: 1rem; background: #1e293b; display: flex; gap: 10px; border-top: 1px solid #334155; }
+            .kt-footer input { flex: 1; }
+        </style>
+
+        <header class="kt-header">
+            <button onclick="closeKeyTester()" style="background:transparent; color:#fff; border:1px solid #444; width:auto; padding: 8px 12px; margin-right: 10px;">← Back</button>
+            <input type="password" id="tester-apiKey" class="kt-input" placeholder="Paste Gemini API Key" oninput="localStorage.setItem('conduit_tester_gemini_key', this.value)">
+            <button onclick="fetchTesterModels()" id="tester-loadBtn" class="kt-btn">Load Models</button>
+            <select id="tester-modelList" class="kt-select"><option value="">Select a model...</option></select>
+        </header>
+
+        <div id="tester-chat-container"></div>
+
+        <footer class="kt-footer">
+            <input type="text" id="tester-userInput" class="kt-input" placeholder="Ask something..." onkeypress="if(event.key==='Enter') sendTesterMessage()">
+            <button onclick="sendTesterMessage()" id="tester-sendBtn" class="kt-btn">Send</button>
+        </footer>
     </div>
 
     <!-- SQL EXECUTOR OVERLAY -->
@@ -5975,6 +6010,84 @@ async function downloadArtifact(runId) {
                 btn.classList.remove('bg-blue-500', 'text-white');
             }, 2000);
         });
+    }
+
+    // --- KEY TESTER LOGIC ---
+    function openKeyTester() {
+        const overlay = document.getElementById('key-tester-overlay');
+        overlay.style.display = 'flex';
+        setTimeout(() => overlay.classList.add('active'), 10);
+        toggleFab(false);
+        
+        const savedKey = localStorage.getItem('conduit_tester_gemini_key');
+        if (savedKey) document.getElementById('tester-apiKey').value = savedKey;
+    }
+
+    function closeKeyTester() {
+        const overlay = document.getElementById('key-tester-overlay');
+        overlay.classList.remove('active');
+        setTimeout(() => overlay.style.display = 'none', 300);
+        toggleFab(true);
+    }
+
+    async function fetchTesterModels() {
+        const key = document.getElementById('tester-apiKey').value;
+        const modelSelect = document.getElementById('tester-modelList');
+        if (!key) return alert("Enter API Key first.");
+        
+        try {
+            const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + key);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message);
+            
+            modelSelect.innerHTML = '';
+            data.models.forEach(m => {
+                if (m.supportedGenerationMethods.includes("generateContent")) {
+                    const opt = document.createElement('option');
+                    opt.value = m.name;
+                    opt.textContent = m.displayName;
+                    modelSelect.appendChild(opt);
+                }
+            });
+            showGlobalToast("Models loaded successfully");
+        } catch (e) { alert("Error: " + e.message); }
+    }
+
+    async function sendTesterMessage() {
+        const key = document.getElementById('tester-apiKey').value;
+        const modelSelect = document.getElementById('tester-modelList');
+        const model = modelSelect.value;
+        const input = document.getElementById('tester-userInput');
+        const container = document.getElementById('tester-chat-container');
+        const text = input.value.trim();
+
+        if (!key || !model || !text) return alert("Key, Model, and Message are all required.");
+
+        appendTesterMsg(text, 'tester-user');
+        input.value = '';
+        const botMsgDiv = appendTesterMsg("...", 'tester-bot');
+
+        try {
+            const res = await fetch('https://generativelanguage.googleapis.com/v1beta/' + model + ':generateContent?key=' + key, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] })
+            });
+
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message);
+            const responseText = data.candidates[0].content.parts[0].text;
+            botMsgDiv.innerText = responseText;
+        } catch (e) { botMsgDiv.innerText = "Error: " + e.message; }
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function appendTesterMsg(text, sender) {
+        const div = document.createElement('div');
+        div.className = 'tester-msg ' + sender;
+        div.innerText = text;
+        document.getElementById('tester-chat-container').appendChild(div);
+        return div;
     }
 
     function downloadSqlCsv() {
