@@ -629,10 +629,6 @@
                     <input type="text" id="setting-func-url" class="input-field" placeholder="https://...supabase.co/functions/v1/ide-brain">
                 </div>
                 <div class="input-group">
-                    <label class="input-label">Supabase Personal Access Token (PAT)</label>
-                    <input type="password" id="setting-supabase-pat" class="input-field" placeholder="sbp_...">
-                </div>
-                <div class="input-group">
                     <label class="input-label">GitHub Repo Name</label>
                     <div style="position: relative; display: flex; align-items: center;">
                         <input type="text" id="setting-repo-name" class="input-field" placeholder="IDE" style="padding-right: 40px;">
@@ -1447,7 +1443,6 @@
 
         // Load Settings into UI
         document.getElementById('setting-func-url').value = CONFIG.funcUrl;
-        document.getElementById('setting-supabase-pat').value = localStorage.getItem('conduit_supabase_pat') || '';
         document.getElementById('setting-repo-name').value = CONFIG.repoName;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
         document.getElementById('setting-auto-fix').checked = CONFIG.autoFix;
@@ -2099,7 +2094,6 @@
         
         const autoFix = document.getElementById('setting-auto-fix').checked;
         const autoSanity = document.getElementById('setting-auto-sanity').checked;
-        const supabasePat = document.getElementById('setting-supabase-pat').value.trim();
         const showPreview = document.getElementById('setting-show-preview').checked;
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
@@ -2117,7 +2111,6 @@
         sessionStorage.setItem('conduit_projectPath', projectPath);
         sessionStorage.setItem('conduit_auto_fix', autoFix);
         sessionStorage.setItem('conduit_auto_sanity', autoSanity);
-        localStorage.setItem('conduit_supabase_pat', supabasePat);
 
         // Also update localStorage as a fallback for new tabs
         localStorage.setItem('conduit_repoName', repoName);
@@ -6083,7 +6076,6 @@ async function downloadArtifact(runId) {
         const name = document.getElementById('ef-name').value.trim();
         const container = document.getElementById('ef-logs-container');
         const footer = document.getElementById('ef-logs-footer');
-        const pat = localStorage.getItem('conduit_supabase_pat');
 
         if (!isAppend) {
             container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--ai-accent); animation:pulse 1s infinite;">Fetching Live Cloud Logs...</div>';
@@ -6096,7 +6088,6 @@ async function downloadArtifact(runId) {
                 body: apiBody({ 
                     action: 'fetch_ef_logs', 
                     function_slug: name, 
-                    supabase_pat: pat, 
                     before: efLogNextTimestamp 
                 })
             });
