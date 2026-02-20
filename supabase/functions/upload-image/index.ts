@@ -5,9 +5,9 @@ serve(async (req) => {
   const requestId = Math.random().toString(36).substring(7).toUpperCase();
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const GH_PAT = Deno.env.get('GH_PAT');
-  const REPO_OWNER = "YOUR_GITHUB_USERNAME";
-  const REPO_NAME = "YOUR_REPO_NAME";
+  const GITHUB_PAT = Deno.env.get('GITHUB_PAT');
+  const REPO_OWNER = "GetyeTek";
+  const REPO_NAME = "IDE";
 
   if (req.method === 'OPTIONS') return new Response('ok');
 
@@ -28,7 +28,7 @@ serve(async (req) => {
       const ghRes = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/ai_worker.yml/dispatches`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${GH_PAT}`,
+          'Authorization': `Bearer ${GITHUB_PAT}`,
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28'
         },
