@@ -1,0 +1,29 @@
+name: Heavy AI Worker
+on:
+  workflow_dispatch:
+    inputs:
+      record_id:
+        required: true
+      image_paths:
+        required: true
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Run AI Logic
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RECORD_ID: ${{ github.event.inputs.record_id }}
+          IMAGE_PATHS: ${{ github.event.inputs.image_paths }}
+        run: |
+          deno run -A supabase/functions/upload-image/worker_logic.ts
