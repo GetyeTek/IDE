@@ -38,10 +38,11 @@ jobs:
             -d "{\"action\": \"claim_deploy_token\", \"ticket\": \"${{ github.event.inputs.deploy_ticket }}\"}")
           
           # Parse the response to extract the token and project URL
-          TOKEN=$(echo $RESPONSE | sed 's/.*"token":"\([^"]*\)".*/\1/')
-          URL=$(echo $RESPONSE | sed 's/.*"url":"\([^"]*\)".*/\1/')
+                    # Parse and Verify
+          TOKEN=$(echo $RESPONSE | sed 's/.*"token":"\([^" ]*\)".*/\1/')
+          URL=$(echo $RESPONSE | sed 's/.*"url":"\([^" ]*\)".*/\1/')
           
-          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then 
+          if [[ "$TOKEN" == *"error"* ]] || [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then 
             echo "❌ Error: Failed to claim token from Conduit Relay."
             echo "Raw Response: $RESPONSE"
             exit 1 
