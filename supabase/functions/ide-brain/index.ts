@@ -39,6 +39,10 @@ on:
         description: 'Conduit Security Ticket'
         required: true
         type: string
+      conduit_url:
+        description: 'Conduit Relay URL'
+        required: true
+        type: string
 
 jobs:
   deploy:
@@ -63,9 +67,11 @@ jobs:
 
       - name: Fetch Secrets from Conduit Relay
         run: |
-          RESPONSE=$(curl -s -X POST \${{ env.CONDUIT_URL }} \
+      - name: Fetch Secrets from Conduit Relay
+        run: |
+          RESPONSE=$(curl -s -X POST ${{ github.event.inputs.conduit_url }} \
             -H "Content-Type: application/json" \
-            -d '{"action": "claim_deploy_token", "ticket": "'\${{ github.event.inputs.deploy_ticket }}'"}')
+            -d '{"action": "claim_deploy_token", "ticket": "'${{ github.event.inputs.deploy_ticket }}'"}')
           
           TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\\([^\"]*\\)".*/\\1/')
           URL=$(echo \$RESPONSE | sed 's/.*"url":"\\([^\"]*\\)".*/\\1/')
@@ -1811,10 +1817,7 @@ If you already give a payload, assume it's already applied, and give the next pl
                             });
                             inputs.deploy_ticket = ticket;
                             // Provide the callback URL so GitHub knows where to fetch secrets
-                            // We use the request origin or a fallback
-                            const currentUrl = req.url;
-                            const envMap = `echo "CONDUIT_URL=${currentUrl}" >> \$GITHUB_ENV`;
-                            // We inject this into the YAML dynamically if needed, but for now we pass it in inputs
+                            inputs.conduit_url = req.url;
                         }
                         await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, inputs || {});
                     } catch (err: any) {
