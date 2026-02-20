@@ -5945,9 +5945,17 @@ async function downloadArtifact(runId) {
                 btn.className = 'table-pill px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-400 active:scale-95';
                 btn.innerText = row.table_name;
                 btn.onclick = () => {
+                    const isActive = btn.classList.contains('active');
                     document.querySelectorAll('.table-pill').forEach(p => p.classList.remove('active'));
                     btn.classList.add('active');
-                    document.getElementById('sqlEditor').value = 'SELECT * FROM public."' + row.table_name + '" LIMIT 20;';
+                    
+                    if (!isActive) {
+                        // First Tap: Fetch Table Structure
+                        document.getElementById('sqlEditor').value = `-- Table Structure for ${row.table_name}\nSELECT column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;`;
+                    } else {
+                        // Second Tap: Fetch Table Data
+                        document.getElementById('sqlEditor').value = `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
+                    }
                 };
                 container.appendChild(btn);
             });
