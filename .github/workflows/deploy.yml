@@ -19,7 +19,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Deployment restricted to the dev branch
     if: github.ref == 'refs/heads/conduit-dev'
 
     steps:
@@ -33,14 +32,11 @@ jobs:
 
       - name: Fetch Secrets from Conduit Relay
         run: |
-          RESPONSE=$(curl -s -X POST ${{ github.event.inputs.conduit_url }} \
-            -H "Content-Type: application/json" \
-            -d "{\"action\": \"claim_deploy_token\", \"ticket\": \"${{ github.event.inputs.deploy_ticket }}\"}")
+          RESPONSE=$(curl -s -X POST ${{ github.event.inputs.conduit_url }}             -H "Content-Type: application/json"             -d '{"action": "claim_deploy_token", "ticket": "'${{ github.event.inputs.deploy_ticket }}'"}')
           
-          # Parse the response to extract the token and project URL
-                    # Parse and Verify
-          TOKEN=$(echo $RESPONSE | sed 's/.*"token":"\([^" ]*\)".*/\1/')
-          URL=$(echo $RESPONSE | sed 's/.*"url":"\([^" ]*\)".*/\1/')
+          # Parse using jq for reliability
+          TOKEN=$(echo "$RESPONSE" | jq -r '.token')
+          URL=$(echo "$RESPONSE" | jq -r '.url')
           
           if [[ "$TOKEN" == *"error"* ]] || [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then 
             echo "❌ Error: Failed to claim token from Conduit Relay."
@@ -48,11 +44,9 @@ jobs:
             exit 1 
           fi
           
-          # Inject secrets into the environment for the next step
           echo "SUPABASE_ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
           echo "SUPABASE_URL=$URL" >> $GITHUB_ENV
           
-          # Extract Project ID (e.g. 'abc' from 'https://abc.supabase.co')
           REF=$(echo $URL | sed -e 's|^[^/]*//||' -e 's|\..*||')
           echo "PROJECT_ID=$REF" >> $GITHUB_ENV
 
