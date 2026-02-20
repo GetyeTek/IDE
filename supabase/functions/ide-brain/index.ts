@@ -1787,13 +1787,25 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         try {
             if (workflow_id) {
-                // AUTO-PROVISION deploy.yml if missing
+                // AUTO-PROVISION or UPDATE deploy.yml
                 if (workflow_id === 'deploy.yml') {
+                    let sha = "";
+                    let exists = false;
+                    let content = "";
+
                     try {
-                        await githubFetch(TARGET_REPO, `/contents/.github/workflows/deploy.yml?ref=${targetBranch}`);
+                        const res = await githubFetch(TARGET_REPO, `/contents/.github/workflows/deploy.yml?ref=${targetBranch}`);
+                        sha = res.sha;
+                        content = base64ToText(res.content);
+                        exists = true;
                     } catch (e) {
-                        console.log("[Trigger] deploy.yml missing. Provisioning...");
-                        await updateFile(TARGET_REPO, ".github/workflows/deploy.yml", AUTO_DEPLOY_YML, "", targetBranch, "Conduit: Provision deploy workflow");
+                        // 404 likely, file needs creation
+                    }
+
+                    // Check if file is missing OR if it's outdated (missing the new input)
+                    if (!exists || !content.includes("conduit_url")) {
+                        console.log(`[Trigger] deploy.yml ${exists ? 'outdated' : 'missing'}. Provisioning...`);
+                        await updateFile(TARGET_REPO, ".github/workflows/deploy.yml", AUTO_DEPLOY_YML, sha, targetBranch, "Conduit: Update deploy workflow definition");
                         // Give GitHub 2 seconds to index the new file before triggering
                         await new Promise(r => setTimeout(r, 2000));
                     }
