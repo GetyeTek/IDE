@@ -11,6 +11,10 @@ on:
         description: 'Conduit Security Ticket'
         required: true
         type: string
+      conduit_url:
+        description: 'Conduit Relay URL'
+        required: true
+        type: string
 
 jobs:
   deploy:
@@ -29,10 +33,7 @@ jobs:
 
       - name: Fetch Secrets from Conduit Relay
         run: |
-          # Change the URL below ONLY if your IDE Brain function is at a different address
-          IDE_URL="https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/ide-brain"
-
-          RESPONSE=$(curl -s -X POST $IDE_URL \
+          RESPONSE=$(curl -s -X POST ${{ github.event.inputs.conduit_url }} \
             -H "Content-Type: application/json" \
             -d "{\"action\": \"claim_deploy_token\", \"ticket\": \"${{ github.event.inputs.deploy_ticket }}\"}")
           
