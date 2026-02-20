@@ -168,31 +168,32 @@ serve(async (req) => {
           .select().single();
         if (insError) throw insError;
 
-        // Process in background to prevent timeout
-        (async () => {
+        // Process in background to prevent timeout using EdgeRuntime.waitUntil
+        // @ts-ignore: EdgeRuntime is available in Supabase environment
+        EdgeRuntime.waitUntil((async () => {
           try {
-            // 1. Download & Encode Images sequentially (Memory Safe)
             const geminiParts: any[] = [{ text: OCR_PROMPT_TEMPLATE }];
+            
+            // Sequential processing with explicit memory cleanup
             for (const path of payload.paths) {
-              const { data: blob } = await supabase.storage.from('images').download(path);
+              let { data: blob } = await supabase.storage.from('images').download(path);
               if (blob) {
                 const buffer = await blob.arrayBuffer();
+                blob = null; // Release binary blob reference
+                const b64 = encodeBase64(buffer);
                 geminiParts.push({ 
-                  inline_data: { mime_type: "image/jpeg", data: encodeBase64(buffer) } 
+                  inline_data: { mime_type: "image/jpeg", data: b64 } 
                 });
               }
             }
 
-            // 2. OCR Stage
             const ocrRaw = await callGeminiApi(supabase, PRIMARY_MODEL, null, geminiParts, requestId);
             const ocrJson = JSON.parse(extractJson(ocrRaw));
             
-            // 3. Solver Stage (Immediate pipe)
             const friendlyText = formatTranscriptionForAI(ocrJson, requestId);
             const solutionRaw = await callGeminiApi(supabase, PRIMARY_MODEL, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, requestId);
             const solutionJson = JSON.parse(extractJson(solutionRaw));
 
-            // 4. Update Final Result
             await supabase.from('processed_images')
               .update({ 
                 transcription: ocrJson, 
@@ -201,12 +202,12 @@ serve(async (req) => {
               })
               .eq('id', record.id);
 
-            console.log(`[${requestId}] [STAGING] Batch complete for record: ${record.id}`);
+            console.log(`[${requestId}] [STAGING] Batch complete: ${record.id}`);
           } catch (err) {
             console.error(`[${requestId}] [STAGING_ERR]`, err);
             await supabase.from('processed_images').update({ status: 'error' }).eq('id', record.id);
           }
-        })();
+        })());
 
         return new Response(JSON.stringify({ id: record.id }));
       }
@@ -241,11 +242,9 @@ serve(async (req) => {
       });
 
       const storagePath = `${Date.now()}_${file.name}`;
-      supabase.storage.from('images').upload(storagePath, buffer, { contentType: file.type })
-        .then(({ error }) => {
-          if (error) console.error(`[${requestId}] [STORAGE_UPLOAD] Error:`, error.message);
-          else console.log(`[${requestId}] [STORAGE_UPLOAD] Saved: ${storagePath}`);
-        });
+      // Move upload inside loop to avoid carrying many large buffers
+      await supabase.storage.from('images').upload(storagePath, buffer, { contentType: file.type });
+      console.log(`[${requestId}] [STORAGE_UPLOAD] Saved: ${storagePath}`);
     }
 
     const ocrRaw = await callGeminiApi(supabase, PRIMARY_MODEL, null, geminiParts, requestId);
