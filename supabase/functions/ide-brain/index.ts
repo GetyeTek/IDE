@@ -1805,6 +1805,9 @@ If you already give a payload, assume it's already applied, and give the next pl
                 let attempts = 0;
                 const dispatch = async () => {
                     try {
+                        // Ensure inputs exists before modification
+                        let effectiveInputs = inputs || {};
+                        
                         // Generate dynamic ticket for deploy.yml
                         if (workflow_id === 'deploy.yml') {
                             const ticket = crypto.randomUUID();
@@ -1813,11 +1816,11 @@ If you already give a payload, assume it's already applied, and give the next pl
                                 type: 'deploy_ticket',
                                 data: { ticket }
                             });
-                            inputs.deploy_ticket = ticket;
+                            effectiveInputs.deploy_ticket = ticket;
                             // Provide the callback URL so GitHub knows where to fetch secrets
-                            inputs.conduit_url = req.url;
+                            effectiveInputs.conduit_url = req.url;
                         }
-                        await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, inputs || {});
+                        await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, effectiveInputs);
                     } catch (err: any) {
                         if (attempts < 2 && err.message.includes("404")) {
                             attempts++;
