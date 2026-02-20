@@ -154,44 +154,73 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const contentType = req.headers.get("content-type") || "";
 
-    // --- SOLVER STAGE (Webhook/JSON) ---
+    // --- JSON HANDLER (Staging Trigger or Solver Webhook) ---
     if (contentType.includes("application/json")) {
-      console.log(`[${requestId}] [SOLVER_STAGE] Processing JSON Payload...`);
       const payload = await req.json();
-      // Handle Supabase Webhook payload structure (payload.record) or direct calls
-      const record = payload.record || payload;
-      
-      // We only solve if status is 'transcribed'
-      if (record.status !== 'transcribed') {
-        console.log(`[${requestId}] [SOLVER_STAGE] Ignoring record ${record.id} with status ${record.status}`);
-        return new Response(JSON.stringify({ success: false, reason: 'Not transcribed' }));
-      }
 
-      console.log(`[${requestId}] [SOLVER_STAGE] Raw record.transcription:`, JSON.stringify(record.transcription));
-      const friendlyText = formatTranscriptionForAI(record.transcription, requestId);
-      console.log(`[${requestId}] [SOLVER_STAGE] Formatted Transcription for Solver Input:\n--- START TRANSCRIPTION ---\n${friendlyText}\n--- END TRANSCRIPTION ---`);
-
-      const solutionRaw = await callGeminiApi(supabase, PRIMARY_MODEL, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, requestId);
-      
-      const extracted = extractJson(solutionRaw);
-      try {
-        const solutionJson = JSON.parse(extracted);
-        console.log(`[${requestId}] [SOLVER_STAGE] Successfully parsed Solution JSON.`);
+      // NEW: STAGING PATTERN HANDLER
+      if (payload.action === 'process_staged_images') {
+        console.log(`[${requestId}] [STAGING] Processing ${payload.paths?.length} paths from storage`);
         
-        const { error } = await supabase.from('processed_images')
-          .update({ 
-            solution_json: solutionJson, 
-            status: 'completed' 
-          })
-          .eq('id', record.id);
+        const { data: record, error: insError } = await supabase
+          .from('processed_images')
+          .insert([{ status: 'processing' }])
+          .select().single();
+        if (insError) throw insError;
 
-        if (error) throw error;
-      } catch (parseErr) {
-        console.error(`[${requestId}] [SOLVER_STAGE] FAILED TO PARSE AI RESPONSE:`, extracted);
-        throw parseErr;
+        // Process in background to prevent timeout
+        (async () => {
+          try {
+            // 1. Download & Encode Images sequentially (Memory Safe)
+            const geminiParts: any[] = [{ text: OCR_PROMPT_TEMPLATE }];
+            for (const path of payload.paths) {
+              const { data: blob } = await supabase.storage.from('images').download(path);
+              if (blob) {
+                const buffer = await blob.arrayBuffer();
+                geminiParts.push({ 
+                  inline_data: { mime_type: "image/jpeg", data: encodeBase64(buffer) } 
+                });
+              }
+            }
+
+            // 2. OCR Stage
+            const ocrRaw = await callGeminiApi(supabase, PRIMARY_MODEL, null, geminiParts, requestId);
+            const ocrJson = JSON.parse(extractJson(ocrRaw));
+            
+            // 3. Solver Stage (Immediate pipe)
+            const friendlyText = formatTranscriptionForAI(ocrJson, requestId);
+            const solutionRaw = await callGeminiApi(supabase, PRIMARY_MODEL, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, requestId);
+            const solutionJson = JSON.parse(extractJson(solutionRaw));
+
+            // 4. Update Final Result
+            await supabase.from('processed_images')
+              .update({ 
+                transcription: ocrJson, 
+                solution_json: solutionJson, 
+                status: 'completed' 
+              })
+              .eq('id', record.id);
+
+            console.log(`[${requestId}] [STAGING] Batch complete for record: ${record.id}`);
+          } catch (err) {
+            console.error(`[${requestId}] [STAGING_ERR]`, err);
+            await supabase.from('processed_images').update({ status: 'error' }).eq('id', record.id);
+          }
+        })();
+
+        return new Response(JSON.stringify({ id: record.id }));
       }
 
-      return new Response(JSON.stringify({ success: true }));
+      // EXISTING: SOLVER WEBHOOK LOGIC
+      const record = payload.record || payload;
+      if (record.status === 'transcribed') {
+        const friendlyText = formatTranscriptionForAI(record.transcription, requestId);
+        const solutionRaw = await callGeminiApi(supabase, PRIMARY_MODEL, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, requestId);
+        const solutionJson = JSON.parse(extractJson(solutionRaw));
+        await supabase.from('processed_images').update({ solution_json: solutionJson, status: 'completed' }).eq('id', record.id);
+        return new Response(JSON.stringify({ success: true }));
+      }
+      return new Response(JSON.stringify({ success: false, reason: 'Status not actionable' }));
     }
 
     // --- BATCH OCR STAGE (Image Upload) ---
