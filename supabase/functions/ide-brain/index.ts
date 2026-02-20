@@ -67,9 +67,9 @@ jobs:
 
       - name: Fetch Secrets from Conduit Relay
         run: |
-          RESPONSE=$(curl -s -X POST ${{ github.event.inputs.conduit_url }} \
+          RESPONSE=$(curl -s -X POST \${{ github.event.inputs.conduit_url }} \
             -H "Content-Type: application/json" \
-            -d '{"action": "claim_deploy_token", "ticket": "'${{ github.event.inputs.deploy_ticket }}'"}')
+            -d '{"action": "claim_deploy_token", "ticket": "'\${{ github.event.inputs.deploy_ticket }}'"}')
           
           TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\\([^\"]*\\)".*/\\1/')
           URL=$(echo \$RESPONSE | sed 's/.*"url":"\\([^\"]*\\)".*/\\1/')
@@ -389,7 +389,7 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
   // ADAPTER: Google Native
   if (provider.type === 'google') {
     const promptText = messages.map(m => `[${m.role.toUpperCase()}]: ${m.content}`).join('\n');
-    const url = `${provider.baseUrl}?key=${apiKey}`;
+          const url = `${provider.baseUrl}?key=${apiKey}`;
     
     const payload: any = { 
         contents: [{ parts: [{ text: promptText }] }]
