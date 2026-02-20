@@ -58,28 +58,23 @@ jobs:
         with:
           version: latest
 
-      - name: Extract Project Ref from URL
-        id: get_ref
-        run: |
-          URL="\${{ secrets.SUPABASE_URL }}"
-          REF=$(echo $URL | sed -e 's|^[^/]*//||' -e 's|\\..*||')
-          echo "PROJECT_ID=$REF" >> \$GITHUB_ENV
-
       - name: Fetch Secrets from Conduit Relay
         run: |
           RESPONSE=$(curl -s -X POST \${{ github.event.inputs.conduit_url }} \
             -H "Content-Type: application/json" \
             -d '{"action": "claim_deploy_token", "ticket": "'\${{ github.event.inputs.deploy_ticket }}'"}')
           
-          TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\\([^\"]*\\)".*/\\1/')
-          URL=$(echo \$RESPONSE | sed 's/.*"url":"\\([^\"]*\\)".*/\\1/')
+          TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\([^\"]*\)".*/\1/')
+          URL=$(echo \$RESPONSE | sed 's/.*"url":"\([^\"]*\)".*/\1/')
           
-          if [ -z "\$TOKEN" ] || [ "\$TOKEN" = "null" ]; then echo "Failed to claim token"; exit 1; fi
+          if [ -z "\$TOKEN" ] || [ "\$TOKEN" = "null" ]; then 
+            echo "Failed to claim token. Response: \$RESPONSE"
+            exit 1 
+          fi
           
           echo "SUPABASE_ACCESS_TOKEN=\$TOKEN" >> \$GITHUB_ENV
           echo "SUPABASE_URL=\$URL" >> \$GITHUB_ENV
           
-          # Extract Project Ref from the fetched URL
           REF=$(echo \$URL | sed -e 's|^[^/]*//||' -e 's|\\..*||')
           echo "PROJECT_ID=\$REF" >> \$GITHUB_ENV
 
