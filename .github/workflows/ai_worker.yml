@@ -6,6 +6,8 @@ on:
         required: true
       image_paths:
         required: true
+      request_id:
+        required: true
 
 jobs:
   process:
@@ -25,5 +27,6 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RECORD_ID: ${{ github.event.inputs.record_id }}
           IMAGE_PATHS: ${{ github.event.inputs.image_paths }}
+          REQUEST_ID: ${{ github.event.inputs.request_id }}
         run: |
           deno run -A supabase/functions/upload-image/worker_logic.ts
