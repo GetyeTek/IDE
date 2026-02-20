@@ -2014,7 +2014,9 @@
                     fetchState(false, true); 
                     fetchFileList();
                 }, 1500);
-            } else throw new Error("Workflow trigger failed.");
+            } else {
+                throw new Error(buildData.error || "Workflow trigger failed (No error details provided by server).");
+            }
         } catch (e) {
             console.error("❌ Deployment failed:", e);
             status.innerText = "❌ " + (e.message || "Check browser console");
