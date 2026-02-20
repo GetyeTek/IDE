@@ -67,8 +67,6 @@ jobs:
 
       - name: Fetch Secrets from Conduit Relay
         run: |
-      - name: Fetch Secrets from Conduit Relay
-        run: |
           RESPONSE=$(curl -s -X POST ${{ github.event.inputs.conduit_url }} \
             -H "Content-Type: application/json" \
             -d '{"action": "claim_deploy_token", "ticket": "'${{ github.event.inputs.deploy_ticket }}'"}')
