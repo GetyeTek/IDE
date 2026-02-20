@@ -36,7 +36,8 @@ serve(async (req) => {
           ref: 'main',
           inputs: {
             record_id: record.id,
-            image_paths: JSON.stringify(payload.paths)
+            image_paths: JSON.stringify(payload.paths),
+            request_id: requestId
           }
         })
       });
