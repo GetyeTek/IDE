@@ -1983,7 +1983,7 @@
                     body: apiBody({ action: 'patch', operations: [{
                         file_path: `supabase/functions/${name}/index.ts`,
                         action: "create_file",
-                        content: finalCode
+                        content: code
                     }]})
                 });
                 const patchData = await patchRes.json();
