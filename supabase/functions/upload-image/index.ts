@@ -1,4 +1,50 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+serve(async (req) => {
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+  
+  try {
+    const { action, paths } = await req.json()
+    
+    if (action === 'process_staged_images') {
+      // 1. Create a tracking record
+      const { data: record, error: insError } = await supabase
+        .from('processed_images')
+        .insert([{ status: 'processing' }])
+        .select().single()
+
+      if (insError) throw insError
+
+      // 2. Offload AI processing to background (async)
+      // In a real Edge Function, we'd use a queue, but here we'll process and update status
+      (async () => {
+        try {
+          const images = []
+          for (const path of paths) {
+            const { data } = await supabase.storage.from('images').download(path)
+            if (data) images.push(data)
+          }
+          
+          // CALL YOUR AI MODEL HERE WITH images[]
+          // For now, simulate success:
+          await supabase.from('processed_images')
+            .update({ status: 'completed', solution_json: { solutions: [] } })
+            .eq('id', record.id)
+            
+        } catch (err) {
+          await supabase.from('processed_images').update({ status: 'error' }).eq('id', record.id)
+        }
+      })()
+
+      return new Response(JSON.stringify({ id: record.id }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    return new Response("Invalid Action", { status: 400 })
+  } catch (e) {
+    return new Response(e.message, { status: 500 })
+  }
+})
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { encodeBase64 } from "https://deno.land/std@0.203.0/encoding/base64.ts"
 
