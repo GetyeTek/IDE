@@ -64,10 +64,9 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"action": "claim_deploy_token", "ticket": "'\${{ github.event.inputs.deploy_ticket }}'"}')
           
-          # Use double-escaped backslashes for TS template literal -> YAML output
-          # Extract values and verify they aren't error messages
-          TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\\([^\\\" ]*\\)".*/\\\\1/')
-          URL=$(echo \$RESPONSE | sed 's/.*"url":"\\([^\\\" ]*\\)".*/\\\\1/')
+          # Parse using jq for reliability
+          TOKEN=$(echo "\$RESPONSE" | jq -r '.token')
+          URL=$(echo "\$RESPONSE" | jq -r '.url')
           
           if [[ "\$TOKEN" == *"error"* ]] || [ -z "\$TOKEN" ] || [ "\$TOKEN" = "null" ]; then 
             echo "❌ Error: Failed to claim token from Conduit Relay."
@@ -1802,8 +1801,8 @@ If you already give a payload, assume it's already applied, and give the next pl
                         // 404 likely, file needs creation
                     }
 
-                    // Check if file is missing OR if it's outdated (missing the new input)
-                    if (!exists || !content.includes("conduit_url")) {
+                    // Check if file is missing OR outdated (missing input OR using old parsing logic)
+                    if (!exists || !content.includes("conduit_url") || !content.includes("jq -r")) {
                         console.log(`[Trigger] deploy.yml ${exists ? 'outdated' : 'missing'}. Provisioning...`);
                         await updateFile(TARGET_REPO, ".github/workflows/deploy.yml", AUTO_DEPLOY_YML, sha, targetBranch, "Conduit: Update deploy workflow definition");
                         // Give GitHub 2 seconds to index the new file before triggering
