@@ -65,11 +65,13 @@ jobs:
             -d '{"action": "claim_deploy_token", "ticket": "'\${{ github.event.inputs.deploy_ticket }}'"}')
           
           # Use double-escaped backslashes for TS template literal -> YAML output
-          TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\([^\"]*\)".*/\\1/')
-          URL=$(echo \$RESPONSE | sed 's/.*"url":"\([^\"]*\)".*/\\1/')
+          # Extract values and verify they aren't error messages
+          TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\\([^\\\" ]*\\)".*/\\\\1/')
+          URL=$(echo \$RESPONSE | sed 's/.*"url":"\\([^\\\" ]*\\)".*/\\\\1/')
           
-          if [ -z "\$TOKEN" ] || [ "\$TOKEN" = "null" ]; then 
-            echo "Failed to claim token. Response: \$RESPONSE"
+          if [[ "\$TOKEN" == *"error"* ]] || [ -z "\$TOKEN" ] || [ "\$TOKEN" = "null" ]; then 
+            echo "❌ Error: Failed to claim token from Conduit Relay."
+            echo "Raw Response: \$RESPONSE"
             exit 1 
           fi
           
@@ -1813,8 +1815,9 @@ If you already give a payload, assume it's already applied, and give the next pl
                                 data: { ticket }
                             });
                             effectiveInputs.deploy_ticket = ticket;
-                            // Provide the callback URL so GitHub knows where to fetch secrets
-                            effectiveInputs.conduit_url = req.url;
+                            // Use Env Var for absolute reliability
+                            const projectUrl = Deno.env.get("SUPABASE_URL");
+                            effectiveInputs.conduit_url = `${projectUrl}/functions/v1/ide-brain`;
                         }
                         await triggerWorkflowFile(TARGET_REPO, workflow_id, targetBranch, effectiveInputs);
                     } catch (err: any) {
