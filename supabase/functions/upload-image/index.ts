@@ -33,7 +33,7 @@ serve(async (req) => {
           'X-GitHub-Api-Version': '2022-11-28'
         },
         body: JSON.stringify({
-          ref: 'main',
+          ref: 'conduit-dev',
           inputs: {
             record_id: record.id,
             image_paths: JSON.stringify(payload.paths),
