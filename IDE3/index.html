@@ -1936,7 +1936,6 @@
     }
 
     async function deployEdgeFunction() {
-        console.group("🚀 Edge Function Deployment");
         const name = document.getElementById('ef-name').value.trim();
         let code = document.getElementById('ef-code').value.trim();
         const status = document.getElementById('ef-status-msg');
@@ -1988,14 +1987,11 @@
                 });
                 const patchData = await patchRes.json();
                 if (!patchData.success) throw new Error("GitHub sync failed. Check connectivity.");
-            } else {
-                console.log("No local changes detected. Deploying direct from GitHub.");
             }
 
             // Step 2: Trigger Workflow
             status.innerText = "🚀 Triggering deploy.yml...";
             const deployInputs = { function_name: name };
-            console.log("Dispatching deploy.yml with inputs:", deployInputs);
             const buildRes = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: apiBody({ 
@@ -2006,11 +2002,8 @@
                 })
             });
             const buildData = await buildRes.json();
-            console.log("Workflow Trigger Result:", buildData);
             
             if (buildData.success) {
-                console.log("✅ Deployment successful.");
-                console.groupEnd();
                 status.innerText = "✅ Dispatched! Redirecting...";
                 status.style.color = "var(--prod)";
                 setTimeout(() => { 
@@ -2024,7 +2017,6 @@
             } else throw new Error("Workflow trigger failed.");
         } catch (e) {
             console.error("❌ Deployment failed:", e);
-            console.groupEnd();
             status.innerText = "❌ " + (e.message || "Check browser console");
             status.style.color = "var(--danger)";
         }
@@ -2277,7 +2269,6 @@
                 });
                 // Clear after use to prevent polluting next chat
                 window.SURGICAL_DEBUG_DATA = null;
-                console.log("[AI] Using Surgical Context (Single File)");
             } else {
                 // Standard: Grab all checked files
                 const checkedBoxes = document.querySelectorAll('#file-list-container .file-check:checked');
@@ -2291,7 +2282,6 @@
                         contextPayload.push({ path: path, content: data.content });
                     }
                 }
-                console.log(`[AI] Using Global Context (${contextPayload.length} files)`);
             }
 
             const res = await fetch(CONFIG.funcUrl, {
@@ -2870,17 +2860,14 @@ function addTerminalCard(data, options = {}) {
 
     // --- BUNDLER & PREVIEW ---
         async function bundleAndPreview(index) {
-        console.group('[BUNDLER] STARTING NEW BUILD');
         if(!CONFIG.funcUrl) {
             console.error('Bundler Error: No function URL configured');
-            console.groupEnd();
             return;
         }
         document.querySelectorAll('.runtime-log').forEach(el => el.remove());
         
         let entry = (typeof index === 'number') ? dbHistory[index] : null;
         let sha = entry ? entry.sha : null;
-        console.log('Build Context:', sha ? 'Ref: ' + sha : 'Live Development');
         let rootPrefix = ''; 
         if (entry && entry.type === 'Prod') {
             const match = entry.title.match(/Deployed\s+(.+)/);
@@ -2906,13 +2893,11 @@ function addTerminalCard(data, options = {}) {
             const files = (treeData.files || []).filter(f => f.path.startsWith(effectiveRoot));
             
             if (files.length === 0) throw new Error(`No files found in scope: ${effectiveRoot}`);
-            console.log("📦 [Bundler] Files in Scope:", files.map(f => f.path));
 
             const BATCH_SIZE = 12;
             const binaryExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'woff', 'woff2', 'ttf', 'webp'];
             for (let i = 0; i < files.length; i += BATCH_SIZE) {
                 const batch = files.slice(i, i + BATCH_SIZE);
-                console.log('Fetching Batch ' + i + ' to ' + (i + batch.length) + ' of ' + files.length);
                 await Promise.all(batch.map(async (file) => {
                     try {
                         const res = await fetch(CONFIG.funcUrl, {
@@ -2923,7 +2908,6 @@ function addTerminalCard(data, options = {}) {
                         if (data.content) {
                             const ext = file.path.split('.').pop().toLowerCase();
                             const isBinary = binaryExts.includes(ext);
-                            console.log('  File Loaded: ' + file.path + ' (Binary: ' + isBinary + ')');
                             fileCache[file.path] = { 
                                 content: isBinary ? base64ToUint8Array(data.content) : b64DecodeUnicode(data.content),
                                 ext, isBinary, sha: file.sha 
@@ -2940,7 +2924,6 @@ function addTerminalCard(data, options = {}) {
                 // If looking at root and failing, try RepoName prefix (common in some git setups)
                 const repoPrefixed = CONFIG.repoName + '/' + entryFile;
                 if (fileCache[repoPrefixed]) {
-                    console.log("🔍 [Bundler] Detected Repo-Name prefix in paths. Aligning root to:", CONFIG.repoName);
                     entryContent = fileCache[repoPrefixed];
                     effectiveRoot = CONFIG.repoName + '/';
                     entryFile = repoPrefixed;
@@ -2987,7 +2970,6 @@ function addTerminalCard(data, options = {}) {
                 const mime = mimeMap[file.ext] || 'application/octet-stream';
                 const blob = new Blob([file.content], { type: mime });
                 file.blobUrl = URL.createObjectURL(blob);
-                console.log('  Mapping: ' + virtualPath + ' -> ' + file.blobUrl);
                 
                 // Register exact path
                 importMap.imports[virtualPath] = file.blobUrl;
@@ -3000,12 +2982,9 @@ function addTerminalCard(data, options = {}) {
                     if (!importMap.imports[noExt]) {
                         importMap.imports[noExt] = file.blobUrl;
                         importMap.imports['./' + noExt] = file.blobUrl;
-                        console.log('  Script Alias: ' + noExt + ' -> ' + file.blobUrl);
                     }
                 }
             }
-            console.log('Generated Import Map:');
-            console.table(importMap.imports);
 
             const finalEntryContent = entryContent; // Already resolved above
             const doc = new DOMParser().parseFromString(finalEntryContent.content, 'text/html');
@@ -3087,20 +3066,15 @@ function addTerminalCard(data, options = {}) {
                 };
             `;
             doc.head.prepend(baseScript);
-            console.log('Auditing script tags in entry HTML...');
             doc.querySelectorAll('script[src]').forEach(el => {
                 const src = el.getAttribute('src');
                 if (src && !src.startsWith('http')) {
                     const resolved = resolvePath(entryFile, src);
-                    console.log('  Checking script src=' + src + ' -> resolved: ' + resolved);
                     if (fileCache[resolved]) {
                         const inline = doc.createElement('script');
                         inline.type = 'module';
                         inline.textContent = 'import "' + resolved.substring(effectiveRoot.length) + '";';
                         el.replaceWith(inline);
-                        console.log('    Found in cache. Script inlined.');
-                    } else {
-                        console.warn('    MISSING from cache: ' + resolved);
                     }
                 }
             });
@@ -3115,11 +3089,8 @@ function addTerminalCard(data, options = {}) {
             window.PREVIEW_BLOB_URL = URL.createObjectURL(new Blob([iframe.srcdoc], { type: 'text/html' }));
             if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
             document.getElementById('preview-url-display').innerText = sha ? 'Viewing: ' + entry.title : 'Viewing: Live Dev (' + CONFIG.repoName + ')';
-            console.log('Bundling complete. Iframe source updated.');
-            console.groupEnd();
-        } catch(e) {
+                    } catch(e) {
             console.error('CRITICAL BUILD FAILURE:', e);
-            console.groupEnd();
             iframe.srcdoc = '<div style="color:red; padding:20px;"><b>Preview Error:</b><br>' + e.message + '</div>'; 
         }
     }
