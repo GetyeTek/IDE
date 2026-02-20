@@ -4035,8 +4035,8 @@ async function downloadArtifact(runId) {
             
             // 2. Build List with Special Options
             const items = [
-                { name: "📂 Current Repo (Deep Scan)", type: "special", id: "current_deep" },
-                ...(data.repos || []).map(r => ({ name: r.name, type: "repo", id: r.name }))
+                { name: "📂 Current Repo (Deep Scan)", type: "special", id: "current_deep", repo: CONFIG.repoName },
+                ...(data.repos || []).map(r => ({ name: r.name, type: "repo", id: r.name, repo: r.name }))
             ];
             currentDiscoveryItems = items;
             renderDiscoveryList(items, 'source');
@@ -4060,22 +4060,20 @@ async function downloadArtifact(runId) {
             
             const functions = [];
             (data.files || []).forEach(f => {
-                // Logic: If Deep, match any index.ts. If Standard, match supabase/functions/*/index.ts
                 const isMatch = isDeep 
                     ? f.path.endsWith('index.ts')
                     : (f.path.includes('supabase/functions/') && f.path.endsWith('index.ts'));
                 
                 if (isMatch) {
-                    // Extract name
                     let name = "";
                     if (f.path.includes('supabase/functions/')) {
                         const parts = f.path.split('supabase/functions/')[1].split('/');
                         name = parts[0];
                     } else {
-                        // Fallback name for deep files: parent folder
                         const parts = f.path.split('/');
                         name = parts.length > 1 ? parts[parts.length - 2] : 'root';
                     }
+                    // CRITICAL: Explicitly bind the repo name here
                     functions.push({ name: name, path: f.path, repo: targetRepo, type: "function" });
                 }
             });
@@ -4127,8 +4125,14 @@ async function downloadArtifact(runId) {
     }
 
     function filterDiscoveryList(q) {
-        const filtered = currentDiscoveryItems.filter(i => i.name.toLowerCase().includes(q.toLowerCase()) || (i.path && i.path.toLowerCase().includes(q.toLowerCase())));
-        renderDiscoveryList(filtered, currentDiscoveryItems[0]?.repo ? 'function' : 'source');
+        const query = q.toLowerCase();
+        const filtered = currentDiscoveryItems.filter(i => 
+            i.name.toLowerCase().includes(query) || 
+            (i.path && i.path.toLowerCase().includes(query))
+        );
+        // Determine mode based on the first item type in the UNFILTERED list to maintain UI consistency
+        const mode = currentDiscoveryItems.some(i => i.type === 'function') ? 'function' : 'source';
+        renderDiscoveryList(filtered, mode);
     }
 
     async function triggerRemoteDeploy(repo, funcName) {
