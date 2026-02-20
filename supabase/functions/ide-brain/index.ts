@@ -64,8 +64,9 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"action": "claim_deploy_token", "ticket": "'\${{ github.event.inputs.deploy_ticket }}'"}')
           
-          TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\([^\"]*\)".*/\1/')
-          URL=$(echo \$RESPONSE | sed 's/.*"url":"\([^\"]*\)".*/\1/')
+          # Use double-escaped backslashes for TS template literal -> YAML output
+          TOKEN=$(echo \$RESPONSE | sed 's/.*"token":"\([^\"]*\)".*/\\1/')
+          URL=$(echo \$RESPONSE | sed 's/.*"url":"\([^\"]*\)".*/\\1/')
           
           if [ -z "\$TOKEN" ] || [ "\$TOKEN" = "null" ]; then 
             echo "Failed to claim token. Response: \$RESPONSE"
