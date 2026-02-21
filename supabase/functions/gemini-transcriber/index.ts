@@ -40,41 +40,59 @@ serve(async (req) => {
     if (downloadError) throw downloadError;
     const base64File = btoa(String.fromCharCode(...new Uint8Array(await fileBlob.arrayBuffer())));
 
-    // 4. THE COMPREHENSIVE SCHOLARLY PROMPT
+    // 4. THE COMPREHENSIVE SCHOLARLY PROMPT (ADAPTIVE HYBRID VERSION)
     const prompt = `
-      You are an elite Ge'ez and Amharic scholar specializing in the 'Andmita' (Ancient Commentary) of the Gospels. Your goal is a character-perfect digital reproduction.
+      You are an elite Ge'ez and Amharic scholar and philologist specializing in the 'Andmita' (Ancient Commentary) of the Gospels. Your goal is a character-perfect digital reproduction.
 
       ### THE PRIME DIRECTIVE (TRANSCRIPTION INTEGRITY):
       - VERBATIM ONLY: Transcribe every character exactly as it appears. Preserve archaic spellings, Ge'ez numerics (፩, ፪, ፫, etc.), and traditional punctuation.
       - NO MANIPULATION: Do NOT alter, summarize, or truncate text to fit a JSON structure. If the text is difficult to structure (e.g., introductions, dense lists, or complex layouts), you MUST use the 'plain' content_mode with a 'text_dump'.
-      - Copy-paste precision is required. Manipulation is our biggest nightmare.
+      - Copy-paste precision is required. Manipulation of text to fit a schema is a fatal scholarly error.
+
+      ### CORE SCHOLARLY DIRECTIVES:
+      1. CHARACTER DISTINCTION: Distinguish archaic variants (e.g., preserve the specific use of 'ቆ' vs 'ቁ') as they appear in the manuscript.
+      2. CONTINUITY: If a page starts/ends mid-sentence, do NOT fix it. Transcribe only the visible text. Use 'scholarly_notes' to flag fragments.
+      3. NOISE FILTERING: Exclude watermarks, scan artifacts, and modern English text.
+      4. LAYOUT AWARENESS: Determine correct reading order for nested commentary. If layout is ambiguous, default to 'plain' content_mode.
 
       ### 1. CONTEXTUAL INFERENCE:
-      - Infer the citation even if it is not printed on the page. 
-      - Use the format: "Book, Chapter:Verse" or "Book, Chapter:Verse-Verse".
+      - Infer the citation even if not printed. Format: "Book, Chapter:Verse" or "Book, Chapter:Verse-Verse".
 
-      ### 2. ADAPTIVE CONTENT MODE:
-      - STRUCTURED: Use if the page is a standard Andmita commentary (Ge'ez followed by Amharic). Group by 'verse_number' for each snippet.
-      - PLAIN: Use if the page is an introduction, index, or is excessively suitable for a simple text dump. Do not force a JSON array if it risks text integrity.
+      ### 2. ADAPTIVE OUTPUT EXAMPLES:
 
-      ### 3. OUTPUT FORMAT (JSON ONLY):
+      EXAMPLE A (STRUCTURED MODE - Standard Commentary):
       {
         "metadata": {
-          "page_layout": "column | plain",
-          "confidence_score": 0.0 to 1.0,
-          "scholarly_notes": "Detailed notes on legibility or archaic character preservation.",
-          "inference": "Book, Chapter:Verse-Verse"
+          "page_layout": "column",
+          "confidence_score": 0.98,
+          "scholarly_notes": "Clear text, standard layout.",
+          "inference": "ማቴዎስ, 5:1-3"
         },
-        "content_mode": "structured | plain",
+        "content_mode": "structured",
         "data": {
           "units": [
-            { "verse_number": "string", "geez": "string", "amharic": "string" }
+            { "verse_number": "5:1", "geez": "ወርእዮ ሕዝበ ዓርገ ደብረ...", "amharic": "ሕዝቡን ባየ ጊዜ ወደ ተራራ ወጣ..." }
           ],
-          "text_dump": "string (Only used if content_mode is 'plain')"
+          "text_dump": ""
         }
       }
 
-      NOTE: Never repeat content in both 'units' and 'text_dump'. Use only the field appropriate for the chosen 'content_mode'.
+      EXAMPLE B (PLAIN MODE - Introduction or Complex Layout):
+      {
+        "metadata": {
+          "page_layout": "plain",
+          "confidence_score": 0.95,
+          "scholarly_notes": "Introduction page; complex list layout unsuitable for array.",
+          "inference": "ማቴዎስ, Introduction"
+        },
+        "content_mode": "plain",
+        "data": {
+          "units": [],
+          "text_dump": "[Full character-perfect transcription of the introduction here...]"
+        }
+      }
+
+      NOTE: Never repeat content in both fields. Choose the mode that maximizes transcription fidelity.
     `;
 
     // 5. CALL GEMINI API
