@@ -178,9 +178,29 @@ serve(async (req) => {
 
     let transcriptionData;
     try {
-      transcriptionData = JSON.parse(rawJsonResponse);
+      // 1. CLEANING: Remove markdown code blocks if present
+      let cleanedJson = rawJsonResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+      
+      // 2. EXTRACTION: If the AI added prefix/suffix text, find the first '{' and last '}'
+      const firstBracket = cleanedJson.indexOf('{');
+      const lastBracket = cleanedJson.lastIndexOf('}');
+      
+      if (firstBracket === -1 || lastBracket === -1) {
+        throw new Error("No valid JSON object found in AI response.");
+      }
+      
+      cleanedJson = cleanedJson.substring(firstBracket, lastBracket + 1);
+
+      // 3. SANITIZATION: Replace unescaped control characters (newlines/tabs inside strings)
+      // that often break JSON.parse in high-token outputs.
+      cleanedJson = cleanedJson.replace(/[\u0000-\u001F]+/g, (match) => 
+        match === '\n' ? '\\n' : match === '\r' ? '\\r' : ''
+      );
+
+      transcriptionData = JSON.parse(cleanedJson);
     } catch (e) {
-      throw new Error("AI output was not valid JSON. Possible truncation.");
+      console.error("Raw AI Output for Debugging:", rawJsonResponse);
+      throw new Error(`Failed to parse AI JSON: ${e.message}`);
     }
 
     // Validate that we got a real transcription before proceeding
