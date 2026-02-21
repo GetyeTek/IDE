@@ -2,9 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const BATCH_SIZE = 30;
 const MAX_FILES = 26;
-const AI_TIMEOUT = 120000; // 2 Minutes
+const AI_TIMEOUT = 180000; // 3 Minutes (Increased for high-demand spikes)
 const COOLDOWN_DURATION = 10 * 60 * 1000;
-const STALE_CLAIM_THRESHOLD = 30 * 60 * 1000; // 30 Minutes
+const STALE_CLAIM_THRESHOLD = 30 * 60 * 1000;
 
 async function runRefinery() {
   const WORKER_ID = Deno.env.get('WORKER_ID') || '1';
@@ -15,13 +15,13 @@ async function runRefinery() {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  // GHOST HUNTING: Unlock batches stuck in 'claimed' state for too long
+  // GHOST HUNTING: Unlock batches stuck in 'processing' state for too long
   const staleTime = new Date(Date.now() - STALE_CLAIM_THRESHOLD).toISOString();
   const { count: unlocked } = await supabase
     .from('refinery_batches')
     .update({ status: 'failed' })
-    .eq('status', 'claimed')
-    .lt('created_at', staleTime);
+    .eq('status', 'processing')
+    .lt('updated_at', staleTime);
   
   if (unlocked) console.log(`[GHOST HUNTER] Unlocked ${unlocked} stale batches.`);
 
@@ -264,9 +264,20 @@ async function runRefinery() {
         if (!actualText) throw new Error('AI returned thoughts but no actual content text.');
 
         // 2. STAGED RECOVERY SIEVE
-        const sanitize = (val: string) => val
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
-          .replace(/,\s*([\}\]])/g, '$1');           // Fix trailing commas
+        const sanitize = (val: string) => {
+          let sanitized = val
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
+            .replace(/,\s*([\}\]])/g, '$1');           // Fix trailing commas
+          
+          // AUTO-REPAIR TRUNCATION: If it ends in a word/number/quote but no brace, try to close it
+          if (!sanitized.endsWith('}') && !sanitized.endsWith(']')) {
+             if (sanitized.includes('"data": [')) {
+                console.warn('[REPAIR] Attempting to close truncated JSON array...');
+                sanitized += ' ] }';
+             }
+          }
+          return sanitized;
+        };
 
         let parsed = null;
         
