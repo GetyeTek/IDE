@@ -206,26 +206,62 @@ async function runRefinery() {
         if (!candidate) throw new Error('AI Blocked the response or returned no candidates.');
 
         console.log(`[DEBUG: AI_RESPONSE] Finish Reason: ${candidate.finishReason}`);
-        const rawText = candidate.content?.parts?.map((p: any) => p.text || p.thought).filter(Boolean).join('\n').trim() || '';
-        console.log('[DEBUG: PREVIEW]', rawText.substring(0, 200) + '...');
+        
+        // 1. DIFFERENTIATE THINKING AND CONTENT
+        const thoughts = candidate.content?.parts?.filter((p: any) => p.thought).map((p: any) => p.thought).join('\n').trim();
+        const actualText = candidate.content?.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('\n').trim();
 
-        // Robust Regex Parsing to handle thought blocks and markdown
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          console.error('[PARSE ERROR] Raw text dump:', rawText);
-          throw new Error('Could not locate valid JSON block in AI response');
-        }
+        if (thoughts) console.log(`[AI THOUGHTS] ${thoughts.substring(0, 300)}...`);
+        if (!actualText) throw new Error('AI returned thoughts but no actual content text.');
 
-        const sanitizedJson = jsonMatch[0]
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
-          .replace(/,\s*([\}\]])/g, '$1');
+        // 2. STAGED RECOVERY SIEVE
+        const sanitize = (val: string) => val
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
+          .replace(/,\s*([\}\]])/g, '$1');           // Fix trailing commas
 
+        let parsed = null;
+        
+        // STAGE 1: Direct Parse of Cleaned Text
         try {
-          responseObj = JSON.parse(sanitizedJson);
+          parsed = JSON.parse(sanitize(actualText));
+          console.log('[PARSE: STAGE 1] Direct match successful.');
         } catch (e) {
-          errorType = "JSON_PARSE";
-          throw e;
+          // STAGE 2: Greedy Extraction
+          const greedyMatch = actualText.match(/\{[\s\S]*\}/);
+          if (greedyMatch) {
+            try {
+              parsed = JSON.parse(sanitize(greedyMatch[0]));
+              console.log('[PARSE: STAGE 2] Greedy extraction successful.');
+            } catch (e2) {
+              // STAGE 3: Outside-In Sieve (Staged recovery)
+              console.warn('[PARSE: STAGE 3] Attempting iterative sieve recovery...');
+              const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
+              const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
+
+              sieveLoop:
+              for (const s of starts) {
+                for (const e of ends) {
+                  if (e > s) {
+                    try {
+                      const candidateStr = actualText.substring(s, e + 1);
+                      parsed = JSON.parse(sanitize(candidateStr));
+                      console.log(`[PARSE: STAGE 3] Sieve found valid block at range ${s}-${e}`);
+                      break sieveLoop;
+                    } catch (err) { continue; }
+                  }
+                }
+              }
+            }
+          }
         }
+
+        if (!parsed) {
+          console.error('[CRITICAL PARSE FAIL] Raw Content:', actualText);
+          errorType = "JSON_PARSE_EXHAUSTED";
+          throw new Error('All parsing stages failed to extract valid JSON.');
+        }
+
+        responseObj = parsed;
         if (!responseObj?.data || !Array.isArray(responseObj.data)) throw new Error('Parsed JSON missing data array');
 
         break; // Success!
