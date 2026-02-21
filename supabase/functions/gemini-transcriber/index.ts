@@ -24,20 +24,13 @@ serve(async (req) => {
 
     if (keyError || !keyData) throw new Error("No available Gemini API keys found.");
 
-    // 2. FETCH NEXT INCOMPLETE PAGE
-    // Prioritizes the lowest page_number that is not yet 'completed'
-    const { data: page, error: pageError } = await supabase
-      .from('gospel_transcriptions')
-      .select('*')
-      .neq('status', 'completed')
-      .order('page_number', { ascending: true })
-      .limit(1)
-      .single();
+    // 2. FETCH NEXT PAGE ATOMICALLY
+    // Uses RPC with 'FOR UPDATE SKIP LOCKED' to prevent race conditions and recover stuck tasks
+    const { data: page, error: pageError } = await supabase.rpc('get_next_gospel_page').single();
 
-    if (pageError || !page) return new Response(JSON.stringify({ message: "No pending pages to process." }));
-
-    // Mark as processing immediately to prevent double-work
-    await supabase.from('gospel_transcriptions').update({ status: 'processing' }).eq('id', page.id);
+    if (pageError || !page) {
+      return new Response(JSON.stringify({ message: "No pending pages to process or queue is locked." }), { status: 200 });
+    }
 
     // 3. GET FILE FROM STORAGE
     const { data: fileBlob, error: downloadError } = await supabase.storage
@@ -94,18 +87,20 @@ serve(async (req) => {
       })
     });
 
-    const result = await response.json();
-
-    if (result.error) {
-      throw new Error(`Gemini API Error: ${result.error.message}`);
+    // 5. IMMEDIATE STATUS CHECK
+    if (response.status === 429) {
+        const cooldown = new Date(Date.now() + 10 * 60000).toISOString();
+        await Promise.all([
+          supabase.from('api_keys').update({ cooldown_until: cooldown }).eq('id', keyData.id),
+          supabase.from('gospel_transcriptions').update({ status: 'pending' }).eq('id', page.id)
+        ]);
+        throw new Error("Rate limit (429) hit. Key cooling down, page returned to queue.");
     }
 
-    if (response.status === 429) {
-        // Rate limit hit: put key on 10-minute cooldown
-        const cooldown = new Date(Date.now() + 10 * 60000).toISOString();
-        await supabase.from('api_keys').update({ cooldown_until: cooldown }).eq('id', keyData.id);
-        await supabase.from('gospel_transcriptions').update({ status: 'pending' }).eq('id', page.id);
-        throw new Error("Rate limit hit. Key put on cooldown.");
+    const result = await response.json();
+
+    if (result.error || !response.ok) {
+      throw new Error(`Gemini API Error: ${result.error?.message || response.statusText}`);
     }
 
     // Gemini 3.0 fragments responses. We join ALL text parts to fix the 'zigzag' truncation.
