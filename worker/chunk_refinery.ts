@@ -55,111 +55,91 @@ async function runChunkRefinery() {
 
       const text = await fileData.text();
       const batch = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      let finalParsed = null;
 
-      // 4. ROBUST AI CALL (Direct transplant from 1.0)
-      const systemInstruction = `
+      // --- TIER 1: TACTICAL LOOP (3 Internal Attempts) ---
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[STAGE: AI] ${currentPath} - Session Attempt ${attempt}/3...`);
+          
+          const systemInstruction = `
     ROLE: You are the "Amharic Refinery Master," an elite linguistic engine specialized in Ethiopic script restoration, morphological analysis, and lexicographical enrichment.
+    CRITICAL: Your final output MUST be a single JSON object. No markdown. No thoughts in content.
+    PROTOCOLS: 1. Split merged words. 2. Discard nonsense/noise. 3. Fix visuals. 4. Identify Root/Citation form. 5. Nuanced English Synonyms. 6. POS Tagging. 7. FILTER: No single characters. 8. Summary.
+    OUTPUT FORMAT: { "data": [ { "word": "...", "root": "...", "pos": "...", "synonyms": [], "importance": 1-10 } ], "summary": "..." }`;
 
-    CRITICAL: Your final output MUST be a single JSON object. 
-    - Do NOT include partial JSON snippets or code blocks in your thoughts.
-    - If you must explain your work, use plain text only. 
-    - Do NOT use curly braces {} anywhere except in the final JSON structure.
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-    YOUR MISSION: Process messy OCR input through these STRICT SCHOLARLY PROTOCOLS:
-    1. PROTOCOL: THE SPLITTER: Split merged words (e.g., "ጨምሯልለሶስተኛ" ➔ "ጨምሯል", "ለሶስተኛ").
-    2. PROTOCOL: THE JUDGE: Discard gibberish or pure Latin/numbers.
-    3. PROTOCOL: THE CORRECTOR: Fix visual confusion (ሀ vs ሃ). Strip punctuation.
-    4. PROTOCOL: THE LEMMATIZER: Provide Global Citation Form (e.g., "እንድናጓጉዘው" ➔ "ማጓጓዝ").
-    5. PROTOCOL: THE TRANSLATOR: Comprehensive English synonyms.
-    6. PROTOCOL: THE GRAMMARIAN: Identify Part of Speech.
-    7. PROTOCOL: THE FILTER: CRITICAL: Discard any word/root shorter than 2 characters.
-    8. PROTOCOL: EXECUTIVE SUMMARY: Explain your logic.
+          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${cleanKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system_instruction: { parts: [{ text: systemInstruction }] },
+              contents: [{ parts: [{ text: `INPUT BATCH: ${JSON.stringify(batch)}` }] }],
+              generationConfig: { responseMimeType: 'application/json', temperature: 0.1, thinkingConfig: { includeThoughts: true, thinkingLevel: 'HIGH' } },
+              safetySettings: [{ category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }]
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
 
-    OUTPUT FORMAT (STRICT JSON ONLY):
-    {
-      "data": [ { "word": "...", "root": "...", "pos": "...", "synonyms": [], "importance": 1-10 } ],
-      "summary": "..."
-    }`;
+          if (aiResp.status === 429) {
+            await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
+            throw new Error('Rate limit hit.');
+          }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
+          const result = await aiResp.json();
+          const candidate = result.candidates?.[0];
+          if (!candidate || !candidate.content) throw new Error(`No AI Content. Reason: ${candidate?.finishReason || 'UNKNOWN'}`);
 
-      const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${cleanKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemInstruction }] },
-          contents: [{ parts: [{ text: `INPUT BATCH: ${JSON.stringify(batch)}` }] }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.1, thinkingConfig: { includeThoughts: true, thinkingLevel: 'HIGH' } },
-          safetySettings: [{ category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }]
-        }),
-        signal: controller.signal
-      });
+          let actualText = candidate.content.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('').trim();
+          if (!actualText) throw new Error('AI response body is empty.');
 
-      clearTimeout(timeoutId);
+          if (candidate.finishReason === 'MAX_TOKENS' && !actualText.endsWith('}')) {
+            if (actualText.includes('"data":') && !actualText.includes(']')) actualText += ']}';
+            if (!actualText.endsWith('}')) actualText += '}';
+          }
 
-      if (aiResp.status === 429) {
-        await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
-        throw new Error('Rate limit hit.');
-      }
+          const sanitize = (val: string) => val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/,\s*([\}\]])/g, '$1');
+          try { 
+            finalParsed = JSON.parse(sanitize(actualText)); 
+          } catch (e) {
+            const greedyMatch = actualText.match(/\{[\s\S]*\}/);
+            if (greedyMatch) try { finalParsed = JSON.parse(sanitize(greedyMatch[0])); } catch (e2) {
+              const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
+              const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
+              sieve: for (const s of starts) for (const e of ends) if (e > s) try { 
+                finalParsed = JSON.parse(sanitize(actualText.substring(s, e + 1))); 
+                break sieve; 
+              } catch (err) { continue; }
+            }
+          }
 
-      const result = await aiResp.json();
-      const candidate = result.candidates?.[0];
-      if (!candidate || !candidate.content) {
-        throw new Error(`AI returned no content. FinishReason: ${candidate?.finishReason || 'UNKNOWN'}`);
-      }
+          if (finalParsed?.data && Array.isArray(finalParsed.data)) break; // SUCCESS: Exit attempt loop
+          else throw new Error('Parsing Sieve failed to recover JSON.');
 
-      // 1. CONTIGUOUS ASSEMBLY: Join text parts without separators to preserve JSON integrity
-      let actualText = candidate.content.parts
-        ?.filter((p: any) => p.text)
-        .map((p: any) => p.text)
-        .join('')
-        .trim();
-      
-      if (!actualText) throw new Error('AI response body is empty.');
-
-      // 2. TRUNCATION RECOVERY: If AI hit max tokens, try to close the JSON structure
-      if (candidate.finishReason === 'MAX_TOKENS' && !actualText.endsWith('}')) {
-        console.warn('[REPAIR] Response truncated. Attempting to force-close JSON...');
-        if (actualText.includes('"data":') && !actualText.includes(']')) actualText += ']}';
-        if (!actualText.endsWith('}')) actualText += '}';
-      }
-
-      // 3. ROBUST STAGED SIEVE PARSING (Stage 1-3)
-      const sanitize = (val: string) => val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/,\s*([\}\]])/g, '$1');
-      let parsed = null;
-      try { 
-        parsed = JSON.parse(sanitize(actualText)); 
-      } catch (e) {
-        const greedyMatch = actualText.match(/\{[\s\S]*\}/);
-        if (greedyMatch) try { parsed = JSON.parse(sanitize(greedyMatch[0])); } catch (e2) {
-          const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
-          const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
-          sieveLoop: for (const s of starts) for (const e of ends) if (e > s) try { 
-            parsed = JSON.parse(sanitize(actualText.substring(s, e + 1))); 
-            break sieveLoop; 
-          } catch (err) { continue; }
+        } catch (attemptErr) {
+          console.warn(`[ATTEMPT FAIL] ${currentPath} attempt ${attempt}: ${attemptErr.message}`);
+          if (attempt === 3) throw attemptErr; // Final internal attempt failed
+          await new Promise(r => setTimeout(r, 2000 * attempt)); // Exponential backoff
         }
       }
 
-      if (!parsed || !Array.isArray(parsed.data)) throw new Error('Parsing Sieve failed to recover JSON.');
+      // 5. POST-AI PROCESSING
+      finalParsed.data = finalParsed.data.filter((item: any) => item.word?.trim().length > 1 && item.root?.trim().length > 1);
 
-      // 6. PROGRAMMATIC FILTERING
-      parsed.data = parsed.data.filter((item: any) => item.word?.trim().length > 1 && item.root?.trim().length > 1);
-
-      // 7. SAVE DATA & STATS
       const { error: saveErr } = await supabase.from('processed_words').upsert({
-        source_file: currentPath, batch_index: 0, input_words: batch, words: parsed.data, summary: parsed.summary
+        source_file: currentPath, batch_index: 0, input_words: batch, words: finalParsed.data, summary: finalParsed.summary
       }, { onConflict: 'source_file,batch_index' });
       if (saveErr) throw saveErr;
 
       await supabase.from('refinery_stats').insert({
-        worker_id: WORKER_ID, source_file: currentPath, status: 'success', input_words: batch.length, output_words: parsed.data.length, total_duration_ms: Date.now() - batchStart
+        worker_id: WORKER_ID, source_file: currentPath, status: 'success', input_words: batch.length, output_words: finalParsed.data.length, total_duration_ms: Date.now() - batchStart
       });
 
       await supabase.from('chunk_queue').update({ status: 'completed' }).eq('id', chunkRecordId);
       await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
-
       console.log(`[SUCCESS] Chunk ${currentPath} done.`);
 
     } catch (err) {
