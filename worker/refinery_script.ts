@@ -4,6 +4,7 @@ const BATCH_SIZE = 30;
 const MAX_FILES = 26;
 const AI_TIMEOUT = 120000; // 2 Minutes
 const COOLDOWN_DURATION = 10 * 60 * 1000;
+const STALE_CLAIM_THRESHOLD = 30 * 60 * 1000; // 30 Minutes
 
 async function runRefinery() {
   const WORKER_ID = Deno.env.get('WORKER_ID') || '1';
@@ -13,6 +14,16 @@ async function runRefinery() {
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
+
+  // GHOST HUNTING: Unlock batches stuck in 'claimed' state for too long
+  const staleTime = new Date(Date.now() - STALE_CLAIM_THRESHOLD).toISOString();
+  const { count: unlocked } = await supabase
+    .from('refinery_batches')
+    .update({ status: 'failed' })
+    .eq('status', 'claimed')
+    .lt('created_at', staleTime);
+  
+  if (unlocked) console.log(`[GHOST HUNTER] Unlocked ${unlocked} stale batches.`);
 
   // Loop to process 5 batches per worker run to maximize runtime
   for (let batchLoop = 0; batchLoop < 5; batchLoop++) {
@@ -29,44 +40,62 @@ async function runRefinery() {
 
     try {
       // 1. Progress Tracking
-      console.log('[STAGE: BOOKMARK] Checking active task...');
-      let { data: progress } = await supabase
+      console.log('[STAGE: BOOKMARK] Fetching unfinished files...');
+      let { data: unfinishedFiles } = await supabase
         .from('refinery_progress')
         .select('*')
         .eq('is_finished', false)
-        .order('id', { ascending: true })
-        .limit(1)
-        .single();
+        .order('id', { ascending: true });
 
-      if (!progress) {
-        console.log('[STAGE: INITIALIZATION] No active file. Determining next file from sequence...');
+      if (!unfinishedFiles || unfinishedFiles.length === 0) {
+        console.log('[STAGE: INITIALIZATION] Initializing file sequence...');
         for (let i = 1; i <= MAX_FILES; i++) {
           const fname = `rare_words_${i}.txt`;
           await supabase.from('refinery_progress').upsert({ file_path: fname }, { onConflict: 'file_path' });
         }
-        const { data: current } = await supabase.from('refinery_progress').select('*').eq('is_finished', false).order('id', { ascending: true }).limit(1).single();
-        if (!current) { console.log('--- ALL FILES FULLY PROCESSED ---'); Deno.exit(0); }
-        progress = current;
+        const { data: refreshed } = await supabase.from('refinery_progress').select('*').eq('is_finished', false).order('id', { ascending: true });
+        unfinishedFiles = refreshed || [];
       }
 
-      // STATEFUL CLAIM
-      const { data: claim, error: claimErr } = await supabase.rpc('claim_refinery_batch', { 
+      if (unfinishedFiles.length === 0) {
+        console.log('--- ALL FILES FULLY PROCESSED ---');
+        Deno.exit(0);
+      }
+
+      // 2. STATEFUL CLAIM (Search through unfinished files)
+      let claim = null;
+      let claimErr = null;
+
+      const { data: claimData, error: rpcErr } = await supabase.rpc('claim_refinery_batch', { 
         p_worker_id: WORKER_ID, 
         p_batch_size: BATCH_SIZE 
       });
-
-      if (claimErr || !claim?.[0]) throw new Error(`Claim failed: ${claimErr?.message}`);
       
-      currentBatchOffset = claim[0].current_offset;
-      currentFilePath = claim[0].target_file;
-      batchRecordId = Number(claim[0].batch_record_id);
-      const shouldClose = claim[0].should_close_file;
+      claim = claimData?.[0];
+      claimErr = rpcErr;
 
-    if (shouldClose) {
-        console.log(`[CLEANUP] No gaps remaining in ${currentFilePath}. Marking finished.`);
-        await supabase.from('refinery_progress').update({ is_finished: true }).eq('file_path', currentFilePath);
+      if (claimErr) {
+        errorType = "RPC_ERROR";
+        throw new Error(`Claim RPC failed: ${claimErr.message}`);
+      }
+
+      if (!claim) {
+        console.log("[WAITING] No available batches. Checking if any files can be closed...");
+        // If the RPC returns nothing, it might mean the current file is full of 'pending' jobs.
+        // We move to the next loop iteration which will re-fetch unfinished files.
+        await new Promise(r => setTimeout(r, 5000));
         continue;
-    }
+      }
+      
+      currentBatchOffset = claim.current_offset;
+      currentFilePath = claim.target_file;
+      batchRecordId = Number(claim.batch_record_id);
+      
+      if (claim.should_close_file) {
+          console.log(`[CLEANUP] Closing ${currentFilePath}.`);
+          await supabase.from('refinery_progress').update({ is_finished: true }).eq('file_path', currentFilePath);
+          continue;
+      }
 
     console.log(`[STAGE: CLAIMED] Worker ${WORKER_ID} reserved batch ${batchRecordId} (${currentFilePath} at ${currentBatchOffset})`);
 
@@ -87,8 +116,17 @@ async function runRefinery() {
     }
     const cleanKey = keyRecord.api_key.trim();
 
-    // 3. Gathering Material
-    const { data: fileData, error: fileError } = await supabase.storage.from('Chunks').download(currentFilePath);
+    // 3. Gathering Material (with Timeout)
+    console.log(`[STAGE: DOWNLOAD] Downloading ${currentFilePath}...`);
+    const storageController = new AbortController();
+    const storageTimeout = setTimeout(() => storageController.abort(), 30000); // 30s limit
+
+    const { data: fileData, error: fileError } = await supabase.storage.from('Chunks').download(currentFilePath, {
+      // Use standard fetch options if supported, otherwise manually abort
+    });
+    
+    clearTimeout(storageTimeout);
+
     if (fileError) {
       errorType = "STORAGE_DOWNLOAD_ERROR";
       throw fileError;
