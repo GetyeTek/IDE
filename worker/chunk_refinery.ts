@@ -109,19 +109,29 @@ async function runChunkRefinery() {
         throw new Error(`AI returned no content. FinishReason: ${candidate?.finishReason || 'UNKNOWN'}`);
       }
 
-      const actualText = candidate.content.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('\n').trim();
+      // 1. CONTIGUOUS ASSEMBLY: Join text parts without separators to preserve JSON integrity
+      let actualText = candidate.content.parts
+        ?.filter((p: any) => p.text)
+        .map((p: any) => p.text)
+        .join('')
+        .trim();
       
-      if (!actualText) {
-        throw new Error('AI response body is empty.');
+      if (!actualText) throw new Error('AI response body is empty.');
+
+      // 2. TRUNCATION RECOVERY: If AI hit max tokens, try to close the JSON structure
+      if (candidate.finishReason === 'MAX_TOKENS' && !actualText.endsWith('}')) {
+        console.warn('[REPAIR] Response truncated. Attempting to force-close JSON...');
+        if (actualText.includes('"data":') && !actualText.includes(']')) actualText += ']}';
+        if (!actualText.endsWith('}')) actualText += '}';
       }
 
-      // 5. ROBUST STAGED SIEVE PARSING (Stage 1-3)
+      // 3. ROBUST STAGED SIEVE PARSING (Stage 1-3)
       const sanitize = (val: string) => val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/,\s*([\}\]])/g, '$1');
       let parsed = null;
       try { 
         parsed = JSON.parse(sanitize(actualText)); 
       } catch (e) {
-        const greedyMatch = actualText ? actualText.match(/\{[\s\S]*\}/) : null;
+        const greedyMatch = actualText.match(/\{[\s\S]*\}/);
         if (greedyMatch) try { parsed = JSON.parse(sanitize(greedyMatch[0])); } catch (e2) {
           const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
           const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
