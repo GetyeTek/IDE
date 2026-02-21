@@ -188,7 +188,10 @@ async function runRefinery() {
     6. PROTOCOL: THE GRAMMARIAN (Linguistic Tagging)
        - Identify the Part of Speech (POS) for the word (e.g., Noun, Verb, Adjective, Adverb, Conjunction, Preposition).
 
-    7. PROTOCOL: EXECUTIVE SUMMARY
+    7. PROTOCOL: THE FILTER (Size Constraint)
+       - CRITICAL: Discard any word or root that consists of only a single character. Amharic words must be at least 2 characters long to be included in the dataset.
+
+    8. PROTOCOL: EXECUTIVE SUMMARY
        - Explain splits, discards, and "Scholarly Guesses."
 
     OUTPUT FORMAT (STRICT JSON ONLY):
@@ -329,6 +332,18 @@ async function runRefinery() {
 
         responseObj = parsed;
         if (!responseObj?.data || !Array.isArray(responseObj.data)) throw new Error('Parsed JSON missing data array');
+
+        // PROGRAMMATIC FILTER: Ensure no single-letter entries pass through
+        const initialCount = responseObj.data.length;
+        responseObj.data = responseObj.data.filter(item => {
+          const wordValid = item.word && item.word.trim().length > 1;
+          const rootValid = item.root && item.root.trim().length > 1;
+          return wordValid && rootValid;
+        });
+
+        if (responseObj.data.length < initialCount) {
+          console.log(`[CLEANUP] Programmatically removed ${initialCount - responseObj.data.length} single-letter noise entries.`);
+        }
 
         break; // Success!
 
