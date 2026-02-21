@@ -147,22 +147,40 @@ async function runChunkRefinery() {
           }
 
           const sanitize = (val: string) => val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/,\s*([\}\]])/g, '$1');
+          let sieveError = "";
+          
           try { 
             finalParsed = JSON.parse(sanitize(actualText)); 
           } catch (e) {
+            sieveError += `[Stage1: ${e.message}] `;
             const greedyMatch = actualText.match(/\{[\s\S]*\}/);
-            if (greedyMatch) try { finalParsed = JSON.parse(sanitize(greedyMatch[0])); } catch (e2) {
-              const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
-              const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
-              sieve: for (const s of starts) for (const e of ends) if (e > s) try { 
-                finalParsed = JSON.parse(sanitize(actualText.substring(s, e + 1))); 
-                break sieve; 
-              } catch (err) { continue; }
+            if (greedyMatch) {
+              try { 
+                finalParsed = JSON.parse(sanitize(greedyMatch[0])); 
+              } catch (e2) {
+                sieveError += `[Stage2: ${e2.message}] `;
+                const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
+                const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
+                sieve: for (const s of starts) for (const e of ends) if (e > s) try { 
+                  finalParsed = JSON.parse(sanitize(actualText.substring(s, e + 1))); 
+                  break sieve; 
+                } catch (err) { continue; }
+              }
+            } else {
+              sieveError += "[Stage2: No curly braces found] ";
             }
           }
 
-          if (finalParsed?.data && Array.isArray(finalParsed.data)) break; // SUCCESS: Exit attempt loop
-          else throw new Error('Parsing Sieve failed to recover JSON.');
+          if (finalParsed?.data && Array.isArray(finalParsed.data)) break;
+          else {
+            console.error(`[SIEVE FAILURE] ${currentPath}: ${sieveError}`);
+            // Log raw output to DB immediately for forensics
+            await supabase.from('refinery_stats').insert({
+              worker_id: WORKER_ID, source_file: currentPath, status: 'failed', 
+              error_message: `Sieve Fail: ${sieveError}`, raw_output: actualText
+            });
+            throw new Error('Parsing Sieve failed to recover JSON.');
+          }
 
         } catch (attemptErr) {
           console.warn(`[ATTEMPT FAIL] ${currentPath} attempt ${attempt}: ${attemptErr.message}`);
@@ -180,7 +198,13 @@ async function runChunkRefinery() {
       if (saveErr) throw saveErr;
 
       await supabase.from('refinery_stats').insert({
-        worker_id: WORKER_ID, source_file: currentPath, status: 'success', input_words: batch.length, output_words: finalParsed.data.length, total_duration_ms: Date.now() - batchStart
+        worker_id: WORKER_ID, 
+        source_file: currentPath, 
+        status: 'success', 
+        input_words: batch.length, 
+        output_words: finalParsed.data.length, 
+        total_duration_ms: Date.now() - batchStart,
+        raw_output: JSON.stringify(finalParsed) // Store successful result for pattern analysis
       });
 
       await supabase.from('chunk_queue').update({ status: 'completed' }).eq('id', chunkRecordId);
