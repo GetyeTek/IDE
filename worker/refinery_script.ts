@@ -60,18 +60,19 @@ async function runRefinery() {
       progress = newProgress;
     }
 
-    // ATOMIC CLAIM: Increment offset immediately to "reserve" this batch for this worker
-    const { data: claim, error: claimErr } = await supabase.rpc('increment_refinery_offset', { 
-      row_id: progress.id, 
-      amount: BATCH_SIZE 
+        // STATEFUL CLAIM: Get a specific batch and track its status
+    const { data: claim, error: claimErr } = await supabase.rpc('claim_refinery_batch', { 
+      p_worker_id: WORKER_ID, 
+      p_batch_size: BATCH_SIZE 
     });
 
     if (claimErr || !claim?.[0]) throw new Error(`Claim failed: ${claimErr?.message}`);
     
-    const currentBatchOffset = claim[0].old_offset;
+    const currentBatchOffset = claim[0].current_offset;
     const currentFilePath = claim[0].target_file;
+    const batchRecordId = claim[0].batch_record_id;
 
-    console.log(`[STAGE: CLAIMED] Worker ${WORKER_ID} reserved ${currentFilePath} at offset ${currentBatchOffset}`);
+    console.log(`[STAGE: CLAIMED] Worker ${WORKER_ID} reserved batch ${batchRecordId} (${currentFilePath} at ${currentBatchOffset})`);
 
     // 2. Resource Management
     const { data: keyRecord, error: keyError } = await supabase
@@ -199,17 +200,14 @@ async function runRefinery() {
         const rawText = candidate.content?.parts?.map((p: any) => p.text || p.thought).filter(Boolean).join('\n').trim() || '';
         console.log('[DEBUG: PREVIEW]', rawText.substring(0, 200) + '...');
 
-        // Targeted Reverse Search Parsing
-        const lastDataKey = rawText.lastIndexOf('"data"');
-        const lastClosingBrace = rawText.lastIndexOf('}');
-        const startIndex = rawText.lastIndexOf('{', lastDataKey);
-
-        if (lastDataKey === -1 || lastClosingBrace === -1 || startIndex === -1) {
+        // Robust Regex Parsing to handle thought blocks and markdown
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
           console.error('[PARSE ERROR] Raw text dump:', rawText);
           throw new Error('Could not locate valid JSON block in AI response');
         }
 
-        const sanitizedJson = rawText.substring(startIndex, lastClosingBrace + 1)
+        const sanitizedJson = jsonMatch[0]
           .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
           .replace(/,\s*([\}\]])/g, '$1');
 
@@ -245,13 +243,22 @@ async function runRefinery() {
       summary: responseObj.summary
     }, { onConflict: 'source_file,batch_index' });
 
-    if (saveErr) throw saveErr;
+        if (saveErr) throw saveErr;
 
+    // Mark the specific batch as COMPLETED
+    await supabase.from('refinery_batches').update({ status: 'completed' }).eq('id', batchRecordId);
     await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
     
-    console.log(`[SUCCESS] Batch at ${currentBatchOffset} completed.`);
+    console.log(`[SUCCESS] Batch ${batchRecordId} completed.`);
+
     } catch (err) {
       console.error(`[BATCH ERROR] ${err.message}`);
+      
+      // If we have a batch claimed but failed, mark it for retry
+      if (typeof batchRecordId !== 'undefined') {
+        await supabase.from('refinery_batches').update({ status: 'failed' }).eq('id', batchRecordId);
+      }
+
       if (err.message.includes('No available Gemini keys')) break;
     }
   }
