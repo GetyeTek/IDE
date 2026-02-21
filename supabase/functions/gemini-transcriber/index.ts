@@ -59,7 +59,29 @@ serve(async (req) => {
       - Map these relationships into the 'units' array. If multiple Ge'ez phrases are explained in one paragraph, break them into separate logical units.
 
       ### 4. OUTPUT FORMAT (JSON ONLY):
-      You must output ONLY a valid JSON object following the provided schema.
+      You must output ONLY a valid JSON object following the provided schema. 
+
+      TEMPLATE EXAMPLE FOR YOUR REFERENCE:
+      {
+        "inference": {
+          "book": "ማቴዎስ",
+          "chapter": 5,
+          "verse_range": "1-3",
+          "confidence_score": 0.98
+        },
+        "transcription": {
+          "full_page_text": "[Full top-to-bottom text here...]",
+          "units": [
+            {
+              "verse_ref": "5:1",
+              "geez_text": "ወርእዮ ሕዝበ ዓርገ ደብረ...",
+              "amharic_commentary": "ሕዝቡን ባየ ጊዜ ወደ ተራራ ወጣ...",
+              "is_continuation": false
+            }
+          ]
+        },
+        "scholarly_notes": "Text is clear; archaic 'ቆ' preserved."
+      }
 
       ### 5. SCENARIO HANDLING:
       - If the page is a Table of Contents or Index: Use the 'full_page_text' for the content and set 'units' to an empty array.
