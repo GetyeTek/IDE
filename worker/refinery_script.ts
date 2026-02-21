@@ -18,53 +18,49 @@ async function runRefinery() {
   for (let batchLoop = 0; batchLoop < 5; batchLoop++) {
     console.log(`[LOOP ${batchLoop + 1}/5] Processing next available batch...`);
 
-  try {
-    // 1. Progress Tracking
-    console.log('[STAGE: BOOKMARK] Checking active task...');
-    let { data: progress } = await supabase
-      .from('refinery_progress')
-      .select('*')
-      .eq('is_finished', false)
-      .order('id', { ascending: true })
-      .limit(1)
-      .single();
+    let batchRecordId = 0;
+    let currentFilePath = "";
+    let currentBatchOffset = 0;
+    let batchStart = Date.now();
+    let totalAiLatency = 0;
+    let errorType = "";
+    let lastErrorMessage = "";
+    let finalAttemptCount = 0;
 
-    if (!progress) {
-      console.log('[STAGE: INITIALIZATION] No active file. Determining next file from sequence...');
-      // Ensure we have entries for all 26 files in progress table
-      for (let i = 1; i <= MAX_FILES; i++) {
-        const fname = `rare_words_${i}.txt`;
-        await supabase.from('refinery_progress').upsert({ file_path: fname }, { onConflict: 'file_path' });
-      }
-      
-      // Re-fetch progress to get the current sequential task
-      const { data: current } = await supabase
+    try {
+      // 1. Progress Tracking
+      console.log('[STAGE: BOOKMARK] Checking active task...');
+      let { data: progress } = await supabase
         .from('refinery_progress')
         .select('*')
         .eq('is_finished', false)
         .order('id', { ascending: true })
         .limit(1)
         .single();
-      
-      if (!current) {
-        console.log('--- ALL FILES FULLY PROCESSED ---');
-        Deno.exit(0);
+
+      if (!progress) {
+        console.log('[STAGE: INITIALIZATION] No active file. Determining next file from sequence...');
+        for (let i = 1; i <= MAX_FILES; i++) {
+          const fname = `rare_words_${i}.txt`;
+          await supabase.from('refinery_progress').upsert({ file_path: fname }, { onConflict: 'file_path' });
+        }
+        const { data: current } = await supabase.from('refinery_progress').select('*').eq('is_finished', false).order('id', { ascending: true }).limit(1).single();
+        if (!current) { console.log('--- ALL FILES FULLY PROCESSED ---'); Deno.exit(0); }
+        progress = current;
       }
-      progress = current;
-    }
 
-        // STATEFUL CLAIM: Get a specific batch and track its status
-    const { data: claim, error: claimErr } = await supabase.rpc('claim_refinery_batch', { 
-      p_worker_id: WORKER_ID, 
-      p_batch_size: BATCH_SIZE 
-    });
+      // STATEFUL CLAIM
+      const { data: claim, error: claimErr } = await supabase.rpc('claim_refinery_batch', { 
+        p_worker_id: WORKER_ID, 
+        p_batch_size: BATCH_SIZE 
+      });
 
-    if (claimErr || !claim?.[0]) throw new Error(`Claim failed: ${claimErr?.message}`);
-    
-    const currentBatchOffset = claim[0].current_offset;
-    const currentFilePath = claim[0].target_file;
-    const batchRecordId = Number(claim[0].batch_record_id);
-    const shouldClose = claim[0].should_close_file;
+      if (claimErr || !claim?.[0]) throw new Error(`Claim failed: ${claimErr?.message}`);
+      
+      currentBatchOffset = claim[0].current_offset;
+      currentFilePath = claim[0].target_file;
+      batchRecordId = Number(claim[0].batch_record_id);
+      const shouldClose = claim[0].should_close_file;
 
     if (shouldClose) {
         console.log(`[CLEANUP] No gaps remaining in ${currentFilePath}. Marking finished.`);
@@ -156,12 +152,9 @@ async function runRefinery() {
 
     let responseObj: { summary: string, data: any[] } | null = null;
     const MAX_RETRIES = 3;
-    const batchStart = Date.now();
-    let totalAiLatency = 0;
-    let errorType = "";
-    let lastErrorMessage = "";
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      finalAttemptCount = attempt;
       const attemptStart = Date.now();
       try {
         console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES} starting...`);
@@ -254,6 +247,7 @@ async function runRefinery() {
     }
 
     if (!responseObj) throw new Error('AI processing failed after retries.');
+    if (!responseObj) throw new Error('AI processing failed after retries.');
 
     // 5. Save
     console.log(`[STAGE: SAVE] Archiving ${responseObj.data.length} words for offset ${currentBatchOffset}...`);
@@ -264,14 +258,12 @@ async function runRefinery() {
       summary: responseObj.summary
     }, { onConflict: 'source_file,batch_index' });
 
-        if (saveErr) throw saveErr;
-
     if (saveErr) throw saveErr;
 
     // LOG STATS ON SUCCESS
     await supabase.from('refinery_stats').insert({
         batch_record_id: batchRecordId, worker_id: WORKER_ID, source_file: currentFilePath,
-        batch_index: currentBatchOffset, attempts: 1, total_duration_ms: Date.now() - batchStart,
+        batch_index: currentBatchOffset, attempts: finalAttemptCount, total_duration_ms: Date.now() - batchStart,
         ai_latency_ms: totalAiLatency, input_chars: JSON.stringify(batch).length, 
         output_words: responseObj.data.length, status: 'success'
     });
@@ -283,16 +275,23 @@ async function runRefinery() {
     } catch (err) {
       console.error(`[BATCH ERROR] ${err.message}`);
       
-      if (typeof batchRecordId !== 'undefined' && batchRecordId !== 0) {
-        // LOG STATS ON FAILURE
+      if (batchRecordId !== 0) {
         await supabase.from('refinery_stats').insert({
             batch_record_id: batchRecordId, worker_id: WORKER_ID, source_file: currentFilePath,
-            batch_index: currentBatchOffset, status: 'failed', error_type: errorType,
-            error_message: lastErrorMessage || err.message, total_duration_ms: Date.now() - batchStart
+            batch_index: currentBatchOffset, status: 'failed', error_type: errorType || 'SYSTEM_ERROR',
+            error_message: lastErrorMessage || err.message, total_duration_ms: Date.now() - batchStart,
+            attempts: finalAttemptCount
         });
         await supabase.from('refinery_batches').update({ status: 'failed' }).eq('id', batchRecordId);
       }
 
+      if (err.message.includes('No available Gemini keys')) break;
+    }
+  }
+  console.log('--- WORKER CYCLE COMPLETE ---');
+}
+
+runRefinery();
       if (err.message.includes('No available Gemini keys')) break;
     }
   console.log('--- WORKER CYCLE COMPLETE ---');
