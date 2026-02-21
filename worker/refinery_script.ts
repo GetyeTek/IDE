@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const BATCH_SIZE = 30;
-const MAX_FILES = 26;
+const MAX_FILES = 12;
 const AI_TIMEOUT = 180000; // 3 Minutes (Increased for high-demand spikes)
 const COOLDOWN_DURATION = 10 * 60 * 1000;
 const STALE_CLAIM_THRESHOLD = 30 * 60 * 1000;
@@ -60,6 +60,12 @@ async function runRefinery() {
         unfinishedFiles = refreshed || [];
       }
 
+      // HARD BOUNDARY FILTER: Ignore any records that might exist for files 13-26
+      unfinishedFiles = unfinishedFiles.filter(f => {
+        const match = f.file_path.match(/rare_words_(\d+)\.txt/);
+        return match && parseInt(match[1]) <= MAX_FILES;
+      });
+
       if (unfinishedFiles.length === 0) {
         console.log('--- ALL FILES FULLY PROCESSED ---');
         Deno.exit(0);
@@ -93,6 +99,14 @@ async function runRefinery() {
       currentBatchOffset = claim.current_offset;
       currentFilePath = claim.target_file;
       batchRecordId = Number(claim.batch_record_id);
+
+      // GATEKEEPER: Prevent processing if RPC returns a file beyond the allowed 1-12 range
+      const fileMatch = currentFilePath.match(/rare_words_(\d+)\.txt/);
+      const fileNum = fileMatch ? parseInt(fileMatch[1]) : 999;
+      if (fileNum > MAX_FILES) {
+        console.log(`[BOUNDARY REACHED] Claimed ${currentFilePath}, but limit is ${MAX_FILES}. Stopping loop.`);
+        break;
+      }
       
       if (claim.should_close_file) {
           console.log(`[CLEANUP] Closing ${currentFilePath}.`);
