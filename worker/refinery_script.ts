@@ -25,6 +25,9 @@ async function runRefinery() {
   
   if (unlocked) console.log(`[GHOST HUNTER] Unlocked ${unlocked} stale batches.`);
 
+  let cachedText = "";
+  let cachedPath = "";
+
   // Loop to process 5 batches per worker run to maximize runtime
   for (let batchLoop = 0; batchLoop < 5; batchLoop++) {
     console.log(`[LOOP ${batchLoop + 1}/5] Processing next available batch...`);
@@ -116,24 +119,27 @@ async function runRefinery() {
     }
     const cleanKey = keyRecord.api_key.trim();
 
-    // 3. Gathering Material (with Timeout)
-    console.log(`[STAGE: DOWNLOAD] Downloading ${currentFilePath}...`);
-    const storageController = new AbortController();
-    const storageTimeout = setTimeout(() => storageController.abort(), 30000); // 30s limit
+    // 3. Gathering Material (with Caching & Timeout)
+    if (currentFilePath !== cachedPath) {
+      console.log(`[STAGE: DOWNLOAD] Cache miss. Downloading ${currentFilePath}...`);
+      const storageController = new AbortController();
+      const storageTimeout = setTimeout(() => storageController.abort(), 30000);
 
-    const { data: fileData, error: fileError } = await supabase.storage.from('Chunks').download(currentFilePath, {
-      // Use standard fetch options if supported, otherwise manually abort
-    });
-    
-    clearTimeout(storageTimeout);
+      const { data: fileData, error: fileError } = await supabase.storage.from('Chunks').download(currentFilePath);
+      clearTimeout(storageTimeout);
 
-    if (fileError) {
-      errorType = "STORAGE_DOWNLOAD_ERROR";
-      throw fileError;
+      if (fileError) {
+        errorType = "STORAGE_DOWNLOAD_ERROR";
+        throw fileError;
+      }
+
+      cachedText = await fileData.text();
+      cachedPath = currentFilePath;
+    } else {
+      console.log(`[STAGE: CACHE] Using cached version of ${currentFilePath}`);
     }
 
-    const text = await fileData.text();
-    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    const lines = cachedText.split(/\r?\n/).filter(l => l.trim().length > 0);
     const batch = lines.slice(currentBatchOffset, currentBatchOffset + BATCH_SIZE);
 
     if (batch.length === 0) {
@@ -344,11 +350,12 @@ async function runRefinery() {
 
     if (!responseObj) throw new Error('AI processing failed after retries.');
 
-    // 5. Save
+        // 5. Save (Includes Input-Output Ledger)
     console.log(`[STAGE: SAVE] Archiving ${responseObj.data.length} words for offset ${currentBatchOffset}...`);
     const { error: saveErr } = await supabase.from('processed_words').upsert({
       source_file: currentFilePath,
       batch_index: currentBatchOffset,
+      input_words: batch, // The EXACT list of words sent
       words: responseObj.data,
       summary: responseObj.summary
     }, { onConflict: 'source_file,batch_index' });
@@ -357,10 +364,18 @@ async function runRefinery() {
 
     // LOG STATS ON SUCCESS
     await supabase.from('refinery_stats').insert({
-        batch_record_id: batchRecordId, worker_id: WORKER_ID, source_file: currentFilePath,
-        batch_index: currentBatchOffset, attempts: finalAttemptCount, total_duration_ms: Date.now() - batchStart,
-        ai_latency_ms: totalAiLatency, input_chars: JSON.stringify(batch).length, 
-        input_words: batch.length, output_words: responseObj.data.length, status: 'success'
+        batch_record_id: batchRecordId, 
+        worker_id: WORKER_ID, 
+        source_file: currentFilePath,
+        batch_index: currentBatchOffset, 
+        attempts: finalAttemptCount, 
+        total_duration_ms: Date.now() - batchStart,
+        ai_latency_ms: totalAiLatency, 
+        input_chars: JSON.stringify(batch).length, 
+        input_words: batch.length, 
+        input_data: batch, // Ledger for failed/partial analysis
+        output_words: responseObj.data.length, 
+        status: 'success'
     });
 
     await supabase.from('refinery_batches').update({ status: 'completed' }).eq('id', batchRecordId);
