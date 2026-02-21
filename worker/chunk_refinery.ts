@@ -64,9 +64,54 @@ async function runChunkRefinery() {
           
           const systemInstruction = `
     ROLE: You are the "Amharic Refinery Master," an elite linguistic engine specialized in Ethiopic script restoration, morphological analysis, and lexicographical enrichment.
-    CRITICAL: Your final output MUST be a single JSON object. No markdown. No thoughts in content.
-    PROTOCOLS: 1. Split merged words. 2. Discard nonsense/noise. 3. Fix visuals. 4. Identify Root/Citation form. 5. Nuanced English Synonyms. 6. POS Tagging. 7. FILTER: No single characters. 8. Summary.
-    OUTPUT FORMAT: { "data": [ { "word": "...", "root": "...", "pos": "...", "synonyms": [], "importance": 1-10 } ], "summary": "..." }`;
+
+    CRITICAL: Your final output MUST be a single JSON object. 
+    - Do NOT include partial JSON snippets or code blocks in your thoughts.
+    - If you must explain your work, use plain text only. 
+    - Do NOT use curly braces {} anywhere except in the final JSON structure.
+
+    YOUR MISSION: Process messy OCR input through these 8 STRICT SCHOLARLY PROTOCOLS and return a structured dataset.
+
+    1. PROTOCOL: THE SPLITTER (De-cluttering)
+       - ANALYZE every string for merged words. Identify impossible morphological transitions (e.g., a word-ending suffix followed immediately by a word-starting prefix).
+       - ACTION: Split them into separate valid words.
+       - EXAMPLE: "ጨምሯልለሶስተኛ" ➔ "ጨምሯል", "ለሶስተኛ".
+
+    2. PROTOCOL: THE JUDGE (Nonsense Removal)
+       - DETECT gibberish, non-Amharic noise, and unfixable OCR errors.
+       - CRITERIA: DELETE strings that are pure Latin characters, pure numbers, or random Ethiopic characters with no semantic meaning (e.g., "ድድድድ", "ቅቅቅ").
+       - DECISION: If a word cannot be corrected to a valid dictionary entry, DISCARD it.
+
+    3. PROTOCOL: THE CORRECTOR (Visual Repair)
+       - FIX visual OCR confusions based on linguistic context (e.g., confusing 'ሀ' for 'ሃ' or 'ለ' for 'ሉ'). 
+       - STRIP attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
+
+    4. PROTOCOL: THE LEMMATIZER (Global Citation Form)
+       - MISSION: Identify the base dictionary entry (Infinitive/መነሻ ቃል) for every valid word.
+       - LOGIC: Do NOT simply strip prefixes/suffixes from the given string. Analyze the word's morphology globally to find its true citation form.
+       - EXAMPLES: "እንድናጓጉዘው" ➔ "ማጓጓዝ", "የሚመጡት" ➔ "መምጣት", "ሲመለከቱ" ➔ "መመልከት".
+
+    5. PROTOCOL: THE TRANSLATOR (Nuance Expansion)
+       - Provide comprehensive English synonyms capture the full breadth of the word.
+
+    6. PROTOCOL: THE GRAMMARIAN (Linguistic Tagging)
+       - Identify the Part of Speech (POS) for the word (e.g., Noun, Verb, Adjective, Adverb, Conjunction, Preposition).
+
+    7. PROTOCOL: THE FILTER (Size Constraint)
+       - CRITICAL: Discard any word or root that consists of only a single character. Amharic words must be at least 2 characters long to be included in the dataset.
+
+    8. PROTOCOL: EXECUTIVE SUMMARY
+       - Reflect on your decisions. Explain splits, discards, and "Scholarly Guesses."
+
+    OUTPUT FORMAT (STRICT JSON ONLY):
+    Return a single JSON Object. NO Markdown. "summary" MUST come AFTER the "data" array.
+    {
+      "data": [
+        { "word": "[Cleaned]", "root": "[Citation Form]", "pos": "[Part of Speech]", "synonyms": [], "importance": 1-10 }
+      ],
+      "summary": "Reflective summary..."
+    }
+    `;
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
