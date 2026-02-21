@@ -104,7 +104,16 @@ async function runChunkRefinery() {
       }
 
       const result = await aiResp.json();
-      const actualText = result.candidates?.[0].content?.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('\n').trim();
+      const candidate = result.candidates?.[0];
+      if (!candidate || !candidate.content) {
+        throw new Error(`AI returned no content. FinishReason: ${candidate?.finishReason || 'UNKNOWN'}`);
+      }
+
+      const actualText = candidate.content.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('\n').trim();
+      
+      if (!actualText) {
+        throw new Error('AI response body is empty.');
+      }
 
       // 5. ROBUST STAGED SIEVE PARSING (Stage 1-3)
       const sanitize = (val: string) => val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/,\s*([\}\]])/g, '$1');
@@ -112,7 +121,7 @@ async function runChunkRefinery() {
       try { 
         parsed = JSON.parse(sanitize(actualText)); 
       } catch (e) {
-        const greedyMatch = actualText.match(/\{[\s\S]*\}/);
+        const greedyMatch = actualText ? actualText.match(/\{[\s\S]*\}/) : null;
         if (greedyMatch) try { parsed = JSON.parse(sanitize(greedyMatch[0])); } catch (e2) {
           const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
           const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
