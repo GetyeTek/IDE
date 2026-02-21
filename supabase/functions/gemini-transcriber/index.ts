@@ -42,50 +42,39 @@ serve(async (req) => {
 
     // 4. THE COMPREHENSIVE SCHOLARLY PROMPT
     const prompt = `
-      You are an elite Ge'ez and Amharic scholar and philologist specializing in the 'Andmita' (Ancient Commentary) of the Four Gospels. Your task is to perform a high-fidelity, verbatim transcription and scholarly analysis of the provided manuscript image.
+      You are an elite Ge'ez and Amharic scholar specializing in the 'Andmita' (Ancient Commentary) of the Gospels. Your goal is a character-perfect digital reproduction.
 
-      ### 1. IDENTITY & SCHOLARLY INTEGRITY:
-      - Transcribe every character exactly as written. 
-      - Preserve archaic Ge'ez spellings and specific character variants (e.g., distinguish between 'ቆ' and 'ቁ').
-      - Do NOT "fix" fragments or add modern punctuation. Transcribe only the visual evidence.
-      - Exclude noise: scan artifacts, English text, and page numbers unless they are part of the original manuscript text.
+      ### THE PRIME DIRECTIVE (TRANSCRIPTION INTEGRITY):
+      - VERBATIM ONLY: Transcribe every character exactly as it appears. Preserve archaic spellings, Ge'ez numerics (፩, ፪, ፫, etc.), and traditional punctuation.
+      - NO MANIPULATION: Do NOT alter, summarize, or truncate text to fit a JSON structure. If the text is difficult to structure (e.g., introductions, dense lists, or complex layouts), you MUST use the 'plain' content_mode with a 'text_dump'.
+      - Copy-paste precision is required. Manipulation is our biggest nightmare.
 
-      ### 2. CONTEXTUAL INFERENCE:
-      - Use your internal knowledge of the Four Gospels and the Andmita tradition to infer the Book, Chapter, and Verse range even if they are not explicitly written on this specific page.
-      - Identify if the text at the very top of the page is a continuation of a sentence from the previous page.
+      ### 1. CONTEXTUAL INFERENCE:
+      - Infer the citation even if it is not printed on the page. 
+      - Use the format: "Book, Chapter:Verse" or "Book, Chapter:Verse-Verse".
 
-      ### 3. STRUCTURAL MAPPING (ANDMITA RELATIONSHIP):
-      - Recognize the "Cycle": In Andmita, a Ge'ez verse or phrase is usually followed by a detailed Amharic explanation.
-      - Map these relationships into the 'units' array. If multiple Ge'ez phrases are explained in one paragraph, break them into separate logical units.
+      ### 2. ADAPTIVE CONTENT MODE:
+      - STRUCTURED: Use if the page is a standard Andmita commentary (Ge'ez followed by Amharic). Group by 'verse_number' for each snippet.
+      - PLAIN: Use if the page is an introduction, index, or is excessively suitable for a simple text dump. Do not force a JSON array if it risks text integrity.
 
-      ### 4. OUTPUT FORMAT (JSON ONLY):
-      You must output ONLY a valid JSON object following the provided schema. 
-
-      TEMPLATE EXAMPLE FOR YOUR REFERENCE:
+      ### 3. OUTPUT FORMAT (JSON ONLY):
       {
-        "inference": {
-          "book": "ማቴዎስ",
-          "chapter": 5,
-          "verse_range": "1-3",
-          "confidence_score": 0.98
+        "metadata": {
+          "page_layout": "column | plain",
+          "confidence_score": 0.0 to 1.0,
+          "scholarly_notes": "Detailed notes on legibility or archaic character preservation.",
+          "inference": "Book, Chapter:Verse-Verse"
         },
-        "transcription": {
-          "full_page_text": "[Full top-to-bottom text here...]",
+        "content_mode": "structured | plain",
+        "data": {
           "units": [
-            {
-              "verse_ref": "5:1",
-              "geez_text": "ወርእዮ ሕዝበ ዓርገ ደብረ...",
-              "amharic_commentary": "ሕዝቡን ባየ ጊዜ ወደ ተራራ ወጣ...",
-              "is_continuation": false
-            }
-          ]
-        },
-        "scholarly_notes": "Text is clear; archaic 'ቆ' preserved."
+            { "verse_number": "string", "geez": "string", "amharic": "string" }
+          ],
+          "text_dump": "string (Only used if content_mode is 'plain')"
+        }
       }
 
-      ### 5. SCENARIO HANDLING:
-      - If the page is a Table of Contents or Index: Use the 'full_page_text' for the content and set 'units' to an empty array.
-      - If the page is heavily damaged: Provide your best scholarly reconstruction in 'full_page_text' and flag it in 'scholarly_notes'.
+      NOTE: Never repeat content in both 'units' and 'text_dump'. Use only the field appropriate for the chosen 'content_mode'.
     `;
 
     // 5. CALL GEMINI API
@@ -112,34 +101,33 @@ serve(async (req) => {
           response_schema: {
             type: "object",
             properties: {
-              inference: {
+              metadata: {
                 type: "object",
                 properties: {
-                  book: { type: "string" },
-                  chapter: { type: "number" },
-                  verse_range: { type: "string" },
-                  confidence_score: { type: "number" }
+                  page_layout: { type: "string" },
+                  confidence_score: { type: "number" },
+                  scholarly_notes: { type: "string" },
+                  inference: { type: "string" }
                 }
               },
-              transcription: {
+              content_mode: { type: "string" },
+              data: {
                 type: "object",
                 properties: {
-                  full_page_text: { type: "string" },
                   units: {
                     type: "array",
                     items: {
                       type: "object",
                       properties: {
-                        verse_ref: { type: "string" },
-                        geez_text: { type: "string" },
-                        amharic_commentary: { type: "string" },
-                        is_continuation: { type: "boolean" }
+                        verse_number: { type: "string" },
+                        geez: { type: "string" },
+                        amharic: { type: "string" }
                       }
                     }
-                  }
+                  },
+                  text_dump: { type: "string" }
                 }
-              },
-              scholarly_notes: { type: "string" }
+              }
             }
           },
           thinkingConfig: {
@@ -203,9 +191,14 @@ serve(async (req) => {
       throw new Error(`Failed to parse AI JSON: ${e.message}`);
     }
 
-    // Validate that we got a real transcription before proceeding
-    if (!transcriptionData.transcription?.full_page_text) {
-      throw new Error("JSON response missing critical transcription field.");
+    // Validate that we got a real transcription based on the mode
+    const isStructured = transcriptionData.content_mode === 'structured';
+    const hasContent = isStructured 
+      ? transcriptionData.data?.units?.length > 0 
+      : !!transcriptionData.data?.text_dump;
+
+    if (!hasContent) {
+      throw new Error("JSON response missing critical content based on selected mode.");
     }
 
     // 6. UPDATE DATABASE & ROTATE KEY
