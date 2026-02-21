@@ -63,7 +63,14 @@ async function runRefinery() {
     
     const currentBatchOffset = claim[0].current_offset;
     const currentFilePath = claim[0].target_file;
-    const batchRecordId = claim[0].batch_record_id;
+    const batchRecordId = Number(claim[0].batch_record_id);
+    const shouldClose = claim[0].should_close_file;
+
+    if (shouldClose) {
+        console.log(`[CLEANUP] No gaps remaining in ${currentFilePath}. Marking finished.`);
+        await supabase.from('refinery_progress').update({ is_finished: true }).eq('file_path', currentFilePath);
+        continue;
+    }
 
     console.log(`[STAGE: CLAIMED] Worker ${WORKER_ID} reserved batch ${batchRecordId} (${currentFilePath} at ${currentBatchOffset})`);
 
@@ -90,18 +97,17 @@ async function runRefinery() {
     const batch = lines.slice(currentBatchOffset, currentBatchOffset + BATCH_SIZE);
 
     if (batch.length === 0) {
-      console.log(`[STAGE: FINISHED] File ${currentFilePath} is empty at offset ${currentBatchOffset}.`);
-      // Check if there are ANY missing batches before this one
-      const { count } = await supabase
-        .from('processed_words')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_file', currentFilePath);
+      console.log(`[STAGE: EMPTY] File ${currentFilePath} is empty at offset ${currentBatchOffset}. Marking batch as completed to prevent re-fetch.`);
+      // If the batch is empty, we still save a placeholder so the Gap-Filler knows we checked it
+      await supabase.from('processed_words').upsert({
+        source_file: currentFilePath,
+        batch_index: currentBatchOffset,
+        words: [],
+        summary: "End of file reached or empty chunk."
+      }, { onConflict: 'source_file,batch_index' });
       
-      console.log(`[VERIFY] File has ${count} processed batches.`);
-      // We mark as finished only if we hit the end of the file
-      await supabase.from('refinery_progress').update({ is_finished: true }).eq('id', progress.id);
       await supabase.from('refinery_batches').update({ status: 'completed' }).eq('id', batchRecordId);
-      break; // Stop loop to allow next worker run to pick up next file
+      continue; 
     }
 
     // 4. AI Logic with Retry Wrapper
