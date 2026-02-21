@@ -146,30 +146,45 @@ async function runChunkRefinery() {
             if (!actualText.endsWith('}')) actualText += '}';
           }
 
-          const sanitize = (val: string) => val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/,\s*([\}\]])/g, '$1');
+          // SANITIZER: Handles control chars, trailing commas, and the AI's double-double quote error
+          const sanitize = (val: string) => {
+            return val
+              .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") 
+              .replace(/""/g, '"')                       
+              .replace(/,\s*([\}\]])/g, '$1');           
+          };
+
           let sieveError = "";
           
+          // TIER 1: Direct Parse
           try { 
-            finalParsed = JSON.parse(sanitize(actualText)); 
-          } catch (e) {
-            sieveError += `[Stage1: ${e.message}] `;
-            const greedyMatch = actualText.match(/\{[\s\S]*\}/);
-            if (greedyMatch) {
-              try { 
-                finalParsed = JSON.parse(sanitize(greedyMatch[0])); 
-              } catch (e2) {
-                sieveError += `[Stage2: ${e2.message}] `;
-                const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
-                const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
-                sieve: for (const s of starts) for (const e of ends) if (e > s) try { 
-                  finalParsed = JSON.parse(sanitize(actualText.substring(s, e + 1))); 
-                  break sieve; 
-                } catch (err) { continue; }
+            const p = JSON.parse(sanitize(actualText)); 
+            if (p?.data && Array.isArray(p.data)) finalParsed = p;
+          } catch (e) { sieveError += `[Direct: ${e.message}] `; }
+
+          // TIER 2: RECURSIVE BRACE EXHAUSTION (The "Original Robustness")
+          if (!finalParsed) {
+            const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
+            const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
+
+            sieveLoop: for (const s of starts) {
+              for (const e of ends) {
+                if (e > s) {
+                  try {
+                    const candidateStr = actualText.substring(s, e + 1);
+                    const p = JSON.parse(sanitize(candidateStr));
+                    if (p?.data && Array.isArray(p.data)) {
+                      finalParsed = p;
+                      console.log(`[SIEVE] Success at range ${s}-${e}`);
+                      break sieveLoop;
+                    }
+                  } catch (err) { continue; }
+                }
               }
-            } else {
-              sieveError += "[Stage2: No curly braces found] ";
             }
           }
+
+          if (!finalParsed) sieveError += "[Exhaustive Sieve: No valid data block found among all brace pairs]";
 
           if (finalParsed?.data && Array.isArray(finalParsed.data)) break;
           else {
