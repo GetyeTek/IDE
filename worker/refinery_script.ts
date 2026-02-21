@@ -247,7 +247,6 @@ async function runRefinery() {
     }
 
     if (!responseObj) throw new Error('AI processing failed after retries.');
-    if (!responseObj) throw new Error('AI processing failed after retries.');
 
     // 5. Save
     console.log(`[STAGE: SAVE] Archiving ${responseObj.data.length} words for offset ${currentBatchOffset}...`);
@@ -287,13 +286,7 @@ async function runRefinery() {
 
       if (err.message.includes('No available Gemini keys')) break;
     }
-  }
-  console.log('--- WORKER CYCLE COMPLETE ---');
-}
-
-runRefinery();
-      if (err.message.includes('No available Gemini keys')) break;
-    }
+  } // End of batchLoop
   console.log('--- WORKER CYCLE COMPLETE ---');
 }
 
