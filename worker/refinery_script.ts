@@ -81,12 +81,18 @@ async function runRefinery() {
       .limit(1)
       .single();
 
-    if (keyError || !keyRecord) throw new Error('No available Gemini keys.');
+    if (keyError || !keyRecord) {
+      errorType = "NO_API_KEY";
+      throw new Error('No available Gemini keys.');
+    }
     const cleanKey = keyRecord.api_key.trim();
 
     // 3. Gathering Material
     const { data: fileData, error: fileError } = await supabase.storage.from('Chunks').download(currentFilePath);
-    if (fileError) throw fileError;
+    if (fileError) {
+      errorType = "STORAGE_DOWNLOAD_ERROR";
+      throw fileError;
+    }
 
     const text = await fileData.text();
     const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
@@ -187,14 +193,19 @@ async function runRefinery() {
 
         clearTimeout(timeoutId);
         const duration = Date.now() - attemptStart;
-        console.log(`[PERF] AI Request received response in ${duration}ms`);
-
-        if (aiResp.status === 429) {
-          console.warn(`[RATE LIMIT] 429 encountered after ${duration}ms`);
-          await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
-          throw new Error('Rate limit hit');
+        
+        if (!aiResp.ok) {
+          errorType = `HTTP_${aiResp.status}`;
+          if (aiResp.status === 429) {
+            console.warn(`[RATE LIMIT] 429 encountered after ${duration}ms`);
+            await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
+            throw new Error('Gemini API Rate Limit (429)');
+          }
+          const errBody = await aiResp.text().catch(() => 'No body');
+          throw new Error(`Gemini API ${aiResp.status}: ${errBody.substring(0, 150)}`);
         }
 
+        console.log(`[PERF] AI Request received response in ${duration}ms`);
         const result = await aiResp.json();
         if (result.error) {
           errorType = "API_ERROR";
@@ -300,7 +311,7 @@ async function runRefinery() {
         batch_record_id: batchRecordId, worker_id: WORKER_ID, source_file: currentFilePath,
         batch_index: currentBatchOffset, attempts: finalAttemptCount, total_duration_ms: Date.now() - batchStart,
         ai_latency_ms: totalAiLatency, input_chars: JSON.stringify(batch).length, 
-        output_words: responseObj.data.length, status: 'success'
+        input_words: batch.length, output_words: responseObj.data.length, status: 'success'
     });
 
     await supabase.from('refinery_batches').update({ status: 'completed' }).eq('id', batchRecordId);
@@ -311,11 +322,25 @@ async function runRefinery() {
       console.error(`[BATCH ERROR] ${err.message}`);
       
       if (batchRecordId !== 0) {
+        // Determine final error classification
+        let finalErrorType = errorType;
+        if (!finalErrorType) {
+          if (err.name === 'AbortError') finalErrorType = "TIMEOUT";
+          else if (err.message.includes("fetch")) finalErrorType = "NETWORK_ERROR";
+          else finalErrorType = "UNHANDLED_EXCEPTION";
+        }
+
         await supabase.from('refinery_stats').insert({
-            batch_record_id: batchRecordId, worker_id: WORKER_ID, source_file: currentFilePath,
-            batch_index: currentBatchOffset, status: 'failed', error_type: errorType || 'SYSTEM_ERROR',
-            error_message: lastErrorMessage || err.message, total_duration_ms: Date.now() - batchStart,
-            attempts: finalAttemptCount
+            batch_record_id: batchRecordId, 
+            worker_id: WORKER_ID, 
+            source_file: currentFilePath,
+            batch_index: currentBatchOffset, 
+            status: 'failed', 
+            error_type: finalErrorType,
+            error_message: err.message || lastErrorMessage,
+            total_duration_ms: Date.now() - batchStart,
+            attempts: finalAttemptCount,
+            input_words: typeof batch !== 'undefined' ? batch.length : 0
         });
         await supabase.from('refinery_batches').update({ status: 'failed' }).eq('id', batchRecordId);
       }
