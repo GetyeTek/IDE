@@ -42,20 +42,28 @@ serve(async (req) => {
 
     // 4. THE COMPREHENSIVE SCHOLARLY PROMPT
     const prompt = `
-      You are an elite Ge'ez and Amharic scholar specializing in the 'Andmita' (Ancient Commentary) of the Four Gospels.
-      Your goal is to provide a high-fidelity, verbatim transcription of the provided image.
+      You are an elite Ge'ez and Amharic scholar and philologist specializing in the 'Andmita' (Ancient Commentary) of the Four Gospels. Your task is to perform a high-fidelity, verbatim transcription and scholarly analysis of the provided manuscript image.
 
-      ### CORE DIRECTIVES:
-      1. INTEGRITY & HONESTY: Transcribe every word exactly as written. Preserve archaic spellings and specific Ge'ez characters (e.g., distinguish between 'ቆ' and 'ቁ') as they appear in the manuscript.
-      2. CONTINUITY AWARENESS: This is one page of a long book. The text may start/end mid-sentence. Do NOT add missing punctuation or 'fix' fragments. Transcribe only what is visible.
-      3. LAYOUT & RELATIONSHIP: Determine the correct reading order for nested commentary. If the text is a Ge'ez verse followed by Amharic commentary, preserve that relationship.
-      4. CONTEXTUAL CORRECTION: If a character is blurred, use your knowledge of Amharic grammar and Gospel context to resolve it (e.g., distinguishing 'ሀ' vs 'ሃ').
-      5. NOISE FILTERING: Exclude watermarks, scan artifacts, page numbers, and English text.
-      6. FORMATTING: Maintain paragraph breaks. Output ONLY the transcribed text. No conversational filler.
+      ### 1. IDENTITY & SCHOLARLY INTEGRITY:
+      - Transcribe every character exactly as written. 
+      - Preserve archaic Ge'ez spellings and specific character variants (e.g., distinguish between 'ቆ' and 'ቁ').
+      - Do NOT "fix" fragments or add modern punctuation. Transcribe only the visual evidence.
+      - Exclude noise: scan artifacts, English text, and page numbers unless they are part of the original manuscript text.
 
-      ### UNEXPECTED SCENARIOS:
-      - Damaged sections: Provide your best scholarly reconstruction based on context.
-      - Ambiguous layout: Prioritize the flow that maintains theological meaning.
+      ### 2. CONTEXTUAL INFERENCE:
+      - Use your internal knowledge of the Four Gospels and the Andmita tradition to infer the Book, Chapter, and Verse range even if they are not explicitly written on this specific page.
+      - Identify if the text at the very top of the page is a continuation of a sentence from the previous page.
+
+      ### 3. STRUCTURAL MAPPING (ANDMITA RELATIONSHIP):
+      - Recognize the "Cycle": In Andmita, a Ge'ez verse or phrase is usually followed by a detailed Amharic explanation.
+      - Map these relationships into the 'units' array. If multiple Ge'ez phrases are explained in one paragraph, break them into separate logical units.
+
+      ### 4. OUTPUT FORMAT (JSON ONLY):
+      You must output ONLY a valid JSON object following the provided schema.
+
+      ### 5. SCENARIO HANDLING:
+      - If the page is a Table of Contents or Index: Use the 'full_page_text' for the content and set 'units' to an empty array.
+      - If the page is heavily damaged: Provide your best scholarly reconstruction in 'full_page_text' and flag it in 'scholarly_notes'.
     `;
 
     // 5. CALL GEMINI API
@@ -78,6 +86,40 @@ serve(async (req) => {
           temperature: 0.1,
           topP: 1,
           maxOutputTokens: 15000,
+          response_mime_type: "application/json",
+          response_schema: {
+            type: "object",
+            properties: {
+              inference: {
+                type: "object",
+                properties: {
+                  book: { type: "string" },
+                  chapter: { type: "number" },
+                  verse_range: { type: "string" },
+                  confidence_score: { type: "number" }
+                }
+              },
+              transcription: {
+                type: "object",
+                properties: {
+                  full_page_text: { type: "string" },
+                  units: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        verse_ref: { type: "string" },
+                        geez_text: { type: "string" },
+                        amharic_commentary: { type: "string" },
+                        is_continuation: { type: "boolean" }
+                      }
+                    }
+                  }
+                }
+              },
+              scholarly_notes: { type: "string" }
+            }
+          },
           thinkingConfig: {
             includeThoughts: false,
             thinkingLevel: "MINIMAL"
@@ -103,25 +145,32 @@ serve(async (req) => {
       throw new Error(`Gemini API Error: ${result.error?.message || response.statusText}`);
     }
 
-    // Gemini 3.0 fragments responses. We join ALL text parts to fix the 'zigzag' truncation.
+    // Gemini returns the JSON as a string within the first part
     const candidate = result.candidates?.[0];
-    const transcribedText = candidate?.content?.parts
-      ?.map(part => part.text)
-      .filter(Boolean)
-      .join("")
-      .trim();
-
+    const rawJsonResponse = candidate?.content?.parts?.[0]?.text;
     const finishReason = candidate?.finishReason || "UNKNOWN";
 
-    if (!transcribedText || transcribedText.length < 5) {
-      throw new Error(`AI returned empty or truncated content. Finish Reason: ${finishReason}`);
+    if (!rawJsonResponse) {
+      throw new Error(`AI returned empty content. Finish Reason: ${finishReason}`);
+    }
+
+    let transcriptionData;
+    try {
+      transcriptionData = JSON.parse(rawJsonResponse);
+    } catch (e) {
+      throw new Error("AI output was not valid JSON. Possible truncation.");
+    }
+
+    // Validate that we got a real transcription before proceeding
+    if (!transcriptionData.transcription?.full_page_text) {
+      throw new Error("JSON response missing critical transcription field.");
     }
 
     // 6. UPDATE DATABASE & ROTATE KEY
     // If finishReason is not 'STOP', we mark as 'error' so the retry logic can pick it up again
     const isSuccess = finishReason === "STOP";
     await supabase.from('gospel_transcriptions').update({
-      content: transcribedText,
+      content: JSON.stringify(transcriptionData),
       status: isSuccess ? 'completed' : 'error',
       error_log: isSuccess ? null : `AI finish reason: ${finishReason}`,
       updated_at: new Date().toISOString()
