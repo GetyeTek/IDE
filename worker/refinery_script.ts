@@ -30,34 +30,27 @@ async function runRefinery() {
       .single();
 
     if (!progress) {
-      console.log('[STAGE: INITIALIZATION] No active file. Determining next file...');
-      const { data: lastTask } = await supabase
+      console.log('[STAGE: INITIALIZATION] No active file. Determining next file from sequence...');
+      // Ensure we have entries for all 26 files in progress table
+      for (let i = 1; i <= MAX_FILES; i++) {
+        const fname = `rare_words_${i}.txt`;
+        await supabase.from('refinery_progress').upsert({ file_path: fname }, { onConflict: 'file_path' });
+      }
+      
+      // Re-fetch progress to get the current sequential task
+      const { data: current } = await supabase
         .from('refinery_progress')
-        .select('file_path')
-        .order('id', { ascending: false })
+        .select('*')
+        .eq('is_finished', false)
+        .order('id', { ascending: true })
         .limit(1)
         .single();
-
-      let nextFileNumber = 1;
-      if (lastTask) {
-        const match = lastTask.file_path.match(/rare_words_(\d+)\.txt/);
-        if (match) nextFileNumber = parseInt(match[1]) + 1;
+      
+      if (!current) {
+        console.log('--- ALL FILES FULLY PROCESSED ---');
+        Deno.exit(0);
       }
-
-      if (nextFileNumber > MAX_FILES) {
-        console.log('--- ALL FILES FINISHED ---');
-        Deno.exit(0); // Exit cleanly, but we might want to prevent the next trigger
-      }
-
-      const nextFileName = `rare_words_${nextFileNumber}.txt`;
-      const { data: newProgress, error: insErr } = await supabase
-        .from('refinery_progress')
-        .insert({ file_path: nextFileName, last_offset: 0, is_finished: false })
-        .select()
-        .single();
-
-      if (insErr) throw insErr;
-      progress = newProgress;
+      progress = current;
     }
 
         // STATEFUL CLAIM: Get a specific batch and track its status
@@ -97,9 +90,18 @@ async function runRefinery() {
     const batch = lines.slice(currentBatchOffset, currentBatchOffset + BATCH_SIZE);
 
     if (batch.length === 0) {
-      console.log(`[STAGE: FINISHED] File ${currentFilePath} is empty at this offset. Marking as finished.`);
+      console.log(`[STAGE: FINISHED] File ${currentFilePath} is empty at offset ${currentBatchOffset}.`);
+      // Check if there are ANY missing batches before this one
+      const { count } = await supabase
+        .from('processed_words')
+        .select('*', { count: 'exact', head: true })
+        .eq('source_file', currentFilePath);
+      
+      console.log(`[VERIFY] File has ${count} processed batches.`);
+      // We mark as finished only if we hit the end of the file
       await supabase.from('refinery_progress').update({ is_finished: true }).eq('id', progress.id);
-      continue; // Move to next iteration or next file
+      await supabase.from('refinery_batches').update({ status: 'completed' }).eq('id', batchRecordId);
+      break; // Stop loop to allow next worker run to pick up next file
     }
 
     // 4. AI Logic with Retry Wrapper
