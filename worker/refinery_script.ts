@@ -156,6 +156,10 @@ async function runRefinery() {
 
     let responseObj: { summary: string, data: any[] } | null = null;
     const MAX_RETRIES = 3;
+    const batchStart = Date.now();
+    let totalAiLatency = 0;
+    let errorType = "";
+    let lastErrorMessage = "";
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       const attemptStart = Date.now();
@@ -199,8 +203,12 @@ async function runRefinery() {
         }
 
         const result = await aiResp.json();
-        if (result.error) throw new Error(`Gemini API Error: ${result.error.message}`);
+        if (result.error) {
+          errorType = "API_ERROR";
+          throw new Error(`Gemini API Error: ${result.error.message}`);
+        }
 
+        totalAiLatency += (Date.now() - attemptStart);
         const candidate = result.candidates?.[0];
         if (!candidate) throw new Error('AI Blocked the response or returned no candidates.');
 
@@ -219,7 +227,12 @@ async function runRefinery() {
           .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
           .replace(/,\s*([\}\]])/g, '$1');
 
-        responseObj = JSON.parse(sanitizedJson);
+        try {
+          responseObj = JSON.parse(sanitizedJson);
+        } catch (e) {
+          errorType = "JSON_PARSE";
+          throw e;
+        }
         if (!responseObj?.data || !Array.isArray(responseObj.data)) throw new Error('Parsed JSON missing data array');
 
         break; // Success!
@@ -228,14 +241,14 @@ async function runRefinery() {
         const duration = Date.now() - attemptStart;
         const isTimeout = err.name === 'AbortError' || (err instanceof DOMException && err.name === 'AbortError');
         
-        console.error(`[AI FAIL] Attempt ${attempt} failed after ${duration}ms. Type: ${err.name}`);
-        if (isTimeout) {
-             console.error(`[TIMEOUT] The AI exceeded the ${AI_TIMEOUT}ms limit. Batch Size: ${JSON.stringify(batch).length} chars.`);
-        } else {
-             console.error(`[ERROR MSG] ${err.message}`);
-        }
+        lastErrorMessage = err.message;
+        if (isTimeout) errorType = "TIMEOUT";
+        else if (err.message.includes('429')) errorType = "RATE_LIMIT";
+        else if (!errorType) errorType = "UNKNOWN";
 
-        if (err.message.includes('Rate limit hit') || attempt === MAX_RETRIES) throw err;
+        console.error(`[AI FAIL] Attempt ${attempt} failed: ${errorType} (${duration}ms)`);
+
+        if (errorType === 'RATE_LIMIT' || attempt === MAX_RETRIES) break;
         await new Promise(r => setTimeout(r, 2000 * attempt));
       }
     }
@@ -253,23 +266,35 @@ async function runRefinery() {
 
         if (saveErr) throw saveErr;
 
-    // Mark the specific batch as COMPLETED
+    if (saveErr) throw saveErr;
+
+    // LOG STATS ON SUCCESS
+    await supabase.from('refinery_stats').insert({
+        batch_record_id: batchRecordId, worker_id: WORKER_ID, source_file: currentFilePath,
+        batch_index: currentBatchOffset, attempts: 1, total_duration_ms: Date.now() - batchStart,
+        ai_latency_ms: totalAiLatency, input_chars: JSON.stringify(batch).length, 
+        output_words: responseObj.data.length, status: 'success'
+    });
+
     await supabase.from('refinery_batches').update({ status: 'completed' }).eq('id', batchRecordId);
     await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
-    
-    console.log(`[SUCCESS] Batch ${batchRecordId} completed.`);
+    console.log(`[SUCCESS] Batch ${batchRecordId} done in ${Date.now() - batchStart}ms`);
 
     } catch (err) {
       console.error(`[BATCH ERROR] ${err.message}`);
       
-      // If we have a batch claimed but failed, mark it for retry
-      if (typeof batchRecordId !== 'undefined') {
+      if (typeof batchRecordId !== 'undefined' && batchRecordId !== 0) {
+        // LOG STATS ON FAILURE
+        await supabase.from('refinery_stats').insert({
+            batch_record_id: batchRecordId, worker_id: WORKER_ID, source_file: currentFilePath,
+            batch_index: currentBatchOffset, status: 'failed', error_type: errorType,
+            error_message: lastErrorMessage || err.message, total_duration_ms: Date.now() - batchStart
+        });
         await supabase.from('refinery_batches').update({ status: 'failed' }).eq('id', batchRecordId);
       }
 
       if (err.message.includes('No available Gemini keys')) break;
     }
-  }
   console.log('--- WORKER CYCLE COMPLETE ---');
 }
 
