@@ -141,6 +141,11 @@ async function runRefinery() {
 
     const lines = cachedText.split(/\r?\n/).filter(l => l.trim().length > 0);
     const batch = lines.slice(currentBatchOffset, currentBatchOffset + BATCH_SIZE);
+    
+    // HUMAN-READABLE TRACKING
+    const batchNumber = Math.floor(currentBatchOffset / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(lines.length / BATCH_SIZE);
+    const batchLabel = `Words ${currentBatchOffset + 1}-${currentBatchOffset + batch.length} (Batch ${batchNumber}/${totalBatches})`;
 
     if (batch.length === 0) {
       console.log(`[STAGE: EMPTY] File ${currentFilePath} is empty at offset ${currentBatchOffset}. Marking batch as completed to prevent re-fetch.`);
@@ -366,11 +371,13 @@ async function runRefinery() {
     if (!responseObj) throw new Error('AI processing failed after retries.');
 
         // 5. Save (Includes Input-Output Ledger)
-    console.log(`[STAGE: SAVE] Archiving ${responseObj.data.length} words for offset ${currentBatchOffset}...`);
+    console.log(`[STAGE: SAVE] Archiving ${responseObj.data.length} words for ${batchLabel}...`);
     const { error: saveErr } = await supabase.from('processed_words').upsert({
       source_file: currentFilePath,
       batch_index: currentBatchOffset,
-      input_words: batch, // The EXACT list of words sent
+      batch_number: batchNumber,
+      batch_label: batchLabel,
+      input_words: batch,
       words: responseObj.data,
       summary: responseObj.summary
     }, { onConflict: 'source_file,batch_index' });
@@ -383,12 +390,14 @@ async function runRefinery() {
         worker_id: WORKER_ID, 
         source_file: currentFilePath,
         batch_index: currentBatchOffset, 
+        batch_number: batchNumber,
+        batch_label: batchLabel,
         attempts: finalAttemptCount, 
         total_duration_ms: Date.now() - batchStart,
         ai_latency_ms: totalAiLatency, 
         input_chars: JSON.stringify(batch).length, 
         input_words: batch.length, 
-        input_data: batch, // Ledger for failed/partial analysis
+        input_data: batch, 
         output_words: responseObj.data.length, 
         status: 'success'
     });
