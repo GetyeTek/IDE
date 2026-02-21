@@ -118,11 +118,12 @@ serve(async (req) => {
     }
 
     // 6. UPDATE DATABASE & ROTATE KEY
+    // If finishReason is not 'STOP', we mark as 'error' so the retry logic can pick it up again
     const isSuccess = finishReason === "STOP";
     await supabase.from('gospel_transcriptions').update({
       content: transcribedText,
       status: isSuccess ? 'completed' : 'error',
-      error_log: isSuccess ? null : `Incomplete: ${finishReason}`,
+      error_log: isSuccess ? null : `AI finish reason: ${finishReason}`,
       updated_at: new Date().toISOString()
     }).eq('id', page.id);
 
@@ -136,10 +137,14 @@ serve(async (req) => {
   } catch (err) {
     console.error("Transcription Error:", err.message);
     
-    // Attempt to clear the 'processing' lock so the page can be retried
+    // If we have a page record, mark it as error so the RPC can manage retries
     if (typeof page !== 'undefined' && page?.id) {
       await supabase.from('gospel_transcriptions')
-        .update({ status: 'error', error_log: err.message })
+        .update({
+          status: 'error',
+          error_log: err.message,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', page.id);
     }
 
