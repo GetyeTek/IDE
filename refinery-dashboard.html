@@ -153,8 +153,9 @@
             
             const s1Grid = document.getElementById('s1-grid');
             s1Grid.innerHTML = '';
+            const files = data.script1.files || [];
             for(let i=1; i<=12; i++) {
-                const file = data.script1.files.find(f => f.file_path.includes(`_${i}.txt`));
+                const file = files.find(f => f && f.file_path && f.file_path.includes(`_${i}.txt`));
                 const isDone = file?.is_finished;
                 s1Grid.innerHTML += `
                     <div class="flex flex-col items-center p-2 rounded-xl ${isDone ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-slate-800/50 border-slate-700/50'} border">
