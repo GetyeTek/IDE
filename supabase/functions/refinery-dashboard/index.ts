@@ -78,13 +78,13 @@ serve(async (req) => {
     const dashboardData = {
       global: {
         total_processed_batches: (s1Actual || 0) + (s2Stats.completed || 0),
-        api_keys_active: keys.data?.filter(k => k.is_active).length,
-        api_keys_in_cooldown: keys.data?.filter(k => k.cooldown_until && new Date(k.cooldown_until) > new Date()).length,
+        api_keys_active: keys.data?.filter(k => k.is_active).length || 0,
+        api_keys_in_cooldown: keys.data?.filter(k => k.cooldown_until && new Date(k.cooldown_until) > new Date()).length || 0,
       },
       script1: {
-        files: s1Progress.data,
-        batch_gap_count: (s1Expected || 0) - (s1Actual || 0),
-        completion_rate: s1Expected ? Math.round(((s1Actual || 0) / s1Expected) * 100) : 0
+        files: s1Progress.data || [],
+        batch_gap_count: Math.max(0, (s1Expected || 0) - (s1Actual || 0)),
+        completion_rate: s1Expected ? Math.min(100, Math.round(((s1Actual || 0) / s1Expected) * 100)) : 0
       },
       script2: {
         queue: s2Stats,
