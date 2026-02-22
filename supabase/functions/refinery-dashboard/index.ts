@@ -49,6 +49,60 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(50);
 
+    // Detect if we are inspecting a specific file
+    const url = new URL(req.url);
+    const targetFile = url.searchParams.get('file');
+    const isScript2 = url.searchParams.get('is_script2') === 'true';
+
+    if (targetFile) {
+      let query = supabase.from('processed_words').select('words, batch_index');
+      
+      if (isScript2) {
+        // Grouping 13-26 for Script 2
+        query = query.or('source_file.ilike.rare_words_1[3-9]%,source_file.ilike.rare_words_2[0-6]%');
+      } else {
+        query = query.eq('source_file', targetFile);
+      }
+
+      const { data: wordsData, error: wordsErr } = await query;
+      if (wordsErr) throw wordsErr;
+
+      // Calculate Deep Stats
+      const allWords = wordsData.flatMap(row => row.words || []);
+      const totalWords = allWords.length;
+      const uniqueWords = new Set(allWords.map(w => w.word)).size;
+      const uniqueRoots = new Set(allWords.map(w => w.root)).size;
+      
+      // Batch Stats
+      let batchQuery = isScript2 
+        ? supabase.from('chunk_queue').select('status')
+        : supabase.from('refinery_batches').select('status').eq('target_file', targetFile);
+      
+      const { data: bData } = await batchQuery;
+      const batchStats = (bData || []).reduce((acc: any, curr: any) => {
+        acc[curr.status] = (acc[curr.status] || 0) + 1;
+        return acc;
+      }, { completed: 0, failed: 0, processing: 0, pending: 0 });
+
+      const totalBatches = (bData || []).length;
+      const successRate = totalBatches > 0 ? Math.round((batchStats.completed / totalBatches) * 100) : 0;
+
+      return new Response(JSON.stringify({
+        file_path: targetFile,
+        total_words: totalWords,
+        unique_words: uniqueWords,
+        unique_roots: uniqueRoots,
+        duplicates: totalWords - uniqueWords,
+        batch_stats: batchStats,
+        health: successRate > 90 ? 'Healthy' : successRate > 50 ? 'Warning' : 'Critical',
+        success_rate: successRate,
+        avg_importance: (allWords.reduce((a, b) => a + (b.importance || 0), 0) / totalWords).toFixed(1)
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     const [
       linguistic,
       s1Progress,
