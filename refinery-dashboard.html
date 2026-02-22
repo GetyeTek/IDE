@@ -108,9 +108,9 @@
 
     <script>
         // CONFIGURATION
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const SUPABASE_URL = 'https://xvldfsmxskhemkslsbym.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU';
+        const refinery = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let currentTab = 's1';
 
@@ -128,7 +128,7 @@
         async function fetchStats() {
             try {
                 document.getElementById('last-updated').innerText = 'Refreshing...';
-                const { data, error } = await supabase.functions.invoke('refinery-dashboard');
+                const { data, error } = await refinery.functions.invoke('refinery-dashboard');
                 
                 if (error) throw error;
 
