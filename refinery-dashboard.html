@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Refinery OS</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #0f172a; 
+            color: #f8fafc; 
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glass-card { 
+            background: rgba(30, 41, 59, 0.7); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(255,255,255,0.1); 
+        }
+        .tab-active { 
+            border-bottom: 3px solid #38bdf8; 
+            color: #38bdf8; 
+        }
+        .progress-ring { transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: 50% 50%; }
+        .status-dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <!-- HEADER -->
+    <header class="p-6 flex justify-between items-center sticky top-0 z-50 glass-card">
+        <div>
+            <h1 class="text-xl font-bold tracking-tight text-sky-400">REFINERY<span class="text-white underline decoration-sky-500/50">OS</span></h1>
+            <p id="last-updated" class="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Connecting...</p>
+        </div>
+        <button onclick="fetchStats()" class="h-10 w-10 bg-sky-500/10 rounded-full flex items-center justify-center border border-sky-500/20 active:scale-90 transition-transform">
+            <i class="fa-solid fa-arrows-rotate text-sky-400"></i>
+        </button>
+    </header>
+
+    <!-- GLOBAL KPI -->
+    <div class="p-4 grid grid-cols-2 gap-3">
+        <div class="glass-card p-4 rounded-3xl">
+            <p class="text-slate-400 text-xs font-semibold uppercase">API Status</p>
+            <div class="flex items-center gap-2 mt-2">
+                <span id="key-status-dot" class="status-dot bg-slate-500"></span>
+                <span id="active-keys" class="text-xl font-bold">--</span>
+            </div>
+            <p id="cooldown-text" class="text-[10px] text-slate-500 mt-1">0 in cooldown</p>
+        </div>
+        <div class="glass-card p-4 rounded-3xl text-right">
+            <p class="text-slate-400 text-xs font-semibold uppercase">Throughput</p>
+            <p id="total-batches" class="text-xl font-bold mt-2">--</p>
+            <p class="text-[10px] text-slate-500 mt-1">Total Batches</p>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <nav class="flex border-b border-white/5 px-4 mb-4">
+        <button onclick="switchTab('s1')" id="tab-s1" class="flex-1 py-3 text-sm font-medium tab-active">Rare Words</button>
+        <button onclick="switchTab('s2')" id="tab-s2" class="flex-1 py-3 text-sm font-medium text-slate-500">Chunks</button>
+        <button onclick="switchTab('logs')" id="tab-logs" class="flex-1 py-3 text-sm font-medium text-slate-500">Logs</button>
+    </nav>
+
+    <!-- CONTENT AREAS -->
+    <main id="content-container" class="px-4 space-y-4">
+        
+        <!-- SCRIPT 1: RARE WORDS -->
+        <div id="view-s1" class="space-y-4">
+            <div class="glass-card p-5 rounded-3xl">
+                <div class="flex justify-between items-end mb-4">
+                    <h3 class="font-bold">Sequence Status (1-12)</h3>
+                    <span id="s1-percent" class="text-2xl font-bold text-sky-400">0%</span>
+                </div>
+                <div id="s1-grid" class="grid grid-cols-4 gap-2">
+                    <!-- JS will inject 12 file pills here -->
+                </div>
+            </div>
+            <div class="glass-card p-4 rounded-3xl flex justify-between items-center">
+                <span class="text-sm text-slate-300">Index Gaps Found</span>
+                <span id="s1-gaps" class="px-3 py-1 bg-rose-500/20 text-rose-400 rounded-full text-xs font-bold font-mono">--</span>
+            </div>
+        </div>
+
+        <!-- SCRIPT 2: CHUNKS -->
+        <div id="view-s2" class="hidden space-y-4">
+            <div class="glass-card p-5 rounded-3xl">
+                <h3 class="font-bold mb-4">Queue Distribution</h3>
+                <div class="space-y-3">
+                    <div id="s2-stats-list">
+                        <!-- Dynamic Queue Stats -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div id="view-logs" class="hidden">
+            <div id="error-list" class="space-y-2">
+                <!-- Dynamic Errors -->
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // CONFIGURATION
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentTab = 's1';
+
+        function switchTab(tab) {
+            ['s1', 's2', 'logs'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('tab-active', 'text-sky-400');
+                document.getElementById(`tab-${t}`).classList.add('text-slate-500');
+            });
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('tab-active', 'text-sky-400');
+            currentTab = tab;
+        }
+
+        async function fetchStats() {
+            try {
+                document.getElementById('last-updated').innerText = 'Refreshing...';
+                const { data, error } = await supabase.functions.invoke('refinery-dashboard');
+                
+                if (error) throw error;
+
+                updateUI(data);
+                document.getElementById('last-updated').innerText = `Updated: ${new Date().toLocaleTimeString()}`;
+            } catch (err) {
+                console.error(err);
+                document.getElementById('last-updated').innerText = 'Connection Failed';
+            }
+        }
+
+        function updateUI(data) {
+            // Global stats
+            document.getElementById('active-keys').innerText = data.global.api_keys_active;
+            document.getElementById('cooldown-text').innerText = `${data.global.api_keys_in_cooldown} in cooldown`;
+            document.getElementById('key-status-dot').className = `status-dot ${data.global.api_keys_active > 0 ? 'bg-emerald-500' : 'bg-rose-500'}`;
+            document.getElementById('total-batches').innerText = data.global.total_processed_batches.toLocaleString();
+
+            // Script 1 UI
+            document.getElementById('s1-percent').innerText = `${data.script1.completion_rate}%`;
+            document.getElementById('s1-gaps').innerText = data.script1.batch_gap_count;
+            
+            const s1Grid = document.getElementById('s1-grid');
+            s1Grid.innerHTML = '';
+            for(let i=1; i<=12; i++) {
+                const file = data.script1.files.find(f => f.file_path.includes(`_${i}.txt`));
+                const isDone = file?.is_finished;
+                s1Grid.innerHTML += `
+                    <div class="flex flex-col items-center p-2 rounded-xl ${isDone ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-slate-800/50 border-slate-700/50'} border">
+                        <span class="text-[10px] text-slate-400">F${i}</span>
+                        <i class="fa-solid ${isDone ? 'fa-check text-emerald-400' : 'fa-spinner fa-spin text-slate-600'} text-xs mt-1"></i>
+                    </div>
+                `;
+            }
+
+            // Script 2 UI
+            const s2List = document.getElementById('s2-stats-list');
+            const q = data.script2.queue;
+            s2List.innerHTML = `
+                ${renderStatLine('Completed', q.completed, 'text-emerald-400', (q.completed/data.script2.total_chunks)*100)}
+                ${renderStatLine('Failed', q.failed, 'text-rose-400', (q.failed/data.script2.total_chunks)*100)}
+                ${renderStatLine('Processing', q.processing, 'text-sky-400', (q.processing/data.script2.total_chunks)*100)}
+                ${renderStatLine('Pending', q.pending, 'text-slate-500', (q.pending/data.script2.total_chunks)*100)}
+                <div class="mt-4 pt-4 border-t border-white/5 flex justify-between">
+                    <span class="text-xs text-slate-400">Retried Items</span>
+                    <span class="text-xs font-bold">${q.retried}</span>
+                </div>
+            `;
+
+            // Logs UI
+            const logList = document.getElementById('error-list');
+            logList.innerHTML = data.errors.recent_logs.map(log => `
+                <div class="glass-card p-3 rounded-2xl border-l-4 border-rose-500">
+                    <div class="flex justify-between items-start">
+                        <span class="text-[10px] font-bold text-rose-400 uppercase">${log.error_type}</span>
+                        <span class="text-[8px] text-slate-500">${new Date(log.created_at).toLocaleTimeString()}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 mt-1 line-clamp-2">${log.error_message}</p>
+                    <p class="text-[9px] text-slate-500 mt-1 font-mono">${log.source_file}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderStatLine(label, count, colorClass, percent) {
+            return `
+                <div class="space-y-1">
+                    <div class="flex justify-between text-xs">
+                        <span class="text-slate-400">${label}</span>
+                        <span class="font-bold ${colorClass}">${count}</span>
+                    </div>
+                    <div class="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                        <div class="h-full ${colorClass.replace('text', 'bg')} transition-all duration-1000" style="width: ${percent}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initial Fetch
+        fetchStats();
+        // Auto-refresh every 60 seconds
+        setInterval(fetchStats, 60000);
+    </script>
+</body>
+</html>
