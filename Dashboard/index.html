@@ -152,8 +152,6 @@
                             <th class="p-4 text-right text-sky-400 whitespace-nowrap">Unique</th>
                         </tr>
                     </thead>
-                        </tr>
-                    </thead>
                     <tbody id="yield-table-body" class="divide-y divide-white/5">
                         <!-- SQL style rows here -->
                     </tbody>
@@ -192,6 +190,7 @@
                 document.getElementById('cooldown-text').innerText = `${data.global.api_keys_in_cooldown} Nodes in Cooldown`;
 
                 // Update Yield Table (The SQL Result)
+                const tbody = document.getElementById('yield-table-body');
                 tbody.innerHTML = data.file_breakdown.map(f => `
                     <tr onclick="inspectFile('${f.source}', ${f.source.includes('chunk')})" class="hover:bg-white/5 active:bg-sky-500/10 transition-colors cursor-pointer">
                         <td class="p-4 font-medium text-slate-300 sticky left-0 bg-[#0f172ae6] backdrop-blur-md z-10 border-r border-white/5">
