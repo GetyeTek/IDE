@@ -143,13 +143,15 @@
         <!-- YIELD TABLE VIEW -->
         <div id="view-breakdown" class="space-y-4">
             <div class="glass-card rounded-2xl overflow-x-auto no-scrollbar">
-                <table class="w-full text-left text-[11px] min-w-[500px]">
+                <table class="w-full text-left text-[11px] min-w-[800px]">
                     <thead class="bg-white/5 text-slate-500 uppercase text-[9px] font-bold">
                         <tr>
                             <th class="p-4 sticky left-0 bg-[#0f172ae6] backdrop-blur-md z-10">Source</th>
                             <th class="p-4 text-right whitespace-nowrap">Batch Progress</th>
                             <th class="p-4 text-right whitespace-nowrap">Offset</th>
+                            <th class="p-4 text-right whitespace-nowrap">Total</th>
                             <th class="p-4 text-right text-sky-400 whitespace-nowrap">Unique</th>
+                            <th class="p-4 text-right text-rose-400 whitespace-nowrap">Dups</th>
                         </tr>
                     </thead>
                     <tbody id="yield-table-body" class="divide-y divide-white/5">
@@ -203,7 +205,9 @@
                            <span class="text-emerald-400">${f.completed_batches}</span><span class="text-slate-600">/${f.total_batches}</span>
                         </td>
                         <td class="p-4 text-right text-slate-500 font-mono whitespace-nowrap">${f.last_index?.toLocaleString() || 0}</td>
-                        <td class="p-4 text-right font-bold text-white whitespace-nowrap">${f.unique_words.toLocaleString()}</td>
+                        <td class="p-4 text-right text-slate-400 whitespace-nowrap">${f.total_entries.toLocaleString()}</td>
+                        <td class="p-4 text-right font-bold text-sky-400 whitespace-nowrap">${f.unique_words.toLocaleString()}</td>
+                        <td class="p-4 text-right text-rose-400/60 whitespace-nowrap">${f.duplicate_count.toLocaleString()}</td>
                     </tr>
                 `).join('');
 
