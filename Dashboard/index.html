@@ -142,15 +142,16 @@
         
         <!-- YIELD TABLE VIEW -->
         <div id="view-breakdown" class="space-y-4">
-            <div class="glass-card rounded-2xl overflow-hidden">
-                <table class="w-full text-left text-[11px]">
+            <div class="glass-card rounded-2xl overflow-x-auto no-scrollbar">
+                <table class="w-full text-left text-[11px] min-w-[500px]">
                     <thead class="bg-white/5 text-slate-500 uppercase text-[9px] font-bold">
                         <tr>
-                            <th class="p-4">Source</th>
-                            <th class="p-4 text-right">Unique</th>
-                            <th class="p-4 text-right">Dups</th>
-                            <th class="p-4 text-right">Progress</th>
-                            <th class="p-4 text-right">Index</th>
+                            <th class="p-4 sticky left-0 bg-[#0f172ae6] backdrop-blur-md z-10">Source</th>
+                            <th class="p-4 text-right whitespace-nowrap">Batch Progress</th>
+                            <th class="p-4 text-right whitespace-nowrap">Offset</th>
+                            <th class="p-4 text-right text-sky-400 whitespace-nowrap">Unique</th>
+                        </tr>
+                    </thead>
                         </tr>
                     </thead>
                     <tbody id="yield-table-body" class="divide-y divide-white/5">
@@ -191,14 +192,19 @@
                 document.getElementById('cooldown-text').innerText = `${data.global.api_keys_in_cooldown} Nodes in Cooldown`;
 
                 // Update Yield Table (The SQL Result)
-                const tbody = document.getElementById('yield-table-body');
                 tbody.innerHTML = data.file_breakdown.map(f => `
                     <tr onclick="inspectFile('${f.source}', ${f.source.includes('chunk')})" class="hover:bg-white/5 active:bg-sky-500/10 transition-colors cursor-pointer">
-                        <td class="p-4 font-medium text-slate-300">${f.source}</td>
-                        <td class="p-4 text-right font-bold text-emerald-400">${f.unique_words.toLocaleString()}</td>
-                        <td class="p-4 text-right text-rose-400/60">${f.duplicate_count.toLocaleString()}</td>
-                        <td class="p-4 text-right font-mono text-sky-400">${f.completed_batches}/${f.total_batches}</td>
-                        <td class="p-4 text-right font-mono text-slate-500">${f.last_index > 0 ? f.last_index.toLocaleString() : '---'}</td>
+                        <td class="p-4 font-medium text-slate-300 sticky left-0 bg-[#0f172ae6] backdrop-blur-md z-10 border-r border-white/5">
+                            ${f.source}
+                            <div class="w-16 h-1 bg-white/5 rounded-full mt-1">
+                                <div class="h-full bg-sky-500 rounded-full" style="width: ${f.progress_percent}%"></div>
+                            </div>
+                        </td>
+                        <td class="p-4 text-right font-mono whitespace-nowrap">
+                           <span class="text-emerald-400">${f.completed_batches}</span><span class="text-slate-600">/${f.total_batches}</span>
+                        </td>
+                        <td class="p-4 text-right text-slate-500 font-mono whitespace-nowrap">${f.last_index?.toLocaleString() || 0}</td>
+                        <td class="p-4 text-right font-bold text-white whitespace-nowrap">${f.unique_words.toLocaleString()}</td>
                     </tr>
                 `).join('');
 
