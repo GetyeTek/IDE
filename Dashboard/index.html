@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Refinery OS | Linguistic Intelligence</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Ethiopic:wght@400;700&display=swap');
+        
+        :root {
+            --glass: rgba(15, 23, 42, 0.8);
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+        }
+
+        .font-amharic { font-family: 'Noto Sans Ethiopic', sans-serif; }
+
+        .glass-card { 
+            background: var(--glass); 
+            backdrop-filter: blur(16px); 
+            border: 1px solid var(--border); 
+        }
+
+        .tab-active { 
+            border-bottom: 2px solid #38bdf8; 
+            color: #38bdf8; 
+            background: linear-gradient(to top, rgba(56, 189, 248, 0.05), transparent);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        .status-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+        .loading-shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- HEADER -->
+    <header class="p-6 flex justify-between items-center sticky top-0 z-50 glass-card border-b">
+        <div>
+            <div class="flex items-center gap-2">
+                <div class="h-2 w-2 bg-sky-500 rounded-full status-pulse"></div>
+                <h1 class="text-xl font-bold tracking-tighter text-white">REFINERY<span class="text-sky-500">OS</span></h1>
+            </div>
+            <p id="last-updated" class="text-[10px] text-slate-500 uppercase tracking-widest mt-1">System Synchronizing...</p>
+        </div>
+        <button onclick="fetchStats()" class="h-10 w-10 glass-card rounded-xl flex items-center justify-center hover:bg-white/5 transition-colors">
+            <i class="fa-solid fa-arrows-rotate text-sky-400"></i>
+        </button>
+    </header>
+
+    <!-- TOP METRICS -->
+    <div class="p-4 grid grid-cols-2 gap-3">
+        <div class="glass-card p-4 rounded-3xl">
+            <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Unique Vocabulary</p>
+            <p id="total-unique" class="text-2xl font-bold mt-2">--</p>
+            <div class="flex items-center gap-2 mt-1">
+                <span id="key-count" class="text-[10px] text-emerald-400 font-mono">0 Nodes Active</span>
+            </div>
+        </div>
+        <div class="glass-card p-4 rounded-3xl text-right">
+            <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Global Redundancy</p>
+            <p id="total-duplicates" class="text-2xl font-bold mt-2 text-rose-400">--</p>
+            <p id="cooldown-text" class="text-[10px] text-slate-500 mt-1 uppercase">0 Keys in Cooldown</p>
+        </div>
+    </div>
+
+    <!-- INSPECTOR PANEL -->
+    <div id="deep-stats-panel" class="hidden px-4 mb-6">
+        <div class="glass-card rounded-[2rem] p-6 border-sky-500/30 bg-gradient-to-br from-sky-500/5 to-transparent">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h2 id="inspect-title" class="text-xl font-bold text-white tracking-tight">Source Analysis</h2>
+                    <p id="inspect-subtitle" class="text-[10px] text-sky-400 font-mono mt-1">Linguistic Deep-Dive</p>
+                </div>
+                <button onclick="closeInspector()" class="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-slate-400">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-6 mb-8">
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-slate-500 text-[9px] uppercase font-bold tracking-widest">Total Yield</p>
+                        <p id="stat-total-words" class="text-xl font-bold">--</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500 text-[9px] uppercase font-bold tracking-widest">Unique Roots</p>
+                        <p id="stat-unique-roots" class="text-xl font-bold text-sky-400">--</p>
+                    </div>
+                </div>
+                <div class="space-y-4 text-right">
+                    <div>
+                        <p class="text-slate-500 text-[9px] uppercase font-bold tracking-widest">AI Success Rate</p>
+                        <p id="stat-success-rate" class="text-xl font-bold text-emerald-400">--%</p>
+                    </div>
+                    <div>
+                        <p class="text-slate-500 text-[9px] uppercase font-bold tracking-widest">Health</p>
+                        <span id="stat-health" class="text-[10px] font-black px-2 py-0.5 rounded bg-white/5 uppercase">Scanning</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-white/5 pt-6">
+                <p class="text-slate-500 text-[9px] uppercase font-bold tracking-widest mb-4">Grammatical Distribution</p>
+                <div id="pos-bar" class="w-full h-2 flex rounded-full overflow-hidden bg-white/5 mb-4"></div>
+                <div id="pos-legend" class="grid grid-cols-2 gap-2 text-[10px]"></div>
+                
+                <p class="text-slate-500 text-[9px] uppercase font-bold tracking-widest mt-6 mb-4">Top Roots Found</p>
+                <div id="root-cloud" class="flex flex-wrap gap-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <nav class="flex border-b border-white/5 px-4 mb-4 sticky top-20 z-40 bg-[#020617]">
+        <button onclick="switchTab('breakdown')" id="tab-breakdown" class="flex-1 py-4 text-[10px] font-bold uppercase tracking-widest tab-active">Linguistic Yield</button>
+        <button onclick="switchTab('queue')" id="tab-queue" class="flex-1 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Queue State</button>
+        <button onclick="switchTab('logs')" id="tab-logs" class="flex-1 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">System Logs</button>
+    </nav>
+
+    <main id="content-container" class="px-4">
+        
+        <!-- YIELD TABLE VIEW -->
+        <div id="view-breakdown" class="space-y-4">
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-[11px]">
+                    <thead class="bg-white/5 text-slate-500 uppercase text-[9px] font-bold">
+                        <tr>
+                            <th class="p-4">Source</th>
+                            <th class="p-4 text-right">Unique</th>
+                            <th class="p-4 text-right">Dups</th>
+                        </tr>
+                    </thead>
+                    <tbody id="yield-table-body" class="divide-y divide-white/5">
+                        <!-- SQL style rows here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- QUEUE VIEW -->
+        <div id="view-queue" class="hidden space-y-4">
+            <div class="glass-card p-6 rounded-3xl">
+                <h3 class="text-sm font-bold mb-6">Cluster Distribution (13-26)</h3>
+                <div id="queue-stats" class="space-y-6"></div>
+            </div>
+        </div>
+
+        <!-- LOGS VIEW -->
+        <div id="view-logs" class="hidden space-y-3" id="error-list"></div>
+
+    </main>
+
+    <script>
+        const SUPABASE_URL = 'https://xvldfsmxskhemkslsbym.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Replace with yours
+        const refinery = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function fetchStats() {
+            try {
+                document.getElementById('last-updated').innerText = 'Neural Sync...';
+                const { data, error } = await refinery.functions.invoke('refinery-dashboard');
+                if (error) throw error;
+
+                // Update Global Header
+                document.getElementById('total-unique').innerText = data.global.total_unique_words.toLocaleString();
+                document.getElementById('total-duplicates').innerText = data.global.total_duplicates.toLocaleString();
+                document.getElementById('key-count').innerText = `${data.global.api_keys_active} Nodes Active`;
+                document.getElementById('cooldown-text').innerText = `${data.global.api_keys_in_cooldown} Nodes in Cooldown`;
+
+                // Update Yield Table (The SQL Result)
+                const tbody = document.getElementById('yield-table-body');
+                tbody.innerHTML = data.file_breakdown.map(f => `
+                    <tr onclick="inspectFile('${f.source}', ${f.source.includes('chunk')})" class="hover:bg-white/5 active:bg-sky-500/10 transition-colors cursor-pointer">
+                        <td class="p-4 font-medium text-slate-300">${f.source}</td>
+                        <td class="p-4 text-right font-bold text-emerald-400">${f.unique_words.toLocaleString()}</td>
+                        <td class="p-4 text-right text-rose-400/60">${f.duplicate_count.toLocaleString()}</td>
+                    </tr>
+                `).join('');
+
+                // Update Queue Stats
+                const q = data.script2_queue.stats;
+                const totalQ = data.script2_queue.total_chunks;
+                const queueDiv = document.getElementById('queue-stats');
+                queueDiv.innerHTML = `
+                    ${renderBar('Completed', q.completed, totalQ, 'bg-emerald-500')}
+                    ${renderBar('Processing', q.processing, totalQ, 'bg-sky-500')}
+                    ${renderBar('Failed', q.failed, totalQ, 'bg-rose-500')}
+                    ${renderBar('Pending', q.pending, totalQ, 'bg-slate-700')}
+                `;
+
+                // Update Logs
+                const logList = document.getElementById('view-logs');
+                logList.innerHTML = data.errors.recent_logs.map(log => `
+                    <div class="glass-card p-4 rounded-xl border-l-2 border-rose-500/50">
+                        <div class="flex justify-between text-[9px] mb-2">
+                            <span class="text-rose-400 font-bold uppercase">${log.error_type}</span>
+                            <span class="text-slate-500">${new Date(log.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-snug">${log.error_message}</p>
+                    </div>
+                `).join('');
+
+                document.getElementById('last-updated').innerText = `Synced: ${new Date().toLocaleTimeString()}`;
+            } catch (err) {
+                document.getElementById('last-updated').innerText = 'Sync Error';
+            }
+        }
+
+        async function inspectFile(source, isScript2) {
+            const panel = document.getElementById('deep-stats-panel');
+            panel.classList.remove('hidden');
+            panel.scrollIntoView({ behavior: 'smooth' });
+
+            document.getElementById('inspect-title').innerText = source.toUpperCase();
+            
+            // Note: Manual string building for search params to ensure Deno receives them
+            try {
+                const funcUrl = `refinery-dashboard?file=${encodeURIComponent(source)}&is_script2=${isScript2}`;
+                const { data, error } = await refinery.functions.invoke(funcUrl);
+                if (error) throw error;
+
+                document.getElementById('stat-total-words').innerText = data.total_words.toLocaleString();
+                document.getElementById('stat-unique-roots').innerText = data.unique_roots.toLocaleString();
+                document.getElementById('stat-success-rate').innerText = `${data.success_rate}%`;
+                document.getElementById('stat-health').innerText = data.health;
+
+                const posColors = { Noun: 'bg-sky-500', Verb: 'bg-emerald-500', Adjective: 'bg-amber-500', Adverb: 'bg-rose-500' };
+                const posBar = document.getElementById('pos-bar');
+                const posLegend = document.getElementById('pos-legend');
+                posBar.innerHTML = ''; posLegend.innerHTML = '';
+
+                Object.entries(data.pos_distribution).forEach(([pos, count]) => {
+                    const pct = (count / data.total_words) * 100;
+                    const color = posColors[pos] || 'bg-slate-500';
+                    posBar.innerHTML += `<div class="${color} h-full" style="width: ${pct}%"></div>`;
+                    posLegend.innerHTML += `<div class="flex justify-between"><span>${pos}</span><span class="text-slate-500">${Math.round(pct)}%</span></div>`;
+                });
+
+                document.getElementById('root-cloud').innerHTML = data.top_roots.map(r => `
+                    <div class="px-2 py-1 bg-white/5 rounded-lg text-[11px] font-amharic">
+                        ${r.root} <span class="text-[9px] text-slate-500 ml-1">${r.count}</span>
+                    </div>
+                `).join('');
+
+            } catch (err) { console.error(err); }
+        }
+
+        function renderBar(label, count, total, color) {
+            const pct = total > 0 ? (count / total) * 100 : 0;
+            return `
+                <div>
+                    <div class="flex justify-between text-[10px] mb-1 uppercase font-bold tracking-widest">
+                        <span class="text-slate-500">${label}</span>
+                        <span>${count}</span>
+                    </div>
+                    <div class="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div class="${color} h-full transition-all duration-1000" style="width: ${pct}%"></div>
+                    </div>
+                </div>`;
+        }
+
+        function switchTab(tab) {
+            ['breakdown', 'queue', 'logs'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('tab-active');
+            });
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('tab-active');
+        }
+
+        function closeInspector() { document.getElementById('deep-stats-panel').classList.add('hidden'); }
+
+        fetchStats();
+        setInterval(fetchStats, 60000);
+    </script>
+</body>
+</html>
