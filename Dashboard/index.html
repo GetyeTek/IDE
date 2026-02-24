@@ -149,6 +149,8 @@
                             <th class="p-4">Source</th>
                             <th class="p-4 text-right">Unique</th>
                             <th class="p-4 text-right">Dups</th>
+                            <th class="p-4 text-right">Progress</th>
+                            <th class="p-4 text-right">Index</th>
                         </tr>
                     </thead>
                     <tbody id="yield-table-body" class="divide-y divide-white/5">
@@ -195,6 +197,8 @@
                         <td class="p-4 font-medium text-slate-300">${f.source}</td>
                         <td class="p-4 text-right font-bold text-emerald-400">${f.unique_words.toLocaleString()}</td>
                         <td class="p-4 text-right text-rose-400/60">${f.duplicate_count.toLocaleString()}</td>
+                        <td class="p-4 text-right font-mono text-sky-400">${f.completed_batches}/${f.total_batches}</td>
+                        <td class="p-4 text-right font-mono text-slate-500">${f.last_index > 0 ? f.last_index.toLocaleString() : '---'}</td>
                     </tr>
                 `).join('');
 
