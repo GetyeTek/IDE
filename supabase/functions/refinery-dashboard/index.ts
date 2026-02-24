@@ -88,7 +88,7 @@ serve(async (req) => {
 
     // Calculate grand totals from the yieldReport
     const grandTotalWords = (yieldReport.data || []).reduce((sum: number, f: any) => sum + Number(f.total_entries), 0);
-    const grandUniqueWords = (yieldReport.data || []).reduce((sum: number, f: any) => sum + Number(f.unique_words), 0); // Note: Distinct overall might be slightly lower, but this is accurate for file sums
+    const grandUniqueWords = (yieldReport.data || []).reduce((sum: number, f: any) => sum + Number(f.unique_words), 0);
 
     const dashboardData = {
       global: {
