@@ -192,8 +192,9 @@
                 document.getElementById('cooldown-text').innerText = `${data.global.api_keys_in_cooldown} Nodes in Cooldown`;
 
                 // Update Yield Table (The SQL Result)
-                const tbody = document.getElementById('yield-table-body');
-                tbody.innerHTML = data.file_breakdown.map(f => `
+                const yieldBody = document.getElementById('yield-table-body');
+                if (yieldBody) {
+                    yieldBody.innerHTML = data.file_breakdown.map(f => `
                     <tr onclick="inspectFile('${f.source}', ${f.source.includes('chunk')})" class="hover:bg-white/5 active:bg-sky-500/10 transition-colors cursor-pointer">
                         <td class="p-4 font-medium text-slate-300 sticky left-0 bg-[#0f172ae6] backdrop-blur-md z-10 border-r border-white/5">
                             ${f.source}
@@ -209,7 +210,8 @@
                         <td class="p-4 text-right font-bold text-sky-400 whitespace-nowrap">${f.unique_words.toLocaleString()}</td>
                         <td class="p-4 text-right text-rose-400/60 whitespace-nowrap">${f.duplicate_count.toLocaleString()}</td>
                     </tr>
-                `).join('');
+                    `).join('');
+                }
 
                 // Update Queue Stats
                 const q = data.script2_queue.stats;
