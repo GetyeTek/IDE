@@ -6,6 +6,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// HELPER: Implements the SQL grouping logic
+// "rare_words_13/chunk_5.txt" -> "rare_words_13/chunk"
+// "rare_words_1.txt" -> "rare_words_1"
+const getLogicalName = (path: string) => {
+  if (!path) return "unknown";
+  if (path.includes('/')) {
+    return path.replace(/_[0-9]+\.[^.]+$/, '');
+  }
+  return path.replace(/\.[^.]+$/, '');
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -21,28 +32,27 @@ serve(async (req) => {
 
     // --- MODE: DEEP FILE INSPECTION ---
     if (targetFile) {
-      let query = supabase.from('processed_words').select('words, batch_index');
+      const logicalTarget = getLogicalName(targetFile);
       
-      if (isScript2) {
-        // Aggregate stats for the entire 13-26 range
-        query = query.or('source_file.ilike.rare_words_1[3-9]%,source_file.ilike.rare_words_2[0-6]%');
-      } else {
-        query = query.eq('source_file', targetFile);
-      }
+      // We fetch all records that belong to the logical group
+      // (e.g. if you pass chunk_1, it finds chunk_1, chunk_2, etc via the prefix)
+      const { data: wordsData, error: wordsErr } = await supabase
+        .from('processed_words')
+        .select('words, source_file')
+        .ilike('source_file', `${logicalTarget}%`);
 
-      const { data: wordsData, error: wordsErr } = await query;
       if (wordsErr) throw wordsErr;
 
       const allWords = (wordsData || []).flatMap(row => row.words || []);
       const totalWords = allWords.length;
       
-      // Linguistic Frequencies
       const rootFreq = new Map();
       const posDist = new Map();
       const wordSet = new Set();
 
       allWords.forEach(w => {
-        if (w.word) wordSet.add(w.word.trim());
+        const wordText = w.word?.trim();
+        if (wordText) wordSet.add(wordText);
         if (w.root) rootFreq.set(w.root, (rootFreq.get(w.root) || 0) + 1);
         if (w.pos) posDist.set(w.pos, (posDist.get(w.pos) || 0) + 1);
       });
@@ -55,7 +65,7 @@ serve(async (req) => {
       // Batch Success Metrics
       let batchQuery = isScript2 
         ? supabase.from('chunk_queue').select('status')
-        : supabase.from('refinery_batches').select('status').eq('target_file', targetFile);
+        : supabase.from('refinery_batches').select('status').ilike('target_file', `${logicalTarget}%`);
       
       const { data: bData } = await batchQuery;
       const batchStats = (bData || []).reduce((acc: any, curr: any) => {
@@ -67,7 +77,7 @@ serve(async (req) => {
       const successRate = totalBatches > 0 ? Math.round((batchStats.completed / totalBatches) * 100) : 0;
 
       return new Response(JSON.stringify({
-        file_path: targetFile,
+        logical_group: logicalTarget,
         total_words: totalWords,
         unique_words: wordSet.size,
         unique_roots: rootFreq.size,
@@ -84,21 +94,52 @@ serve(async (req) => {
     }
 
     // --- MODE: GLOBAL DASHBOARD OVERVIEW ---
+    // We fetch the word arrays to calculate uniques/duplicates per logical file
     const [
       s1Progress, 
       s2Queue, 
       keys, 
       errors,
-      s1TotalBatches,
-      s1ProcessedCount
+      allProcessed
     ] = await Promise.all([
       supabase.from('refinery_progress').select('file_path, is_finished, updated_at').order('id', { ascending: true }),
       supabase.from('chunk_queue').select('status, retry_count'),
       supabase.from('api_keys').select('service, is_active, last_used_at, cooldown_until').eq('service', 'gemini'),
       supabase.from('refinery_stats').select('worker_id, source_file, error_type, error_message, created_at').eq('status', 'failed').order('created_at', { ascending: false }).limit(30),
-      supabase.from('refinery_batches').select('id', { count: 'exact', head: true }),
-      supabase.from('processed_words').select('id', { count: 'exact', head: true }).ilike('source_file', 'rare_words_%')
+      supabase.from('processed_words').select('source_file, words')
     ]);
+
+    // Aggregate logical stats (The JS version of your SQL query)
+    const fileGroups = new Map();
+    let grandTotalWords = 0;
+    const grandWordSet = new Set();
+
+    (allProcessed.data || []).forEach(row => {
+      const groupName = getLogicalName(row.source_file);
+      if (!fileGroups.has(groupName)) {
+        fileGroups.set(groupName, { total: 0, uniqueSet: new Set() });
+      }
+
+      const group = fileGroups.get(groupName);
+      const words = row.words || [];
+      
+      words.forEach((w: any) => {
+        const txt = w.word?.trim();
+        if (txt) {
+          group.total++;
+          group.uniqueSet.add(txt);
+          grandTotalWords++;
+          grandWordSet.add(txt);
+        }
+      });
+    });
+
+    const fileStatsReport = [...fileGroups.entries()].map(([name, stats]) => ({
+      source: name,
+      total_entries: stats.total,
+      unique_words: stats.uniqueSet.size,
+      duplicate_count: stats.total - stats.uniqueSet.size
+    })).sort((a, b) => b.total_entries - a.total_entries);
 
     const s2Stats = (s2Queue.data || []).reduce((acc: any, curr: any) => {
       acc[curr.status] = (acc[curr.status] || 0) + 1;
@@ -107,17 +148,15 @@ serve(async (req) => {
 
     const dashboardData = {
       global: {
-        total_processed_batches: (s1ProcessedCount.count || 0) + (s2Stats.completed || 0),
+        total_words_found: grandTotalWords,
+        total_unique_words: grandWordSet.size,
+        total_duplicates: grandTotalWords - grandWordSet.size,
         api_keys_active: keys.data?.filter(k => k.is_active).length || 0,
         api_keys_in_cooldown: keys.data?.filter(k => k.cooldown_until && new Date(k.cooldown_until) > new Date()).length || 0,
       },
-      script1: {
-        files: s1Progress.data || [],
-        batch_gap_count: Math.max(0, (s1TotalBatches.count || 0) - (s1ProcessedCount.count || 0)),
-        completion_rate: s1TotalBatches.count ? Math.min(100, Math.round(((s1ProcessedCount.count || 0) / s1TotalBatches.count) * 100)) : 0
-      },
-      script2: {
-        queue: s2Stats,
+      file_breakdown: fileStatsReport, // This replaces the simple list with grouped stats
+      script2_queue: {
+        stats: s2Stats,
         total_chunks: (s2Queue.data || []).length
       },
       errors: {
