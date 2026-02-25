@@ -1928,53 +1928,63 @@ If you already give a payload, assume it's already applied, and give the next pl
             });
         };
 
-        let responseObj = await tryQuery('function_logs');
+        // BRUTE FORCE DISCOVERY: Unnest metadata and search the raw stringified struct
+        const trySmartQuery = async (table: string) => {
+            // CAST(m AS STRING) allows us to search for the function name even if we don't know the exact key name
+            const sql = `SELECT t.timestamp, t.event_message, t.level, CAST(m AS STRING) as raw_meta
+                         FROM ${table} AS t
+                         CROSS JOIN UNNEST(t.metadata) AS m
+                         WHERE (t.event_message LIKE '%${function_slug}%' OR CAST(m AS STRING) LIKE '%${function_slug}%')
+                         ${before ? `AND t.timestamp < '${before}'` : ''}
+                         ORDER BY t.timestamp DESC 
+                         LIMIT 50`;
+            
+            const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
+            return fetch(url, { headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" } });
+        };
+
+        let discoveryRes = await trySmartQuery('function_logs');
         
-        if (!responseObj.ok) {
-            console.warn("[LogFetch] function_logs failed, trying edge_logs...");
-            responseObj = await tryQuery('edge_logs');
+        if (!discoveryRes.ok) {
+            console.warn("[LogFetch] function_logs failed, trying function_edge_logs...");
+            discoveryRes = await trySmartQuery('function_edge_logs');
         }
 
-        if (!responseObj.ok) {
-             console.warn("[LogFetch] Trials failed, attempting final fallback...");
-             const superSafeSql = `SELECT timestamp, event_message FROM function_logs WHERE event_message LIKE '%${function_slug}%' LIMIT 10`;
-             const urlFallback = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(superSafeSql)}`;
-             responseObj = await fetch(urlFallback, { headers: { "Authorization": `Bearer ${cloudKey}` } });
+        if (!discoveryRes.ok) {
+             console.warn("[LogFetch] Fallback to simple edge_logs...");
+             const simpleSql = `SELECT timestamp, event_message FROM edge_logs WHERE event_message LIKE '%${function_slug}%' LIMIT 20`;
+             const urlSimple = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(simpleSql)}`;
+             discoveryRes = await fetch(urlSimple, { headers: { "Authorization": `Bearer ${cloudKey}` } });
         }
 
-        console.log("Supabase Response Status:", responseObj.status);
-        const rawText = await responseObj.text();
-        console.log("RAW RESPONSE FROM SUPABASE:", rawText);
+        console.log("Supabase Response Status:", discoveryRes.status);
+        const rawText = await discoveryRes.text();
+        console.log("RAW RESPONSE:", rawText);
 
         let parsed;
         try {
             parsed = JSON.parse(rawText);
         } catch(e) {
-            return new Response(JSON.stringify({ error: "Failed to parse Supabase response", raw: rawText }), { headers: corsHeaders });
+            return new Response(JSON.stringify({ error: "Failed to parse response", raw: rawText }), { headers: corsHeaders });
         }
 
-        // FIX: The API returns data in 'result', not 'data'
         const rawRows = parsed.result || parsed.data || [];
-        console.log("Parsed Data Count:", rawRows.length);
 
-        // DYNAMIC NORMALIZATION
         const normalizedLogs = rawRows.map((row: any) => {
             const msg = row.event_message || "(No message)";
-            
-            // FIX: Analytics timestamp is in microseconds (16 digits). JS needs milliseconds (13 digits).
             let ts = row.timestamp || Date.now();
             if (typeof ts === 'number' && ts > 9999999999999) ts = Math.floor(ts / 1000);
             
-            let lvl = "info";
+            let lvl = row.level || "info";
             const lowerMsg = msg.toLowerCase();
-            if (lowerMsg.includes("error") || lowerMsg.includes("exception") || lowerMsg.includes("failed")) lvl = "error";
-            else if (lowerMsg.includes("warn")) lvl = "warning";
+            if (lowerMsg.includes("error") || lowerMsg.includes("exception")) lvl = "error";
 
             return {
                 timestamp: ts,
                 event_message: msg,
                 level: lvl,
-                function_id: row.id || ""
+                // Append raw meta string for debugging visibility in the UI
+                function_id: row.raw_meta ? `[META: ${row.raw_meta.substring(0, 50)}...]` : ""
             };
         });
 
