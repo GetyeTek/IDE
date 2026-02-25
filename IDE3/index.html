@@ -6222,12 +6222,15 @@ async function downloadArtifact(runId) {
                     } catch(e) { /* Fallback to plain text */ }
                 }
 
+                // Safe encoding for attributes to prevent SyntaxErrors from newlines/quotes
+                const safeLog = btoa(encodeURIComponent(log.event_message || ''));
+
                 row.innerHTML = `
                     <div class="flex-between" style="margin-bottom:6px;">
                         <span style="color:#555; font-size:10px;">${new Date(log.timestamp).toLocaleString()}</span>
                         <div class="flex-gap">
-                            <button class="action-mini-btn" style="color:var(--ai-accent)" onclick="chatWithLogText('${btoa(encodeURIComponent(log.event_message))}')">AI Fix</button>
-                            <button class="action-mini-btn" onclick="copyText('${(log.event_message || '').replace(/'/g, "\\'")}')">Copy</button>
+                            <button class="action-mini-btn" style="color:var(--ai-accent)" onclick="chatWithLogText('${safeLog}')">AI Fix</button>
+                            <button class="action-mini-btn" onclick="copyEncodedLog('${safeLog}')">Copy</button>
                         </div>
                     </div>
                     <div style="white-space:pre-wrap; word-break:break-all; color:${isError ? '#ffcdcd' : '#eee'}; line-height:1.4;">${displayMessage}</div>
@@ -6236,7 +6239,8 @@ async function downloadArtifact(runId) {
                 efLogNextTimestamp = log.timestamp;
             });
 
-            footer.style.display = data.logs.length >= 20 ? 'block' : 'none';
+            // Show button as long as we are finding results, hide only when truly exhausted
+            footer.style.display = data.logs.length > 0 ? 'block' : 'none';
 
         } catch(e) {
             const projectRef = CONFIG.funcUrl.split('https://')[1]?.split('.')[0];
@@ -6271,6 +6275,11 @@ async function downloadArtifact(runId) {
         toggleChat(true);
         chatHistory.push({ role: 'user', text: `Analyze this Edge Function log entry and suggest a fix if it indicates an error:\n\n${logText}` });
         processAIResponse();
+    }
+
+    function copyEncodedLog(base64Encoded) {
+        const logText = decodeURIComponent(atob(base64Encoded));
+        navigator.clipboard.writeText(logText).then(() => showGlobalToast("Log copied to clipboard"));
     }
 
     function convertToCSV(data) {
