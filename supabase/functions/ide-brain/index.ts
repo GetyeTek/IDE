@@ -1907,26 +1907,32 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
-        // DIAGNOSTIC 1: Try to get table metadata (may fail based on permissions)
-        const metaSql = `SELECT column_name, data_type FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'function_logs' LIMIT 100`;
+                // SCOUT: Fetch exactly 1 raw row to see the definitive schema structure
+        const scoutSql = `SELECT * FROM edge_logs LIMIT 1`;
         
-        // DIAGNOSTIC 2: The actual log query using BigQuery dot-notation for nested metadata
-        // We query 'function_logs' for console output and 'function_edge_logs' for execution metadata
-        const sql = `SELECT timestamp, event_message, level, metadata
-                     FROM function_logs
-                     WHERE (metadata.function_name = '${function_slug}' OR event_message LIKE '%${function_slug}%')
-                     ${before ? `AND timestamp < '${before}'` : ''}
-                     ORDER BY timestamp DESC
+        // THE FIX: UNNEST the metadata array to access fields inside the STRUCT
+        // We use a LEFT JOIN to ensure we don't drop logs that have empty metadata
+        const sql = `SELECT 
+                        t.timestamp, 
+                        t.event_message, 
+                        t.level, 
+                        m.function_name, 
+                        m.function_id
+                     FROM edge_logs AS t
+                     LEFT JOIN UNNEST(t.metadata) AS m
+                     WHERE (m.function_name = '${function_slug}' OR m.function_id = '${function_slug}' OR t.event_message LIKE '%${function_slug}%')
+                     ${before ? `AND t.timestamp < '${before}'` : ''}
+                     ORDER BY t.timestamp DESC 
                      LIMIT 50`;
 
-        console.log("[Diagnostic] Attempting Metadata Fetch...");
-        const metaRes = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(metaSql)}`, {
+        console.log("[LogScout] Probing schema...");
+        const scoutRes = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(scoutSql)}`, {
             headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
         });
-        const metaData = await metaRes.json();
-        console.log("[Diagnostic] Metadata Result:", JSON.stringify(metaData));
+        const scoutData = await scoutRes.json();
+        console.log("[LogScout] Raw Row Structure:", JSON.stringify(scoutData.data?.[0] || "No Rows Found"));
 
-        console.log("[LogFetch] Executing BigQuery-style logs fetch...");
+        console.log("[LogFetch] Executing Unnested Query...");
         
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
         console.log("SQL Query Used:", sql);
