@@ -2087,6 +2087,28 @@ If you already give a payload, assume it's already applied, and give the next pl
         }
 
         const data = await res.json();
+
+        // 1. Fetch the SHA of the initial auto-generated commit
+        let initialSha = "";
+        try {
+            // Small delay to let GitHub finalize the repository reference
+            await new Promise(r => setTimeout(r, 1500));
+            const refData = await githubFetch(data.name, `/git/ref/heads/${MAIN_BRANCH}`);
+            initialSha = refData.object.sha;
+        } catch (e: any) {
+            console.warn("Initial SHA fetch failed (GitHub indexing):", e.message);
+        }
+
+        // 2. Create the first History Record for the new repo
+        await supabase.from('conduit_history').insert({
+            repo_name: data.name,
+            title: "Repository Created",
+            type: "Dev",
+            meta: "Initial GitHub State",
+            sha: initialSha,
+            ops: []
+        });
+
         return new Response(JSON.stringify({ 
             success: true, 
             repo_name: data.name, 
