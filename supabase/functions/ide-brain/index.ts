@@ -1910,28 +1910,15 @@ If you already give a payload, assume it's already applied, and give the next pl
                 // SCOUT: Probing 'function_logs' (Console/Code output) instead of 'edge_logs' (HTTP Gateway)
         const scoutSql = `SELECT * FROM function_logs LIMIT 1`;
         
-        // THE FIX: Dialect-Safe Search
-        // 1. We search the event_message (where most logs contain the function name context).
-        // 2. We pull the first item from the metadata array as a raw object to avoid 'Field does not exist' errors.
-        const sql = `SELECT 
-                        t.timestamp, 
-                        t.event_message, 
-                        t.level,
-                        t.metadata[SAFE_OFFSET(0)] as meta_info
-                     FROM function_logs AS t
-                     WHERE (t.event_message LIKE '%${function_slug}%' OR t.id = '${function_slug}')
-                     ${before ? `AND t.timestamp < '${before}'` : ''}
-                     ORDER BY t.timestamp DESC 
+        // NUCLEAR OPTION: SELECT * to prevent 'Name not found' errors
+        const sql = `SELECT * 
+                     FROM function_logs 
+                     WHERE (event_message LIKE '%${function_slug}%')
+                     ${before ? `AND timestamp < '${before}'` : ''}
+                     ORDER BY timestamp DESC 
                      LIMIT 50`;
 
-        console.log("[LogScout] Probing function_logs schema...");
-        const scoutRes = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(scoutSql)}`, {
-            headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
-        });
-        const scoutData = await scoutRes.json();
-        console.log("[LogScout] row:", JSON.stringify(scoutData.data?.[0] || "Empty Table"));
-
-        console.log("[LogFetch] Executing Safe-String Query...");
+        console.log("[LogFetch] Executing Nuclear Query...");
         
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
         console.log("SQL Query Used:", sql);
@@ -1957,8 +1944,26 @@ If you already give a payload, assume it's already applied, and give the next pl
             console.log("Sample Log Entry:", JSON.stringify(parsed.data[0]));
         }
 
+        // DYNAMIC NORMALIZATION
+        // We map the random BigQuery columns back to what the IDE expects
+        const normalizedLogs = (parsed.data || []).map((row: any) => {
+            // Try common field names for message
+            const msg = row.event_message || row.message || (row.metadata?.[0]?.message) || "(No message)";
+            // Try common field names for level
+            const lvl = row.level || row.status || (row.metadata?.[0]?.level) || "info";
+            // Try common field names for timestamp
+            const ts = row.timestamp || row.created_at || Date.now();
+
+            return {
+                timestamp: ts,
+                event_message: msg,
+                level: lvl,
+                function_id: row.function_id || row.metadata?.[0]?.function_id || ""
+            };
+        });
+
         console.log("--- END LOG DEBUGGING ---");
-        return new Response(JSON.stringify({ logs: parsed.data || [], debug_raw: parsed }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ logs: normalizedLogs, debug_raw: parsed }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "commit_prod") {
