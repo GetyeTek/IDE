@@ -1901,118 +1901,66 @@ If you already give a payload, assume it's already applied, and give the next pl
         const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
         const cloudKey = Deno.env.get("CONDUIT_ACCESS_TOKEN");
 
-        console.log("--- START LOG DEBUGGING ---");
-        console.log("Slug:", function_slug, "Project:", projectRef);
-        console.log("Token Present?", !!cloudKey);
-
+        console.log("--- START PARAMETER-BASED LOG FETCH ---");
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
-                // SCOUT: Probing 'function_logs' (Console/Code output) instead of 'edge_logs' (HTTP Gateway)
-        const scoutSql = `SELECT * FROM function_logs LIMIT 1`;
-        
-        // BRUTE FORCE PROBE: Explicitly naming columns to avoid the 'restricted wildcard' error.
-        // We use the 3 columns most likely to exist in any Logflare/BigQuery schema.
-        const tryQuery = async (table: string) => {
-            const sql = `SELECT id, timestamp, event_message 
-                         FROM ${table} 
-                         WHERE (event_message LIKE '%${function_slug}%') 
-                         ${before ? `AND timestamp < '${before}'` : ''} 
-                         ORDER BY timestamp DESC 
-                         LIMIT 50`;
-            
-            const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
-            console.log(`[LogFetch] Testing table: ${table}`);
-            
-            return fetch(url, {
-                headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
-            });
-        };
+        // 1. Define Time Window
+        // 'before' is millisecond timestamp from frontend
+        const endTimeISO = before ? new Date(parseInt(before)).toISOString() : new Date().toISOString();
+        // Fetch last 24 hours by default
+        const startTimeISO = new Date(new Date(endTimeISO).getTime() - (24 * 60 * 60 * 1000)).toISOString();
 
-        // PRODUCTION LOG FETCH: Optimized for BigQuery/Logflare
-        const fetchLogs = async () => {
-            // 1. Handle Timestamp: Frontend sends MS, DB expects Micros (16-digit)
-            // If 'before' exists, we convert it to a number to avoid the 'Could not cast literal' error
-            let timeFilter = "";
-            if (before) {
-                const micros = parseInt(before) * 1000;
-                timeFilter = `AND timestamp < ${micros}`;
-            }
+        // 2. Build URL with Query Parameters (Bypasses SQL parser entirely)
+        const logUrl = new URL(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all`);
+        logUrl.searchParams.set("service", "functions");
+        logUrl.searchParams.set("iso_timestamp_start", startTimeISO);
+        logUrl.searchParams.set("iso_timestamp_end", endTimeISO);
+        logUrl.searchParams.set("limit", "100");
 
-            // 2. Build Query: Search message and metadata for the slug
-            const sql = `SELECT 
-                            timestamp, 
-                            event_message, 
-                            TO_JSON_STRING(metadata) as metadata_json
-                         FROM function_logs
-                         WHERE (event_message LIKE '%${function_slug}%' OR TO_JSON_STRING(metadata) LIKE '%${function_slug}%')
-                         ${timeFilter}
-                         ORDER BY timestamp DESC 
-                         LIMIT 50`;
-            
-            const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
-            console.log("[LogFetch] Executing Filtered Query");
-            
-            return fetch(url, { 
-                headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" } 
-            });
-        };
+        console.log("Fetching Parameters URL:", logUrl.toString());
 
-        let discoveryRes = await fetchLogs();
-        
-        // Fallback to edge_logs only if function_logs is completely unavailable
-        if (discoveryRes.status === 404) {
-            console.warn("[LogFetch] function_logs 404, falling back to edge_logs");
-            // (Logic would be similar, but function_logs is clearly working based on your dump)
-        }
+        const discoveryRes = await fetch(logUrl.toString(), {
+            headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
+        });
 
-        console.log("Supabase Response Status:", discoveryRes.status);
         const rawText = await discoveryRes.text();
-        console.log("RAW RESPONSE:", rawText);
+        console.log("RAW REST RESPONSE:", rawText.substring(0, 500) + "...");
 
         let parsed;
         try {
             parsed = JSON.parse(rawText);
         } catch(e) {
-            return new Response(JSON.stringify({ error: "Failed to parse response", raw: rawText }), { headers: corsHeaders });
+            return new Response(JSON.stringify({ error: "Failed to parse REST response", raw: rawText }), { headers: corsHeaders });
         }
 
         const rawRows = parsed.result || parsed.data || [];
 
-        const normalizedLogs = rawRows.map((row: any) => {
+        // 3. TypeScript Filtering (Safe & Predictable)
+        const normalizedLogs = rawRows.filter((row: any) => {
+            const msg = row.event_message || "";
+            // Search for the function name in the message or the metadata blob
+            const metaStr = JSON.stringify(row.metadata || []);
+            return msg.includes(function_slug) || metaStr.includes(function_slug);
+        }).map((row: any) => {
             const msg = row.event_message || "(No message)";
             let ts = row.timestamp || Date.now();
-            // Normalize Microseconds -> Milliseconds for JS Date object
+            // Micro -> Milli conversion
             if (typeof ts === 'number' && ts > 9999999999999) ts = Math.floor(ts / 1000);
             
-            // Level Detection: Parse from the metadata JSON string we selected
             let lvl = "info";
-            if (row.metadata_json) {
-                if (row.metadata_json.includes('"level":"error"') || row.metadata_json.includes('"level":"err"')) lvl = "error";
-                else if (row.metadata_json.includes('"level":"warn"')) lvl = "warning";
-            }
-            // Fallback to keyword matching in message if metadata is inconclusive
-            if (lvl === "info") {
-                const lowerMsg = msg.toLowerCase();
-                if (lowerMsg.includes("error") || lowerMsg.includes("exception") || lowerMsg.includes("failed")) lvl = "error";
-                else if (lowerMsg.includes("warn")) lvl = "warning";
-            }
-
-            // Identify the function from metadata string if possible
-            let funcId = "";
-            if (row.metadata_json) {
-                const idMatch = row.metadata_json.match(/"function_id":"(.*?)"/);
-                if (idMatch) funcId = idMatch[1].substring(0, 8) + "...";
-            }
+            const lowerMsg = msg.toLowerCase();
+            if (lowerMsg.includes("error") || lowerMsg.includes("exception")) lvl = "error";
+            else if (lowerMsg.includes("warn")) lvl = "warning";
 
             return {
                 timestamp: ts,
                 event_message: msg,
                 level: lvl,
-                function_id: funcId
+                function_id: row.id || ""
             };
         });
 
-        console.log("--- END LOG DEBUGGING ---");
+        console.log("--- END LOG FETCH (Filtered Count: " + normalizedLogs.length + ") ---");
         return new Response(JSON.stringify({ logs: normalizedLogs, debug_raw: parsed }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
