@@ -2740,14 +2740,15 @@ function addTerminalCard(data, options = {}) {
                             
                             if(isLive && fileRes.file) {
                                 if (!FILE_OP_MAP[fileRes.file]) FILE_OP_MAP[fileRes.file] = [];
-                                FILE_OP_MAP[fileRes.file].push({ id: opId, type: op.type, replace_with: op.replace_with, content: op.content, start_line: op.start_line, end_line: op.end_line });
+                                FILE_OP_MAP[fileRes.file].push({ id: opId, type: op.type, replace_with: op.replace_with, content: op.content, start_line: op.start_line, end_line: op.end_line, query: op.query, data: op.data });
                             }
 
                             window.OP_CACHE[opId] = { file: fileRes.file, op: op, commit_sha: response.commit_sha || null };
 
                             let scoreColor = 'var(--text-muted)';
-                            let badgeText = `${op.score || 0}% Match`;
-                            if (op.message && (op.message.includes('AI') || op.is_ai_fix)) { 
+                            let badgeText = op.type === 'execute_sql' ? 'DATABASE' : `${op.score || 0}% Match`;
+                            if (op.type === 'execute_sql') scoreColor = 'var(--ai-accent)';
+                            else if (op.message && (op.message.includes('AI') || op.is_ai_fix)) { 
                                 scoreColor = '#d946ef'; 
                                 const strategy = op.ai_strategy === 'range_replace' ? `L${op.start_line}-${op.end_line}` : `L${op.anchor_line}`;
                                 badgeText = `✨ AI ${strategy} (${op.score || 0}%)`; 
@@ -5594,7 +5595,7 @@ async function downloadArtifact(runId) {
         const esc = (s) => typeof s === 'string' ? s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : JSON.stringify(s, null, 2);
         
         let contentHtml = '';
-        const searchVal = op.find_block || op.anchor;
+        const searchVal = op.find_block || op.anchor || op.query;
         const replaceVal = op.replace_with || op.content;
         
         // ATTEMPT 1: Build the visual "before/after" diff
@@ -5622,6 +5623,19 @@ async function downloadArtifact(runId) {
                 <label class="code-label">New Content</label>
                 <button class="code-copy" onclick="navigator.clipboard.writeText(this.nextElementSibling.innerText)">Copy</button>
                 <pre class="code-pre diff-add">${esc(replaceVal)}</pre>
+            </div>`;
+        }
+
+        if (op.type === 'execute_sql' && op.data) {
+            contentHtml += `
+            <div class="code-block-wrapper">
+                <label class="code-label">Query Results</label>
+                <div style="max-height:300px; overflow:auto; background:#0a0a0a; border:1px solid #333; border-radius:8px;">
+                    <table class="w-full text-left border-collapse" style="font-size:11px;">
+                        <thead class="sticky top-0 bg-[#111]"><tr>${Object.keys(op.data[0] || {}).map(k => `<th class="p-2 border-b border-white/10 text-blue-400 uppercase">${k}</th>`).join('')}</tr></thead>
+                        <tbody class="divide-y divide-white/5">${op.data.map(row => `<tr>${Object.values(row).map(v => `<td class="p-2 text-slate-400 truncate">${v === null ? 'NULL' : (typeof v === 'object' ? 'JSON' : v)}</td>`).join('')}</tr>`).join('')}</tbody>
+                    </table>
+                </div>
             </div>`;
         }
         
