@@ -324,12 +324,8 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
   const provider = resolveProvider(role, config);
   if (!provider) throw new Error(`No provider found for role: ${role}`);
 
-  // --- DEBUG LOGGING ---
-  // 1. Critical Console Log (Visible in Supabase Dashboard)
-  console.log(`\n=== [AI PROMPT SENT] Role: ${role} | Provider: ${provider.name} ===`);
-  console.log(JSON.stringify(messages, null, 2));
-  if (tools) console.log("TOOLS:", JSON.stringify(tools, null, 2));
-  console.log("=== [END PROMPT] ===\n");
+  // AI Trace Summary (Lightweight)
+  console.log(`[AI_CALL] Role: ${role} | Provider: ${provider.name} | Model: ${provider.model}`);
 
   // 2. Persistent DB Log
   // We use a try-catch to ensure logging failure doesn't block the actual AI request
@@ -488,11 +484,8 @@ async function genericRequestAI(role: keyof AIConfig['roles'], messages: any[], 
   });
   
   const data = await res.json();
-
-  // --- RAW DEBUG LOG (Supabase Dashboard) ---
-  console.log(`\n=== [AI RESPONSE RECEIVED] Provider: ${provider.name} (Standard) ===`);
-  console.log(JSON.stringify(data, null, 2));
-  console.log("=== [END RESPONSE] ===\n");
+  // AI Response Summary
+  if (data.error) console.error(`[AI_ERR] Provider: ${provider.name}`, data.error);
   
   if (!res.ok || data.error) {
       const errMsg = data.error ? (data.error.message || JSON.stringify(data.error)) : `HTTP ${res.status} ${res.statusText}`;
