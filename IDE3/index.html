@@ -6205,22 +6205,35 @@ async function downloadArtifact(runId) {
 
             data.logs.forEach(log => {
                 const row = document.createElement('div');
-                const isError = log.level === 'error' || log.status >= 400;
+                const isError = log.level === 'error';
                 row.className = 'ins-row';
                 row.style.borderLeft = '3px solid ' + (isError ? 'var(--danger)' : 'var(--prod)');
                 
-                // Format metadata for display if it exists
-                const meta = log.function_id ? `<br><small style='color:#555'>ID: ${log.function_id}</small>` : '';
-                
+                // Detect and Prettify JSON in logs
+                let displayMessage = escapeHtml(log.event_message || '');
+                if (log.event_message && (log.event_message.includes('{') || log.event_message.includes('['))) {
+                    try {
+                        // Check if the message ITSELF is JSON or contains JSON
+                        const jsonMatch = log.event_message.match(/\{.*\}|\[.*\]/);
+                        if (jsonMatch) {
+                            const parsed = JSON.parse(jsonMatch[0]);
+                            displayMessage = log.event_message.replace(jsonMatch[0], renderJsonHighlight(parsed));
+                        }
+                    } catch(e) { /* Fallback to plain text */ }
+                }
+
                 row.innerHTML = `
-                    <div class="flex-between">
-                        <span style="color:#555">${new Date(log.timestamp).toLocaleString()}</span>
-                        <button class="action-mini-btn" onclick="copyText('${(log.event_message || '').replace(/'/g, "\\'")}')">Copy</button>
+                    <div class="flex-between" style="margin-bottom:6px;">
+                        <span style="color:#555; font-size:10px;">${new Date(log.timestamp).toLocaleString()}</span>
+                        <div class="flex-gap">
+                            <button class="action-mini-btn" style="color:var(--ai-accent)" onclick="chatWithLogText('${btoa(encodeURIComponent(log.event_message))}')">AI Fix</button>
+                            <button class="action-mini-btn" onclick="copyText('${(log.event_message || '').replace(/'/g, "\\'")}')">Copy</button>
+                        </div>
                     </div>
-                    <div style="margin-top:4px; white-space:pre-wrap; word-break:break-all; color:${isError ? '#ffcdcd' : '#eee'}">${escapeHtml(log.event_message || 'Empty Message')}${meta}</div>
+                    <div style="white-space:pre-wrap; word-break:break-all; color:${isError ? '#ffcdcd' : '#eee'}; line-height:1.4;">${displayMessage}</div>
                 `;
                 container.appendChild(row);
-                efLogNextTimestamp = log.timestamp; // Track for next fetch
+                efLogNextTimestamp = log.timestamp;
             });
 
             footer.style.display = data.logs.length >= 20 ? 'block' : 'none';
@@ -6250,6 +6263,14 @@ async function downloadArtifact(runId) {
 
     function copyText(txt) {
         navigator.clipboard.writeText(txt).then(() => showGlobalToast("Copied to clipboard"));
+    }
+
+    function chatWithLogText(base64Encoded) {
+        const logText = decodeURIComponent(atob(base64Encoded));
+        startNewChat();
+        toggleChat(true);
+        chatHistory.push({ role: 'user', text: `Analyze this Edge Function log entry and suggest a fix if it indicates an error:\n\n${logText}` });
+        processAIResponse();
     }
 
     function convertToCSV(data) {
