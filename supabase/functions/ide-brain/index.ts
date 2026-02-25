@@ -1942,7 +1942,6 @@ If you already give a payload, assume it's already applied, and give the next pl
             const sql = `SELECT 
                             timestamp, 
                             event_message, 
-                            level, 
                             TO_JSON_STRING(metadata) as metadata_json
                          FROM function_logs
                          WHERE (event_message LIKE '%${function_slug}%' OR TO_JSON_STRING(metadata) LIKE '%${function_slug}%')
@@ -1985,10 +1984,18 @@ If you already give a payload, assume it's already applied, and give the next pl
             // Normalize Microseconds -> Milliseconds for JS Date object
             if (typeof ts === 'number' && ts > 9999999999999) ts = Math.floor(ts / 1000);
             
-            // Level Detection: Try metadata first, fallback to message parsing
-            let lvl = row.level || "info";
-            if (row.metadata_json && row.metadata_json.includes('"level":"error"')) lvl = "error";
-            else if (msg.toLowerCase().includes("error")) lvl = "error";
+            // Level Detection: Parse from the metadata JSON string we selected
+            let lvl = "info";
+            if (row.metadata_json) {
+                if (row.metadata_json.includes('"level":"error"') || row.metadata_json.includes('"level":"err"')) lvl = "error";
+                else if (row.metadata_json.includes('"level":"warn"')) lvl = "warning";
+            }
+            // Fallback to keyword matching in message if metadata is inconclusive
+            if (lvl === "info") {
+                const lowerMsg = msg.toLowerCase();
+                if (lowerMsg.includes("error") || lowerMsg.includes("exception") || lowerMsg.includes("failed")) lvl = "error";
+                else if (lowerMsg.includes("warn")) lvl = "warning";
+            }
 
             // Identify the function from metadata string if possible
             let funcId = "";
