@@ -6218,7 +6218,17 @@ async function downloadArtifact(runId) {
             footer.style.display = data.logs.length >= 20 ? 'block' : 'none';
 
         } catch(e) {
-            container.innerHTML = '<div style="padding:20px; color:var(--danger);">Failed to fetch logs: ' + e.message + '</div>';
+            const projectRef = CONFIG.funcUrl.split('https://')[1]?.split('.')[0];
+            container.innerHTML = `
+                <div style="padding:20px; color:var(--danger); font-size:12px;">
+                    <b>Log Fetch Failed</b><br>
+                    Error: ${e.message}<br><br>
+                    <small style="color:#666">
+                        Project Ref: ${projectRef}<br>
+                        Function: ${name}<br>
+                        Token: ${localStorage.getItem('conduit_access_token') ? 'Configured' : 'Missing'}
+                    </small>
+                </div>`;
         }
     }
 
