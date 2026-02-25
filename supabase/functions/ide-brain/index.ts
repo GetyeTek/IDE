@@ -1909,16 +1909,15 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         // 1. Target function_logs for STDOUT (console.log)
         // 2. Target function_edge_logs for network metadata (status codes, latency)
+        // Optimized query to avoid ARRAY/STRUCT metadata errors
         const sql = `
             SELECT 
-                t1.timestamp, 
-                t1.event_message, 
-                t1.metadata.level as level,
-                t1.metadata.function_id as function_id
-            FROM function_logs as t1
+                timestamp, 
+                event_message
+            FROM function_logs
             WHERE 
-                (t1.metadata.function_id = '${function_slug}' OR t1.event_message LIKE '%${function_slug}%')
-            ORDER BY t1.timestamp DESC 
+                event_message LIKE '%${function_slug}%'
+            ORDER BY timestamp DESC 
             LIMIT 50
         `.trim();
         
@@ -1955,16 +1954,16 @@ If you already give a payload, assume it's already applied, and give the next pl
             return new Response(JSON.stringify({ error: "Failed to parse REST response", raw: rawText }), { headers: corsHeaders });
         }
 
-        // This endpoint typically returns a direct array of log objects
-        const rawRows = Array.isArray(parsed) ? parsed : (parsed.data || []);
+        // The logs.all endpoint returns { result: [...] }
+        const rawRows = parsed.result || parsed.data || (Array.isArray(parsed) ? parsed : []);
 
-        // 3. Map to IDE Format (No filtering needed as the endpoint is function-specific)
+        // 3. Map to IDE Format
         const normalizedLogs = rawRows.map((row: any) => {
             return {
                 timestamp: row.timestamp || Date.now(),
                 event_message: row.event_message || row.message || "(No message)",
-                level: row.level || "info",
-                function_id: row.id || ""
+                level: row.level || row.metadata?.level || "info",
+                function_id: function_slug
             };
         });
 
