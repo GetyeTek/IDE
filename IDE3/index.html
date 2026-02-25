@@ -1390,7 +1390,7 @@
     let workflowPage = 1;
     let currentFilterTab = null;
     let filters = {
-        patcher: { time: 'all', files: [] },
+        patcher: { time: 'all', files: [], categories: ['patch', 'sql', 'ai', 'system'] },
         history: { time: 'all', files: [] },
         cicd: { time: 'all', files: [] }
     };
@@ -2805,13 +2805,24 @@ function addTerminalCard(data, options = {}) {
              opHtml = `
                 <div class="op-row">
                     <div class="op-title" style="color:${color}">📡 ${tag}</div>
-                    <div class="op-details" style="color:#ccc">${escapeHtml(response.message)}</div>
+                    <div class="op-details" style="color:#ccc">${escapeHtml(response.message || 'System Action executed.')}</div>
+                </div>
+                <div class="op-row">
+                    <div class="op-title" style="color:#555; font-size:9px;">RAW DATA</div>
+                    <div class="op-details" style="font-family:monospace; font-size:10px; color:#444;">${escapeHtml(JSON.stringify(response, null, 1))}</div>
                 </div>`;
         }
 
         const isFail = failCount > 0;
-        const isEvent = !response.results && response.message && !isFail;
+        const isEvent = !response.results && !response.stage && !response.analysis && !isFail;
         
+        // Categorize for filtering
+        let category = 'system';
+        if (response.results) category = 'patch';
+        if (originalPayload && Array.isArray(originalPayload) && originalPayload.some(p => p.action === 'execute_sql')) category = 'sql';
+        if (response.stage || response.analysis) category = 'ai';
+        el.dataset.category = category;
+
         // --- UPDATED SIGNATURE LOGIC ---
         const historyEntry = response.sha ? dbHistory.find(h => h.sha === response.sha) : null;
         const conduitId = response.conduit_id || (historyEntry ? historyEntry.conduit_id : null);
@@ -3926,15 +3937,24 @@ async function downloadArtifact(runId) {
         const uniqueFiles = [...new Set(dataset)].sort();
         const listContainer = document.getElementById('filter-file-list');
         
-        if (uniqueFiles.length === 0) {
-            listContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No files detected in current results.</div>';
-        } else {
-            listContainer.innerHTML = uniqueFiles.map(f => `
+        if (tab === 'patcher') {
+            let catHtml = `<div class="input-label" style="margin-top:20px;">Log Categories</div><div class="card" style="padding:0; margin-top:10px;">`;
+            const cats = [
+                { id: 'patch', label: '📄 Code Patches' },
+                { id: 'sql', label: '🗄️ Database Queries' },
+                { id: 'ai', label: '🧠 AI Insights' },
+                { id: 'system', label: '📡 System Events' }
+            ];
+            catHtml += cats.map(c => `
                 <label class="filter-checkbox-item">
-                    <input type="checkbox" class="filter-file-check" value="${f}" ${filters[tab].files.includes(f) || filters[tab].files.length === 0 ? 'checked' : ''}>
-                    <span>${f}</span>
+                    <input type="checkbox" class="filter-cat-check" value="${c.id}" ${filters.patcher.categories.includes(c.id) ? 'checked' : ''}>
+                    <span>${c.label}</span>
                 </label>
             `).join('');
+            catHtml += `</div>`;
+            listContainer.innerHTML = catHtml + `<div class="input-label" style="margin-top:20px;">Files Involved</div>` + `<div class="card" style="padding:0; margin-top:10px;">` + (uniqueFiles.length === 0 ? '<div style="padding:20px; text-align:center; color:#666;">No files found.</div>' : uniqueFiles.map(f => `<label class="filter-checkbox-item"><input type="checkbox" class="filter-file-check" value="${f}" ${filters.patcher.files.includes(f) || filters.patcher.files.length === 0 ? 'checked' : ''}><span>${f}</span></label>`).join('')) + `</div>`;
+        } else {
+            listContainer.innerHTML = uniqueFiles.length === 0 ? '<div style="padding:20px; text-align:center; color:#666;">No files detected.</div>' : uniqueFiles.map(f => `<label class="filter-checkbox-item"><input type="checkbox" class="filter-file-check" value="${f}" ${filters[tab].files.includes(f) || filters[tab].files.length === 0 ? 'checked' : ''}><span>${f}</span></label>`).join('');
         }
     }
 
@@ -3965,13 +3985,14 @@ async function downloadArtifact(runId) {
     function applyActiveFilters() {
         const selectedFiles = Array.from(document.querySelectorAll('.filter-file-check:checked')).map(cb => cb.value);
         const allChecks = document.querySelectorAll('.filter-file-check');
-        
-        // If all are checked, we treat it as "No Filter"
         filters[currentFilterTab].files = (selectedFiles.length === allChecks.length) ? [] : selectedFiles;
         
-        if (currentFilterTab === 'history') applyFiltersToHistory();
+        if (currentFilterTab === 'patcher') {
+            filters.patcher.categories = Array.from(document.querySelectorAll('.filter-cat-check:checked')).map(cb => cb.value);
+            applyFiltersToPatcher();
+        }
+        else if (currentFilterTab === 'history') applyFiltersToHistory();
         else if (currentFilterTab === 'cicd') applyFiltersToCicd();
-        else if (currentFilterTab === 'patcher') applyFiltersToPatcher();
 
         closeFilterOverlay();
     }
@@ -4035,10 +4056,13 @@ async function downloadArtifact(runId) {
                 if (f.time === 'hour' && diff > 3600000) visible = false;
                 else if (f.time === 'today' && diff > 86400000) visible = false;
             }
+            // Category Filter
+            if (visible && f.categories && !f.categories.includes(el.dataset.category)) visible = false;
+
             // File Filter
             if (visible && f.files.length > 0) {
                 const files = resp.results ? resp.results.map(r => r.file) : [];
-                if (!files.some(path => f.files.includes(path))) visible = false;
+                if (files.length > 0 && !files.some(path => f.files.includes(path))) visible = false;
             }
             el.style.display = visible ? 'block' : 'none';
         });
