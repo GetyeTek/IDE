@@ -1108,8 +1108,11 @@
             <div id="ins-net-ide" style="flex:1; overflow-y:auto; display:none;"></div>
         </div>
         <div id="ins-view-edge" class="ins-content" style="flex:1; overflow-y:auto; background:#050505; display:none; flex-direction:column;">
-            <div id="ins-edge-selector" class="filter-pill-container" style="border-bottom: 1px solid #1a1a1c; background: #0a0a0a;">
-                <button class="filter-pill active" onclick="selectInsEdgeFunc('', this)">All Functions</button>
+            <div style="display:flex; align-items:center; background:#0a0a0a; border-bottom:1px solid #1a1a1c;">
+                <div id="ins-edge-selector" class="filter-pill-container" style="flex:1; border-bottom:none;">
+                    <button class="filter-pill active" onclick="selectInsEdgeFunc('', this)">All Functions</button>
+                </div>
+                <button class="menu-btn" onclick="syncInsEdgeFunctionList(true)" style="padding:0 12px; color:var(--ai-accent);" title="Sync Functions">↻</button>
             </div>
             <div id="ins-edge-logs" style="flex:1; overflow-y:auto;"></div>
             <button id="ins-edge-load-more" class="btn-outline" style="margin: 10px; font-size: 10px; padding: 8px; display: none;" onclick="fetchInsEdgeLogs(true)">Load Older Logs</button>
@@ -6054,8 +6057,18 @@ async function downloadArtifact(runId) {
         }
     }
 
-    function syncInsEdgeFunctionList() {
+    async function syncInsEdgeFunctionList(forceFetch = false) {
         const container = document.getElementById('ins-edge-selector');
+        
+        // Background fetch if list is missing
+        if (forceFetch || !window.repoFiles || window.repoFiles.length === 0) {
+            try {
+                const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch' }) });
+                const data = await res.json();
+                window.repoFiles = data.files || [];
+            } catch(e) { console.error("HUD Function Sync Failed", e); }
+        }
+
         const functions = new Set();
         (window.repoFiles || []).forEach(f => {
             if (f.path.includes('supabase/functions/')) {
@@ -6064,11 +6077,11 @@ async function downloadArtifact(runId) {
             }
         });
         
-        // Keep "All" and add detected functions
-        container.innerHTML = `<button class="filter-pill ${insEdgeCurrentSlug === '' ? 'active' : ''}" onclick="selectInsEdgeFunc('', this)">All Functions</button>`;
+        let html = `<button class="filter-pill ${insEdgeCurrentSlug === '' ? 'active' : ''}" onclick="selectInsEdgeFunc('', this)">All Functions</button>`;
         functions.forEach(name => {
-            container.innerHTML += `<button class="filter-pill ${insEdgeCurrentSlug === name ? 'active' : ''}" onclick="selectInsEdgeFunc('${name}', this)">${name}</button>`;
+            html += `<button class="filter-pill ${insEdgeCurrentSlug === name ? 'active' : ''}" onclick="selectInsEdgeFunc('${name}', this)">${name}</button>`;
         });
+        container.innerHTML = html;
     }
 
     function selectInsEdgeFunc(slug, btn) {
