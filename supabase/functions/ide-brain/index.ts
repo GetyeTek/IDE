@@ -1928,51 +1928,43 @@ If you already give a payload, assume it's already applied, and give the next pl
             });
         };
 
-        let res = await tryQuery('function_logs');
+        let responseObj = await tryQuery('function_logs');
         
-        if (!res.ok) {
+        if (!responseObj.ok) {
             console.warn("[LogFetch] function_logs failed, trying edge_logs...");
-            res = await tryQuery('edge_logs');
+            responseObj = await tryQuery('edge_logs');
         }
 
-        if (!res.ok) {
-             // Final fallback: remove 'id' just in case it's named something else entirely
+        if (!responseObj.ok) {
+             console.warn("[LogFetch] Trials failed, attempting final fallback...");
              const superSafeSql = `SELECT timestamp, event_message FROM function_logs WHERE event_message LIKE '%${function_slug}%' LIMIT 10`;
-             const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(superSafeSql)}`;
-             res = await fetch(url, { headers: { "Authorization": `Bearer ${cloudKey}` } });
+             const urlFallback = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(superSafeSql)}`;
+             responseObj = await fetch(urlFallback, { headers: { "Authorization": `Bearer ${cloudKey}` } });
         }
-        
-        const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
-        console.log("SQL Query Used:", sql);
 
-        const res = await fetch(url, {
-            headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
-        });
-
-        console.log("Supabase Response Status:", res.status);
-        const rawText = await res.text();
+        console.log("Supabase Response Status:", responseObj.status);
+        const rawText = await responseObj.text();
         console.log("RAW RESPONSE FROM SUPABASE:", rawText);
 
         let parsed;
         try {
             parsed = JSON.parse(rawText);
         } catch(e) {
-            console.error("JSON Parse Error on Supabase Response");
             return new Response(JSON.stringify({ error: "Failed to parse Supabase response", raw: rawText }), { headers: corsHeaders });
         }
 
-        console.log("Parsed Data Count:", parsed.data?.length || 0);
-        if (parsed.data && parsed.data.length > 0) {
-            console.log("Sample Log Entry:", JSON.stringify(parsed.data[0]));
-        }
+        // FIX: The API returns data in 'result', not 'data'
+        const rawRows = parsed.result || parsed.data || [];
+        console.log("Parsed Data Count:", rawRows.length);
 
         // DYNAMIC NORMALIZATION
-        // We map the random BigQuery columns back to what the IDE expects
-        const normalizedLogs = (parsed.data || []).map((row: any) => {
+        const normalizedLogs = rawRows.map((row: any) => {
             const msg = row.event_message || "(No message)";
-            const ts = row.timestamp || Date.now();
             
-            // Heuristic Level Detection since 'level' column is unreliable
+            // FIX: Analytics timestamp is in microseconds (16 digits). JS needs milliseconds (13 digits).
+            let ts = row.timestamp || Date.now();
+            if (typeof ts === 'number' && ts > 9999999999999) ts = Math.floor(ts / 1000);
+            
             let lvl = "info";
             const lowerMsg = msg.toLowerCase();
             if (lowerMsg.includes("error") || lowerMsg.includes("exception") || lowerMsg.includes("failed")) lvl = "error";
