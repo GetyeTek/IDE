@@ -1933,31 +1933,22 @@ If you already give a payload, assume it's already applied, and give the next pl
                 "Accept": "application/json"
             } 
         });
-        const sql = `
-            SELECT 
-                t1.timestamp, 
-                t1.event_message, 
-                t1.metadata.level as level,
-                t1.metadata.function_id as function_id
-            FROM function_logs as t1
-            WHERE 
-                (t1.metadata.function_id = '${function_slug}' OR t1.event_message LIKE '%${function_slug}%')
-            ORDER BY t1.timestamp DESC 
-            LIMIT 50
-        `.trim();
+
+        const rawText = await response.text();
         
-        const url = new URL(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all`);
-        url.searchParams.set("iso_timestamp_start", startDate.toISOString());
-        url.searchParams.set("iso_timestamp_end", endDate.toISOString());
-        url.searchParams.set("sql", sql);
-        
-        const response = await fetch(url.toString(), { 
-            headers: { 
-                "Authorization": `Bearer ${cloudKey}`, 
-                "Accept": "application/json"
-            } 
-        });
+        // --- EXTENSIVE DEBUG LOGGING ---
+        console.log("[EF_LOGS_DEBUG] HTTP Status:", response.status);
+        console.log("[EF_LOGS_DEBUG] Query URL:", url.toString());
+        console.log("[EF_LOGS_DEBUG] Raw Response Body:", rawText);
+
         let parsed;
+        try {
+            parsed = JSON.parse(rawText);
+            console.log("[EF_LOGS_DEBUG] Parsed JSON Structure:", Array.isArray(parsed) ? "Array" : typeof parsed);
+        } catch(e) {
+            console.error("[EF_LOGS_DEBUG] JSON Parse Failed:", e.message);
+            return new Response(JSON.stringify({ error: "Failed to parse REST response", raw: rawText }), { headers: corsHeaders });
+        }
         try {
             parsed = JSON.parse(rawText);
         } catch(e) {
