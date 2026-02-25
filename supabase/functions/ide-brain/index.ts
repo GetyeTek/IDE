@@ -1907,17 +1907,29 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
-        // Analytics API uses BigQuery-style SQL. JSON operators like '->>' are NOT supported.
-        // We rely on function_id and string matching in the event_message.
-        const sql = `SELECT timestamp, event_message, level 
-                     FROM edge_logs 
-                     WHERE (function_id = '${function_slug}' OR event_message LIKE '%${function_slug}%') 
-                     ${before ? `AND timestamp < '${before}'` : ''} 
-                     ORDER BY timestamp DESC 
+        // DIAGNOSTIC 1: Try to get table metadata (may fail based on permissions)
+        const metaSql = `SELECT column_name, data_type FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'function_logs' LIMIT 100`;
+        
+        // DIAGNOSTIC 2: The actual log query using BigQuery dot-notation for nested metadata
+        // We query 'function_logs' for console output and 'function_edge_logs' for execution metadata
+        const sql = `SELECT timestamp, event_message, level, metadata
+                     FROM function_logs
+                     WHERE (metadata.function_name = '${function_slug}' OR event_message LIKE '%${function_slug}%')
+                     ${before ? `AND timestamp < '${before}'` : ''}
+                     ORDER BY timestamp DESC
                      LIMIT 50`;
+
+        console.log("[Diagnostic] Attempting Metadata Fetch...");
+        const metaRes = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(metaSql)}`, {
+            headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
+        });
+        const metaData = await metaRes.json();
+        console.log("[Diagnostic] Metadata Result:", JSON.stringify(metaData));
+
+        console.log("[LogFetch] Executing BigQuery-style logs fetch...");
         
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
-        console.log("Generated URL:", url);
+        console.log("SQL Query Used:", sql);
 
         const res = await fetch(url, {
             headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
