@@ -1904,8 +1904,18 @@ If you already give a payload, assume it's already applied, and give the next pl
         if (!projectRef) throw new Error("Could not resolve Supabase Project Ref");
         if (!cloudKey) throw new Error("Cloud Access Key (CONDUIT_ACCESS_TOKEN) not configured in Supabase secrets");
 
-        const sql = `SELECT timestamp, event_message, level FROM edge_logs WHERE function_id = '${function_slug}' ${before ? `AND timestamp < '${before}'` : ''} ORDER BY timestamp DESC LIMIT 20`;
+        // Robust SQL: Check function_id (UUID) OR function_name in metadata
+        const sql = `SELECT timestamp, event_message, level 
+                     FROM edge_logs 
+                     WHERE (function_id = '${function_slug}' OR metadata->>'function_name' = '${function_slug}') 
+                     ${before ? `AND timestamp < '${before}'` : ''} 
+                     ORDER BY timestamp DESC 
+                     LIMIT 20`;
+        
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
+
+        console.log(`[LogFetch] Project: ${projectRef}, Function: ${function_slug}`);
+        console.log(`[LogFetch] URL: ${url}`);
 
         const res = await fetch(url, {
             headers: { 
