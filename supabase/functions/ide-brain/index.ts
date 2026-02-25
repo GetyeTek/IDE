@@ -1910,15 +1910,13 @@ If you already give a payload, assume it's already applied, and give the next pl
         // Fetch last 24 hours by default
         const startTimeISO = new Date(new Date(endTimeISO).getTime() - (24 * 60 * 60 * 1000)).toISOString();
 
-        // 2. Build URL for specific service endpoint (Bypasses logs.all strictness)
-        // We hit the '/functions' endpoint which is pre-configured for Edge Function logs
-        const logUrl = new URL(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/functions`);
-        logUrl.searchParams.set("iso_timestamp_start", startTimeISO);
-        logUrl.searchParams.set("iso_timestamp_end", endTimeISO);
+        // 2. Use the dedicated Management API endpoint for a specific function's logs
+        // This endpoint is much more stable than the generic analytics SQL endpoint.
+        const logUrl = `https://api.supabase.com/v1/projects/${projectRef}/functions/${function_slug}/logs`;
 
-        console.log("Fetching Parameters URL:", logUrl.toString());
+        console.log("Fetching Direct Logs URL:", logUrl);
 
-        const discoveryRes = await fetch(logUrl.toString(), {
+        const discoveryRes = await fetch(logUrl, {
             headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
         });
 
@@ -1932,29 +1930,15 @@ If you already give a payload, assume it's already applied, and give the next pl
             return new Response(JSON.stringify({ error: "Failed to parse REST response", raw: rawText }), { headers: corsHeaders });
         }
 
-        const rawRows = parsed.result || parsed.data || [];
+        // This endpoint typically returns a direct array of log objects
+        const rawRows = Array.isArray(parsed) ? parsed : (parsed.data || []);
 
-        // 3. TypeScript Filtering (Safe & Predictable)
-        const normalizedLogs = rawRows.filter((row: any) => {
-            const msg = row.event_message || "";
-            // Search for the function name in the message or the metadata blob
-            const metaStr = JSON.stringify(row.metadata || []);
-            return msg.includes(function_slug) || metaStr.includes(function_slug);
-        }).map((row: any) => {
-            const msg = row.event_message || "(No message)";
-            let ts = row.timestamp || Date.now();
-            // Micro -> Milli conversion
-            if (typeof ts === 'number' && ts > 9999999999999) ts = Math.floor(ts / 1000);
-            
-            let lvl = "info";
-            const lowerMsg = msg.toLowerCase();
-            if (lowerMsg.includes("error") || lowerMsg.includes("exception")) lvl = "error";
-            else if (lowerMsg.includes("warn")) lvl = "warning";
-
+        // 3. Map to IDE Format (No filtering needed as the endpoint is function-specific)
+        const normalizedLogs = rawRows.map((row: any) => {
             return {
-                timestamp: ts,
-                event_message: msg,
-                level: lvl,
+                timestamp: row.timestamp || Date.now(),
+                event_message: row.event_message || row.message || "(No message)",
+                level: row.level || "info",
                 function_id: row.id || ""
             };
         });
