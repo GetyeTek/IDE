@@ -6122,6 +6122,7 @@ async function downloadArtifact(runId) {
             });
             loader.style.display = data.logs.length > 0 ? 'block' : 'none';
         } catch(e) { container.innerHTML = `<div style="padding:20px; color:var(--danger);">${e.message}</div>`; }
+    }
 
     function copyInsEntry(btn) {
         const row = btn.closest('.ins-row');
