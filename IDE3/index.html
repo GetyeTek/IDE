@@ -6208,12 +6208,16 @@ async function downloadArtifact(runId) {
                 const isError = log.level === 'error' || log.status >= 400;
                 row.className = 'ins-row';
                 row.style.borderLeft = '3px solid ' + (isError ? 'var(--danger)' : 'var(--prod)');
+                
+                // Format metadata for display if it exists
+                const meta = log.function_id ? `<br><small style='color:#555'>ID: ${log.function_id}</small>` : '';
+                
                 row.innerHTML = `
                     <div class="flex-between">
                         <span style="color:#555">${new Date(log.timestamp).toLocaleString()}</span>
-                        <button class="action-mini-btn" onclick="copyText('${log.event_message.replace(/'/g, "\\'")}')">Copy</button>
+                        <button class="action-mini-btn" onclick="copyText('${(log.event_message || '').replace(/'/g, "\\'")}')">Copy</button>
                     </div>
-                    <div style="margin-top:4px; white-space:pre-wrap; word-break:break-all; color:${isError ? '#ffcdcd' : '#eee'}">${log.event_message}</div>
+                    <div style="margin-top:4px; white-space:pre-wrap; word-break:break-all; color:${isError ? '#ffcdcd' : '#eee'}">${escapeHtml(log.event_message || 'Empty Message')}${meta}</div>
                 `;
                 container.appendChild(row);
                 efLogNextTimestamp = log.timestamp; // Track for next fetch
