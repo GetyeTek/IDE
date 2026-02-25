@@ -2066,6 +2066,34 @@ If you already give a payload, assume it's already applied, and give the next pl
         return new Response(JSON.stringify({ repos }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "create_repo") {
+        const { name, is_private } = payload;
+        if (!name) throw new Error("Repository name is required");
+
+        const url = `https://api.github.com/user/repos`;
+        const res = await fetch(url, {
+            method: "POST",
+            headers: getHeaders(),
+            body: JSON.stringify({
+                name: name,
+                private: !!is_private,
+                auto_init: true // Creates an initial commit with README
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || "GitHub creation failed");
+        }
+
+        const data = await res.json();
+        return new Response(JSON.stringify({ 
+            success: true, 
+            repo_name: data.name, 
+            full_name: data.full_name 
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "rollback") {
         if(!ref_sha) throw new Error("Target SHA required");
         await githubFetch(TARGET_REPO, `/git/refs/heads/${DEV_BRANCH}`, { method: "PATCH", body: JSON.stringify({ sha: ref_sha, force: true }) });
