@@ -2946,12 +2946,25 @@ function addTerminalCard(data, options = {}) {
 
                 if (isJs) {
                     file.content = file.content.replace(/(import|export)([\s\S]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
-                        if (importPath.startsWith('http') || importPath === 'react' || importPath.startsWith('react-dom')) return match;
+                        // 1. Keep absolute URLs as is
+                        if (importPath.startsWith('http')) return match;
+                        
+                        // 2. Handle Local Files
                         if (importPath.startsWith('.')) {
                             const resolvedFull = resolvePath(fullPath, importPath);
                             if (resolvedFull.startsWith(effectiveRoot)) return `${keyword}${mid}${q1}${resolvedFull.substring(effectiveRoot.length)}${q2}`;
+                            return match;
                         }
-                        return match;
+
+                        // 3. Handle Bare Specifiers (NPM Packages)
+                        // If it's in our manual map (react/react-dom), the browser will handle it via importmap.
+                        // Otherwise, redirect to esm.sh for auto-resolution.
+                        if (importMap.imports[importPath]) return match;
+                        
+                        // Avoid rewriting internal virtual paths that might have been registered without extensions
+                        if (Object.keys(importMap.imports).some(k => k === importPath || k === './' + importPath)) return match;
+
+                        return `${keyword}${mid}${q1}https://esm.sh/${importPath}${q2}`;
                     });
 
                     if (['jsx', 'tsx'].includes(file.ext)) {
