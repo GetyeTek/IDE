@@ -1910,15 +1910,37 @@ If you already give a payload, assume it's already applied, and give the next pl
                 // SCOUT: Probing 'function_logs' (Console/Code output) instead of 'edge_logs' (HTTP Gateway)
         const scoutSql = `SELECT * FROM function_logs LIMIT 1`;
         
-        // NUCLEAR OPTION: SELECT * to prevent 'Name not found' errors
-        const sql = `SELECT * 
-                     FROM function_logs 
-                     WHERE (event_message LIKE '%${function_slug}%')
-                     ${before ? `AND timestamp < '${before}'` : ''}
-                     ORDER BY timestamp DESC 
-                     LIMIT 50`;
+        // BRUTE FORCE PROBE: Explicitly naming columns to avoid the 'restricted wildcard' error.
+        // We use the 3 columns most likely to exist in any Logflare/BigQuery schema.
+        const tryQuery = async (table: string) => {
+            const sql = `SELECT id, timestamp, event_message 
+                         FROM ${table} 
+                         WHERE (event_message LIKE '%${function_slug}%') 
+                         ${before ? `AND timestamp < '${before}'` : ''} 
+                         ORDER BY timestamp DESC 
+                         LIMIT 50`;
+            
+            const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
+            console.log(`[LogFetch] Testing table: ${table}`);
+            
+            return fetch(url, {
+                headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
+            });
+        };
 
-        console.log("[LogFetch] Executing Nuclear Query...");
+        let res = await tryQuery('function_logs');
+        
+        if (!res.ok) {
+            console.warn("[LogFetch] function_logs failed, trying edge_logs...");
+            res = await tryQuery('edge_logs');
+        }
+
+        if (!res.ok) {
+             // Final fallback: remove 'id' just in case it's named something else entirely
+             const superSafeSql = `SELECT timestamp, event_message FROM function_logs WHERE event_message LIKE '%${function_slug}%' LIMIT 10`;
+             const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(superSafeSql)}`;
+             res = await fetch(url, { headers: { "Authorization": `Bearer ${cloudKey}` } });
+        }
         
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
         console.log("SQL Query Used:", sql);
@@ -1947,18 +1969,20 @@ If you already give a payload, assume it's already applied, and give the next pl
         // DYNAMIC NORMALIZATION
         // We map the random BigQuery columns back to what the IDE expects
         const normalizedLogs = (parsed.data || []).map((row: any) => {
-            // Try common field names for message
-            const msg = row.event_message || row.message || (row.metadata?.[0]?.message) || "(No message)";
-            // Try common field names for level
-            const lvl = row.level || row.status || (row.metadata?.[0]?.level) || "info";
-            // Try common field names for timestamp
-            const ts = row.timestamp || row.created_at || Date.now();
+            const msg = row.event_message || "(No message)";
+            const ts = row.timestamp || Date.now();
+            
+            // Heuristic Level Detection since 'level' column is unreliable
+            let lvl = "info";
+            const lowerMsg = msg.toLowerCase();
+            if (lowerMsg.includes("error") || lowerMsg.includes("exception") || lowerMsg.includes("failed")) lvl = "error";
+            else if (lowerMsg.includes("warn")) lvl = "warning";
 
             return {
                 timestamp: ts,
                 event_message: msg,
                 level: lvl,
-                function_id: row.function_id || row.metadata?.[0]?.function_id || ""
+                function_id: row.id || ""
             };
         });
 
