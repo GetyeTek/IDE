@@ -1901,28 +1901,43 @@ If you already give a payload, assume it's already applied, and give the next pl
         const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
         const cloudKey = Deno.env.get("CONDUIT_ACCESS_TOKEN");
 
-        console.log("--- START PARAMETER-BASED LOG FETCH ---");
+    if (action === "fetch_ef_logs") {
+        const { function_slug, before } = payload;
+        const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
+        const cloudKey = Deno.env.get("CONDUIT_ACCESS_TOKEN");
+
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
-        // 1. Define Time Window
-        // 'before' is millisecond timestamp from frontend
-        const endTimeISO = before ? new Date(parseInt(before)).toISOString() : new Date().toISOString();
-        // Fetch last 24 hours by default
-        const startTimeISO = new Date(new Date(endTimeISO).getTime() - (24 * 60 * 60 * 1000)).toISOString();
+        // Supabase Analytics limits queries to a 24-hour window
+        const endDate = before ? new Date(parseInt(before)) : new Date();
+        const startDate = new Date(endDate.getTime() - (24 * 60 * 60 * 1000));
 
-        // 2. Use the dedicated Management API endpoint for a specific function's logs
-        // This endpoint is much more stable than the generic analytics SQL endpoint.
-        const logUrl = `https://api.supabase.com/v1/projects/${projectRef}/functions/${function_slug}/logs`;
-
-        console.log("Fetching Direct Logs URL:", logUrl);
-
-        const discoveryRes = await fetch(logUrl, {
-            headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
+        // 1. Target function_logs for STDOUT (console.log)
+        // 2. Target function_edge_logs for network metadata (status codes, latency)
+        const sql = `
+            SELECT 
+                t1.timestamp, 
+                t1.event_message, 
+                t1.metadata.level as level,
+                t1.metadata.function_id as function_id
+            FROM function_logs as t1
+            WHERE 
+                (t1.metadata.function_id = '${function_slug}' OR t1.event_message LIKE '%${function_slug}%')
+            ORDER BY t1.timestamp DESC 
+            LIMIT 50
+        `.trim();
+        
+        const url = new URL(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all`);
+        url.searchParams.set("iso_timestamp_start", startDate.toISOString());
+        url.searchParams.set("iso_timestamp_end", endDate.toISOString());
+        url.searchParams.set("sql", sql);
+        
+        const response = await fetch(url.toString(), { 
+            headers: { 
+                "Authorization": `Bearer ${cloudKey}`, 
+                "Accept": "application/json"
+            } 
         });
-
-        const rawText = await discoveryRes.text();
-        console.log("RAW REST RESPONSE:", rawText.substring(0, 500) + "...");
-
         let parsed;
         try {
             parsed = JSON.parse(rawText);
