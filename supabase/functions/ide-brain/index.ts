@@ -1907,10 +1907,11 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
-        // WIDEN THE NET: Try to find ANY log related to the function name in text or metadata
-        const sql = `SELECT timestamp, event_message, level, metadata 
+        // Analytics API uses BigQuery-style SQL. JSON operators like '->>' are NOT supported.
+        // We rely on function_id and string matching in the event_message.
+        const sql = `SELECT timestamp, event_message, level 
                      FROM edge_logs 
-                     WHERE (event_message LIKE '%${function_slug}%' OR metadata->>'function_name' = '${function_slug}' OR function_id = '${function_slug}') 
+                     WHERE (function_id = '${function_slug}' OR event_message LIKE '%${function_slug}%') 
                      ${before ? `AND timestamp < '${before}'` : ''} 
                      ORDER BY timestamp DESC 
                      LIMIT 50`;
