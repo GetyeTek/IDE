@@ -1220,9 +1220,19 @@
             <div class="relative group">
                 <textarea id="sqlEditor" 
                     class="w-full h-44 p-4 bg-[#0f0f0f] border border-white/10 rounded-2xl code-font text-sm text-blue-300 focus:outline-none focus:border-blue-500 transition-all shadow-inner"
-                    placeholder="-- Select a table or type SQL..."></textarea>
+                    placeholder="-- Select a table or type SQL..." oninput="saveSqlState()"></textarea>
                 
                 <div class="absolute bottom-3 right-3 flex gap-2">
+                    <button onclick="undoSql()" class="p-2 bg-black/40 rounded-lg text-slate-500 active:text-blue-400 transition-colors" title="Undo">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                    </button>
+                    <button onclick="redoSql()" class="p-2 bg-black/40 rounded-lg text-slate-500 active:text-blue-400 transition-colors" title="Redo">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                        </svg>
+                    </button>
                     <button onclick="pasteToSqlEditor()" class="p-2 bg-black/40 rounded-lg text-slate-500 active:text-blue-500 transition-colors" title="Paste">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -1375,6 +1385,8 @@
     let chatHistory = []; 
     let logOffset = 0;
     let historyOffset = 0;
+    let sqlHistory = [];
+    let sqlHistoryIndex = -1;
     let workflowPage = 1;
     let currentFilterTab = null;
     let filters = {
@@ -5904,7 +5916,43 @@ async function downloadArtifact(runId) {
     function openSQLExecutor() {
         document.getElementById('sql-executor-overlay').classList.add('active');
         toggleFab(false);
+        
+        const savedSql = localStorage.getItem('conduit_sql_autosave');
+        if(savedSql) {
+            document.getElementById('sqlEditor').value = savedSql;
+            if (sqlHistory.length === 0) {
+                sqlHistory.push(savedSql);
+                sqlHistoryIndex = 0;
+            }
+        }
+
         fetchSqlSchema();
+    }
+
+    function saveSqlState() {
+        const val = document.getElementById('sqlEditor').value;
+        localStorage.setItem('conduit_sql_autosave', val);
+        if (sqlHistoryIndex === -1 || sqlHistory[sqlHistoryIndex] !== val) {
+            sqlHistory = sqlHistory.slice(0, sqlHistoryIndex + 1);
+            sqlHistory.push(val);
+            sqlHistoryIndex++;
+        }
+    }
+
+    function undoSql() {
+        if (sqlHistoryIndex > 0) {
+            sqlHistoryIndex--;
+            document.getElementById('sqlEditor').value = sqlHistory[sqlHistoryIndex];
+            localStorage.setItem('conduit_sql_autosave', sqlHistory[sqlHistoryIndex]);
+        }
+    }
+
+    function redoSql() {
+        if (sqlHistoryIndex < sqlHistory.length - 1) {
+            sqlHistoryIndex++;
+            document.getElementById('sqlEditor').value = sqlHistory[sqlHistoryIndex];
+            localStorage.setItem('conduit_sql_autosave', sqlHistory[sqlHistoryIndex]);
+        }
     }
 
     function closeSQLExecutor() {
