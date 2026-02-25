@@ -1088,6 +1088,7 @@
                     <button id="log-src-ide" class="btn-outline" onclick="switchLogSource('ide')" style="font-size:10px; padding:4px 8px; border:none; border-radius:6px; background:transparent;">IDE</button>
                 </div>
                 <button class="ins-tab btn-outline" onclick="switchInsTab('network', this)" style="width:auto; padding:6px 15px;">Network</button>
+                <button class="ins-tab btn-outline" onclick="switchInsTab('edge', this)" style="width:auto; padding:6px 15px;">Edge Logs</button>
             </div>
             <div class="flex-gap" style="margin-left: auto;">
                 <button class="icon-btn" onclick="copyActiveInspectorData()">Copy All</button>
@@ -1105,6 +1106,13 @@
             </div>
             <div id="ins-net-app" style="flex:1; overflow-y:auto;"></div>
             <div id="ins-net-ide" style="flex:1; overflow-y:auto; display:none;"></div>
+        </div>
+        <div id="ins-view-edge" class="ins-content" style="flex:1; overflow-y:auto; background:#050505; display:none; flex-direction:column;">
+            <div id="ins-edge-selector" class="filter-pill-container" style="border-bottom: 1px solid #1a1a1c; background: #0a0a0a;">
+                <button class="filter-pill active" onclick="selectInsEdgeFunc('', this)">All Functions</button>
+            </div>
+            <div id="ins-edge-logs" style="flex:1; overflow-y:auto;"></div>
+            <button id="ins-edge-load-more" class="btn-outline" style="margin: 10px; font-size: 10px; padding: 8px; display: none;" onclick="fetchInsEdgeLogs(true)">Load Older Logs</button>
         </div>
     </div>
 
@@ -5966,7 +5974,11 @@ async function downloadArtifact(runId) {
             btn = document.createElement('div');
             btn.id = 'floating-console-btn';
             btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>`;
-            btn.onclick = (e) => { if (!btn.isDragging) openInspector(); };
+            btn.onclick = (e) => {
+                if (btn.isDragging) return;
+                const overlay = document.getElementById('inspector-overlay');
+                overlay.classList.contains('active') ? closeInspector() : openInspector();
+            };
             document.body.appendChild(btn);
             
             // Draggable Logic
@@ -6022,6 +6034,9 @@ async function downloadArtifact(runId) {
         }
         showGlobalToast('Logs cleared for ' + window.currentLogSource.toUpperCase());
     }
+    let insEdgeNextTs = null;
+    let insEdgeCurrentSlug = '';
+
     function switchInsTab(tab, btn) {
         document.querySelectorAll('.ins-tab').forEach(t => {
             t.classList.remove('active'); t.style.background = 'transparent'; t.style.borderColor = 'var(--border)';
@@ -6029,9 +6044,84 @@ async function downloadArtifact(runId) {
         document.querySelectorAll('.ins-content').forEach(c => c.style.display = 'none');
         btn.classList.add('active'); btn.style.background = 'rgba(59,130,246,0.1)'; btn.style.borderColor = 'var(--primary)';
         document.getElementById('ins-view-' + tab).style.display = 'flex';
-        // Toggle remains visible for both Console and Network
-        document.getElementById('ins-source-toggle').style.display = 'flex';
+        
+        // Edge tab hides the source toggle (App/IDE) as it's cloud-only
+        document.getElementById('ins-source-toggle').style.display = (tab === 'edge') ? 'none' : 'flex';
+        
+        if (tab === 'edge') {
+            syncInsEdgeFunctionList();
+            fetchInsEdgeLogs();
+        }
     }
+
+    function syncInsEdgeFunctionList() {
+        const container = document.getElementById('ins-edge-selector');
+        const functions = new Set();
+        (window.repoFiles || []).forEach(f => {
+            if (f.path.includes('supabase/functions/')) {
+                const parts = f.path.split('supabase/functions/')[1].split('/');
+                if (parts[0]) functions.add(parts[0]);
+            }
+        });
+        
+        // Keep "All" and add detected functions
+        container.innerHTML = `<button class="filter-pill ${insEdgeCurrentSlug === '' ? 'active' : ''}" onclick="selectInsEdgeFunc('', this)">All Functions</button>`;
+        functions.forEach(name => {
+            container.innerHTML += `<button class="filter-pill ${insEdgeCurrentSlug === name ? 'active' : ''}" onclick="selectInsEdgeFunc('${name}', this)">${name}</button>`;
+        });
+    }
+
+    function selectInsEdgeFunc(slug, btn) {
+        document.querySelectorAll('#ins-edge-selector .filter-pill').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        insEdgeCurrentSlug = slug;
+        insEdgeNextTs = null;
+        fetchInsEdgeLogs();
+    }
+
+    async function fetchInsEdgeLogs(isAppend = false) {
+        const container = document.getElementById('ins-edge-logs');
+        const loader = document.getElementById('ins-edge-load-more');
+        if (!isAppend) {
+            container.innerHTML = '<div style="padding:40px; text-align:center; font-size:11px; color:var(--ai-accent);">Fetching Cloud Logs...</div>';
+            insEdgeNextTs = null;
+        }
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'fetch_ef_logs', function_slug: insEdgeCurrentSlug, before: insEdgeNextTs })
+            });
+            const data = await res.json();
+            if (!isAppend) container.innerHTML = '';
+
+            if (!data.logs || data.logs.length === 0) {
+                if (!isAppend) container.innerHTML = '<div style="padding:40px; text-align:center; color:#444;">No logs found.</div>';
+                loader.style.display = 'none';
+                return;
+            }
+
+            data.logs.forEach(log => {
+                const row = document.createElement('div');
+                const isError = log.level === 'error';
+                const safeLog = btoa(encodeURIComponent(log.event_message || ''));
+                row.className = 'ins-row';
+                row.style.borderLeft = `3px solid ${isError ? 'var(--danger)' : 'var(--prod)'}`;
+                row.innerHTML = `
+                    <div class="flex-between" style="margin-bottom:4px;">
+                        <span style="color:#555; font-size:9px;">${new Date(log.timestamp).toLocaleTimeString()}</span>
+                        <div class="flex-gap">
+                             <button class="action-mini-btn" style="color:var(--ai-accent)" onclick="chatWithLogText('${safeLog}')">AI Fix</button>
+                             <button class="action-mini-btn" onclick="copyEncodedLog('${safeLog}')">Copy</button>
+                        </div>
+                    </div>
+                    <div style="font-size:10px; color:#ccc; white-space:pre-wrap; word-break:break-all;">${escapeHtml(log.event_message)}</div>
+                `;
+                container.appendChild(row);
+                insEdgeNextTs = log.timestamp;
+            });
+            loader.style.display = data.logs.length > 0 ? 'block' : 'none';
+        } catch(e) { container.innerHTML = `<div style="padding:20px; color:var(--danger);">${e.message}</div>`; }
 
     function copyInsEntry(btn) {
         const row = btn.closest('.ins-row');
