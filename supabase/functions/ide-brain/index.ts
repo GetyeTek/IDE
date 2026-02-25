@@ -1907,32 +1907,31 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
-                // SCOUT: Fetch exactly 1 raw row to see the definitive schema structure
-        const scoutSql = `SELECT * FROM edge_logs LIMIT 1`;
+                // SCOUT: Probing 'function_logs' (Console/Code output) instead of 'edge_logs' (HTTP Gateway)
+        const scoutSql = `SELECT * FROM function_logs LIMIT 1`;
         
-        // THE FIX: UNNEST the metadata array to access fields inside the STRUCT
-        // We use a LEFT JOIN to ensure we don't drop logs that have empty metadata
+        // THE FIX: Dialect-Safe Search
+        // 1. We search the event_message (where most logs contain the function name context).
+        // 2. We pull the first item from the metadata array as a raw object to avoid 'Field does not exist' errors.
         const sql = `SELECT 
                         t.timestamp, 
                         t.event_message, 
-                        t.level, 
-                        m.function_name, 
-                        m.function_id
-                     FROM edge_logs AS t
-                     LEFT JOIN UNNEST(t.metadata) AS m
-                     WHERE (m.function_name = '${function_slug}' OR m.function_id = '${function_slug}' OR t.event_message LIKE '%${function_slug}%')
+                        t.level,
+                        t.metadata[SAFE_OFFSET(0)] as meta_info
+                     FROM function_logs AS t
+                     WHERE (t.event_message LIKE '%${function_slug}%' OR t.id = '${function_slug}')
                      ${before ? `AND t.timestamp < '${before}'` : ''}
                      ORDER BY t.timestamp DESC 
                      LIMIT 50`;
 
-        console.log("[LogScout] Probing schema...");
+        console.log("[LogScout] Probing function_logs schema...");
         const scoutRes = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(scoutSql)}`, {
             headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
         });
         const scoutData = await scoutRes.json();
-        console.log("[LogScout] Raw Row Structure:", JSON.stringify(scoutData.data?.[0] || "No Rows Found"));
+        console.log("[LogScout] row:", JSON.stringify(scoutData.data?.[0] || "Empty Table"));
 
-        console.log("[LogFetch] Executing Unnested Query...");
+        console.log("[LogFetch] Executing Safe-String Query...");
         
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
         console.log("SQL Query Used:", sql);
