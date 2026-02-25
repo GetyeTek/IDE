@@ -1928,33 +1928,28 @@ If you already give a payload, assume it's already applied, and give the next pl
             });
         };
 
-        // BRUTE FORCE DISCOVERY: Unnest metadata and search the raw stringified struct
-        const trySmartQuery = async (table: string) => {
-            // CAST(m AS STRING) allows us to search for the function name even if we don't know the exact key name
-            const sql = `SELECT t.timestamp, t.event_message, t.level, CAST(m AS STRING) as raw_meta
-                         FROM ${table} AS t
-                         CROSS JOIN UNNEST(t.metadata) AS m
-                         WHERE (t.event_message LIKE '%${function_slug}%' OR CAST(m AS STRING) LIKE '%${function_slug}%')
-                         ${before ? `AND t.timestamp < '${before}'` : ''}
-                         ORDER BY t.timestamp DESC 
-                         LIMIT 50`;
+        // NUCLEAR DUMP: No filters, no casts. Just raw data serialization.
+        const tryNuclearQuery = async (table: string) => {
+            // We select only the most base columns + a JSON string of the metadata array
+            const sql = `SELECT 
+                            timestamp, 
+                            event_message, 
+                            TO_JSON_STRING(metadata) as raw_meta_json
+                         FROM ${table}
+                         ${before ? `WHERE timestamp < '${before}'` : ''}
+                         ORDER BY timestamp DESC 
+                         LIMIT 100`;
             
             const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
+            console.log(`[NuclearDump] Testing table: ${table}`);
             return fetch(url, { headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" } });
         };
 
-        let discoveryRes = await trySmartQuery('function_logs');
+        let discoveryRes = await tryNuclearQuery('function_logs');
         
         if (!discoveryRes.ok) {
-            console.warn("[LogFetch] function_logs failed, trying function_edge_logs...");
-            discoveryRes = await trySmartQuery('function_edge_logs');
-        }
-
-        if (!discoveryRes.ok) {
-             console.warn("[LogFetch] Fallback to simple edge_logs...");
-             const simpleSql = `SELECT timestamp, event_message FROM edge_logs WHERE event_message LIKE '%${function_slug}%' LIMIT 20`;
-             const urlSimple = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(simpleSql)}`;
-             discoveryRes = await fetch(urlSimple, { headers: { "Authorization": `Bearer ${cloudKey}` } });
+            console.warn("[NuclearDump] function_logs failed, trying edge_logs...");
+            discoveryRes = await tryNuclearQuery('edge_logs');
         }
 
         console.log("Supabase Response Status:", discoveryRes.status);
@@ -1971,20 +1966,17 @@ If you already give a payload, assume it's already applied, and give the next pl
         const rawRows = parsed.result || parsed.data || [];
 
         const normalizedLogs = rawRows.map((row: any) => {
+            // In Nuclear Dump, we want to see the RAW metadata in the UI message field if possible
             const msg = row.event_message || "(No message)";
             let ts = row.timestamp || Date.now();
             if (typeof ts === 'number' && ts > 9999999999999) ts = Math.floor(ts / 1000);
             
-            let lvl = row.level || "info";
-            const lowerMsg = msg.toLowerCase();
-            if (lowerMsg.includes("error") || lowerMsg.includes("exception")) lvl = "error";
-
             return {
                 timestamp: ts,
                 event_message: msg,
-                level: lvl,
-                // Append raw meta string for debugging visibility in the UI
-                function_id: row.raw_meta ? `[META: ${row.raw_meta.substring(0, 50)}...]` : ""
+                level: "debug",
+                // Pass the stringified metadata directly to the UI ID field for inspection
+                function_id: row.raw_meta_json ? row.raw_meta_json.substring(0, 200) : "no_meta"
             };
         });
 
