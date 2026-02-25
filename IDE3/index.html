@@ -6188,7 +6188,7 @@ async function downloadArtifact(runId) {
                 })
             });
             const data = await res.json();
-            console.log("[IDE] Verbose Log Data Received:", data);
+            console.log("[IDE] VERBOSE DEBUG PACKET:", JSON.stringify(data, null, 2));
             
             if (data.error) {
                 container.innerHTML = `<div style='padding:20px; color:var(--danger)'><b>API ERROR:</b> ${data.error}<br><pre style='font-size:10px'>${JSON.stringify(data.raw, null, 2)}</pre></div>`;
