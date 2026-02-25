@@ -1299,6 +1299,9 @@
     <!-- NEW: MULTI-ACTION FAB -->
     <div class="fab-group" id="main-fab-group">
         <div class="fab-sub-container">
+            <button class="fab-sub" data-label="Create Repo" onclick="initCreateRepo()">
+                <svg width="20" height="20" fill="none" stroke="var(--ai-accent)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"></path></svg>
+            </button>
             <button class="fab-sub" data-label="Create App" onclick="initCreateApp()">
                 <svg width="20" height="20" fill="none" stroke="var(--prod)" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
             </button>
@@ -1674,6 +1677,38 @@
 
     function toggleFabMenu() {
         document.getElementById('main-fab-group').classList.toggle('active');
+    }
+
+    async function initCreateRepo() {
+        const name = prompt("Enter New Repository Name:");
+        if (!name) return;
+        const isPrivate = confirm("Make repository Private? (Cancel for Public)");
+        
+        toggleFabMenu();
+        showGlobalToast("🚀 Provisioning Repository...");
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'create_repo', name, is_private: isPrivate })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                showGlobalToast("✅ Repository Created!");
+                // Auto-update local settings to point to new repo
+                document.getElementById('setting-repo-name').value = data.repo_name;
+                saveSettings();
+                setTimeout(() => {
+                    switchTab('tab-context', document.querySelectorAll('.nav-item')[0]);
+                    fetchFileList();
+                }, 1000);
+            } else {
+                throw new Error(data.error || "Failed to create repo");
+            }
+        } catch(e) {
+            alert("Error: " + e.message);
+        }
     }
 
     async function initCreateApp() {
