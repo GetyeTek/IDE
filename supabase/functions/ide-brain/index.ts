@@ -1901,11 +1901,6 @@ If you already give a payload, assume it's already applied, and give the next pl
         const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
         const cloudKey = Deno.env.get("CONDUIT_ACCESS_TOKEN");
 
-    if (action === "fetch_ef_logs") {
-        const { function_slug, before } = payload;
-        const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
-        const cloudKey = Deno.env.get("CONDUIT_ACCESS_TOKEN");
-
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
         // Supabase Analytics limits queries to a 24-hour window
@@ -1914,6 +1909,30 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         // 1. Target function_logs for STDOUT (console.log)
         // 2. Target function_edge_logs for network metadata (status codes, latency)
+        const sql = `
+            SELECT 
+                t1.timestamp, 
+                t1.event_message, 
+                t1.metadata.level as level,
+                t1.metadata.function_id as function_id
+            FROM function_logs as t1
+            WHERE 
+                (t1.metadata.function_id = '${function_slug}' OR t1.event_message LIKE '%${function_slug}%')
+            ORDER BY t1.timestamp DESC 
+            LIMIT 50
+        `.trim();
+        
+        const url = new URL(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all`);
+        url.searchParams.set("iso_timestamp_start", startDate.toISOString());
+        url.searchParams.set("iso_timestamp_end", endDate.toISOString());
+        url.searchParams.set("sql", sql);
+        
+        const response = await fetch(url.toString(), { 
+            headers: { 
+                "Authorization": `Bearer ${cloudKey}`, 
+                "Accept": "application/json"
+            } 
+        });
         const sql = `
             SELECT 
                 t1.timestamp, 
