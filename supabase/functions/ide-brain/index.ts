@@ -1901,39 +1901,46 @@ If you already give a payload, assume it's already applied, and give the next pl
         const projectRef = Deno.env.get("SUPABASE_URL")?.split("https://")[1].split(".")[0];
         const cloudKey = Deno.env.get("CONDUIT_ACCESS_TOKEN");
 
-        if (!projectRef) throw new Error("Could not resolve Supabase Project Ref");
-        if (!cloudKey) throw new Error("Cloud Access Key (CONDUIT_ACCESS_TOKEN) not configured in Supabase secrets");
+        console.log("--- START LOG DEBUGGING ---");
+        console.log("Slug:", function_slug, "Project:", projectRef);
+        console.log("Token Present?", !!cloudKey);
 
-        // Robust SQL: Check function_id (UUID) OR function_name in metadata
-        const sql = `SELECT timestamp, event_message, level 
+        if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
+
+        // WIDEN THE NET: Try to find ANY log related to the function name in text or metadata
+        const sql = `SELECT timestamp, event_message, level, metadata 
                      FROM edge_logs 
-                     WHERE (function_id = '${function_slug}' OR metadata->>'function_name' = '${function_slug}') 
+                     WHERE (event_message LIKE '%${function_slug}%' OR metadata->>'function_name' = '${function_slug}' OR function_id = '${function_slug}') 
                      ${before ? `AND timestamp < '${before}'` : ''} 
                      ORDER BY timestamp DESC 
-                     LIMIT 20`;
+                     LIMIT 50`;
         
         const url = `https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all?sql=${encodeURIComponent(sql)}`;
-
-        console.log(`[LogFetch] Project: ${projectRef}, Function: ${function_slug}`);
-        console.log(`[LogFetch] URL: ${url}`);
+        console.log("Generated URL:", url);
 
         const res = await fetch(url, {
-            headers: { 
-                "Authorization": `Bearer ${cloudKey}`,
-                "Content-Type": "application/json"
-            }
+            headers: { "Authorization": `Bearer ${cloudKey}`, "Content-Type": "application/json" }
         });
 
-        if (!res.ok) {
-            const text = await res.text();
-            let msg = "Supabase API Error";
-            try { msg = JSON.parse(text).message || msg; } catch(e) {}
-            throw new Error(msg);
+        console.log("Supabase Response Status:", res.status);
+        const rawText = await res.text();
+        console.log("RAW RESPONSE FROM SUPABASE:", rawText);
+
+        let parsed;
+        try {
+            parsed = JSON.parse(rawText);
+        } catch(e) {
+            console.error("JSON Parse Error on Supabase Response");
+            return new Response(JSON.stringify({ error: "Failed to parse Supabase response", raw: rawText }), { headers: corsHeaders });
         }
 
-        const result = await res.json();
-        // Analytics API returns logs in a 'data' array
-        return new Response(JSON.stringify({ logs: result.data || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        console.log("Parsed Data Count:", parsed.data?.length || 0);
+        if (parsed.data && parsed.data.length > 0) {
+            console.log("Sample Log Entry:", JSON.stringify(parsed.data[0]));
+        }
+
+        console.log("--- END LOG DEBUGGING ---");
+        return new Response(JSON.stringify({ logs: parsed.data || [], debug_raw: parsed }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "commit_prod") {
