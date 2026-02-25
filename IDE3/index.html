@@ -150,6 +150,27 @@
         .ins-net-details { background: #050505; margin: 8px -12px -8px -12px; padding: 12px; border-top: 1px solid #222; display: none; }
         .ins-net-details.open { display: block; }
 
+        /* FLOATING HUD */
+        #floating-console-btn {
+            position: fixed; width: 44px; height: 44px; background: #222; border: 1px solid #444;
+            border-radius: 50%; display: none; align-items: center; justify-content: center;
+            z-index: 100000; box-shadow: 0 4px 15px rgba(0,0,0,0.5); cursor: move;
+            touch-action: none; color: var(--ai-accent); font-size: 18px;
+        }
+        #floating-console-btn svg { width: 20px; height: 20px; pointer-events: none; }
+        
+        /* HALF SCREEN OVERRIDE */
+        .inspector-half {
+            top: auto !important; bottom: 0 !important; height: 60vh !important;
+            border-top: 1px solid var(--border);
+            transform: translateY(100%) !important;
+            background: rgba(5, 5, 7, 0.85) !important;
+            backdrop-filter: blur(15px) !important;
+        }
+        .inspector-half.active { transform: translateY(0) !important; }
+        .inspector-half .viewer-header { height: 44px !important; }
+        .inspector-half .ins-row { padding: 4px 8px !important; font-size: 10px !important; }
+
         /* No Logs Feedback */
         [id^="ins-console-"]:empty::after, [id^="ins-net-"]:empty::after {
             content: "No logs found";
@@ -670,6 +691,18 @@
                     <span style="font-size:13px;">🧬 WASM Syntax Scan (Preview)</span>
                     <input type="checkbox" id="setting-wasm-validation" style="accent-color:var(--primary); transform:scale(1.2);">
                 </label>
+
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px;">
+                    <span style="font-size:13px;">🔘 Floating Console Button</span>
+                    <input type="checkbox" id="setting-floating-console" onchange="toggleConsoleSubSetting(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
+                </label>
+
+                <div id="console-half-group" style="display:none; padding-left: 15px; border-left: 2px solid var(--border); margin-bottom: 12px;">
+                    <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                        <span style="font-size:13px;">🌓 Half Screen Mode</span>
+                        <input type="checkbox" id="setting-console-half" style="accent-color:var(--ai-accent); transform:scale(1.2);">
+                    </label>
+                </div>
 
                 <div class="input-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
                     <label class="input-label">EF Deployment Mode</label>
@@ -1376,7 +1409,9 @@
         autoSanity: sessionStorage.getItem('conduit_auto_sanity') === 'true',
         showPreview: localStorage.getItem('conduit_showPreview') !== 'false',
         efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
-        wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false'
+        wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
+        floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
+        consoleHalf: localStorage.getItem('conduit_console_half') === 'true'
     };
     
     // Global State
@@ -1465,6 +1500,12 @@
         document.getElementById('setting-show-preview').checked = CONFIG.showPreview;
         document.getElementById('setting-wasm-validation').checked = CONFIG.wasmValidation;
         document.getElementById('setting-ef-mode').value = CONFIG.efDeploymentMode;
+        
+        const fc = document.getElementById('setting-floating-console');
+        fc.checked = CONFIG.floatingConsole;
+        toggleConsoleSubSetting(CONFIG.floatingConsole);
+        document.getElementById('setting-console-half').checked = CONFIG.consoleHalf;
+        initFloatingHUD();
         
         renderAIConfigUI(); // Render AI Settings
         applyPreviewTabVisibility(); // Apply visibility on load
@@ -2118,6 +2159,8 @@
         const showPreview = document.getElementById('setting-show-preview').checked;
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
+        const floatingConsole = document.getElementById('setting-floating-console').checked;
+        const consoleHalf = document.getElementById('setting-console-half').checked;
 
         if(!funcUrl) return alert("Function URL is required");
         
@@ -2126,6 +2169,8 @@
         localStorage.setItem('conduit_showPreview', showPreview);
         localStorage.setItem('conduit_wasm_validation', wasmValidation);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
+        localStorage.setItem('conduit_floating_console', floatingConsole);
+        localStorage.setItem('conduit_console_half', consoleHalf);
 
         // Tab-Specific Context & Automation (Isolated)
         sessionStorage.setItem('conduit_repoName', repoName);
@@ -2140,9 +2185,10 @@
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
 
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, wasmValidation, efDeploymentMode };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf };
         
-        applyPreviewTabVisibility(); // Apply change immediately
+        applyPreviewTabVisibility(); 
+        initFloatingHUD();
 
         showGlobalToast("Settings Saved & Synced");
         
@@ -5898,8 +5944,55 @@ async function downloadArtifact(runId) {
     }
 
     // --- INSPECTOR ACTIONS ---
-    function openInspector() { document.getElementById('inspector-overlay').classList.add('active'); toggleFab(false); }
-    function closeInspector() { document.getElementById('inspector-overlay').classList.remove('active'); toggleFab(true); }
+    function openInspector() {
+        const overlay = document.getElementById('inspector-overlay');
+        overlay.classList.toggle('inspector-half', CONFIG.consoleHalf);
+        overlay.classList.add('active');
+        toggleFab(false);
+    }
+
+    function closeInspector() {
+        document.getElementById('inspector-overlay').classList.remove('active');
+        toggleFab(true);
+    }
+
+    function toggleConsoleSubSetting(on) {
+        document.getElementById('console-half-group').style.display = on ? 'block' : 'none';
+    }
+
+    function initFloatingHUD() {
+        let btn = document.getElementById('floating-console-btn');
+        if (!btn) {
+            btn = document.createElement('div');
+            btn.id = 'floating-console-btn';
+            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>`;
+            btn.onclick = (e) => { if (!btn.isDragging) openInspector(); };
+            document.body.appendChild(btn);
+            
+            // Draggable Logic
+            let x = 0, y = 0, initialX, initialY;
+            const onTouchStart = (e) => {
+                btn.isDragging = false;
+                const touch = e.touches[0];
+                initialX = touch.clientX - x;
+                initialY = touch.clientY - y;
+            };
+            const onTouchMove = (e) => {
+                btn.isDragging = true;
+                const touch = e.touches[0];
+                x = touch.clientX - initialX;
+                y = touch.clientY - initialY;
+                btn.style.transform = `translate(${x}px, ${y}px)`;
+            };
+            btn.addEventListener('touchstart', onTouchStart);
+            btn.addEventListener('touchmove', onTouchMove);
+        }
+
+        btn.style.display = CONFIG.floatingConsole ? 'flex' : 'none';
+        // Reset position to bottom right default
+        btn.style.right = '20px';
+        btn.style.bottom = '180px';
+    }
     function switchLogSource(source) {
         window.currentLogSource = source;
         const isApp = source === 'app';
