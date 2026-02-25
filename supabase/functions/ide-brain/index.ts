@@ -1903,8 +1903,11 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
-        // Supabase Analytics limits queries to a 24-hour window
-        const endDate = before ? new Date(parseInt(before)) : new Date();
+        // Defensive Timestamp Handling: Handle both ms and us inputs
+        let endTimestamp = before ? parseInt(before) : Date.now();
+        if (endTimestamp > 10000000000000) endTimestamp = Math.floor(endTimestamp / 1000); // Convert us to ms
+        
+        const endDate = new Date(endTimestamp);
         const startDate = new Date(endDate.getTime() - (24 * 60 * 60 * 1000));
 
         // 1. Target function_logs for STDOUT (console.log)
@@ -1959,8 +1962,12 @@ If you already give a payload, assume it's already applied, and give the next pl
 
         // 3. Map to IDE Format
         const normalizedLogs = rawRows.map((row: any) => {
+            // Convert Supabase microseconds (16 digits) to JS milliseconds (13 digits)
+            let ts = row.timestamp || Date.now();
+            if (ts > 10000000000000) ts = Math.floor(ts / 1000);
+
             return {
-                timestamp: row.timestamp || Date.now(),
+                timestamp: ts,
                 event_message: row.event_message || row.message || "(No message)",
                 level: row.level || row.metadata?.level || "info",
                 function_id: function_slug
