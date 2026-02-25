@@ -1910,12 +1910,11 @@ If you already give a payload, assume it's already applied, and give the next pl
         // Fetch last 24 hours by default
         const startTimeISO = new Date(new Date(endTimeISO).getTime() - (24 * 60 * 60 * 1000)).toISOString();
 
-        // 2. Build URL with Query Parameters (Bypasses SQL parser entirely)
-        const logUrl = new URL(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/logs.all`);
-        logUrl.searchParams.set("service", "functions");
+        // 2. Build URL for specific service endpoint (Bypasses logs.all strictness)
+        // We hit the '/functions' endpoint which is pre-configured for Edge Function logs
+        const logUrl = new URL(`https://api.supabase.com/v1/projects/${projectRef}/analytics/endpoints/functions`);
         logUrl.searchParams.set("iso_timestamp_start", startTimeISO);
         logUrl.searchParams.set("iso_timestamp_end", endTimeISO);
-        logUrl.searchParams.set("limit", "100");
 
         console.log("Fetching Parameters URL:", logUrl.toString());
 
