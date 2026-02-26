@@ -3185,15 +3185,20 @@ function addTerminalCard(data, options = {}) {
                     }, '*');
                 };
 
+                window.localLogs = [];
                 ['log', 'warn', 'error', 'debug', 'info'].forEach(method => {
                     const original = console[method];
                     console[method] = (...args) => {
-                        window.parent.postMessage({ 
-                            type: 'CONDUIT_LOG', 
-                            method, 
-                            args: args.map(a => typeof a === 'object' ? JSON.parse(safeStringify(a)) : a),
-                            time: new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'})
-                        }, '*');
+                        const time = new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                        const msg = args.map(a => typeof a === 'object' ? JSON.parse(safeStringify(a)) : a);
+                        
+                        // Send to IDE
+                        window.parent.postMessage({ type: 'CONDUIT_LOG', method, args: msg, time }, '*');
+                        
+                        // Store locally for the floating ball
+                        window.localLogs.push({ method, msg: msg.join(' '), time });
+                        if (window.updateLocalLogUI) window.updateLocalLogUI();
+                        
                         original.apply(console, args);
                     };
                 });
@@ -3227,6 +3232,52 @@ function addTerminalCard(data, options = {}) {
                     }
                 };
             `;
+            // --- INJECT FLOATING HUD INTO PREVIEW ---
+            const hudStyle = doc.createElement('style');
+            hudStyle.textContent = `
+                #conduit-debug-ball { position: fixed; bottom: 20px; right: 20px; width: 44px; height: 44px; background: #222; border: 1px solid #444; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 2147483647; cursor: move; touch-action: none; color: #d946ef; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+                #conduit-debug-ui { position: fixed; inset: 0; background: rgba(5,5,5,0.9); z-index: 2147483646; display: none; flex-direction: column; font-family: sans-serif; color: white; padding-top: env(safe-area-inset-top); }
+                #conduit-debug-ui.active { display: flex; }
+                .debug-header { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 14px; }
+                .debug-scroll { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 11px; }
+                .debug-row { padding: 6px; border-bottom: 1px solid #222; white-space: pre-wrap; word-break: break-all; }
+                .log-error { border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
+                .log-warn { border-left: 3px solid #eab308; }
+            `;
+            doc.head.appendChild(hudStyle);
+
+            const hudHtml = doc.createElement('div');
+            hudHtml.innerHTML = `
+                <div id="conduit-debug-ball">⚡</div>
+                <div id="conduit-debug-ui">
+                    <div class="debug-header"><span>Preview Console</span><button onclick="document.getElementById('conduit-debug-ui').classList.remove('active')" style="background:none; border:none; color:white; font-size:20px;">×</button></div>
+                    <div id="conduit-debug-list" class="debug-scroll"></div>
+                    <div style="padding:10px; border-top:1px solid #333;"><button onclick="window.localLogs=[]; window.updateLocalLogUI();" style="width:100%; padding:8px; background:#333; border:none; color:white; border-radius:4px;">Clear Logs</button></div>
+                </div>
+            `;
+            doc.body.appendChild(hudHtml);
+
+            const hudLogic = doc.createElement('script');
+            hudLogic.textContent = `
+                (function() {
+                    const ball = document.getElementById('conduit-debug-ball');
+                    const ui = document.getElementById('conduit-debug-ui');
+                    const list = document.getElementById('conduit-debug-list');
+                    let x=0, y=0, ix, iy, dragging=false;
+
+                    ball.addEventListener('touchstart', e => { dragging=false; ix=e.touches[0].clientX-x; iy=e.touches[0].clientY-y; });
+                    ball.addEventListener('touchmove', e => { dragging=true; x=e.touches[0].clientX-ix; y=e.touches[0].clientY-iy; ball.style.transform=\`translate(\${x}px, \${y}px)\`; });
+                    ball.onclick = () => { if(!dragging) ui.classList.toggle('active'); };
+
+                    window.updateLocalLogUI = () => {
+                        list.innerHTML = window.localLogs.map(l => \`<div class="debug-row log-\${l.method}"><span style="color:#666">[\${l.time}]</span> \${l.msg}</div>\`).join('');
+                        list.scrollTop = list.scrollHeight;
+                    };
+                    window.updateLocalLogUI();
+                })();
+            `;
+            doc.body.appendChild(hudLogic);
+
             doc.head.prepend(baseScript);
             doc.querySelectorAll('script[src]').forEach(el => {
                 const src = el.getAttribute('src');
