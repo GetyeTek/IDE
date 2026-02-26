@@ -2617,6 +2617,9 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
 
         if (Array.isArray(payload)) {
             for (let op of payload) {
+                // Normalize path to prevent double-prefixing
+                if (op.file_path) op.file_path = op.file_path.replace(/\\/g, '/').replace(/\/\//g, '/');
+
                 if (op.file_path === 'index.ts' && CONFIG.efDeploymentMode === 'default') {
                     const resolved = await resolveEdgeFunctionPath(op.file_path);
                     
@@ -2638,11 +2641,13 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
                     // Remove any leading slashes and whitespace
                     let cleanPath = op.file_path.trim().replace(/^\/+/, '');
                     
-                    // If path doesn't already start with the Project Root, add it
-                    if (!cleanPath.startsWith(CONFIG.projectPath)) {
+                    // Use a more robust check to see if the path is already prefixed
+                    const isAlreadyPrefixed = cleanPath.startsWith(CONFIG.projectPath) || 
+                                           cleanPath.startsWith('/' + CONFIG.projectPath);
+
+                    if (!isAlreadyPrefixed) {
                         op.file_path = CONFIG.projectPath + cleanPath;
                     } else {
-                        // Path is already fully qualified, just use the cleaned version
                         op.file_path = cleanPath;
                     }
                 }
@@ -3061,12 +3066,15 @@ function addTerminalCard(data, options = {}) {
                 const isJs = ['js', 'mjs', 'ts', 'jsx', 'tsx'].includes(file.ext);
 
                 if (isJs) {
-                    file.content = file.content.replace(/(import|export)([\s\S]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
+                    // Use a more restrictive regex that doesn't cross statement boundaries ([^;\n]*?)
+                    // This prevents CSS selectors like '.my-class' from being mistaken for file paths
+                    file.content = file.content.replace(/(import|export)([^;\n]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
                         // 1. Keep absolute URLs as is
                         if (importPath.startsWith('http')) return match;
                         
                         // 2. Handle Local Files
-                        if (importPath.startsWith('.')) {
+                        // Only rewrite if it looks like a file path (has an extension or is a directory jump)
+                        if (importPath.startsWith('.') && (importPath.includes('/') || importPath.includes('.'))) {
                             const resolvedFull = resolvePath(fullPath, importPath);
                             if (resolvedFull.startsWith(effectiveRoot)) return `${keyword}${mid}${q1}${resolvedFull.substring(effectiveRoot.length)}${q2}`;
                             return match;
