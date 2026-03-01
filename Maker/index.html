@@ -67,7 +67,7 @@
         .page-canvas {
             background-color: white;
             width: var(--pdf-width);
-            height: var(--pdf-height);
+            min-height: var(--pdf-height);
             /* Increased bottom padding to 100px to prevent content-footer collision */
             padding: 60px 70px 100px 70px; 
             box-sizing: border-box;
@@ -75,7 +75,6 @@
             box-shadow: 0 0 30px rgba(0,0,0,0.2);
             font-family: var(--font-serif);
             color: #000;
-            overflow: hidden;
             page-break-after: always;
             transform-origin: top center;
             flex-shrink: 0;
@@ -283,7 +282,7 @@
                     
                     const wrapper = document.createElement('div');
                     wrapper.className = 'page-wrapper';
-                    wrapper.style.height = (1123 * scale) + 'px';
+                    wrapper.style.minHeight = (1123 * scale) + 'px';
                     wrapper.style.marginTop = '20px';
 
                     const pageDiv = document.createElement('div');
