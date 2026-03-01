@@ -58,18 +58,25 @@
         }
 
         /* THE PAGE CANVAS */
-        #page-canvas {
+        .page-canvas {
             background-color: white;
             width: var(--pdf-width);
-            min-height: var(--pdf-height);
+            height: var(--pdf-height);
             margin: 20px 0;
-            padding: 60px 70px; /* Standard PDF Margins */
+            padding: 60px 70px; 
             box-sizing: border-box;
             position: relative;
             box-shadow: 0 0 30px rgba(0,0,0,0.8);
             font-family: var(--font-serif);
             color: #000;
-            display: none;
+            overflow: hidden;
+            page-break-after: always;
+        }
+
+        @media print {
+            body { background: none; }
+            #ui-layer { display: none; }
+            .page-canvas { margin: 0; box-shadow: none; }
         }
 
         /* COMPONENT DEFINITIONS */
@@ -129,73 +136,82 @@
         <button onclick="draw()">EXECUTE DRAW COMMAND</button>
     </div>
 
-    <div id="page-canvas"></div>
+    <div id="document-container"></div>
 
     <script>
         function draw() {
             const raw = document.getElementById('json-pen').value;
-            const canvas = document.getElementById('page-canvas');
+            const container = document.getElementById('document-container');
             
             try {
-                const cmd = JSON.parse(raw);
-                canvas.innerHTML = '';
-                canvas.style.display = 'block';
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
 
-                cmd.content.forEach(item => {
-                    const div = document.createElement('div');
-                    
-                    if (item.type === 'paragraph') {
-                        div.className = 'p-block';
-                        div.innerHTML = item.body;
-                    } 
-                    else if (item.type === 'header') {
-                        div.className = 'h-block';
-                        div.innerHTML = item.body;
-                    }
-                    else if (item.type === 'box') {
-                        div.className = 'box-block';
-                        let list = '<ul>';
-                        item.items.forEach(li => list += `<li>${li}</li>`);
-                        div.innerHTML = list + '</ul>';
-                    }
-                    else if (item.type === 'list') {
-                        div.className = 'list-block';
-                        let list = '<ul>';
-                        item.items.forEach(li => list += `<li>${li}</li>`);
-                        div.innerHTML = list + '</ul>';
-                    }
-                    else if (item.type === 'graphic') {
-                        // The SVG injection point
-                        div.className = 'graphic-container';
-                        div.innerHTML = item.svgCode;
-                    }
-                    else if (item.type === 'canvas') {
-                        div.className = 'canvas-placeholder';
-                        div.style.width = item.w || '100%';
-                        div.style.height = item.h || '200px';
-                        div.innerText = `[ RASTER IMAGE: ${item.label || 'Empty'} ]`;
-                    }
-                    else if (item.type === 'table') {
-                        let t = '<table>';
-                        item.rows.forEach(row => {
-                            t += '<tr>';
-                            row.forEach(cell => t += `<td>${cell}</td>`);
-                            t += '</tr>';
-                        });
-                        div.innerHTML = t + '</table>';
-                    }
-                    else if (item.type === 'footer') {
-                        div.className = 'footer';
-                        div.innerText = item.val;
-                    }
+                // Iterate through each Page Key (PDF Index)
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas';
+                    pageDiv.id = `page-${pageKey}`;
 
-                    canvas.appendChild(div);
+                    pageData.content.forEach(item => {
+                        const element = document.createElement('div');
+                        
+                        if (item.type === 'paragraph') {
+                            element.className = 'p-block';
+                            element.innerHTML = item.body;
+                        } 
+                        else if (item.type === 'header') {
+                            element.className = 'h-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'box') {
+                            element.className = 'box-block';
+                            let list = '<ul>';
+                            item.items.forEach(li => list += `<li>${li}</li>`);
+                            element.innerHTML = list + '</ul>';
+                        }
+                        else if (item.type === 'list') {
+                            element.className = 'list-block';
+                            let list = '<ul>';
+                            item.items.forEach(li => list += `<li>${li}</li>`);
+                            element.innerHTML = list + '</ul>';
+                        }
+                        else if (item.type === 'graphic') {
+                            element.className = 'graphic-container';
+                            element.innerHTML = item.svgCode;
+                        }
+                        else if (item.type === 'canvas') {
+                            element.className = 'canvas-placeholder';
+                            element.style.width = item.w || '100%';
+                            element.style.height = item.h || '200px';
+                            element.innerText = `[ RASTER IMAGE: ${item.label || 'Empty'} ]`;
+                        }
+                        else if (item.type === 'table') {
+                            let t = '<table>';
+                            item.rows.forEach(row => {
+                                t += '<tr>';
+                                row.forEach(cell => t += `<td>${cell}</td>`);
+                                t += '</tr>';
+                            });
+                            element.innerHTML = t + '</table>';
+                        }
+                        else if (item.type === 'footer') {
+                            element.className = 'footer';
+                            element.innerText = item.val;
+                        }
+
+                        pageDiv.appendChild(element);
+                    });
+
+                    container.appendChild(pageDiv);
                 });
 
                 window.scrollTo({ top: window.innerHeight * 0.4, behavior: 'smooth' });
 
             } catch (err) {
                 alert("JSON Logic Error: " + err);
+                console.error(err);
             }
         }
     </script>
