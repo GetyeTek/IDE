@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=794, initial-scale=0.4">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Ultimate PDF Manufacturer</title>
     <style>
         :root {
@@ -58,20 +58,26 @@
         }
 
         /* THE PAGE CANVAS */
+        .page-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
         .page-canvas {
             background-color: white;
             width: var(--pdf-width);
             height: var(--pdf-height);
-            margin: 20px 0;
             padding: 60px 70px; 
             box-sizing: border-box;
             position: relative;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            box-shadow: 0 0 30px rgba(0,0,0,0.2);
             font-family: var(--font-serif);
             color: #000;
             overflow: hidden;
             page-break-after: always;
-            transition: transform 0.3s ease;
+            transform-origin: top center;
+            flex-shrink: 0;
         }
 
         /* READER MODE OVERRIDES */
@@ -82,8 +88,10 @@
         body.viewer-active #ui-layer {
             display: none !important;
         }
+        body.viewer-active .page-wrapper {
+            margin-bottom: 20px;
+        }
         body.viewer-active .page-canvas {
-            margin: 10px auto !important;
             box-shadow: 0 0 50px #000;
             border: none;
         }
@@ -266,11 +274,21 @@
                 const doc = JSON.parse(raw);
                 container.innerHTML = '';
 
-                // Iterate through each Page Key (PDF Index)
+                // Calculate scale factor to fit width
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
                 Object.keys(doc).forEach(pageKey => {
                     const pageData = doc[pageKey];
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.height = (1123 * scale) + 'px';
+                    wrapper.style.marginTop = '20px';
+
                     const pageDiv = document.createElement('div');
                     pageDiv.className = 'page-canvas';
+                    pageDiv.style.transform = `scale(${scale})`;
                     pageDiv.id = `page-${pageKey}`;
 
                     pageData.content.forEach(item => {
@@ -348,7 +366,8 @@
                         pageDiv.appendChild(element);
                     });
 
-                    container.appendChild(pageDiv);
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
                 });
 
                 window.scrollTo({ top: window.innerHeight * 0.4, behavior: 'smooth' });
@@ -361,6 +380,8 @@
 
         function toggleViewer() {
             document.body.classList.toggle('viewer-active');
+            // Re-draw to adjust scaling for potential orientation changes
+            draw();
             if (document.body.classList.contains('viewer-active')) {
                 window.scrollTo({ top: 0, behavior: 'auto' });
             }
