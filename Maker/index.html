@@ -127,6 +127,28 @@
         }
 
         center { display: block; width: 100%; margin: 5px 0; }
+
+        /* TABLE OF CONTENTS STYLES */
+        .toc-container { margin: 10px 0; }
+        .toc-entry {
+            display: flex;
+            align-items: flex-end;
+            margin-bottom: 4px;
+            font-size: 14.5px;
+        }
+        .toc-text { flex-shrink: 0; }
+        .toc-dots {
+            flex-grow: 1;
+            border-bottom: 1.5px dotted #000;
+            margin: 0 5px 4px 5px;
+        }
+        .toc-page { flex-shrink: 0; font-weight: bold; }
+
+        /* Indentation Levels */
+        .level-0 { font-weight: bold; margin-top: 10px; }
+        .level-1 { padding-left: 20px; }
+        .level-2 { padding-left: 40px; }
+        .level-3 { padding-left: 60px; }
     </style>
 </head>
 <body>
@@ -199,6 +221,19 @@
                         else if (item.type === 'footer') {
                             element.className = 'footer';
                             element.innerText = item.val;
+                        }
+                        else if (item.type === 'toc') {
+                            element.className = 'toc-container';
+                            item.entries.forEach(entry => {
+                                const row = document.createElement('div');
+                                row.className = `toc-entry level-${entry.level || 0}`;
+                                row.innerHTML = `
+                                    <span class="toc-text">${entry.text}</span>
+                                    <span class="toc-dots"></span>
+                                    <span class="toc-page">${entry.page}</span>
+                                `;
+                                element.appendChild(row);
+                            });
                         }
 
                         pageDiv.appendChild(element);
