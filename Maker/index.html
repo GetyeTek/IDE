@@ -171,8 +171,8 @@
 
         /* Sectioning */
         .section-header { font-weight: bold; font-size: 17px; margin-top: 25px; margin-bottom: 10px; }
-        .overview-block { background: #fff; border: 1.5px solid #000; padding: 15px; margin: 20px 0; }
-        .overview-label { font-weight: bold; font-size: 18px; margin-bottom: 8px; display: block; }
+        .overview-block { margin: 25px 0; }
+        .overview-label { font-weight: bold; font-size: 17px; margin-bottom: 5px; display: block; }
 
         /* The Essential Interaction Box (Brainstorming/Reflection) */
         .interaction-container { margin: 25px 0; }
@@ -375,7 +375,7 @@
                         }
                         else if (item.type === 'overview') {
                             element.className = 'overview-block';
-                            element.innerHTML = `<span class="overview-label">Chapter Overview</span>${item.body}`;
+                            element.innerHTML = `<span class="overview-label">Chapter Overview</span><div class="p-block">${item.body}</div>`;
                         }
                         else if (item.type === 'interaction-box') {
                             element.className = 'interaction-container';
