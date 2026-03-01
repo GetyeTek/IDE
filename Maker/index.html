@@ -456,11 +456,14 @@
                         }
                         else if (item.type === 'reflection' || item.type === 'brainstorming') {
                             const isRef = item.type === 'reflection';
-                            const label = isRef ? 'Reflection' : 'Brainstorming';
+                            const labelText = isRef ? 'Reflection' : 'Brainstorming';
                             const labelClass = isRef ? 'reflection-label' : 'brainstorming-label';
                             const boxClass = isRef ? 'reflection-block' : 'brainstorming-block';
                             
-                            // Collect all possible content types
+                            // Reset the parent container class so the border doesn't wrap the label
+                            element.className = 'academic-container';
+                            element.style.marginTop = '20px';
+                            
                             let contentHtml = item.body || '';
                             const listData = item.questions || item.items || item.points;
                             
@@ -469,9 +472,10 @@
                                     listData.map(q => `<li>${q}</li>`).join('') + '</ul>';
                             }
 
+                            // Label is now a sibling to the box, not inside it
                             element.innerHTML = `
-                                <span class="${labelClass}">${label}</span>
-                                <div class="${boxClass}">${contentHtml}</div>
+                                <span class="${labelClass}" style="display:block; font-weight:bold; margin-bottom:5px;">${labelText}</span>
+                                <div class="${boxClass}" style="margin-top:0;">${contentHtml}</div>
                             `;
                         }
                         else if (item.type === 'spacer') {
