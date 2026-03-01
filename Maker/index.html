@@ -213,8 +213,14 @@
         .brainstorming-block {
             background: #eee;
             border: 1px solid #000;
-            padding: 10px 15px;
-            margin: 15px 0;
+            padding: 12px 15px;
+            margin: 5px 0 15px 0;
+        }
+        .brainstorming-label {
+            font-weight: bold;
+            display: block;
+            margin-top: 15px;
+            font-size: 15px;
         }
 
         /* LIST STYLES */
@@ -448,13 +454,25 @@
                             element.className = 'footer';
                             element.innerText = item.val;
                         }
-                        else if (item.type === 'reflection') {
-                            element.className = 'reflection-block';
-                            element.innerHTML = `<span class="reflection-label">Reflection</span>${item.body}`;
-                        }
-                        else if (item.type === 'brainstorming') {
-                            element.className = 'brainstorming-block';
-                            element.innerHTML = `<b>Brainstorming Questions</b><br>${item.body}`;
+                        else if (item.type === 'reflection' || item.type === 'brainstorming') {
+                            const isRef = item.type === 'reflection';
+                            const label = isRef ? 'Reflection' : 'Brainstorming';
+                            const labelClass = isRef ? 'reflection-label' : 'brainstorming-label';
+                            const boxClass = isRef ? 'reflection-block' : 'brainstorming-block';
+                            
+                            // Collect all possible content types
+                            let contentHtml = item.body || '';
+                            const listData = item.questions || item.items || item.points;
+                            
+                            if (listData && Array.isArray(listData)) {
+                                contentHtml += (contentHtml ? '<br>' : '') + '<ul>' + 
+                                    listData.map(q => `<li>${q}</li>`).join('') + '</ul>';
+                            }
+
+                            element.innerHTML = `
+                                <span class="${labelClass}">${label}</span>
+                                <div class="${boxClass}">${contentHtml}</div>
+                            `;
                         }
                         else if (item.type === 'spacer') {
                             element.style.flexGrow = item.flex || '0';
