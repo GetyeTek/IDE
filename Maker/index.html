@@ -386,8 +386,9 @@
                             if (isReflection) html += `<div class="outer-label">${item.label}</div>`;
                             html += `<div class="interaction-box">`;
                             if (!isReflection) html += `<span class="interaction-label">${item.label}</span>`;
-                            if (item.questions) {
-                                html += '<ul>' + item.questions.map(q => `<li>${q}</li>`).join('') + '</ul>';
+                            const listData = item.questions || item.items || item.points;
+                            if (listData && Array.isArray(listData)) {
+                                html += '<ul>' + listData.map(q => `<li>${q}</li>`).join('') + '</ul>';
                             } else {
                                 html += item.body || '';
                             }
