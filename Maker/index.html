@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=794, initial-scale=0.4">
+    <title>Ultimate PDF Manufacturer</title>
+    <style>
+        :root {
+            --pdf-width: 794px;
+            --pdf-height: 1123px;
+            --grey-bg: #d9d9d9;
+            --font-serif: 'Times New Roman', Times, serif;
+        }
+
+        body {
+            background-color: #2c2c2c;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: sans-serif;
+        }
+
+        /* Mobile Input Interface */
+        #ui-layer {
+            width: 100%;
+            background: #1a1a1a;
+            padding: 10px;
+            box-sizing: border-box;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 2px solid #007bff;
+        }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            background: #000;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border: 1px solid #333;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        /* THE PAGE CANVAS */
+        #page-canvas {
+            background-color: white;
+            width: var(--pdf-width);
+            min-height: var(--pdf-height);
+            margin: 20px 0;
+            padding: 60px 70px; /* Standard PDF Margins */
+            box-sizing: border-box;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            font-family: var(--font-serif);
+            color: #000;
+            display: none;
+        }
+
+        /* COMPONENT DEFINITIONS */
+        .p-block { text-align: justify; margin-bottom: 14px; font-size: 15.5px; line-height: 1.5; }
+        .h-block { font-weight: bold; font-size: 17px; margin: 20px 0 10px 0; }
+        
+        .box-block { 
+            background: var(--grey-bg); 
+            border: 1px solid #000; 
+            padding: 10px 15px; 
+            margin: 15px 0; 
+        }
+        .box-block ul { margin: 0; padding-left: 20px; font-weight: bold; font-style: italic; }
+
+        .list-block { padding-left: 40px; margin-bottom: 15px; }
+        .list-block li { margin-bottom: 8px; text-align: justify; font-size: 15.5px; }
+
+        /* The Graphic/SVG Container */
+        .graphic-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        /* Raster/Image Placeholder */
+        .canvas-placeholder {
+            border: 2px dashed #999;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        /* Table Rendering */
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }
+        th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+        th { background: #eee; }
+
+        .footer {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        center { display: block; width: 100%; margin: 5px 0; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <textarea id="json-pen" placeholder="Paste JSON instructions..."></textarea>
+        <button onclick="draw()">EXECUTE DRAW COMMAND</button>
+    </div>
+
+    <div id="page-canvas"></div>
+
+    <script>
+        function draw() {
+            const raw = document.getElementById('json-pen').value;
+            const canvas = document.getElementById('page-canvas');
+            
+            try {
+                const cmd = JSON.parse(raw);
+                canvas.innerHTML = '';
+                canvas.style.display = 'block';
+
+                cmd.content.forEach(item => {
+                    const div = document.createElement('div');
+                    
+                    if (item.type === 'paragraph') {
+                        div.className = 'p-block';
+                        div.innerHTML = item.body;
+                    } 
+                    else if (item.type === 'header') {
+                        div.className = 'h-block';
+                        div.innerHTML = item.body;
+                    }
+                    else if (item.type === 'box') {
+                        div.className = 'box-block';
+                        let list = '<ul>';
+                        item.items.forEach(li => list += `<li>${li}</li>`);
+                        div.innerHTML = list + '</ul>';
+                    }
+                    else if (item.type === 'list') {
+                        div.className = 'list-block';
+                        let list = '<ul>';
+                        item.items.forEach(li => list += `<li>${li}</li>`);
+                        div.innerHTML = list + '</ul>';
+                    }
+                    else if (item.type === 'graphic') {
+                        // The SVG injection point
+                        div.className = 'graphic-container';
+                        div.innerHTML = item.svgCode;
+                    }
+                    else if (item.type === 'canvas') {
+                        div.className = 'canvas-placeholder';
+                        div.style.width = item.w || '100%';
+                        div.style.height = item.h || '200px';
+                        div.innerText = `[ RASTER IMAGE: ${item.label || 'Empty'} ]`;
+                    }
+                    else if (item.type === 'table') {
+                        let t = '<table>';
+                        item.rows.forEach(row => {
+                            t += '<tr>';
+                            row.forEach(cell => t += `<td>${cell}</td>`);
+                            t += '</tr>';
+                        });
+                        div.innerHTML = t + '</table>';
+                    }
+                    else if (item.type === 'footer') {
+                        div.className = 'footer';
+                        div.innerText = item.val;
+                    }
+
+                    canvas.appendChild(div);
+                });
+
+                window.scrollTo({ top: window.innerHeight * 0.4, behavior: 'smooth' });
+
+            } catch (err) {
+                alert("JSON Logic Error: " + err);
+            }
+        }
+    </script>
+</body>
+</html>
