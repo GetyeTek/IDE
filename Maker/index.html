@@ -284,13 +284,13 @@
         .toc-text { flex-shrink: 0; }
         .toc-dots {
             flex-grow: 1;
-            /* Creates perfect academic dot leaders */
-            background-image: radial-gradient(circle, #000 1px, transparent 1.5px);
-            background-position: bottom;
-            background-size: 6px 3px;
+            /* Aligns dots to text baseline precisely */
+            background-image: radial-gradient(circle, #000 0.8px, transparent 1.2px);
+            background-position: 0 12px;
+            background-size: 8px 1px;
             background-repeat: repeat-x;
-            height: 12px;
-            margin: 0 5px;
+            height: 16px;
+            margin: 0 8px;
         }
         .toc-page { flex-shrink: 0; font-weight: bold; }
 
@@ -477,13 +477,18 @@
                         }
                         else if (item.type === 'toc') {
                             element.className = 'toc-container';
-                            item.entries.forEach(entry => {
+                            const list = item.entries || item.items || [];
+                            list.forEach(entry => {
                                 const row = document.createElement('div');
-                                row.className = `toc-entry level-${entry.level || 0}`;
+                                const text = entry.text || entry.label || (typeof entry === 'string' ? entry : '');
+                                const page = entry.page || '';
+                                const level = entry.level || 0;
+                                
+                                row.className = `toc-entry level-${level}`;
                                 row.innerHTML = `
-                                    <span class="toc-text">${entry.text}</span>
+                                    <span class="toc-text">${text}</span>
                                     <span class="toc-dots"></span>
-                                    <span class="toc-page">${entry.page}</span>
+                                    <span class="toc-page">${page}</span>
                                 `;
                                 element.appendChild(row);
                             });
