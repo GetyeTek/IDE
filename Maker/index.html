@@ -71,7 +71,67 @@
             color: #000;
             overflow: hidden;
             page-break-after: always;
+            transition: transform 0.3s ease;
         }
+
+        /* READER MODE OVERRIDES */
+        body.viewer-active {
+            background-color: #1a1a1a !important;
+            padding-top: 0 !important;
+        }
+        body.viewer-active #ui-layer {
+            display: none !important;
+        }
+        body.viewer-active .page-canvas {
+            margin: 10px auto !important;
+            box-shadow: 0 0 50px #000;
+            border: none;
+        }
+        body.viewer-active #exit-viewer {
+            display: flex !important;
+        }
+        body.viewer-active #magnify-toggle {
+            display: none;
+        }
+
+        /* UI CONTROLS */
+        #magnify-toggle {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            z-index: 2000;
+            font-size: 24px;
+        }
+        #exit-viewer {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            display: none;
+            z-index: 3000;
+            font-weight: bold;
+            border: 1px solid rgba(255,255,255,0.3);
+            backdrop-filter: blur(5px);
+        }
+
+        /* DIAGRAM STYLES */
+        .graphic-container { flex-direction: column; align-items: center; padding: 20px 0; }
+        .graphic-caption { font-size: 13px; font-style: italic; margin-top: 10px; color: #444; }
+        svg { max-width: 100%; height: auto; }
 
         @media print {
             body { background: none; }
@@ -193,6 +253,8 @@
         <button onclick="draw()">EXECUTE DRAW COMMAND</button>
     </div>
 
+    <div id="exit-viewer" onclick="toggleViewer()">← EXIT READER</div>
+    <div id="magnify-toggle" onclick="toggleViewer()">🔍</div>
     <div id="document-container"></div>
 
     <script>
@@ -236,7 +298,7 @@
                         }
                         else if (item.type === 'graphic') {
                             element.className = 'graphic-container';
-                            element.innerHTML = item.svgCode;
+                            element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
                         }
                         else if (item.type === 'canvas') {
                             element.className = 'canvas-placeholder';
@@ -294,6 +356,13 @@
             } catch (err) {
                 alert("JSON Logic Error: " + err);
                 console.error(err);
+            }
+        }
+
+        function toggleViewer() {
+            document.body.classList.toggle('viewer-active');
+            if (document.body.classList.contains('viewer-active')) {
+                window.scrollTo({ top: 0, behavior: 'auto' });
             }
         }
     </script>
