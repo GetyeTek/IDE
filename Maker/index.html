@@ -418,7 +418,8 @@
                         else if (item.type === 'list') {
                             element.className = 'list-block';
                             let list = '<ul>';
-                            item.items.forEach(li => list += `<li>${li}</li>`);
+                            const data = item.items || item.points || [];
+                            data.forEach(li => list += `<li>${li}</li>`);
                             element.innerHTML = list + '</ul>';
                         }
                         else if (item.type === 'graphic') {
@@ -455,13 +456,15 @@
                         else if (item.type === 'numbered-list') {
                             element.className = 'list-block';
                             let list = '<ol>';
-                            item.items.forEach(li => list += `<li>${li}</li>`);
+                            const data = item.items || item.points || [];
+                            data.forEach(li => list += `<li>${li}</li>`);
                             element.innerHTML = list + '</ol>';
                         }
                         else if (item.type === 'bullet-list') {
                             element.className = 'list-block';
                             let list = '<ul>';
-                            item.items.forEach(li => list += `<li>${li}</li>`);
+                            const data = item.items || item.points || [];
+                            data.forEach(li => list += `<li>${li}</li>`);
                             element.innerHTML = list + '</ul>';
                         }
                         else if (item.type === 'toc') {
