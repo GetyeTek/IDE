@@ -175,10 +175,14 @@
         .overview-label { font-weight: bold; font-size: 18px; margin-bottom: 8px; display: block; }
 
         /* The Essential Interaction Box (Brainstorming/Reflection) */
-        .interaction-box { background: #eeeeee; border: 1px solid #333; padding: 15px; margin: 20px 0; position: relative; }
+        .interaction-container { margin: 25px 0; }
+        .interaction-box { background: #eeeeee; border: 1px solid #333; padding: 15px; position: relative; }
         .interaction-label { font-weight: bold; font-style: italic; display: block; margin-bottom: 10px; font-size: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
         .interaction-box ul { margin: 0; padding-left: 20px; }
-        .interaction-box li { margin-bottom: 8px; font-size: 14px; font-weight: bold; }
+        .interaction-box li { margin-bottom: 8px; font-size: 14.5px; font-weight: bold; }
+
+        /* Specifically for Reflections where label is OUTSIDE */
+        .outer-label { display: block; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 8px; text-transform: none; }
 
         /* Summary Style */
         .summary-block { border-top: 3px solid #007bff; margin-top: 30px; padding-top: 10px; }
@@ -363,14 +367,26 @@
                             element.innerHTML = `<span class="overview-label">Chapter Overview</span>${item.body}`;
                         }
                         else if (item.type === 'interaction-box') {
-                            element.className = 'interaction-box';
-                            let content = `<span class="interaction-label">${item.label}</span>`;
-                            if (item.questions) {
-                                content += '<ul>' + item.questions.map(q => `<li>${q}</li>`).join('') + '</ul>';
-                            } else {
-                                content += item.body;
+                            element.className = 'interaction-container';
+                            const isReflection = item.label.toLowerCase().includes('reflection');
+                            
+                            let html = '';
+                            if (isReflection) {
+                                html += `<div class="outer-label">${item.label}</div>`;
                             }
-                            element.innerHTML = content;
+                            
+                            html += `<div class="interaction-box">`;
+                            if (!isReflection) {
+                                html += `<span class="interaction-label">${item.label}</span>`;
+                            }
+                            
+                            if (item.questions) {
+                                html += '<ul>' + item.questions.map(q => `<li>${q}</li>`).join('') + '</ul>';
+                            } else {
+                                html += item.body || '';
+                            }
+                            html += `</div>`;
+                            element.innerHTML = html;
                         }
                         else if (item.type === 'summary') {
                             element.className = 'summary-block';
