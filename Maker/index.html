@@ -81,7 +81,42 @@
 
         /* COMPONENT DEFINITIONS */
         .p-block { text-align: justify; margin-bottom: 14px; font-size: 15.5px; line-height: 1.5; }
-        .h-block { font-weight: bold; font-size: 17px; margin: 20px 0 10px 0; }
+        .h-block { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .p-block { text-align: justify; margin-bottom: 16px; font-size: 15px; line-height: 1.6; text-justify: inter-word; }
+        
+        /* CALLOUT BLOCKS */
+        .reflection-block {
+            background: #f2f7ff;
+            border: 1px solid #333;
+            padding: 15px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .reflection-block::before {
+            content: 'Reflection';
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+            text-decoration: underline;
+        }
+
+        .brainstorming-block {
+            background: #f9f9f9;
+            border: 1.5px solid #000;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .brainstorming-block b { color: #000; }
+
+        .definition-box {
+            border: 2px solid #000;
+            padding: 12px 20px;
+            margin: 20px 40px;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 8px;
+            background: #fff;
+        }
         
         .box-block { 
             background: var(--grey-bg); 
@@ -221,6 +256,18 @@
                         else if (item.type === 'footer') {
                             element.className = 'footer';
                             element.innerText = item.val;
+                        }
+                        else if (item.type === 'reflection') {
+                            element.className = 'reflection-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'brainstorming') {
+                            element.className = 'brainstorming-block';
+                            element.innerHTML = `<strong>Brainstorming Questions</strong><br><br>${item.body}`;
+                        }
+                        else if (item.type === 'definition') {
+                            element.className = 'definition-box';
+                            element.innerHTML = item.body;
                         }
                         else if (item.type === 'toc') {
                             element.className = 'toc-container';
