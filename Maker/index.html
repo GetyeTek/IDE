@@ -382,17 +382,10 @@
                         else if (item.type === 'interaction-box') {
                             element.className = 'interaction-container';
                             const isReflection = item.label.toLowerCase().includes('reflection');
-                            
                             let html = '';
-                            if (isReflection) {
-                                html += `<div class="outer-label">${item.label}</div>`;
-                            }
-                            
+                            if (isReflection) html += `<div class="outer-label">${item.label}</div>`;
                             html += `<div class="interaction-box">`;
-                            if (!isReflection) {
-                                html += `<span class="interaction-label">${item.label}</span>`;
-                            }
-                            
+                            if (!isReflection) html += `<span class="interaction-label">${item.label}</span>`;
                             if (item.questions) {
                                 html += '<ul>' + item.questions.map(q => `<li>${q}</li>`).join('') + '</ul>';
                             } else {
@@ -411,36 +404,25 @@
                             element.className = 'definition-highlight';
                             element.innerHTML = `<ul><li>${item.body}</li></ul>`;
                         }
-                        else if (item.type === 'spacer') {
-                            element.style.flexGrow = item.flex || '0';
-                            element.style.height = item.height || '0px';
-                        }
-
-                        // APPLY GRANULAR STYLES
-                        if (item.style) {
-                            if (item.style.align) element.style.textAlign = item.style.align;
-                            if (item.style.bold) element.style.fontWeight = 'bold';
-                            if (item.style.size) element.style.fontSize = item.style.size;
-                            if (item.style.marginTop) element.style.marginTop = item.style.marginTop;
-                            if (item.style.marginBottom) element.style.marginBottom = item.style.marginBottom;
-                            if (item.style.color) element.style.color = item.style.color;
-                            if (item.style.italic) element.style.fontStyle = 'italic';
-                        }
-
-                        pageDiv.appendChild(element);
-                    });
+                        else if (item.type === 'box-block') {
                             element.className = 'box-block';
                             let list = '<ul>';
                             item.items.forEach(li => list += `<li>${li}</li>`);
                             element.innerHTML = list + '</ul>';
                         }
-                        else if (item.type === 'list') {
+                        else if (item.type === 'list' || item.type === 'bullet-list') {
                             element.className = 'list-block';
                             let list = '<ul>';
                             const data = item.items || item.points || [];
                             data.forEach(li => list += `<li>${li}</li>`);
                             element.innerHTML = list + '</ul>';
                         }
+                        else if (item.type === 'numbered-list') {
+                            element.className = 'list-block';
+                            let list = '<ol>';
+                            const data = item.items || item.points || [];
+                            data.forEach(li => list += `<li>${li}</li>`);
+                            element.innerHTML = list + '</ol>';
                         }
                         else if (item.type === 'graphic') {
                             element.className = 'graphic-container';
@@ -473,26 +455,9 @@
                             element.className = 'brainstorming-block';
                             element.innerHTML = `<b>Brainstorming Questions</b><br>${item.body}`;
                         }
-                        else if (item.type === 'numbered-list') {
-                            element.className = 'list-block';
-                            let list = '<ol>';
-                            const data = item.items || item.points || [];
-                            data.forEach(li => list += `<li>${li}</li>`);
-                            element.innerHTML = list + '</ol>';
-                        }
-                        else if (item.type === 'bullet-list') {
-                            element.className = 'list-block';
-                            let list = '<ul>';
-                            const data = item.items || item.points || [];
-                            data.forEach(li => list += `<li>${li}</li>`);
-                            element.innerHTML = list + '</ul>';
-                        }
-                        else if (item.type === 'bullet-list') {
-                            element.className = 'list-block';
-                            let list = '<ul>';
-                            const data = item.items || item.points || [];
-                            data.forEach(li => list += `<li>${li}</li>`);
-                            element.innerHTML = list + '</ul>';
+                        else if (item.type === 'spacer') {
+                            element.style.flexGrow = item.flex || '0';
+                            element.style.height = item.height || '0px';
                         }
                         else if (item.type === 'toc') {
                             element.className = 'toc-container';
@@ -502,15 +467,21 @@
                                 const text = entry.text || entry.label || (typeof entry === 'string' ? entry : '');
                                 const page = entry.page || '';
                                 const level = entry.level || 0;
-                                
                                 row.className = `toc-entry level-${level}`;
-                                row.innerHTML = `
-                                    <span class="toc-text">${text}</span>
-                                    <span class="toc-dots"></span>
-                                    <span class="toc-page">${page}</span>
-                                `;
+                                row.innerHTML = `<span class="toc-text">${text}</span><span class="toc-dots"></span><span class="toc-page">${page}</span>`;
                                 element.appendChild(row);
                             });
+                        }
+
+                        // APPLY GRANULAR STYLES
+                        if (item.style) {
+                            if (item.style.align) element.style.textAlign = item.style.align;
+                            if (item.style.bold) element.style.fontWeight = 'bold';
+                            if (item.style.size) element.style.fontSize = item.style.size;
+                            if (item.style.marginTop) element.style.marginTop = item.style.marginTop;
+                            if (item.style.marginBottom) element.style.marginBottom = item.style.marginBottom;
+                            if (item.style.color) element.style.color = item.style.color;
+                            if (item.style.italic) element.style.fontStyle = 'italic';
                         }
 
                         pageDiv.appendChild(element);
