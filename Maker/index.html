@@ -68,7 +68,6 @@
             background-color: white;
             width: var(--pdf-width);
             min-height: var(--pdf-height);
-            /* Increased bottom padding to 100px to prevent content-footer collision */
             padding: 60px 70px 100px 70px; 
             box-sizing: border-box;
             position: relative;
@@ -78,6 +77,9 @@
             page-break-after: always;
             transform-origin: top center;
             flex-shrink: 0;
+            /* Enables vertical distribution */
+            display: flex;
+            flex-direction: column;
         }
 
         /* READER MODE OVERRIDES */
@@ -409,7 +411,24 @@
                             element.className = 'definition-highlight';
                             element.innerHTML = `<ul><li>${item.body}</li></ul>`;
                         }
-                        else if (item.type === 'box') {
+                        else if (item.type === 'spacer') {
+                            element.style.flexGrow = item.flex || '0';
+                            element.style.height = item.height || '0px';
+                        }
+
+                        // APPLY GRANULAR STYLES
+                        if (item.style) {
+                            if (item.style.align) element.style.textAlign = item.style.align;
+                            if (item.style.bold) element.style.fontWeight = 'bold';
+                            if (item.style.size) element.style.fontSize = item.style.size;
+                            if (item.style.marginTop) element.style.marginTop = item.style.marginTop;
+                            if (item.style.marginBottom) element.style.marginBottom = item.style.marginBottom;
+                            if (item.style.color) element.style.color = item.style.color;
+                            if (item.style.italic) element.style.fontStyle = 'italic';
+                        }
+
+                        pageDiv.appendChild(element);
+                    });
                             element.className = 'box-block';
                             let list = '<ul>';
                             item.items.forEach(li => list += `<li>${li}</li>`);
