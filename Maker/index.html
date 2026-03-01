@@ -422,6 +422,7 @@
                             data.forEach(li => list += `<li>${li}</li>`);
                             element.innerHTML = list + '</ul>';
                         }
+                        }
                         else if (item.type === 'graphic') {
                             element.className = 'graphic-container';
                             element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
@@ -459,6 +460,13 @@
                             const data = item.items || item.points || [];
                             data.forEach(li => list += `<li>${li}</li>`);
                             element.innerHTML = list + '</ol>';
+                        }
+                        else if (item.type === 'bullet-list') {
+                            element.className = 'list-block';
+                            let list = '<ul>';
+                            const data = item.items || item.points || [];
+                            data.forEach(li => list += `<li>${li}</li>`);
+                            element.innerHTML = list + '</ul>';
                         }
                         else if (item.type === 'bullet-list') {
                             element.className = 'list-block';
