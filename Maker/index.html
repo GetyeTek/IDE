@@ -67,7 +67,7 @@
         .page-canvas {
             background-color: white;
             width: var(--pdf-width);
-            min-height: var(--pdf-height);
+            height: var(--pdf-height);
             padding: 60px 70px 100px 70px; 
             box-sizing: border-box;
             position: relative;
@@ -475,13 +475,28 @@
 
                         // APPLY GRANULAR STYLES
                         if (item.style) {
-                            if (item.style.align) element.style.textAlign = item.style.align;
+                            if (item.style.align) {
+                                element.style.textAlign = item.style.align;
+                                // If block-level centering is needed
+                                if (item.style.align === 'center') {
+                                    element.style.marginLeft = 'auto';
+                                    element.style.marginRight = 'auto';
+                                } else if (item.style.align === 'right') {
+                                    element.style.marginLeft = 'auto';
+                                    element.style.marginRight = '0';
+                                }
+                            }
                             if (item.style.bold) element.style.fontWeight = 'bold';
                             if (item.style.size) element.style.fontSize = item.style.size;
                             if (item.style.marginTop) element.style.marginTop = item.style.marginTop;
                             if (item.style.marginBottom) element.style.marginBottom = item.style.marginBottom;
                             if (item.style.color) element.style.color = item.style.color;
                             if (item.style.italic) element.style.fontStyle = 'italic';
+                            if (item.style.width) element.style.width = item.style.width;
+                            if (item.style.height) element.style.height = item.style.height;
+                            if (item.style.padding) element.style.padding = item.style.padding;
+                            if (item.style.flex) element.style.flex = item.style.flex;
+                            if (item.style.border) element.style.border = item.style.border;
                         }
 
                         pageDiv.appendChild(element);
