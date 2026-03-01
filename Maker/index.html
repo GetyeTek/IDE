@@ -187,7 +187,12 @@
         /* Summary Style */
         .summary-block { border-top: 3px solid #007bff; margin-top: 30px; padding-top: 10px; }
         .summary-label { font-weight: bold; font-size: 19px; color: #007bff; margin-bottom: 10px; display: block; }
-        .p-block { text-align: justify; margin-bottom: 8px; font-size: 14.5px; line-height: 1.4; text-justify: inter-word; }
+
+        /* Page 8/40 style Definition Box */
+        .definition-highlight { border: 1px solid #000; padding: 12px 20px; margin: 20px 40px; border-radius: 4px; }
+        .definition-highlight ul { margin: 0; padding-left: 15px; list-style-type: disc; }
+        .definition-highlight li { font-style: italic; font-weight: normal; font-size: 15px; }
+        .p-block { text-align: justify; margin-bottom: 12px; font-size: 15px; line-height: 1.5; text-justify: inter-word; hyphens: auto; }
         
         /* ACADEMIC CALLOUT BLOCKS */
         .reflection-block {
@@ -262,7 +267,8 @@
             justify-content: center;
             background: white;
             z-index: 10;
-            font-size: 14px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
         }
 
         center { display: block; width: 100%; margin: 5px 0; }
@@ -278,8 +284,13 @@
         .toc-text { flex-shrink: 0; }
         .toc-dots {
             flex-grow: 1;
-            border-bottom: 1.5px dotted #000;
-            margin: 0 5px 4px 5px;
+            /* Creates perfect academic dot leaders */
+            background-image: radial-gradient(circle, #000 1px, transparent 1.5px);
+            background-position: bottom;
+            background-size: 6px 3px;
+            background-repeat: repeat-x;
+            height: 12px;
+            margin: 0 5px;
         }
         .toc-page { flex-shrink: 0; font-weight: bold; }
 
@@ -393,6 +404,10 @@
                             let list = `<span class="summary-label">Summary</span><ul>`;
                             item.points.forEach(p => list += `<li>${p}</li>`);
                             element.innerHTML = list + '</ul>';
+                        }
+                        else if (item.type === 'definition-box') {
+                            element.className = 'definition-highlight';
+                            element.innerHTML = `<ul><li>${item.body}</li></ul>`;
                         }
                         else if (item.type === 'box') {
                             element.className = 'box-block';
