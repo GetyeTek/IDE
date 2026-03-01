@@ -150,40 +150,43 @@
         /* COMPONENT DEFINITIONS */
         .p-block { text-align: justify; margin-bottom: 14px; font-size: 15.5px; line-height: 1.5; }
         .h-block { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .p-block { text-align: justify; margin-bottom: 16px; font-size: 15px; line-height: 1.6; text-justify: inter-word; }
+        .p-block { text-align: justify; margin-bottom: 8px; font-size: 14.5px; line-height: 1.4; text-justify: inter-word; }
         
-        /* CALLOUT BLOCKS */
+        /* ACADEMIC CALLOUT BLOCKS */
         .reflection-block {
-            background: #f2f7ff;
-            border: 1px solid #333;
-            padding: 15px;
-            margin: 20px 0;
-            position: relative;
+            border: 1px solid #666;
+            padding: 12px 15px;
+            margin: 15px 0;
         }
-        .reflection-block::before {
-            content: 'Reflection';
+        .reflection-label {
             font-weight: bold;
-            display: block;
-            margin-bottom: 8px;
             text-decoration: underline;
+            display: block;
+            margin-bottom: 5px;
+            font-size: 15px;
         }
 
         .brainstorming-block {
-            background: #f9f9f9;
-            border: 1.5px solid #000;
-            padding: 15px;
-            margin: 20px 0;
+            background: #eee;
+            border: 1px solid #000;
+            padding: 10px 15px;
+            margin: 15px 0;
         }
-        .brainstorming-block b { color: #000; }
 
-        .definition-box {
-            border: 2px solid #000;
-            padding: 12px 20px;
-            margin: 20px 40px;
-            font-weight: bold;
+        /* LIST STYLES */
+        .list-block { padding-left: 25px; margin: 10px 0; }
+        .list-block ul, .list-block ol { padding: 0; margin: 0; }
+        .list-block li { margin-bottom: 4px; text-align: justify; font-size: 14.5px; line-height: 1.3; }
+
+        .footer {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            right: 0;
             text-align: center;
-            border-radius: 8px;
-            background: #fff;
+            font-size: 13px;
+            background: white; /* Block elements behind it */
+            padding-top: 5px;
         }
         
         .box-block { 
@@ -339,15 +342,23 @@
                         }
                         else if (item.type === 'reflection') {
                             element.className = 'reflection-block';
-                            element.innerHTML = item.body;
+                            element.innerHTML = `<span class="reflection-label">Reflection</span>${item.body}`;
                         }
                         else if (item.type === 'brainstorming') {
                             element.className = 'brainstorming-block';
-                            element.innerHTML = `<strong>Brainstorming Questions</strong><br><br>${item.body}`;
+                            element.innerHTML = `<b>Brainstorming Questions</b><br>${item.body}`;
                         }
-                        else if (item.type === 'definition') {
-                            element.className = 'definition-box';
-                            element.innerHTML = item.body;
+                        else if (item.type === 'numbered-list') {
+                            element.className = 'list-block';
+                            let list = '<ol>';
+                            item.items.forEach(li => list += `<li>${li}</li>`);
+                            element.innerHTML = list + '</ol>';
+                        }
+                        else if (item.type === 'bullet-list') {
+                            element.className = 'list-block';
+                            let list = '<ul>';
+                            item.items.forEach(li => list += `<li>${li}</li>`);
+                            element.innerHTML = list + '</ul>';
                         }
                         else if (item.type === 'toc') {
                             element.className = 'toc-container';
