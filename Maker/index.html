@@ -198,9 +198,10 @@
         
         /* ACADEMIC CALLOUT BLOCKS */
         .reflection-block {
-            border: 1px solid #666;
+            border: 1px solid #000;
             padding: 12px 15px;
             margin: 15px 0;
+            background: transparent; /* Keeping it clean like Reflection */
         }
         .reflection-label {
             font-weight: bold;
@@ -387,11 +388,13 @@
                         }
                         else if (item.type === 'interaction-box') {
                             element.className = 'interaction-container';
-                            const isReflection = item.label.toLowerCase().includes('reflection');
+                            const labelLower = item.label.toLowerCase();
+                            const isOuter = labelLower.includes('reflection') || labelLower.includes('brainstorming');
+                            
                             let html = '';
-                            if (isReflection) html += `<div class="outer-label">${item.label}</div>`;
+                            if (isOuter) html += `<div class="outer-label">${item.label}</div>`;
                             html += `<div class="interaction-box">`;
-                            if (!isReflection) html += `<span class="interaction-label">${item.label}</span>`;
+                            if (!isOuter) html += `<span class="interaction-label">${item.label}</span>`;
                             const listData = item.questions || item.items || item.points;
                             if (listData && Array.isArray(listData)) {
                                 html += '<ul>' + listData.map(q => `<li>${q}</li>`).join('') + '</ul>';
@@ -454,9 +457,13 @@
                             element.className = 'footer';
                             element.innerText = item.val;
                         }
-                        else if (item.type === 'reflection' || item.type === 'brainstorming') {
-                            const isRef = item.type === 'reflection';
-                            const labelText = isRef ? 'Reflection' : 'Brainstorming';
+                        else if (item.type === 'reflection' || item.type === 'brainstorming' || item.type === 'brainstorming-questions') {
+                            const isBrainstormingQuestions = item.type === 'brainstorming-questions';
+                            const isRef = item.type === 'reflection' || isBrainstormingQuestions;
+                            
+                            let labelText = isRef ? 'Reflection' : 'Brainstorming';
+                            if (isBrainstormingQuestions) labelText = 'Brainstorming Questions';
+                            
                             const labelClass = isRef ? 'reflection-label' : 'brainstorming-label';
                             const boxClass = isRef ? 'reflection-block' : 'brainstorming-block';
                             
