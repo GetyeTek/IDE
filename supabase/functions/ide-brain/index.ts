@@ -2173,11 +2173,13 @@ If you already give a payload, assume it's already applied, and give the next pl
             // 1. Inject Base Tag to fix assets
             const baseTag = `<base href="${new URL(targetUrl).origin}/">`;
             
-            // 2. Inject Conduit Bridge
+            // 2. Inject Conduit Bridge with Navigation Guard
             const bridgeScript = `
                 <script>
                 (function() {
                     window.IS_CONDUIT_PROXY = true;
+                    
+                    // --- LOG & NET INTERCEPTION ---
                     const originalConsole = { ...console };
                     ['log','warn','error','info'].forEach(m => {
                         console[m] = (...args) => {
@@ -2189,21 +2191,30 @@ If you already give a payload, assume it's already applied, and give the next pl
                             originalConsole[m](...args);
                         };
                     });
-                    const originalFetch = window.fetch;
-                    window.fetch = async (...args) => {
-                        const start = Date.now();
-                        const res = await originalFetch(...args);
-                        const clone = res.clone();
-                        window.parent.postMessage({
-                            type: 'CONDUIT_NETWORK',
-                            payload: {
-                                url: args[0], method: 'GET', status: res.status, 
-                                duration: Date.now() - start
-                            }
-                        }, '*');
-                        return res;
-                    };
-                    console.log("⚡ Conduit Interceptor Active on: " + location.href);
+
+                    // --- NAVIGATION INTERCEPTION ---
+                    // Intercept Link Clicks
+                    document.addEventListener('click', (e) => {
+                        const link = e.target.closest('a');
+                        if (link && link.href && !link.href.startsWith('javascript:')) {
+                            e.preventDefault();
+                            window.parent.postMessage({ type: 'CONDUIT_NAVIGATE', url: link.href }, '*');
+                        }
+                    }, true);
+
+                    // Intercept Form Submissions (Google Search Fix)
+                    document.addEventListener('submit', (e) => {
+                        const form = e.target;
+                        const url = new URL(form.action || location.href);
+                        if (form.method.toLowerCase() === 'get') {
+                            const params = new URLSearchParams(new FormData(form));
+                            const finalUrl = url.origin + url.pathname + '?' + params.toString();
+                            e.preventDefault();
+                            window.parent.postMessage({ type: 'CONDUIT_NAVIGATE', url: finalUrl }, '*');
+                        }
+                    }, true);
+
+                    console.log("⚡ Conduit Interceptor Active: " + location.href);
                 })();
                 </script>
             `;
