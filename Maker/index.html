@@ -373,30 +373,32 @@
 
         /* LOGIC BOOK SPECIFIC STYLES */
         .logic-header {
-            border-top: 2px solid #bbb; /* Restored visibility with light grey */
-            height: 30px;
-            margin-bottom: 25px;
+            border-top: 3.5px solid #444; /* Darker and thicker as per PDF */
+            height: 10px;
+            margin-bottom: 40px;
             position: relative;
         }
         .logic-header::after {
             content: '';
             position: absolute;
             right: 40px;
-            bottom: 30px; 
-            width: 2px; /* Matched thickness */
-            height: 35px;
-            background: #bbb;
+            top: -3.5px; /* Precisely glued to the horizontal bar top */
+            width: 3.5px; 
+            height: 45px;
+            background: #444;
         }
         .logic-footer {
-            /* Precise Asymmetrical: 5px thick top, 1px gap, 1px thin bottom */
-            background: linear-gradient(to bottom, #800000 0, #800000 5px, transparent 5px, transparent 6px, #800000 6px, #800000 7px) top/100% 7px no-repeat;
+            /* Precise Asymmetrical: 4px bold top line, 1px micro-gap, 1px thin base line */
+            background: linear-gradient(to bottom, #800000 0, #800000 4px, transparent 4px, transparent 5px, #800000 5px, #800000 6px) top/100% 6px no-repeat;
             margin-top: auto;
-            padding-top: 15px; 
+            padding-top: 12px; 
             display: flex;
             justify-content: space-between;
-            font-size: 14.5px;
+            font-size: 14px;
             font-style: italic;
             font-family: var(--font-serif);
+            color: #000;
+            font-variant-numeric: tabular-nums;
         }
         .logic-example-label {
             font-weight: bold;
