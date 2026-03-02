@@ -373,7 +373,7 @@
 
         /* LOGIC BOOK SPECIFIC STYLES */
         .logic-header {
-            border-top: 1px solid #bbb; /* Subtle light grey */
+            border-top: 2px solid #bbb; /* Restored visibility with light grey */
             height: 30px;
             margin-bottom: 25px;
             position: relative;
@@ -383,13 +383,13 @@
             position: absolute;
             right: 40px;
             bottom: 30px; 
-            width: 1px;
+            width: 2px; /* Matched thickness */
             height: 35px;
             background: #bbb;
         }
         .logic-footer {
-            /* Ultra-tight Asymmetrical: 4px thick, 1px gap, 1px thin */
-            background: linear-gradient(to bottom, #800000 0, #800000 4px, transparent 4px, transparent 5px, #800000 5px, #800000 6px) top/100% 6px no-repeat;
+            /* Precise Asymmetrical: 5px thick top, 1px gap, 1px thin bottom */
+            background: linear-gradient(to bottom, #800000 0, #800000 5px, transparent 5px, transparent 6px, #800000 6px, #800000 7px) top/100% 7px no-repeat;
             margin-top: auto;
             padding-top: 15px; 
             display: flex;
