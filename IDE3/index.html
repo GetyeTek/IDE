@@ -322,6 +322,16 @@
         #ace-container { flex: 1; width: 100%; position: relative; }
 
         /* PREVIEW TAB */
+        .browser-toolbar {
+            display: flex; gap: 8px; padding: 8px 12px; background: #1a1a1c; border: 1px solid var(--border);
+            border-radius: 12px; margin-bottom: 12px; align-items: center;
+        }
+        .url-bar {
+            flex: 1; background: #0a0a0a; border: 1px solid #333; color: #eee; padding: 6px 12px;
+            border-radius: 8px; font-size: 12px; outline: none; font-family: 'JetBrains Mono';
+        }
+        .url-bar:focus { border-color: var(--primary); }
+
         .preview-container {
             /* Calculated height: Viewport - Nav - Header - Padding */
             height: calc(100vh - 180px);
@@ -613,19 +623,24 @@
         <!-- PREVIEW TAB -->
         <div id="tab-preview" class="tab-content">
             <button class="fs-back-btn" onclick="toggleFullscreen(false)">Back</button>
-            <div class="header" style="flex-shrink:0;">
+            <div class="header" style="flex-shrink:0; margin-bottom:10px;">
                 Preview
                 <div class="flex-gap">
-                    <button class="icon-btn" onclick="bundleAndPreview(null)">Refresh</button>
-                    <button class="icon-btn" onclick="openInspector()" style="color:var(--ai-accent); border-color:var(--ai-accent);">📟 Logs</button>
-                    <button class="icon-btn" onclick="openPopOut()">↗ Pop-out</button>
+                    <button class="icon-btn" onclick="openInspector()" style="color:var(--ai-accent); border-color:var(--ai-accent);">📟 Inspector</button>
                     <button class="icon-btn" onclick="toggleFullscreen(true)">Expand</button>
                 </div>
             </div>
+
+            <div class="browser-toolbar">
+                <button class="icon-btn" style="padding:6px;" onclick="bundleAndPreview(null)" title="Reset to Local App">🏠</button>
+                <input type="text" id="browser-url" class="url-bar" placeholder="Search or enter URL (e.g. google.com)" onkeydown="if(event.key==='Enter') navigateProxy()">
+                <button class="icon-btn" style="color:var(--prod)" onclick="navigateProxy()">Go</button>
+            </div>
+
             <div class="preview-container">
                 <iframe src="" id="preview-frame"></iframe>
             </div>
-            <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px; flex-shrink:0;">Rendering Client-Side</p>
+            <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px; flex-shrink:0;">Conduit Proxy Environment</p>
         </div>
 
         <!-- HISTORY TAB -->
@@ -3127,7 +3142,26 @@ function addTerminalCard(data, options = {}) {
     }
 
     // --- BUNDLER & PREVIEW ---
-        async function bundleAndPreview(index) {
+        async function navigateProxy() {
+        const url = document.getElementById('browser-url').value.trim();
+        if(!url) return;
+        const iframe = document.getElementById('preview-frame');
+        iframe.srcdoc = '<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Proxying Connection to ' + url + '...</div>';
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'proxy_web', url: url })
+            });
+            const html = await res.text();
+            iframe.srcdoc = html;
+            document.getElementById('preview-url-display').innerText = 'Browsing: ' + url;
+        } catch(e) {
+            iframe.srcdoc = '<div style="color:red; padding:20px;">Proxy Error: ' + e.message + '</div>';
+        }
+    }
+
+    async function bundleAndPreview(index) {
         if(!CONFIG.funcUrl) {
             console.error('Bundler Error: No function URL configured');
             return;
@@ -3459,6 +3493,7 @@ function addTerminalCard(data, options = {}) {
             window.PREVIEW_BLOB_URL = URL.createObjectURL(new Blob([iframe.srcdoc], { type: 'text/html' }));
             if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
             document.getElementById('preview-url-display').innerText = sha ? 'Viewing: ' + entry.title : 'Viewing: Live Dev (' + CONFIG.repoName + ')';
+            document.getElementById('browser-url').value = '';
                     } catch(e) {
             console.error('CRITICAL BUILD FAILURE:', e);
             iframe.srcdoc = '<div style="color:red; padding:20px;"><b>Preview Error:</b><br>' + e.message + '</div>'; 
