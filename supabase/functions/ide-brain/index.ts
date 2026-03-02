@@ -2161,6 +2161,53 @@ If you already give a payload, assume it's already applied, and give the next pl
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "create_cron_job") {
+        const { job_name, schedule, function_slug } = payload;
+        const projectUrl = Deno.env.get("SUPABASE_URL");
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        const fullUrl = `${projectUrl}/functions/v1/${function_slug}`;
+
+        // SQL to enable extensions and schedule the job
+        const sql = `
+            CREATE EXTENSION IF NOT EXISTS pg_cron;
+            CREATE EXTENSION IF NOT EXISTS pg_net;
+            
+            SELECT cron.schedule(
+                '${job_name}',
+                '${schedule}',
+                $
+                SELECT net.http_post(
+                    url:='${fullUrl}',
+                    headers:='{"Content-Type": "application/json", "Authorization": "Bearer ${serviceKey}"}'::jsonb,
+                    body:='{"job": "${job_name}", "triggered_at": "' || now() || '"}'::jsonb
+                )
+                $
+            );
+        `.trim();
+
+        // Use the internal SQL executor endpoint
+        const sqlRes = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+                'apikey': Deno.env.get("SUPABASE_ANON_KEY")
+            },
+            body: JSON.stringify({ query: sql })
+        });
+
+        const sqlData = await sqlRes.json();
+        if (sqlData.error) throw new Error(sqlData.error);
+
+        await supabase.from('conduit_logs').insert({
+            repo_name: TARGET_REPO,
+            type: 'cron_created',
+            data: { job_name, schedule, function_slug, status: "Success" }
+        });
+
+        return new Response(JSON.stringify({ success: true, message: `Cron job '${job_name}' scheduled.` }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "rollback") {
         if(!ref_sha) throw new Error("Target SHA required");
         await githubFetch(TARGET_REPO, `/git/refs/heads/${DEV_BRANCH}`, { method: "PATCH", body: JSON.stringify({ sha: ref_sha, force: true }) });
