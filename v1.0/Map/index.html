@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="//cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init(); console.log('Director Studio Debugger Active');</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Geo-Scholar: Ethiopia & The Horn</title>
+    <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #0a0a0c; --accent: #60a5fa; --glass: rgba(15, 23, 42, 0.9);
+            --text-main: #f1f5f9; --highlight: #fbbf24;
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: white; }
+        
+        #map-container { position: absolute; width: 100%; height: 100%; filter: brightness(0); transition: filter 1.5s ease; }
+        #map { width: 100%; height: 100%; }
+
+        #splash { position: fixed; z-index: 1000; top:0; left:0; width:100%; height:100%; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 1s; }
+        .loader { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 70vh;
+            background: var(--glass); backdrop-filter: blur(25px);
+            border-top: 1px solid rgba(255,255,255,0.1); border-radius: 20px 20px 0 0;
+            z-index: 500; transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+            display: flex; flex-direction: column; pointer-events: auto;
+        }
+        .bottom-sheet.open { transform: translateY(0); }
+        .sheet-handle { width: 40px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 10px; margin: 12px auto; }
+
+        .editor-header { padding: 0 20px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .editor-header h3 { margin: 0; font-size: 0.9rem; letter-spacing: 1px; color: var(--accent); }
+
+        .editor-body { flex: 1; padding: 0 15px 15px; display: flex; flex-direction: column; }
+        #json-input {
+            flex: 1; background: #000; border: 1px solid #222; border-radius: 12px;
+            color: #00ffaa; font-family: 'Menlo', 'Monaco', monospace; font-size: 13px; padding: 15px; outline: none;
+            -webkit-appearance: none;
+        }
+
+        .hud-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; display: flex; flex-direction: column; justify-content: space-between; }
+        .cinema-bar { height: 15vh; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); }
+        .cinema-bar.bottom { 
+            height: 25vh; 
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 20%, transparent);
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            padding-bottom: calc(20px + var(--safe-bottom, 20px));
+        }
+
+        #subtitle { 
+            font-size: 1.05rem; line-height: 1.6; font-weight: 400; text-align: left; 
+            padding: 25px; margin-bottom: 20px; background: var(--glass); 
+            border-radius: 12px; border-left: 4px solid var(--accent);
+            max-width: 85%; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            opacity: 0; transform: translateY(20px); transition: 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #subtitle.active { opacity: 1; transform: translateY(0); }
+
+        .touch-controls { display: flex; gap: 10px; pointer-events: auto; }
+        
+        .marker-beacon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+        .beacon-ring {
+            position: absolute; border: 2px solid var(--accent); border-radius: 50%;
+            animation: pulse-ring 2s infinite ease-out;
+        }
+        @keyframes pulse-ring {
+            0% { width: 4px; height: 4px; opacity: 1; }
+            100% { width: 50px; height: 50px; opacity: 0; }
+        }
+        .marker-arrow {
+            width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent;
+            border-top: 20px solid #ff3366; filter: drop-shadow(0 0 5px #ff3366);
+            animation: bounce 1s infinite alternate ease-in-out;
+        }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-15px); } }
+
+        .fab { 
+            background: white; color: black; border: none; padding: 14px 24px; border-radius: 30px;
+            font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+        }
+        .fab-outline { background: rgba(255,255,255,0.1); color: white; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); }
+
+        .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 150; background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.4) 100%); }
+        .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 151; opacity: 0.05; background: url('https://grainy-gradients.vercel.app/noise.svg'); }
+        
+        .moving { filter: blur(2px) saturate(1.2); transition: filter 0.3s; }
+
+        #lens-scope {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 250px; height: 250px; border-radius: 50%;
+            border: 2px solid var(--accent); box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);
+            pointer-events: none; z-index: 400; display: none;
+            overflow: hidden;
+        }
+        #lens-scope.active { display: block; animation: scope-intro 0.5s ease-out; }
+        .scope-overlay { position: absolute; top:0; left:0; width:100%; height:100%; backdrop-filter: invert(1) hue-rotate(180deg) brightness(1.5); opacity: 0.4; }
+        .scan-line { position: absolute; top: 0; width: 100%; height: 2px; background: var(--accent); opacity: 0.3; animation: scan 4s linear infinite; }
+        @keyframes scan { from { top: 0; } to { top: 100%; } }
+        
+        #choice-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 600; pointer-events: auto; }
+        #choice-overlay.active { display: flex; }
+        .choice-btn { background: var(--accent); color: white; border: none; padding: 15px 40px; margin: 10px; border-radius: 50px; font-weight: 800; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
+
+        .filter-night { filter: brightness(0.6) sepia(1) hue-rotate(100deg) contrast(1.2); }
+        .filter-blueprint { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.5); }
+        .filter-vhs { filter: contrast(1.1) saturate(1.2) sepia(0.2); animation: vhs-flicker 0.1s infinite; }
+        .filter-glitch { filter: hue-rotate(90deg) contrast(1.5); animation: glitch-anim 0.2s infinite; }
+        .filter-hologram { filter: brightness(1.2) hue-rotate(180deg) saturate(2); }
+
+        @keyframes vhs-flicker { 0% { opacity: 0.99; } 50% { opacity: 1; } 100% { opacity: 0.98; } }
+        @keyframes glitch-anim { 0% { transform: translate(0); } 20% { transform: translate(-2px, 2px); } 40% { transform: translate(-2px, -2px); } 60% { transform: translate(2px, 2px); } 80% { transform: translate(2px, -2px); } 100% { transform: translate(0); } }
+
+        #intel-container { position: absolute; top: 20px; right: 20px; width: 150px; height: 100px; border: 2px solid var(--accent); background: #000; border-radius: 8px; overflow: hidden; opacity: 0; transform: scale(0.8); transition: 0.5s; z-index: 200; pointer-events: auto; }
+        #intel-container.active { opacity: 1; transform: scale(1); }
+        #intel-img, #intel-video { width: 100%; height: 100%; object-fit: cover; }
+
+        .spatial-label { color: white; background: rgba(0,0,0,0.7); padding: 4px 10px; border-radius: 4px; font-size: 10px; border: 1px solid var(--accent); white-space: nowrap; pointer-events: none; }
+        .timeline-container { position: absolute; bottom: 85px; width: 80%; left: 10%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+        #timeline-progress { width: 0%; height: 100%; background: var(--accent); transition: width 0.1s linear; }
+
+        #weather-canvas, #flow-canvas { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 11; }
+    </style>
+</head>
+<body>
+
+<div id="splash">
+    <div class="loader"></div>
+    <p style="margin-top: 20px; font-size: 0.7rem; letter-spacing: 3px; opacity: 0.6;">INITIALIZING SATELLITE</p>
+</div>
+
+<div id="map-container">
+    <div id="map"></div>
+    <canvas id="weather-canvas"></canvas>
+    <canvas id="flow-canvas"></canvas>
+    <div id="lens-scope"><div class="scope-overlay"></div><div class="scan-line"></div></div>
+</div>
+
+<div class="vignette"></div>
+<div class="grain"></div>
+
+<div id="choice-overlay">
+    <h2 id="choice-prompt" style="margin-bottom: 20px; font-weight: 300;">SELECT PATH</h2>
+    <div id="choice-buttons"></div>
+</div>
+
+    <div id="academic-hud" style="position:fixed; top:20px; left:20px; z-index:700; font-family:monospace; background:rgba(0,0,0,0.8); padding:10px; border:1px solid var(--accent); border-radius:4px;">
+        <div style="color:var(--accent); font-size:10px;">PHYSIOGRAPHIC UNIT</div>
+        <div id="hud-unit" style="color:white; font-size:14px; margin-bottom:10px;">GENERAL OVERVIEW</div>
+        <div style="color:var(--accent); font-size:10px;">ELEVATION (EST.)</div>
+        <div id="hud-alt" style="color:var(--highlight); font-size:18px;">--- m.a.s.l</div>
+    </div>
+
+<div class="hud-overlay">
+    <div class="cinema-bar top"></div>
+    <div class="cinema-bar bottom">
+        <div class="timeline-container"><div id="timeline-progress"></div></div>
+        <div id="subtitle"></div>
+        <div class="touch-controls">
+            <button class="fab" onclick="director.play()">Launch Movie</button>
+            <button class="fab fab-outline" onclick="toggleSheet()">Edit Script</button>
+        </div>
+    </div>
+</div>
+
+<div class="bottom-sheet" id="editor-sheet">
+    <div class="sheet-handle" onclick="toggleSheet()"></div>
+    <div class="editor-header">
+        <h3>SCRIPT EDITOR</h3>
+        <button class="fab" style="padding: 8px 15px; font-size: 0.6rem;" onclick="toggleSheet()">Done</button>
+    </div>
+    <div class="editor-body">
+        <textarea id="json-input" spellcheck="false"></textarea>
+    </div>
+</div>
+
+<script>
+    const toggleSheet = () => document.getElementById('editor-sheet').classList.toggle('open');
+
+    class SoundEngine {
+        constructor() {
+            this.ctx = null;
+            this.nodes = {};
+            this.panners = new Map();
+        }
+        init() {
+            if (this.ctx) {
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                return;
+            }
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        playSpatial(id, coords, type = 'tech') {
+            this.init();
+            const panner = this.ctx.createPanner();
+            panner.panningModel = 'HRTF';
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type === 'tech' ? 'sine' : 'sawtooth';
+            osc.frequency.value = type === 'tech' ? 440 : 110;
+            gain.gain.value = 0.1;
+            osc.connect(gain); gain.connect(panner); panner.connect(this.ctx.destination);
+            osc.start();
+            this.panners.set(id, { panner, osc, coords });
+        }
+        updatePanners(map) {
+            if (!this.ctx) return;
+            const cam = map.getCenter();
+            this.panners.forEach((p) => {
+                const dx = p.coords[0] - cam.lng;
+                const dy = p.coords[1] - cam.lat;
+                p.panner.setPosition(dx * 100, dy * 100, -0.5);
+            });
+        }
+        playStatic() {
+            this.init();
+            const osc = this.ctx.createOscillator(); osc.type = 'square'; osc.frequency.value = 100;
+            const gain = this.ctx.createGain(); gain.gain.value = 0.02;
+            osc.connect(gain); gain.connect(this.ctx.destination); osc.start();
+            setTimeout(() => osc.stop(), 200);
+        }
+        playTech() {
+            this.init();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(440, this.ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
+            osc.connect(gain); gain.connect(this.ctx.destination);
+            osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+        }
+        playImpact() {
+            this.init();
+            const noise = this.ctx.createBufferSource();
+            const bufferSize = this.ctx.sampleRate * 2, buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate), data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1000;
+            const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.5, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 1.5);
+            noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+            noise.start();
+        }
+        playWind(intensity = 0.5) {
+            this.init();
+            const bufferSize = 2 * this.ctx.sampleRate, noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate), output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+            const whiteNoise = this.ctx.createBufferSource(); whiteNoise.buffer = noiseBuffer; whiteNoise.loop = true;
+            const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 100 + (intensity * 1000);
+            const gain = this.ctx.createGain(); gain.gain.value = 0.1 * intensity;
+            whiteNoise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+            whiteNoise.start();
+            this.nodes.wind = { source: whiteNoise, filter, gain };
+        }
+        stopAll() {
+            Object.values(this.nodes).forEach(n => { if(n.source) n.source.stop(); if(n.osc) n.osc.stop(); });
+            this.panners.forEach(p => p.osc.stop());
+            this.nodes = {}; this.panners.clear();
+        }
+    }
+
+    class MapDirector {
+        constructor() {
+            this.sounds = new SoundEngine();
+            this.markers = [];
+            this.registry = [];
+            this.state = { fuel: 100, intel: 0, stealth: 100 };
+            this.map = new maplibregl.Map({
+                container: 'map',
+                style: {
+                    version: 8,
+                    sources: {
+                        'sat': { type: 'raster', tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 },
+                        'terrain': { type: 'raster-dem', url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json', tileSize: 256 }
+                    },
+                    layers: [
+                        { id: 'atmosphere', type: 'background', paint: { 'background-color': '#000' } },
+                        { id: 'sat', type: 'raster', source: 'sat' }
+                    ],
+                    terrain: { source: 'terrain', exaggeration: 1.5 }
+                },
+                center: [0, 20], zoom: 2, pitch: 45
+            });
+
+            this.narrator = window.speechSynthesis;
+            this.initVoice();
+            this.map.on('load', () => {
+                document.getElementById('splash').style.opacity = '0';
+                document.getElementById('map-container').style.filter = 'brightness(1)';
+                setTimeout(() => document.getElementById('splash').remove(), 1000);
+            });
+
+            this.map.on('movestart', () => document.getElementById('map-container').classList.add('moving'));
+            this.map.on('move', () => {
+                try {
+                    const center = this.map.getCenter();
+                    if (this.map.getSource('terrain')) {
+                        const elevation = this.map.queryTerrainElevation(center);
+                        if (typeof elevation === 'number') {
+                            document.getElementById('hud-alt').innerText = `${Math.round(elevation)} m.a.s.l`;
+                        }
+                    }
+                } catch (e) {}
+            });
+
+            this.map.on('moveend', () => {
+                document.getElementById('map-container').classList.remove('moving');
+                this.sounds.updatePanners(this.map);
+            });
+        }
+
+        initVoice() {
+            const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!Speech || this.recognition) return;
+            this.recognition = new Speech();
+            this.recognition.continuous = true;
+            this.recognition.onresult = (e) => {
+                const cmd = e.results[e.results.length-1][0].transcript.toLowerCase();
+                const match = this.currentScript?.find(s => s.voice_trigger && cmd.includes(s.voice_trigger));
+                if (match) this.executeScene(match);
+            };
+            try { this.recognition.start(); } catch(e) {}
+        }
+
+        async play() {
+            if(document.getElementById('editor-sheet').classList.contains('open')) toggleSheet();
+            this.sounds.init();
+            this.narrator.cancel(); // Stop any previous reading
+            this.isPlaying = true;
+            this.currentWeatherType = null;
+            this.sounds.stopAll();
+            
+            // Clear Registry
+            this.registry.forEach(id => {
+                if (this.map.getLayer(id)) this.map.removeLayer(id);
+                if (this.map.getSource(id)) this.map.removeSource(id);
+            });
+            this.registry = [];
+
+            this.markers.forEach(m => m.remove());
+            this.markers = [];
+            this.currentStep = 0;
+            
+            const raw = document.getElementById('json-input').value;
+            try {
+                this.currentScript = JSON.parse(raw);
+            } catch (e) {
+                alert("JSON Error: " + e.message); return;
+            }
+
+            try {
+                while (this.currentStep < this.currentScript.length) {
+                    const scene = this.currentScript[this.currentStep];
+                    if (this.evaluateCondition(scene.condition)) {
+                        await this.executeScene(scene);
+                        if (scene.updates) Object.assign(this.state, scene.updates);
+                        
+                        if (scene.next) {
+                            const idx = this.currentScript.findIndex(s => s.id === scene.next);
+                            if (idx !== -1) { this.currentStep = idx; continue; }
+                        }
+                    }
+                    this.currentStep++;
+                }
+            } catch (e) { 
+                console.error("EXECUTION ERROR:", e);
+            } finally {
+                this.isPlaying = false;
+            }
+        }
+
+        evaluateCondition(cond) {
+            if (!cond) return true;
+            try {
+                const func = new Function('state', `return ${cond}`);
+                return func(this.state);
+            } catch(e) { return true; }
+        }
+
+        executeScene(scene) {
+            return new Promise((resolve) => {
+                const progress = ((this.currentStep + 1) / this.currentScript.length) * 100;
+                document.getElementById('timeline-progress').style.width = `${progress}%`;
+
+                // 1. Atmosphere / Sky Fix
+                document.getElementById('map-container').className = scene.filter ? `filter-${scene.filter}` : '';
+                if (scene.weather) this.startWeather(scene.weather);
+                
+                if (scene.sky || scene.fog) {
+                    this.map.setSky({
+                        "sky-color": scene.sky?.color || "#000000",
+                        "horizon-color": scene.sky?.horizon || "#ffffff",
+                        "fog-color": scene.fog?.color || "#ffffff",
+                        "fog-ground-blend": 0.5
+                    });
+                }
+
+                // 2. Academic HUD Updates
+                const hud = document.getElementById('academic-hud');
+                if (hud) {
+                    hud.style.opacity = scene.unit ? '1' : '0.5';
+                    if (scene.unit) document.getElementById('hud-unit').innerText = scene.unit.toUpperCase();
+                }
+
+                // 3. Choice Interactivity
+                if (scene.choices) {
+                    this.presentChoices(scene.choices, scene.subtitle).then(nextId => {
+                        const nextIdx = this.currentScript.findIndex(s => s.id === nextId);
+                        this.currentStep = nextIdx - 1;
+                        resolve();
+                    });
+                    return;
+                }
+
+                // 4. Subtitles & Synchronized Voice
+                const sub = document.getElementById('subtitle');
+                sub.innerText = scene.subtitle || '';
+                sub.classList.toggle('active', !!scene.subtitle);
+                
+                let voiceFinished = true;
+                if (scene.narrate && scene.subtitle) {
+                    voiceFinished = false;
+                    const u = new SpeechSynthesisUtterance(scene.subtitle);
+                    u.rate = 1.0; 
+                    u.onend = () => { voiceFinished = true; };
+                    u.onerror = () => { voiceFinished = true; };
+                    this.narrator.speak(u);
+                }
+
+                // 5. Camera with Interruption Handling
+                if (scene.camera) {
+                    try {
+                        if (scene.camera.type === 'orbit') {
+                            this.startOrbit(scene.camera, scene.duration);
+                        } else {
+                            this.map.flyTo({
+                                ...scene.camera,
+                                duration: scene.duration || 3000,
+                                essential: true
+                            });
+                        }
+                    } catch (e) { console.warn("Camera transition interrupted"); }
+                    if (scene.camera.shake) this.startShake(scene.camera.shake, scene.duration);
+                }
+
+                // 6. Action Elements
+                if (scene.action === 'draw') this.animateTrace(scene);
+                if (scene.action === 'radar') this.startRadar(scene.radar);
+                if (scene.action === 'blast') this.addBlast(scene);
+                if (scene.action === 'extrude') this.addExtrusion(scene);
+                
+                // 7. Markers
+                if (scene.marker) {
+                    const el = document.createElement('div');
+                    el.className = `marker-${scene.marker.type}`;
+                    if(scene.marker.type === 'beacon') {
+                        for(let i=0; i<3; i++) {
+                            const r = document.createElement('div'); r.className = 'beacon-ring';
+                            r.style.animationDelay = `${i * 0.6}s`; el.appendChild(r);
+                        }
+                    }
+                    const m = new maplibregl.Marker({ element: el }).setLngLat(scene.marker.coords).addTo(this.map);
+                    this.markers.push(m);
+                }
+
+                // Wait for both the visual duration AND the narration to finish
+                const checkFinish = setInterval(() => {
+                    if (voiceFinished) {
+                        clearInterval(checkFinish);
+                        setTimeout(resolve, scene.wait || 500);
+                    }
+                }, 100);
+            });
+        }
+
+        presentChoices(choices, prompt) {
+            return new Promise(res => {
+                const overlay = document.getElementById('choice-overlay');
+                const btns = document.getElementById('choice-buttons');
+                document.getElementById('choice-prompt').innerText = prompt || "CHOOSE PATH";
+                btns.innerHTML = ''; overlay.classList.add('active');
+                choices.forEach(c => {
+                    const b = document.createElement('button');
+                    b.className = 'choice-btn'; b.innerText = c.label;
+                    b.onclick = () => { overlay.classList.remove('active'); res(c.scene_id); };
+                    btns.appendChild(b);
+                });
+            });
+        }
+
+        animateTrace(scene) {
+            const id = 't-' + Math.random().toString(36).substr(2, 4);
+            this.registry.push(id);
+            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [scene.coordinates[0]] } } });
+            this.map.addLayer({ id, source: id, type: 'line', paint: { 'line-color': scene.color || '#3b82f6', 'line-width': 4 } });
+            let step = 0;
+            const draw = () => {
+                if (step >= scene.coordinates.length || !this.map.getSource(id)) return;
+                this.map.getSource(id).setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: scene.coordinates.slice(0, ++step) } });
+                if (step < scene.coordinates.length) setTimeout(() => requestAnimationFrame(draw), scene.duration / scene.coordinates.length);
+            };
+            draw();
+        }
+
+        startRadar(config) {
+            const id = 'radar-' + Math.random().toString(36).substr(2,4);
+            this.registry.push(id);
+            let angle = 0;
+            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0,0],[0,0],[0,0]]] } } });
+            this.map.addLayer({ id, type: 'fill', source: id, paint: { 'fill-color': config.color || '#00ff00', 'fill-opacity': 0.3 } });
+            const update = () => {
+                angle += 2; const radius = config.radius || 0.01; const center = config.center;
+                const coords = [center];
+                for(let i=0; i<=30; i++) {
+                    const rad = (angle + i) * Math.PI / 180;
+                    coords.push([center[0] + Math.cos(rad) * radius, center[1] + Math.sin(rad) * radius]);
+                }
+                coords.push(center);
+                if(this.map.getSource(id)) {
+                    this.map.getSource(id).setData({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } });
+                    requestAnimationFrame(update);
+                }
+            };
+            update();
+        }
+
+        addBlast(scene) {
+            const id = 'blast-' + Math.random().toString(36).substr(2,4);
+            this.registry.push(id);
+            this.sounds.playImpact();
+            this.map.addSource(id, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0,0],[0,0]] } } });
+            this.map.addLayer({ id, type: 'line', source: id, paint: { 'line-color': scene.color || '#ff4400', 'line-width': 2 } });
+            let radius = 0;
+            const expand = () => {
+                radius += 0.002; const center = scene.center; const coords = [];
+                for(let i=0; i<=360; i+=10) {
+                    const rad = i * Math.PI / 180;
+                    coords.push([center[0] + Math.cos(rad) * radius, center[1] + Math.sin(rad) * radius]);
+                }
+                if(this.map.getSource(id)) {
+                    this.map.getSource(id).setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+                    if(radius < 0.1) requestAnimationFrame(expand);
+                }
+            };
+            expand();
+        }
+
+        addExtrusion(scene) {
+            const id = 'ext-' + Math.random().toString(36).substr(2,4);
+            this.registry.push(id);
+            this.map.addSource(id, { type: 'geojson', data: {
+                type: 'FeatureCollection',
+                features: scene.data.map(d => ({ type: 'Feature', properties: { height: d.h }, geometry: { type: 'Polygon', coordinates: [[[d.c[0]-0.002, d.c[1]-0.002], [d.c[0]+0.002, d.c[1]-0.002], [d.c[0]+0.002, d.c[1]+0.002], [d.c[0]-0.002, d.c[1]+0.002], [d.c[0]-0.002, d.c[1]-0.002]]] } }))
+            }});
+            this.map.addLayer({ id, type: 'fill-extrusion', source: id, paint: { 'fill-extrusion-color': scene.color || '#3b82f6', 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': 0.8 } });
+        }
+
+        startWeather(type) {
+            const canvas = document.getElementById('weather-canvas');
+            const ctx = canvas.getContext('2d');
+            this.currentWeatherType = type;
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            let particles = [];
+            for(let i=0; i<100; i++) particles.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: Math.random()*5+2 });
+            const animate = () => {
+                if (this.currentWeatherType !== type) return;
+                ctx.clearRect(0,0,canvas.width, canvas.height);
+                ctx.fillStyle = type === 'rain' ? '#3b82f6' : '#fff';
+                particles.forEach(p => {
+                    ctx.fillRect(p.x, p.y, type === 'rain' ? 1 : 3, type === 'rain' ? 10 : 3);
+                    p.y += p.s; if(p.y > canvas.height) p.y = -10;
+                });
+                requestAnimationFrame(animate);
+            };
+            animate();
+        }
+
+        startOrbit(config, duration) {
+            let start = null;
+            const animate = (time) => {
+                if (!start) start = time;
+                const progress = time - start;
+                this.map.setBearing((progress / (duration/360)) % 360);
+                if (progress < duration && this.isPlaying) requestAnimationFrame(animate);
+            };
+            requestAnimationFrame(animate);
+        }
+
+        startShake(intensity, duration) {
+            const canvas = this.map.getCanvas();
+            const start = Date.now();
+            const interval = setInterval(() => {
+                const elapsed = Date.now() - start;
+                if (elapsed > duration) {
+                    canvas.style.transform = '';
+                    clearInterval(interval); return;
+                }
+                canvas.style.transform = `translate(${(Math.random()-0.5)*intensity}px, ${(Math.random()-0.5)*intensity}px)`;
+            }, 50);
+        }
+    }
+
+    const director = new MapDirector();
+    const demo = [
+        { "id": "intro", "subtitle": "INITIALIZING NEURAL LINK...", "filter": "vhs", "camera": { "center": [0, 20], "zoom": 2 }, "duration": 3000 },
+        { "id": "tokyo", "subtitle": "LOCATING SECTOR: TOKYO", "camera": { "center": [139.6503, 35.6762], "zoom": 12, "pitch": 60 }, "duration": 4000 },
+        { "id": "choice", "subtitle": "ANOMALY DETECTED. SELECT OPERATIONAL MODE.", "choices": [
+            { "label": "RECON SCAN", "scene_id": "recon" },
+            { "label": "KINETIC STRIKE", "scene_id": "strike" }
+        ]},
+        { "id": "recon", "subtitle": "SCANNING...", "action": "radar", "radar": { "center": [139.6503, 35.6762] }, "next": "dubai" },
+        { "id": "strike", "subtitle": "STRIKE INBOUND", "action": "blast", "center": [139.6503, 35.6762], "camera": { "shake": 20 }, "next": "dubai" },
+        { "id": "dubai", "subtitle": "TARGET SECURED. RELOCATING TO DUBAI HUB.", "camera": { "center": [55.2708, 25.2048], "zoom": 14, "pitch": 70 }, "duration": 4000 },
+        { "id": "end", "subtitle": "LINK TERMINATED.", "camera": { "zoom": 2 }, "duration": 2000 }
+    ];
+    const textbook = [
+        {
+            "id": "ch3_intro",
+            "unit": "ETHIOPIA & THE HORN",
+            "subtitle": "CHAPTER 3: THE TOPOGRAPHY OF ETHIOPIA. The topography is largely determined by the geologic activities of the Cenozoic Era. The uplifting of the Arabo-Ethiopian swell and Trapean lava have given rise to an outward sloping highland plateau.",
+            "camera": { "center": [39.5, 9.0], "zoom": 5.5, "pitch": 30, "bearing": 0 },
+            "duration": 8000,
+            "narrate": true
+        },
+        {
+            "id": "western_highlands",
+            "unit": "WESTERN HIGHLANDS",
+            "subtitle": "The Western Highlands make up 44% of the country. This region includes the Tigray Plateau, North Central Massifs, and the Shewa Plateau. More than 50% of the landmass is above 1,000 meters.",
+            "camera": { "center": [37.5, 11.5], "zoom": 7, "pitch": 50, "bearing": -10 },
+            "duration": 7000,
+            "narrate": true
+        },
+        {
+            "id": "ras_dashen",
+            "unit": "SIMEN MOUNTAINS",
+            "subtitle": "MOUNT RAS DASHEN (4,620 m.a.s.l): Located in the North Central Massifs, it is the fourth highest mountain in Africa and the highest point in Ethiopia.",
+            "camera": { "center": [38.37, 13.23], "zoom": 11, "pitch": 75, "bearing": 45 },
+            "marker": { "type": "beacon", "coords": [38.37, 13.23] },
+            "action": "extrude",
+            "color": "#fbbf24",
+            "data": [{"c": [38.37, 13.23], "h": 4620}],
+            "duration": 10000,
+            "narrate": true
+        },
+        {
+            "id": "rift_valley",
+            "unit": "RIFT VALLEY",
+            "subtitle": "THE RIFT VALLEY: A structural depression formed by faulting. It extends from the Afar Triangle to Chew Bahir. Elevation drops to 125m below sea level at the Kobar Sink (Dallol).",
+            "camera": { "center": [40.5, 12.0], "zoom": 8, "pitch": 45, "bearing": 0 },
+            "duration": 9000,
+            "narrate": true
+        }
+    ];
+    document.getElementById('json-input').value = JSON.stringify(textbook, null, 2);
+</script>
+</body>
+</html>
