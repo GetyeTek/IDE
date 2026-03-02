@@ -38,9 +38,9 @@ def main():
         with open("temp.pdf", "wb") as f:
             f.write(res)
 
-        # 3. Setup Gemini (Using 2.0 Flash as the most capable 'flash' model)
+        # 3. Setup Gemini (Using Gemini 2.5 Flash as requested)
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Upload file to Gemini
         sample_file = genai.upload_file(path="temp.pdf", display_name="Source PDF")
