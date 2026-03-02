@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate PDF Manufacturer</title>
+    <style>
+        :root {
+            --entre-blue: #007bff;
+            --entre-grey: #f2f2f2;
+        }
+
+        :root {
+            --pdf-width: 794px;
+            --pdf-height: 1123px;
+            --grey-bg: #d9d9d9;
+            --font-serif: 'Times New Roman', Times, serif;
+        }
+
+        body {
+            background-color: #2c2c2c;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: sans-serif;
+        }
+
+        /* Mobile Input Interface */
+        #ui-layer {
+            width: 100%;
+            background: #1a1a1a;
+            padding: 10px;
+            box-sizing: border-box;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 2px solid #007bff;
+        }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            background: #000;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border: 1px solid #333;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        /* THE PAGE CANVAS */
+        .page-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .page-canvas {
+            background-color: white;
+            width: var(--pdf-width);
+            min-height: var(--pdf-height);
+            padding: 60px 70px 40px 70px; 
+            box-sizing: border-box;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.2);
+            font-family: var(--font-serif);
+            color: #000;
+            page-break-after: always;
+            transform-origin: top center;
+            flex-shrink: 0;
+            /* Enables vertical distribution */
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* READER MODE OVERRIDES */
+        body.viewer-active {
+            background-color: #1a1a1a !important;
+            padding-top: 0 !important;
+        }
+        body.viewer-active #ui-layer {
+            display: none !important;
+        }
+        body.viewer-active .page-wrapper {
+            margin-bottom: 20px;
+        }
+        body.viewer-active .page-canvas {
+            box-shadow: 0 0 50px #000;
+            border: none;
+        }
+        body.viewer-active #exit-viewer {
+            display: flex !important;
+        }
+        body.viewer-active #magnify-toggle {
+            display: none;
+        }
+
+        /* UI CONTROLS */
+        #magnify-toggle {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            z-index: 2000;
+            font-size: 24px;
+        }
+        #exit-viewer {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            display: none;
+            z-index: 3000;
+            font-weight: bold;
+            border: 1px solid rgba(255,255,255,0.3);
+            backdrop-filter: blur(5px);
+        }
+
+        /* DIAGRAM STYLES */
+        .graphic-container { flex-direction: column; align-items: center; padding: 20px 0; }
+        .graphic-caption { font-size: 13px; font-style: italic; margin-top: 10px; color: #444; }
+        svg { max-width: 100%; height: auto; }
+
+        @media print {
+            body { background: none; }
+            #ui-layer { display: none; }
+            .page-canvas { margin: 0; box-shadow: none; }
+        }
+
+        /* COMPONENT DEFINITIONS */
+        .p-block { text-align: justify; margin-bottom: 14px; font-size: 15.5px; line-height: 1.5; }
+        .h-block { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; }
+        
+        /* Textbook Specific Styles */
+        .chapter-header { text-align: center; margin-bottom: 40px; }
+        .chapter-number { display: block; font-size: 20px; font-weight: bold; margin-bottom: 10px; }
+        .chapter-title { display: block; font-size: 24px; font-weight: bold; text-transform: uppercase; padding-bottom: 5px; }
+
+        .appetizer-block { font-style: italic; border-left: 4px solid #007bff; padding: 10px 20px; margin: 20px 0; background: #f9f9f9; line-height: 1.6; }
+        .appetizer-label { font-weight: bold; display: block; margin-bottom: 10px; font-style: normal; text-transform: uppercase; color: #007bff; }
+
+        .reference-block { padding-left: 30px; text-indent: -30px; font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+
+        /* Title/Cover Page Styles */
+        .title-page { text-align: center; display: flex; flex-direction: column; justify-content: center; height: 100%; }
+        .title-main { font-size: 28px; font-weight: bold; margin-bottom: 10px; }
+        .title-sub { font-size: 20px; margin-bottom: 50px; }
+        .contributor-item { margin-bottom: 15px; font-size: 16px; }
+        .contributor-name { font-weight: bold; display: block; }
+        .contributor-detail { font-style: italic; font-size: 14px; color: #444; }
+
+        /* Sectioning */
+        .section-header { font-weight: bold; font-size: 17px; margin-top: 25px; margin-bottom: 10px; }
+        .overview-block { margin: 25px 0; }
+        .overview-label { font-weight: bold; font-size: 17px; margin-bottom: 5px; display: block; }
+
+        /* Unified Academic Container Styles */
+        .academic-container { margin-top: 20px; }
+        .academic-label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
+        .academic-box {
+            background: #eeeeee;
+            border: 1px solid #000;
+            padding: 12px 15px;
+            margin-top: 0;
+        }
+        .academic-box ul { margin: 0; padding-left: 20px; }
+        .academic-box li { margin-bottom: 8px; font-size: 14.5px; }
+
+        /* Summary Style */
+        .summary-block { border-top: 3px solid #007bff; margin-top: 30px; padding-top: 10px; }
+        .summary-label { font-weight: bold; font-size: 19px; color: #007bff; margin-bottom: 10px; display: block; }
+
+        /* Page 8/40 style Definition Box */
+        .definition-highlight { border: 1px solid #000; padding: 12px 20px; margin: 20px 40px; border-radius: 4px; }
+        .definition-highlight ul { margin: 0; padding-left: 15px; list-style-type: disc; }
+        .definition-highlight li { font-style: italic; font-weight: normal; font-size: 15px; }
+        .p-block { text-align: justify; margin-bottom: 12px; font-size: 15px; line-height: 1.5; text-justify: inter-word; hyphens: auto; }
+        
+
+
+        /* LIST STYLES */
+        .list-block { padding-left: 25px; margin: 10px 0; }
+        .list-block ul, .list-block ol { padding: 0; margin: 0; }
+        .list-block li { margin-bottom: 4px; text-align: justify; font-size: 14.5px; line-height: 1.3; }
+
+
+        
+
+
+        .list-block { padding-left: 40px; margin-bottom: 15px; }
+        .list-block li { margin-bottom: 8px; text-align: justify; font-size: 15.5px; }
+
+        /* Page Flag Badge */
+        .manual-flag {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: #ff4757;
+            color: white;
+            padding: 6px 15px;
+            font-size: 12px;
+            font-weight: bold;
+            border-bottom-left-radius: 8px;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-family: sans-serif;
+        }
+        @media print {
+            .manual-flag { display: none !important; }
+        }
+
+        /* The Graphic/SVG Container */
+        .graphic-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        /* Raster/Image Placeholder */
+        .canvas-placeholder {
+            border: 2px dashed #999;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        /* Table Rendering */
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }
+        th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+        th { background: #eee; }
+
+        .footer {
+            margin-top: auto; 
+            padding-top: 20px;
+            height: 40px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        center { display: block; width: 100%; margin: 5px 0; }
+
+        /* AI INLINE BUTTON */
+        .ai-btn-inline {
+            display: inline-block;
+            width: auto !important; /* Overrides the global mobile button width */
+            background: #e8f0fe !important;
+            border: 1px solid #aec2ec !important;
+            border-radius: 12px !important;
+            padding: 2px 8px !important;
+            font-size: 12px !important;
+            color: #1a73e8 !important;
+            cursor: pointer;
+            font-family: sans-serif;
+            font-weight: bold;
+            margin-left: 6px !important;
+            margin-top: 0 !important;
+            vertical-align: baseline;
+            white-space: nowrap; /* Keeps it pill-shaped */
+            line-height: 1.2;
+            text-decoration: none;
+        }
+        .ai-btn-inline:hover {
+            background: #d2e3fc !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        body.viewer-active .ai-btn-inline { background: #333 !important; color: #4ade80 !important; border-color: #4ade80 !important; }
+        
+        @media print {
+            .ai-btn-inline { display: none !important; }
+        }
+
+        /* TABLE OF CONTENTS STYLES */
+        .toc-container { margin: 10px 0; }
+        .toc-entry {
+            display: flex;
+            align-items: flex-end;
+            margin-bottom: 4px;
+            font-size: 14.5px;
+        }
+        .toc-text { flex-shrink: 0; }
+        .toc-dots {
+            flex-grow: 1;
+            /* Aligns dots to text baseline precisely */
+            background-image: radial-gradient(circle, #000 0.8px, transparent 1.2px);
+            background-position: 0 12px;
+            background-size: 8px 1px;
+            background-repeat: repeat-x;
+            height: 16px;
+            margin: 0 8px;
+        }
+        .toc-page { flex-shrink: 0; font-weight: bold; }
+
+        /* Indentation Levels */
+        .level-0 { font-weight: bold; margin-top: 10px; }
+        .level-1 { padding-left: 20px; }
+        .level-2 { padding-left: 40px; }
+        .level-3 { padding-left: 60px; }
+
+        /* ANTHROPOLOGY SPECIFIC STYLES */
+        .anthro-unit-header { text-align: left; margin-bottom: 30px; }
+        .anthro-unit-label { display: block; font-size: 18px; margin-bottom: 10px; text-align: center; }
+        .anthro-unit-title { display: block; font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+        .anthro-unit-hours { display: block; font-size: 16px; font-weight: bold; }
+
+        .anthro-callout { display: flex; align-items: flex-start; gap: 20px; border: 1px solid #000; padding: 15px; margin: 20px 0; }
+        .anthro-callout-icon { width: 80px; flex-shrink: 0; }
+        .anthro-callout-icon img { width: 100%; height: auto; }
+        .anthro-callout-content { flex-grow: 1; }
+        .anthro-callout-title { font-weight: bold; margin-bottom: 10px; display: block; font-size: 16px; }
+
+        .anthro-list { list-style: none; padding-left: 0; margin: 15px 0; }
+        .anthro-list-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; text-align: justify; }
+        .anthro-bullet-img { width: 22px; flex-shrink: 0; margin-top: 2px; }
+        
+
+
+        .anthro-footnote { font-size: 12.5px; margin-top: 25px; padding-top: 10px; position: relative; }
+        .anthro-footnote::before { content: ''; position: absolute; top: 0; left: 0; width: 120px; border-top: 1px solid #000; }
+
+        .anthro-reference { padding-left: 30px; text-indent: -30px; font-size: 14.5px; margin-bottom: 12px; line-height: 1.4; }
+        .anthro-term { font-weight: bold; margin-top: 18px; margin-bottom: 4px; font-size: 15.5px; }
+
+        .anthro-kv-container { margin: 20px 0; }
+        .anthro-kv-row { display: flex; align-items: flex-start; margin-bottom: 10px; font-size: 17px; }
+        .anthro-kv-label { font-weight: bold; width: 150px; flex-shrink: 0; }
+        .anthro-kv-separator { margin-right: 15px; font-weight: bold; }
+        .anthro-kv-value { flex-grow: 1; }
+
+        .anthro-table-header { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+
+        /* Anthropology TOC Style */
+        .anthro-toc-item { display: flex; align-items: flex-end; margin-bottom: 6px; font-size: 15px; }
+        .anthro-toc-dots { flex-grow: 1; border-bottom: 1px dotted #000; margin: 0 5px; position: relative; top: -4px; }
+        .anthro-toc-page { font-weight: bold; min-width: 25px; text-align: right; }
+        .anthro-toc-level-1 { padding-left: 20px; }
+        .anthro-toc-level-2 { padding-left: 40px; }
+
+        .anthro-title-block { text-align: center; width: 100%; }
+        .anthro-title-main { font-size: 28px; font-weight: bold; margin: 100px 0; }
+        .anthro-title-sub { font-size: 18px; margin-bottom: 10px; }
+
+        .anthro-bullet-char { width: 22px; flex-shrink: 0; font-weight: bold; font-size: 18px; line-height: 1; margin-top: -2px; }
+
+        /* LOGIC BOOK SPECIFIC STYLES */
+        .logic-header {
+            border-top: 3.5px solid #444; /* Darker and thicker as per PDF */
+            height: 10px;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        .logic-header::after {
+            content: '';
+            position: absolute;
+            right: 40px;
+            top: -3.5px; /* Precisely glued to the horizontal bar top */
+            width: 3.5px; 
+            height: 45px;
+            background: #444;
+        }
+        .logic-footer {
+            /* Precise Asymmetrical: 4px bold top line, 1px micro-gap, 1px thin base line */
+            background: linear-gradient(to bottom, #800000 0, #800000 4px, transparent 4px, transparent 5px, #800000 5px, #800000 6px) top/100% 6px no-repeat;
+            margin-top: auto;
+            padding-top: 12px; 
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            font-style: italic;
+            font-family: var(--font-serif);
+            color: #000;
+            font-variant-numeric: tabular-nums;
+        }
+        .logic-example-label {
+            font-weight: bold;
+            text-decoration: underline;
+            font-size: 16px;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+        .logic-chapter-num { font-size: 22px; font-weight: bold; display: block; text-align: center; margin-bottom: 5px; }
+        .logic-chapter-title { font-size: 26px; font-weight: bold; display: block; text-align: center; text-transform: uppercase; margin-bottom: 30px; }
+        .logic-activity-box {
+            border: 1px solid #000;
+            padding: 15px 25px;
+            margin: 20px 0;
+            font-style: italic;
+            line-height: 1.5;
+        }
+        .logic-activity-label {
+            font-weight: bold;
+            font-style: normal;
+            margin-right: 10px;
+        }
+        .logic-argument-block {
+            margin: 20px auto;
+            width: fit-content;
+            text-align: left;
+            line-height: 1.6;
+        }
+        .logic-argument-line {
+            border-top: 1px solid #000;
+            margin: 4px 0;
+            width: 100%;
+        }
+        .logic-venn-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .logic-exercise-line {
+            border-bottom: 1px solid #aaa;
+            margin: 18px 0;
+            height: 1px;
+            width: 100%;
+        }
+        .logic-quote-block {
+            margin: 20px 40px;
+            text-align: justify;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .logic-square-container {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .logic-note-box {
+            border: 1.5px solid #000;
+            padding: 10px 20px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+        }
+        .logic-note-label {
+            font-weight: bold;
+            text-decoration: underline;
+            margin-right: 20px;
+            font-size: 17px;
+        }
+
+        /* ENTREPRENEUR ENGINE STYLES */
+        .entre-chapter-title { text-align: center; font-weight: bold; font-size: 24px; text-transform: uppercase; margin: 30px 0; padding: 15px 0; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; width: 100%; display: block; }
+        .entre-section-h { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; border: none; padding-left: 0; }
+        
+        /* Box Archetypes */
+        .entre-case-box { border: 2px solid #000; padding: 20px; margin: 25px 0; background: #fff; }
+        .entre-case-label { font-weight: bold; text-transform: uppercase; text-decoration: underline; display: block; margin-bottom: 12px; font-size: 16px; }
+        
+        .entre-activity-box { border: 1.5px solid #000; padding: 18px; margin: 25px 0; background: #fff; }
+        .entre-activity-tag { background: #000; color: #fff; padding: 4px 15px; font-weight: bold; font-size: 14px; margin-bottom: 15px; display: inline-block; text-transform: uppercase; }
+        
+        .entre-reflection-box { border: 1px solid #444; padding: 15px; margin: 20px 0; background: #f2f2f2; }
+        .entre-reflection-label { font-weight: bold; display: block; margin-bottom: 10px; font-style: normal; }
+
+        /* Bullets & Grids */
+        .entre-bullet-item { display: flex; gap: 12px; margin-bottom: 8px; align-items: flex-start; text-align: justify; }
+        .entre-bullet-char { font-size: 20px; line-height: 1; flex-shrink: 0; color: #000; font-family: serif; }
+        .entre-bullet-img { width: 22px; height: 22px; flex-shrink: 0; object-fit: contain; }
+        
+        .entre-likert-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13.5px; }
+        .entre-likert-table th, .entre-likert-table td { border: 1px solid #000; padding: 8px; }
+        .entre-likert-table th { background: #ddd; font-weight: bold; }
+        .entre-chapter-title { text-align: center; font-weight: bold; font-size: 24px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .entre-section-h { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; }
+        .entre-case-box { border: 1.5px solid #000; padding: 15px 25px; margin: 20px 0; background: #fff; }
+        .entre-case-label { font-weight: bold; display: block; margin-bottom: 10px; font-size: 17px; }
+        .entre-activity-box { border: 1px solid #000; padding: 15px; margin: 20px 0; }
+        .entre-activity-label { background: #000; color: #fff; padding: 2px 10px; font-weight: bold; margin-bottom: 10px; display: inline-block; }
+        .entre-reflection-box { background: var(--entre-grey); border: 1px dashed #444; padding: 15px; margin: 15px 0; font-style: italic; }
+        .entre-likert-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px; }
+        .entre-likert-table th { background: var(--entre-grey); border: 1px solid #000; padding: 5px; text-align: center; }
+        .entre-likert-table td { border: 1px solid #000; padding: 8px; }
+        .entre-ansoff-matrix { display: table; width: 100%; border-collapse: separate; border-spacing: 10px; table-layout: fixed; }
+        .entre-ansoff-quadrant { display: table-cell; border: 2px solid var(--entre-blue); background: #f8f9fa; padding: 15px; vertical-align: middle; text-align: center; font-weight: bold; height: 120px; }
+        .entre-label-axis { font-weight: bold; color: var(--entre-blue); font-size: 12px; text-transform: uppercase; }
+
+        /* HISTORY ENGINE STYLES */
+        .history-canvas { position: relative; overflow: hidden; }
+        .history-watermark::before {
+            content: 'History of Ethiopia and the Horn Module (Hist.1102)';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 45px;
+            color: rgba(200, 200, 200, 0.15);
+            white-space: nowrap;
+            z-index: 0;
+            pointer-events: none;
+            font-family: var(--font-serif);
+        }
+        .history-header-text {
+            text-align: center;
+            font-style: italic;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        .history-unit-title {
+            text-align: center;
+            text-transform: uppercase;
+            font-weight: bold;
+            font-size: 22px;
+            margin: 20px 0;
+            line-height: 1.2;
+        }
+        .history-arrow-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        .history-arrow-list li {
+            position: relative;
+            padding-left: 30px;
+            margin-bottom: 10px;
+            text-align: justify;
+        }
+        .history-arrow-list li::before {
+            content: '➢';
+            position: absolute;
+            left: 0;
+            color: #000;
+            font-size: 18px;
+        }
+        .history-source-line {
+            font-size: 13px;
+            margin-top: 5px;
+            color: #333;
+        }
+        .history-cover-frame {
+            border: 4px solid #000;
+            outline: 1px solid #000;
+            outline-offset: -8px;
+            height: 100%;
+            padding: 40px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            /* The third inner line via shadow */
+            box-shadow: inset 0 0 0 10px white, inset 0 0 0 12px black;
+        }
+        .history-bolt {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #000;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .history-bolt::after { content: ''; width: 8px; height: 8px; background: #000; border-radius: 50%; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+            <select id="engine-select" style="flex: 1; padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid #007bff;">
+                <option value="history">ENGINE: History (2021 Edition)</option>
+                <option value="logic">ENGINE: Logic (Ministry Edition)</option>
+                <option value="anthro">ENGINE: Anthropology (2026 Edition)</option>
+                <option value="psych">ENGINE: General Psychology (Legacy)</option>
+                <option value="entre">ENGINE: Entrepreneurship (MoSHE 2019)</option>
+            </select>
+            <button onclick="masterDraw()" style="flex: 1; margin-top: 0;">EXECUTE DRAW COMMAND</button>
+        </div>
+        <textarea id="json-pen" placeholder="Paste JSON instructions..."></textarea>
+    </div>
+
+    <div id="exit-viewer" onclick="toggleViewer()">← EXIT READER</div>
+    <div id="magnify-toggle" onclick="toggleViewer()">🔍</div>
+    <div id="document-container"></div>
+
+    <script>
+        function masterDraw() {
+            const engine = document.getElementById('engine-select').value;
+            if (engine === 'psych') {
+                drawPsychology();
+            } else if (engine === 'anthro') {
+                drawAnthropology();
+            } else if (engine === 'logic') {
+                drawLogic();
+            } else if (engine === 'history') {
+                drawHistory();
+            } else if (engine === 'entre') {
+                drawEntrepreneur();
+            }
+        }
+
+        function drawEntrepreneur() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas';
+                    pageDiv.style.transform = `scale(${scale})`;
+
+                    pageData.content.forEach(item => {
+                        const el = renderEntrepreneurItem(item, pageKey);
+                        pageDiv.appendChild(el);
+                    });
+
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+            } catch (err) { alert("Entrepreneur Engine Error: " + err); }
+        }
+
+        function renderEntrepreneurItem(item, pageKey) {
+            const element = document.createElement('div');
+            if (item.type === 'chapter-header') {
+                element.className = 'entre-chapter-title';
+                element.innerHTML = `CHAPTER ${item.number || ''}: ${item.title || ''}`;
+            } 
+            else if (item.type === 'header') {
+                element.className = 'entre-section-h';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'paragraph') {
+                element.className = 'p-block';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'entre-case') {
+                element.className = 'entre-case-box';
+                element.innerHTML = `<span class="entre-case-label">${item.label || 'Case Study'}</span>${item.body}`;
+            }
+            else if (item.type === 'entre-activity') {
+                element.className = 'entre-activity-box';
+                let html = `<div class="entre-activity-tag">Activity ${item.number || ''}</div>`;
+                if (item.objective) html += `<div><b>Objective of activity:</b> ${item.objective}</div>`;
+                if (item.instructions) html += `<div style="margin-top:5px"><b>Instructions:</b> ${item.instructions}</div>`;
+                html += `<div style="margin-top:10px">${item.body || ''}</div>`;
+                element.innerHTML = html;
+            }
+            else if (item.type === 'entre-reflection') {
+                element.className = 'entre-reflection-box';
+                let listHtml = item.items ? `<ul>${item.items.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
+                element.innerHTML = `<span class="entre-reflection-label">${item.label || 'Reflection Questions'}:</span><div style="font-style: italic;">${item.body || ''}</div>${listHtml}`;
+            }
+            else if (item.type === 'bullet-list') {
+                const charMap = { 
+                    'finger': '☞', 
+                    'pen': '✍', 
+                    'arrow': '➢', 
+                    'square': '■', 
+                    'chevron': '➤', 
+                    'circle': '○', 
+                    'diamond': '❖', 
+                    'dot': '●', 
+                    'default': '•' 
+                };
+
+                element.innerHTML = (item.items || []).map(text => {
+                    let bulletHtml = '';
+                    if (item.bullet === 'spark') {
+                        bulletHtml = `<img src="assets/bullet-spark.png" class="entre-bullet-img">`;
+                    } else {
+                        const char = charMap[item.bullet] || charMap['default'];
+                        bulletHtml = `<div class="entre-bullet-char">${char}</div>`;
+                    }
+
+                    return `
+                        <div class="entre-bullet-item">
+                            ${bulletHtml}
+                            <div>${text}</div>
+                        </div>`;
+                }).join('');
+            }
+            else if (item.type === 'entre-likert-grid') {
+                element.innerHTML = `<table class="entre-likert-table">
+                    <tr><th style="width:50px">S. No</th><th>Characteristic</th><th style="width:30px">1</th><th style="width:30px">2</th><th style="width:30px">3</th><th style="width:30px">4</th><th style="width:30px">5</th></tr>
+                    ${(item.rows || []).map(r => `<tr><td style="text-align:center">${r.no}</td><td>${r.text}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+                </table>`;
+            }
+            else if (item.type === 'footer') {
+                element.className = 'footer';
+                element.innerText = item.val || pageKey;
+            }
+            else if (item.type === 'spacer') {
+                element.style.flexGrow = item.flex || '0';
+                element.style.height = item.height || '0px';
+            }
+
+            if (item.style) Object.assign(element.style, item.style);
+            return element;
+        }
+
+        function drawHistory() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas history-canvas';
+                    if (pageData.watermark !== false) pageDiv.classList.add('history-watermark');
+                    pageDiv.style.transform = `scale(${scale})`;
+
+                    // Check for Cover Pattern
+                    if (pageData.is_cover) {
+                        const frame = document.createElement('div');
+                        frame.className = 'history-cover-frame';
+                        // Bolts
+                        ['top:5px;left:5px','top:5px;right:5px','bottom:5px;left:5px','bottom:5px;right:5px'].forEach(pos => {
+                            const bolt = document.createElement('div');
+                            bolt.className = 'history-bolt';
+                            bolt.style.cssText = pos;
+                            pageDiv.appendChild(bolt);
+                        });
+                        pageDiv.appendChild(frame);
+                        // Render cover content inside frame
+                        pageData.content.forEach(item => {
+                            const el = renderHistoryItem(item);
+                            frame.appendChild(el);
+                        });
+                    } else {
+                        pageData.content.forEach(item => {
+                            const el = renderHistoryItem(item, pageKey);
+                            pageDiv.appendChild(el);
+                        });
+                    }
+
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+            } catch (err) { alert("History Engine Error: " + err); }
+        }
+
+        function renderHistoryItem(item, pageKey) {
+            const element = document.createElement('div');
+            if (item.type === 'history-header') {
+                element.className = 'history-header-text';
+                element.innerText = 'History of Ethiopia and the Horn Module (Hist.1102)';
+            }
+            else if (item.type === 'history-unit-header') {
+                element.innerHTML = `<div class="history-unit-title">UNIT ${item.number || ''}<br>${item.title || ''} (${item.hours || ''} hours)</div>`;
+            }
+            else if (item.type === 'history-arrow-list') {
+                element.className = 'history-arrow-list';
+                element.innerHTML = (item.items || []).map(i => `<li>${i}</li>`).join('');
+            }
+            else if (item.type === 'paragraph') {
+                element.className = 'p-block';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'header') {
+                element.className = 'h-block';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'history-footer') {
+                element.className = 'footer';
+                element.style.marginTop = 'auto';
+                element.innerText = item.page || pageKey;
+            }
+            else if (item.type === 'history-graphic') {
+                element.className = 'graphic-container';
+                element.innerHTML = `<img src="${item.url}" style="max-width:100%"><div class="history-source-line"><b>Source:</b> ${item.source || ''}</div>`;
+            }
+            else if (item.type === 'spacer') {
+                element.style.flexGrow = item.flex || '0';
+                element.style.height = item.height || '0px';
+            }
+
+            if (item.style) Object.assign(element.style, item.style);
+            return element;
+        }
+
+        function drawLogic() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas';
+                    pageDiv.style.transform = `scale(${scale})`;
+                    pageDiv.id = `page-${pageKey}`;
+
+                    pageData.content.forEach(item => {
+                        const element = document.createElement('div');
+
+                        if (item.type === 'logic-header') {
+                            element.className = 'logic-header';
+                        }
+                        else if (item.type === 'logic-footer') {
+                            element.className = 'logic-footer';
+                            element.innerHTML = `<span>${item.authors || ''}</span><span>Page ${item.page || pageKey}</span>`;
+                        }
+                        else if (item.type === 'chapter-title') {
+                            element.innerHTML = `<span class="logic-chapter-num">CHAPTER ${item.number}</span><span class="logic-chapter-title">${item.title}</span>`;
+                        }
+                        else if (item.type === 'paragraph') {
+                            element.className = 'p-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'header') {
+                            element.className = 'h-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'bullet-list') {
+                            element.className = 'list-block';
+                            element.innerHTML = '<ul>' + (item.items || []).map(i => `<li>${i}</li>`).join('') + '</ul>';
+                        }
+                        else if (item.type === 'logic-activity') {
+                            element.className = 'logic-activity-box';
+                            element.innerHTML = `<span class="logic-activity-label">${item.label || ''}</span>${item.body}`;
+                        }
+                        else if (item.type === 'logic-argument') {
+                            element.className = 'logic-argument-block';
+                            let html = (item.premises || []).map(p => `<div>${p}</div>`).join('');
+                            html += `<div class="logic-argument-line"></div>`;
+                            html += `<div>${item.conclusion}</div>`;
+                            element.innerHTML = html;
+                        }
+                        else if (item.type === 'logic-self-check') {
+                            let html = `<div style="margin-bottom:10px;"><b>${item.number}.</b> ${item.question}</div>`;
+                            for(let i=0; i<(item.lines || 2); i++) {
+                                html += `<div class="logic-exercise-line"></div>`;
+                            }
+                            element.innerHTML = html;
+                        }
+                        else if (item.type === 'graphic') {
+                            element.className = 'graphic-container';
+                            element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
+                        }
+                        else if (item.type === 'logic-quote') {
+                            element.className = 'logic-quote-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'logic-note') {
+                            element.className = 'logic-note-box';
+                            element.innerHTML = `<span class="logic-note-label">Note:</span><div style="font-style:italic;">${item.body}</div>`;
+                        }
+                        else if (item.type === 'logic-example') {
+                            element.innerHTML = `<div><span class="logic-example-label">${item.label || 'Example'}:</span> ${item.body || ''}</div>`;
+                        }
+                        else if (item.type === 'spacer') {
+                            element.style.flexGrow = item.flex || '0';
+                            element.style.height = item.height || '0px';
+                        }
+
+                        if (item.style) Object.assign(element.style, item.style);
+                        pageDiv.appendChild(element);
+                    });
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (err) { alert("Logic Engine Error: " + err); }
+        }
+
+        function drawAnthropology() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas';
+                    pageDiv.style.transform = `scale(${scale})`;
+                    pageDiv.id = `page-${pageKey}`;
+
+                    if (pageData.requires_manual_image === true) {
+                        const flag = document.createElement('div');
+                        flag.className = 'manual-flag';
+                        flag.innerText = '🖼️ MANUAL IMAGE REQUIRED';
+                        pageDiv.appendChild(flag);
+                    }
+
+                    pageData.content.forEach(item => {
+                        const element = document.createElement('div');
+
+                        if (item.type === 'unit-header') {
+                            element.className = 'anthro-unit-header';
+                            element.innerHTML = `<span class="anthro-unit-label">Unit ${item.number || ''}</span><span class="anthro-unit-title">${item.title || ''}</span><span class="anthro-unit-hours">Study Hours: ${item.hours || ''}</span>`;
+                        }
+                        else if (item.type === 'callout-box') {
+                            element.className = 'anthro-callout';
+                            const iconFile = item.icon === 'books' ? 'icon-books.png' : 'icon-question-man.png';
+                            let listHtml = '';
+                            if (item.items) {
+                                listHtml = '<div class="anthro-list">' + 
+                                    item.items.map(i => `
+                                        <div class="anthro-list-item">
+                                            <img src="assets/bullet-swirl.png" class="anthro-bullet-img">
+                                            <div>${i}</div>
+                                        </div>`).join('') + 
+                                    '</div>';
+                            }
+                            element.innerHTML = `
+                                <div class="anthro-callout-icon"><img src="assets/${iconFile}"></div>
+                                <div class="anthro-callout-content">
+                                    <span class="anthro-callout-title">${item.label || ''}</span>
+                                    ${item.body || ''}
+                                    ${listHtml}
+                                </div>`;
+                        }
+                        else if (item.type === 'bullet-list') {
+                            element.className = 'anthro-list';
+                            const listItems = item.items || [];
+                            listItems.forEach(text => {
+                                const row = document.createElement('div');
+                                row.className = 'anthro-list-item';
+                                
+                                let bImg = 'bullet-swirl.png'; // Default
+                                if (item.bullet === 'spark') bImg = 'bullet-spark.png';
+                                if (item.bullet === 'checkmark') bImg = 'bullet-check.png';
+                                
+                                if (item.bullet === 'char') {
+                                    row.innerHTML = `<div class="anthro-bullet-char">${item.char || '•'}</div><div>${text}</div>`;
+                                } else {
+                                    row.innerHTML = `<img src="assets/${bImg}" class="anthro-bullet-img"><div>${text}</div>`;
+                                }
+                                element.appendChild(row);
+                            });
+                        }
+                        else if (item.type === 'anthro-toc') {
+                            element.innerHTML = item.items.map(i => `
+                                <div class="anthro-toc-item anthro-toc-level-${i.level || 0}">
+                                    <span>${i.text}</span>
+                                    <div class="anthro-toc-dots"></div>
+                                    <span class="anthro-toc-page">${i.page}</span>
+                                </div>
+                            `).join('');
+                        }
+                        else if (item.type === 'title-block') {
+                            element.className = 'anthro-title-block';
+                            element.innerHTML = `
+                                <div class="anthro-title-sub">${item.top || ''}</div>
+                                <div class="anthro-title-main">${item.main || ''}</div>
+                                <div class="anthro-title-sub">${item.bottom || ''}</div>
+                            `;
+                        }
+                        else if (item.type === 'graphic') {
+                            element.className = 'graphic-container';
+                            element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
+                        }
+                        else if (item.type === 'paragraph') {
+                            element.className = 'p-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'header') {
+                            element.className = 'h-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'table') {
+                            let t = '<table>';
+                            item.rows.forEach((row, idx) => {
+                                const isHeader = idx === 0 && item.headerStyle;
+                                const tdClass = isHeader ? 'class="anthro-table-header"' : '';
+                                t += '<tr>' + row.map(c => `<td ${tdClass}>${c}</td>`).join('') + '</tr>';
+                            });
+                            element.innerHTML = t + '</table>';
+                        }
+                        else if (item.type === 'reference-item') {
+                            element.className = 'anthro-reference';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'term-header') {
+                            element.className = 'anthro-term';
+                            element.innerText = item.body;
+                        }
+                        else if (item.type === 'kv-list') {
+                            element.className = 'anthro-kv-container';
+                            element.innerHTML = item.items.map(row => `
+                                <div class="anthro-kv-row">
+                                    <div class="anthro-kv-label">${row.label}</div>
+                                    <div class="anthro-kv-separator">:</div>
+                                    <div class="anthro-kv-value">${row.value}</div>
+                                </div>
+                            `).join('');
+                        }
+                        else if (item.type === 'footnote') {
+                            element.className = 'anthro-footnote';
+                            element.innerHTML = `<sup>${item.number || ''}</sup> ${item.body}`;
+                        }
+                        else if (item.type === 'spacer') {
+                            element.style.flexGrow = item.flex || '0';
+                            element.style.height = item.height || '0px';
+                        }
+                        else if (item.type === 'footer') {
+                            element.className = 'footer';
+                            element.innerText = item.val;
+                        }
+
+                        // Apply styles if present
+                        if (item.style) {
+                            Object.assign(element.style, item.style);
+                        }
+
+                        pageDiv.appendChild(element);
+                    });
+
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+                window.scrollTo({ top: window.innerHeight * 0.4, behavior: 'smooth' });
+            } catch (err) {
+                alert("Anthropology Engine Error: " + err);
+            }
+        }
+
+        function drawPsychology() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.minHeight = (1123 * scale) + 'px';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas';
+                    pageDiv.style.transform = `scale(${scale})`;
+                    pageDiv.id = `page-${pageKey}`;
+
+                    // Apply Manual Image Flag
+                    if (pageData.requires_manual_image === true) {
+                        pageDiv.setAttribute('data-manual-image', 'true');
+                        const flag = document.createElement('div');
+                        flag.className = 'manual-flag';
+                        flag.innerText = '🖼️ MANUAL IMAGE REQUIRED';
+                        pageDiv.appendChild(flag);
+                    }
+
+                    pageData.content.forEach(item => {
+                        const element = document.createElement('div');
+                        
+                        if (item.type === 'paragraph') {
+                            element.className = 'p-block';
+                            element.innerHTML = item.body;
+                        } 
+                        else if (item.type === 'header') {
+                            element.className = 'h-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'chapter-header') {
+                            element.className = 'chapter-header';
+                            element.innerHTML = `<span class="chapter-number">CHAPTER ${item.number}</span><span class="chapter-title">${item.title}</span>`;
+                        }
+                        else if (item.type === 'appetizer') {
+                            element.className = 'appetizer-block';
+                            element.innerHTML = `<span class="appetizer-label">${item.label || 'Learning Appetizer'}</span>${item.body}`;
+                        }
+                        else if (item.type === 'reference') {
+                            element.className = 'reference-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'title-page') {
+                            element.className = 'title-page';
+                            element.innerHTML = `<div class="title-main">${item.main}</div><div class="title-sub">${item.sub}</div>`;
+                        }
+                        else if (item.type === 'contributor') {
+                            element.className = 'contributor-item';
+                            element.innerHTML = `<span class="contributor-name">${item.name}</span><span class="contributor-detail">${item.detail}</span>`;
+                        }
+                        else if (item.type === 'section-header') {
+                            element.className = 'section-header';
+                            element.innerText = item.body;
+                        }
+                        else if (item.type === 'overview') {
+                            element.className = 'overview-block';
+                            element.innerHTML = `<span class="overview-label">Chapter Overview</span><div class="p-block">${item.body}</div>`;
+                        }
+
+                        else if (item.type === 'summary') {
+                            element.className = 'summary-block';
+                            let list = `<span class="summary-label">Summary</span><ul>`;
+                            const summaryData = item.items || item.points || [];
+                            summaryData.forEach(p => list += `<li>${p}</li>`);
+                            element.innerHTML = list + '</ul>';
+                        }
+                        else if (item.type === 'definition-box') {
+                            element.className = 'definition-highlight';
+                            element.innerHTML = `<ul><li>${item.body}</li></ul>`;
+                        }
+
+                        else if (item.type === 'list' || item.type === 'bullet-list') {
+                            element.className = 'list-block';
+                            let list = '<ul>';
+                            const data = item.items || item.points || [];
+                            data.forEach(li => list += `<li>${li}</li>`);
+                            element.innerHTML = list + '</ul>';
+                        }
+                        else if (item.type === 'numbered-list') {
+                            element.className = 'list-block';
+                            let list = '<ol>';
+                            const data = item.items || item.points || [];
+                            data.forEach(li => list += `<li>${li}</li>`);
+                            element.innerHTML = list + '</ol>';
+                        }
+                        else if (item.type === 'graphic') {
+                            element.className = 'graphic-container';
+                            element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
+                        }
+                        else if (item.type === 'canvas') {
+                            element.className = 'canvas-placeholder';
+                            element.style.width = item.w || '100%';
+                            element.style.height = item.h || '200px';
+                            element.innerText = `[ RASTER IMAGE: ${item.label || 'Empty'} ]`;
+                        }
+                        else if (item.type === 'table') {
+                            let t = '<table>';
+                            item.rows.forEach(row => {
+                                t += '<tr>';
+                                row.forEach(cell => t += `<td>${cell}</td>`);
+                                t += '</tr>';
+                            });
+                            element.innerHTML = t + '</table>';
+                        }
+                        else if (item.type === 'footer') {
+                            element.className = 'footer';
+                            element.innerText = item.val;
+                        }
+                                                else if (item.type === 'reflection' || item.type === 'brainstorming-questions') {
+                            const isRef = item.type === 'reflection';
+                            const labelText = isRef ? 'Reflection' : 'Brainstorming Questions';
+                            const labelExtraClass = '';
+                            
+                            element.className = 'academic-container';
+                            
+                            let contentHtml = item.body || '';
+                            const listData = item.questions || item.items || item.points;
+                            
+                            if (listData && Array.isArray(listData)) {
+                                contentHtml += (contentHtml ? '<br>' : '') + '<ul>' + 
+                                    listData.map(q => `<li>${q}</li>`).join('') + '</ul>';
+                            }
+
+                            element.innerHTML = `
+                                <span class="academic-label ${labelExtraClass}">${labelText}</span>
+                                <div class="academic-box">${contentHtml}</div>
+                            `;
+                        }
+                        else if (item.type === 'spacer') {
+                            element.style.flexGrow = item.flex || '0';
+                            element.style.height = item.height || '0px';
+                        }
+                        else if (item.type === 'toc') {
+                            element.className = 'toc-container';
+                            const list = item.entries || item.items || [];
+                            list.forEach(entry => {
+                                const row = document.createElement('div');
+                                const text = entry.text || entry.label || (typeof entry === 'string' ? entry : '');
+                                const page = entry.page || '';
+                                const level = entry.level || 0;
+                                row.className = `toc-entry level-${level}`;
+                                row.innerHTML = `<span class="toc-text">${text}</span><span class="toc-dots"></span><span class="toc-page">${page}</span>`;
+                                element.appendChild(row);
+                            });
+                        }
+
+                        // APPLY GRANULAR STYLES
+                        if (item.style) {
+                            if (item.style.align) {
+                                element.style.textAlign = item.style.align;
+                                // If block-level centering is needed
+                                if (item.style.align === 'center') {
+                                    element.style.marginLeft = 'auto';
+                                    element.style.marginRight = 'auto';
+                                } else if (item.style.align === 'right') {
+                                    element.style.marginLeft = 'auto';
+                                    element.style.marginRight = '0';
+                                }
+                            }
+                            if (item.style.bold) element.style.fontWeight = 'bold';
+                            if (item.style.size) element.style.fontSize = item.style.size;
+                            if (item.style.marginTop) element.style.marginTop = item.style.marginTop;
+                            if (item.style.marginBottom) element.style.marginBottom = item.style.marginBottom;
+                            if (item.style.color) element.style.color = item.style.color;
+                            if (item.style.italic) element.style.fontStyle = 'italic';
+                            if (item.style.underline) element.style.textDecoration = 'underline';
+                            if (item.style.transform) element.style.textTransform = item.style.transform;
+                            if (item.style.lineHeight) element.style.lineHeight = item.style.lineHeight;
+                            if (item.style.letterSpacing) element.style.letterSpacing = item.style.letterSpacing;
+                            if (item.style.width) element.style.width = item.style.width;
+                            if (item.style.height) element.style.height = item.style.height;
+                            if (item.style.padding) element.style.padding = item.style.padding;
+                            if (item.style.flex) element.style.flex = item.style.flex;
+                            if (item.style.border) element.style.border = item.style.border;
+                        }
+
+                        pageDiv.appendChild(element);
+
+                        // INJECT INLINE AI BUTTON
+                        if (item.ai_ready === true) {
+                            let target = element;
+                            
+                            // Smart Placement Logic
+                            const listItems = element.querySelectorAll('li');
+                            if (listItems.length > 0) {
+                                // If it's a list, append inside the last list item
+                                target = listItems[listItems.length - 1];
+                            } else {
+                                // If it's a box, append inside the actual box div, not the outer container
+                                const innerBox = element.querySelector('.academic-box');
+                                if (innerBox) target = innerBox;
+                            }
+                            
+                            target.innerHTML += ` <button class="ai-btn-inline" onclick="triggerAI('explore')">✨ AI Explore</button>`;
+                        }
+                    });
+
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+
+                window.scrollTo({ top: window.innerHeight * 0.4, behavior: 'smooth' });
+
+            } catch (err) {
+                alert("JSON Logic Error: " + err);
+                console.error(err);
+            }
+        }
+
+        function toggleViewer() {
+            document.body.classList.toggle('viewer-active');
+            // Re-draw to adjust scaling for potential orientation changes
+            masterDraw();
+            if (document.body.classList.contains('viewer-active')) {
+                window.scrollTo({ top: 0, behavior: 'auto' });
+            }
+        }
+
+        function triggerAI(action) {
+            // Placeholder function for future backend hook
+            alert(`AI Action triggered: [${action.toUpperCase()}]\n\nIn the future, this will grab the JSON block data and send it to your backend for translation/explanation.`);
+        }
+    </script>
+</body>
+</html>
