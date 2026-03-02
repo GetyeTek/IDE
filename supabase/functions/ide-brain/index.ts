@@ -2168,18 +2168,34 @@ If you already give a payload, assume it's already applied, and give the next pl
             const response = await fetch(targetUrl, {
                 headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
             });
+    if (action === "proxy_web") {
+        const { url } = payload;
+        try {
+            const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+            const origin = new URL(targetUrl).origin;
+            
+            const response = await fetch(targetUrl, {
+                headers: { 
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,webp,*/*;q=0.8'
+                }
+            });
+            
             let html = await response.text();
 
-            // 1. Inject Base Tag to fix assets
-            const baseTag = `<base href="${new URL(targetUrl).origin}/">`;
-            
-            // 2. Inject Conduit Bridge with Navigation Guard
+            // --- SERVER-SIDE REWRITING ---
+            // Fix relative paths manually via regex for high reliability
+            html = html.replace(/(href|src|action)="\/\//g, `$1="https://`); // //google.com -> https://google.com
+            html = html.replace(/(href|src|action)="\//g, `$1="${origin}/`); // /search -> https://google.com/search
+
             const bridgeScript = `
                 <script>
                 (function() {
-                    window.IS_CONDUIT_PROXY = true;
-                    
-                    // --- LOG & NET INTERCEPTION ---
+                    // Prevent Frame-Busting
+                    window.onbeforeunload = function() { return "Conduit prevented a redirect"; };
+                    Object.defineProperty(window, 'location', { value: window.location, configurable: false, writable: false });
+
+                    // Proxy Interceptor
                     const originalConsole = { ...console };
                     ['log','warn','error','info'].forEach(m => {
                         console[m] = (...args) => {
@@ -2192,37 +2208,36 @@ If you already give a payload, assume it's already applied, and give the next pl
                         };
                     });
 
-                    // --- NAVIGATION INTERCEPTION ---
-                    // Intercept Link Clicks
-                    document.addEventListener('click', (e) => {
-                        const link = e.target.closest('a');
-                        if (link && link.href && !link.href.startsWith('javascript:')) {
+                    // Catch AJAX/Fetch calls
+                    const oldFetch = window.fetch;
+                    window.fetch = async (...args) => {
+                        window.parent.postMessage({ type: 'CONDUIT_LOG', method: 'info', args: ["Fetch: " + args[0]], time: '' }, '*');
+                        return oldFetch(...args);
+                    };
+
+                    // Intercept Navigations
+                    document.addEventListener('click', e => {
+                        const a = e.target.closest('a');
+                        if(a && a.href) {
                             e.preventDefault();
-                            window.parent.postMessage({ type: 'CONDUIT_NAVIGATE', url: link.href }, '*');
+                            window.parent.postMessage({ type: 'CONDUIT_NAVIGATE', url: a.href }, '*');
                         }
                     }, true);
-
-                    // Intercept Form Submissions (Google Search Fix)
-                    document.addEventListener('submit', (e) => {
-                        const form = e.target;
-                        const url = new URL(form.action || location.href);
-                        if (form.method.toLowerCase() === 'get') {
-                            const params = new URLSearchParams(new FormData(form));
-                            const finalUrl = url.origin + url.pathname + '?' + params.toString();
-                            e.preventDefault();
-                            window.parent.postMessage({ type: 'CONDUIT_NAVIGATE', url: finalUrl }, '*');
-                        }
-                    }, true);
-
-                    console.log("⚡ Conduit Interceptor Active: " + location.href);
                 })();
                 </script>
             `;
 
-            const modifiedHtml = html.replace('<head>', `<head>${baseTag}${bridgeScript}`);
-            return new Response(modifiedHtml, { headers: { ...corsHeaders, "Content-Type": "text/html" } });
+            const modifiedHtml = html.replace('<head>', `<head><base href="${origin}/">${bridgeScript}`);
+            
+            // Strip Security Headers to allow framing
+            const headers = new Headers(corsHeaders);
+            headers.set("Content-Type", "text/html");
+            headers.delete("X-Frame-Options");
+            headers.delete("Content-Security-Policy");
+
+            return new Response(modifiedHtml, { headers });
         } catch(e) {
-            return new Response(`Error proxying: ${e.message}`, { status: 500, headers: corsHeaders });
+            return new Response(`Proxy Error: ${e.message}`, { status: 500, headers: corsHeaders });
         }
     }
 
