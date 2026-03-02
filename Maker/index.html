@@ -198,8 +198,7 @@
         .definition-highlight li { font-style: italic; font-weight: normal; font-size: 15px; }
         .p-block { text-align: justify; margin-bottom: 12px; font-size: 15px; line-height: 1.5; text-justify: inter-word; hyphens: auto; }
         
-        /* Reflection specific underlining */
-        .reflection-underline { text-decoration: underline; }
+
 
         /* LIST STYLES */
         .list-block { padding-left: 25px; margin: 10px 0; }
@@ -414,7 +413,15 @@
                             element.className = 'anthro-callout';
                             const iconFile = item.icon === 'books' ? 'icon-books.png' : 'icon-question-man.png';
                             let listHtml = '';
-                            if (item.items) listHtml = '<ul>' + item.items.map(i => `<li>${i}</li>`).join('') + '</ul>';
+                            if (item.items) {
+                                listHtml = '<div class="anthro-list">' + 
+                                    item.items.map(i => `
+                                        <div class="anthro-list-item">
+                                            <img src="assets/bullet-swirl.png" class="anthro-bullet-img">
+                                            <div>${i}</div>
+                                        </div>`).join('') + 
+                                    '</div>';
+                            }
                             element.innerHTML = `
                                 <div class="anthro-callout-icon"><img src="assets/${iconFile}"></div>
                                 <div class="anthro-callout-content">
@@ -608,7 +615,7 @@
                                                 else if (item.type === 'reflection' || item.type === 'brainstorming-questions') {
                             const isRef = item.type === 'reflection';
                             const labelText = isRef ? 'Reflection' : 'Brainstorming Questions';
-                            const labelExtraClass = isRef ? 'reflection-underline' : '';
+                            const labelExtraClass = '';
                             
                             element.className = 'academic-container';
                             
