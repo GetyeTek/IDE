@@ -176,15 +176,17 @@
         .overview-block { margin: 25px 0; }
         .overview-label { font-weight: bold; font-size: 17px; margin-bottom: 5px; display: block; }
 
-        /* The Essential Interaction Box (Brainstorming/Reflection) */
-        .interaction-container { margin: 25px 0; }
-        .interaction-box { background: var(--grey-bg); border: 1px solid #000; padding: 15px; position: relative; }
-        .interaction-label { font-weight: bold; font-style: italic; display: block; margin-bottom: 10px; font-size: 15px; border-bottom: 1px solid #999; padding-bottom: 5px; }
-        .interaction-box ul { margin: 0; padding-left: 20px; }
-        .interaction-box li { margin-bottom: 8px; font-size: 14.5px; font-weight: bold; }
-
-        /* Specifically for Reflections where label is OUTSIDE */
-        .outer-label { display: block; text-align: left; font-weight: bold; font-size: 16px; margin-bottom: 8px; text-transform: none; }
+        /* Unified Academic Container Styles */
+        .academic-container { margin-top: 20px; }
+        .academic-label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
+        .academic-box {
+            background: #eeeeee;
+            border: 1px solid #000;
+            padding: 12px 15px;
+            margin-top: 0;
+        }
+        .academic-box ul { margin: 0; padding-left: 20px; }
+        .academic-box li { margin-bottom: 8px; font-size: 14.5px; }
 
         /* Summary Style */
         .summary-block { border-top: 3px solid #007bff; margin-top: 30px; padding-top: 10px; }
@@ -196,33 +198,8 @@
         .definition-highlight li { font-style: italic; font-weight: normal; font-size: 15px; }
         .p-block { text-align: justify; margin-bottom: 12px; font-size: 15px; line-height: 1.5; text-justify: inter-word; hyphens: auto; }
         
-        /* ACADEMIC CALLOUT BLOCKS */
-        .reflection-block {
-            border: 1px solid #000;
-            padding: 12px 15px;
-            margin: 15px 0;
-            background: transparent; /* Keeping it clean like Reflection */
-        }
-        .reflection-label {
-            font-weight: bold;
-            text-decoration: underline;
-            display: block;
-            margin-bottom: 5px;
-            font-size: 15px;
-        }
-
-        .brainstorming-block {
-            background: #eee;
-            border: 1px solid #000;
-            padding: 12px 15px;
-            margin: 5px 0 15px 0;
-        }
-        .brainstorming-label {
-            font-weight: bold;
-            display: block;
-            margin-top: 15px;
-            font-size: 15px;
-        }
+        /* Reflection specific underlining */
+        .reflection-underline { text-decoration: underline; }
 
         /* LIST STYLES */
         .list-block { padding-left: 25px; margin: 10px 0; }
@@ -231,13 +208,7 @@
 
 
         
-        .box-block { 
-            background: var(--grey-bg); 
-            border: 1px solid #000; 
-            padding: 10px 15px; 
-            margin: 15px 0; 
-        }
-        .box-block ul { margin: 0; padding-left: 20px; font-weight: bold; font-style: italic; }
+
 
         .list-block { padding-left: 40px; margin-bottom: 15px; }
         .list-block li { margin-bottom: 8px; text-align: justify; font-size: 15.5px; }
@@ -442,24 +413,7 @@
                             element.className = 'overview-block';
                             element.innerHTML = `<span class="overview-label">Chapter Overview</span><div class="p-block">${item.body}</div>`;
                         }
-                        else if (item.type === 'interaction-box') {
-                            element.className = 'interaction-container';
-                            const labelLower = item.label.toLowerCase();
-                            const isOuter = labelLower.includes('reflection') || labelLower.includes('brainstorming');
-                            
-                            let html = '';
-                            if (isOuter) html += `<div class="outer-label">${item.label}</div>`;
-                            html += `<div class="interaction-box">`;
-                            if (!isOuter) html += `<span class="interaction-label">${item.label}</span>`;
-                            const listData = item.questions || item.items || item.points;
-                            if (listData && Array.isArray(listData)) {
-                                html += '<ul>' + listData.map(q => `<li>${q}</li>`).join('') + '</ul>';
-                            } else {
-                                html += item.body || '';
-                            }
-                            html += `</div>`;
-                            element.innerHTML = html;
-                        }
+
                         else if (item.type === 'summary') {
                             element.className = 'summary-block';
                             let list = `<span class="summary-label">Summary</span><ul>`;
@@ -471,13 +425,7 @@
                             element.className = 'definition-highlight';
                             element.innerHTML = `<ul><li>${item.body}</li></ul>`;
                         }
-                        else if (item.type === 'box-block') {
-                            element.className = 'box-block';
-                            let list = '<ul>';
-                            const boxData = item.items || item.points || [];
-                            boxData.forEach(li => list += `<li>${li}</li>`);
-                            element.innerHTML = list + '</ul>';
-                        }
+
                         else if (item.type === 'list' || item.type === 'bullet-list') {
                             element.className = 'list-block';
                             let list = '<ul>';
@@ -515,19 +463,12 @@
                             element.className = 'footer';
                             element.innerText = item.val;
                         }
-                        else if (item.type === 'reflection' || item.type === 'brainstorming' || item.type === 'brainstorming-questions') {
-                            const isBrainstormingQuestions = item.type === 'brainstorming-questions';
-                            const isRef = item.type === 'reflection' || isBrainstormingQuestions;
+                                                else if (item.type === 'reflection' || item.type === 'brainstorming-questions') {
+                            const isRef = item.type === 'reflection';
+                            const labelText = isRef ? 'Reflection' : 'Brainstorming Questions';
+                            const labelExtraClass = isRef ? 'reflection-underline' : '';
                             
-                            let labelText = isRef ? 'Reflection' : 'Brainstorming';
-                            if (isBrainstormingQuestions) labelText = 'Brainstorming Questions';
-                            
-                            const labelClass = isRef ? 'reflection-label' : 'brainstorming-label';
-                            const boxClass = isRef ? 'reflection-block' : 'brainstorming-block';
-                            
-                            // Reset the parent container class so the border doesn't wrap the label
                             element.className = 'academic-container';
-                            element.style.marginTop = '20px';
                             
                             let contentHtml = item.body || '';
                             const listData = item.questions || item.items || item.points;
@@ -537,10 +478,9 @@
                                     listData.map(q => `<li>${q}</li>`).join('') + '</ul>';
                             }
 
-                            // Label is now a sibling to the box, not inside it
                             element.innerHTML = `
-                                <span class="${labelClass}" style="display:block; font-weight:bold; margin-bottom:5px;">${labelText}</span>
-                                <div class="${boxClass}" style="margin-top:0;">${contentHtml}</div>
+                                <span class="academic-label ${labelExtraClass}">${labelText}</span>
+                                <div class="academic-box">${contentHtml}</div>
                             `;
                         }
                         else if (item.type === 'spacer') {
@@ -604,7 +544,7 @@
                                 target = listItems[listItems.length - 1];
                             } else {
                                 // If it's a box, append inside the actual box div, not the outer container
-                                const innerBox = element.querySelector('.interaction-box, .reflection-block, .brainstorming-block, .box-block');
+                                const innerBox = element.querySelector('.academic-box');
                                 if (innerBox) target = innerBox;
                             }
                             
