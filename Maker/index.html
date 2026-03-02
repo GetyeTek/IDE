@@ -331,8 +331,14 @@
 <body>
 
     <div id="ui-layer">
+        <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+            <select id="engine-select" style="flex: 1; padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid #007bff;">
+                <option value="anthro">ENGINE: Anthropology (2026 Edition)</option>
+                <option value="psych">ENGINE: General Psychology (Legacy)</option>
+            </select>
+            <button onclick="masterDraw()" style="flex: 1; margin-top: 0;">EXECUTE DRAW COMMAND</button>
+        </div>
         <textarea id="json-pen" placeholder="Paste JSON instructions..."></textarea>
-        <button onclick="draw()">EXECUTE DRAW COMMAND</button>
     </div>
 
     <div id="exit-viewer" onclick="toggleViewer()">← EXIT READER</div>
@@ -340,7 +346,48 @@
     <div id="document-container"></div>
 
     <script>
-        function draw() {
+        function masterDraw() {
+            const engine = document.getElementById('engine-select').value;
+            if (engine === 'psych') {
+                drawPsychology();
+            } else if (engine === 'anthro') {
+                drawAnthropology();
+            }
+        }
+
+        function drawAnthropology() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas';
+                    pageDiv.style.transform = `scale(${scale})`;
+                    pageDiv.id = `page-${pageKey}`;
+
+                    // NEW ANTHROPOLOGY LOGIC WILL GO HERE
+
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+                window.scrollTo({ top: window.innerHeight * 0.4, behavior: 'smooth' });
+            } catch (err) {
+                alert("Anthropology Engine Error: " + err);
+            }
+        }
+
+        function drawPsychology() {
             const raw = document.getElementById('json-pen').value;
             const container = document.getElementById('document-container');
             
@@ -348,7 +395,6 @@
                 const doc = JSON.parse(raw);
                 container.innerHTML = '';
 
-                // Calculate scale factor to fit width
                 const availableWidth = window.innerWidth - 20;
                 const scale = availableWidth < 794 ? availableWidth / 794 : 1;
 
@@ -567,7 +613,7 @@
         function toggleViewer() {
             document.body.classList.toggle('viewer-active');
             // Re-draw to adjust scaling for potential orientation changes
-            draw();
+            masterDraw();
             if (document.body.classList.contains('viewer-active')) {
                 window.scrollTo({ top: 0, behavior: 'auto' });
             }
