@@ -6,6 +6,9 @@
     <title>Ultimate PDF Manufacturer</title>
     <style>
         :root {
+            --entre-blue: #007bff;
+            --entre-grey: #f2f2f2;
+        :root {
             --pdf-width: 794px;
             --pdf-height: 1123px;
             --grey-bg: #d9d9d9;
@@ -469,6 +472,21 @@
             font-size: 17px;
         }
 
+        /* ENTREPRENEUR ENGINE STYLES */
+        .entre-chapter-title { text-align: center; font-weight: bold; font-size: 24px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .entre-section-h { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; }
+        .entre-case-box { border: 1.5px solid #000; padding: 15px 25px; margin: 20px 0; background: #fff; }
+        .entre-case-label { font-weight: bold; display: block; margin-bottom: 10px; font-size: 17px; }
+        .entre-activity-box { border: 1px solid #000; padding: 15px; margin: 20px 0; }
+        .entre-activity-label { background: #000; color: #fff; padding: 2px 10px; font-weight: bold; margin-bottom: 10px; display: inline-block; }
+        .entre-reflection-box { background: var(--entre-grey); border: 1px dashed #444; padding: 15px; margin: 15px 0; font-style: italic; }
+        .entre-likert-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px; }
+        .entre-likert-table th { background: var(--entre-grey); border: 1px solid #000; padding: 5px; text-align: center; }
+        .entre-likert-table td { border: 1px solid #000; padding: 8px; }
+        .entre-ansoff-matrix { display: table; width: 100%; border-collapse: separate; border-spacing: 10px; table-layout: fixed; }
+        .entre-ansoff-quadrant { display: table-cell; border: 2px solid var(--entre-blue); background: #f8f9fa; padding: 15px; vertical-align: middle; text-align: center; font-weight: bold; height: 120px; }
+        .entre-label-axis { font-weight: bold; color: var(--entre-blue); font-size: 12px; text-transform: uppercase; }
+
         /* HISTORY ENGINE STYLES */
         .history-canvas { position: relative; overflow: hidden; }
         .history-watermark::before {
@@ -558,6 +576,7 @@
                 <option value="logic">ENGINE: Logic (Ministry Edition)</option>
                 <option value="anthro">ENGINE: Anthropology (2026 Edition)</option>
                 <option value="psych">ENGINE: General Psychology (Legacy)</option>
+                <option value="entre">ENGINE: Entrepreneurship (MoSHE 2019)</option>
             </select>
             <button onclick="masterDraw()" style="flex: 1; margin-top: 0;">EXECUTE DRAW COMMAND</button>
         </div>
@@ -579,7 +598,104 @@
                 drawLogic();
             } else if (engine === 'history') {
                 drawHistory();
+            } else if (engine === 'entre') {
+                drawEntrepreneur();
             }
+        }
+
+        function drawEntrepreneur() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas';
+                    pageDiv.style.transform = `scale(${scale})`;
+
+                    pageData.content.forEach(item => {
+                        const el = renderEntrepreneurItem(item, pageKey);
+                        pageDiv.appendChild(el);
+                    });
+
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+            } catch (err) { alert("Entrepreneur Engine Error: " + err); }
+        }
+
+        function renderEntrepreneurItem(item, pageKey) {
+            const element = document.createElement('div');
+            if (item.type === 'chapter-header') {
+                element.className = 'entre-chapter-title';
+                element.innerHTML = `CHAPTER ${item.number}: ${item.title}`;
+            } 
+            else if (item.type === 'header') {
+                element.className = 'entre-section-h';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'paragraph') {
+                element.className = 'p-block';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'entre-case') {
+                element.className = 'entre-case-box';
+                element.innerHTML = `<span class="entre-case-label">${item.label || ''}</span>${item.body}`;
+            }
+            else if (item.type === 'entre-activity') {
+                element.className = 'entre-activity-box';
+                element.innerHTML = `<div class="entre-activity-label">Activity ${item.number || ''}</div><div><b>Objective:</b> ${item.objective || ''}</div><div style="margin-top:10px">${item.body || ''}</div>`;
+            }
+            else if (item.type === 'entre-reflection') {
+                element.className = 'entre-reflection-box';
+                element.innerHTML = `<b>Reflection Questions:</b><ul>${(item.items || []).map(i => `<li>${i}</li>`).join('')}</ul>`;
+            }
+            else if (item.type === 'entre-likert-grid') {
+                element.innerHTML = `<table class="entre-likert-table">
+                    <tr><th>S. No</th><th>Characteristic</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th></tr>
+                    ${(item.rows || []).map(r => `<tr><td style="text-align:center">${r.no}</td><td>${r.text}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+                </table>`;
+            }
+            else if (item.type === 'entre-ansoff') {
+                element.innerHTML = `
+                    <div style="text-align:center; font-weight:bold; margin-bottom:10px;">Ansoff Matrix</div>
+                    <div class="entre-ansoff-matrix">
+                        <div class="entre-ansoff-quadrant">${item.q1 || 'Market Penetration'}</div>
+                        <div class="entre-ansoff-quadrant">${item.q2 || 'Product Development'}</div>
+                    </div>
+                    <div class="entre-ansoff-matrix">
+                        <div class="entre-ansoff-quadrant">${item.q3 || 'Market Development'}</div>
+                        <div class="entre-ansoff-quadrant">${item.q4 || 'Diversification'}</div>
+                    </div>`;
+            }
+            else if (item.type === 'bullet-list') {
+                element.className = 'list-block';
+                element.innerHTML = '<ul>' + (item.items || []).map(i => `<li>${i}</li>`).join('') + '</ul>';
+            }
+            else if (item.type === 'graphic') {
+                element.className = 'graphic-container';
+                element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
+            }
+            else if (item.type === 'footer') {
+                element.className = 'footer';
+                element.innerText = item.val || pageKey;
+            }
+            else if (item.type === 'spacer') {
+                element.style.flexGrow = item.flex || '0';
+                element.style.height = item.height || '0px';
+            }
+
+            if (item.style) Object.assign(element.style, item.style);
+            return element;
         }
 
         function drawHistory() {
