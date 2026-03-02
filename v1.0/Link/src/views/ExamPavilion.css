@@ -1,0 +1,169 @@
+/* --- ACADEMIC PAVILION UI --- */
+.pavilion-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    background-color: #080808;
+    color: #e0e0e0;
+    font-family: 'Poppins', sans-serif;
+    display: flex;
+    flex-direction: column;
+    animation: pavilionFade 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pavilionFade { from { opacity: 0; transform: scale(1.02); } to { opacity: 1; transform: scale(1); } }
+
+.pavilion-header {
+    padding: 2rem 1.5rem 1rem;
+    background: linear-gradient(to bottom, #0c0c0c, transparent);
+    flex-shrink: 0;
+}
+
+.pav-uni-identity {
+    display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;
+}
+
+.pav-emblem-sm {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: #121212; border: 1px solid #42d7b8;
+    display: flex; align-items: center; justify-content: center;
+    color: #42d7b8; box-shadow: 0 0 15px rgba(66, 215, 184, 0.2);
+}
+
+.pav-header-text h1 { font-size: 1.2rem; font-weight: 600; margin: 0; }
+.pav-header-text p { font-size: 0.75rem; color: #808080; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
+
+/* --- SEGMENTED CONTROL --- */
+.pav-selector-area {
+    padding: 0 1.5rem 1.5rem;
+    flex-shrink: 0;
+}
+
+.pav-segmented-control {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    padding: 4px; border-radius: 16px;
+    display: flex; position: relative;
+}
+
+.pav-segment {
+    flex: 1; padding: 12px 0; text-align: center;
+    font-size: 0.85rem; font-weight: 600; color: #808080;
+    cursor: pointer; z-index: 2; transition: color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pav-segment.active {
+    color: #080808;
+}
+
+.pav-active-pill {
+    position: absolute; top: 4px; left: 4px;
+    width: calc(33.33% - 4px); height: calc(100% - 8px);
+    background: var(--accent-teal);
+    border-radius: 12px; z-index: 1;
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 15px rgba(66, 215, 184, 0.3);
+}
+
+/* --- EXAM LIST --- */
+.pavilion-scroll {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0; /* Critical for flex scroll */
+    padding: 0 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    -webkit-overflow-scrolling: touch;
+}
+
+.pav-exam-card {
+    background: #121212; 
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 24px; 
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    animation: cardRise 0.5s ease-out forwards;
+    /* Enforce the Intended Design Volume */
+    display: flex;
+    flex-direction: column;
+    min-height: 160px;
+    justify-content: space-between;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.pav-exam-card:active {
+    transform: scale(0.98);
+    border-color: var(--accent-teal);
+}
+
+@keyframes cardRise { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+.pav-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+
+.pav-course-code {
+    font-family: 'Roboto Mono', monospace; font-size: 0.75rem; font-weight: 700;
+    color: #42d7b8; background: rgba(66, 215, 184, 0.1); padding: 4px 8px; border-radius: 6px;
+}
+
+.pav-year { font-size: 0.8rem; font-weight: 600; color: #808080; }
+.pav-exam-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; line-height: 1.3; color: white; }
+
+.pav-meta-ribbon {
+    display: flex; gap: 1.2rem; padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.pav-meta-item {
+    display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #808080;
+}
+
+.pav-meta-item i { color: #42d7b8; }
+
+/* --- LUME GAUGE --- */
+.pav-lume-gauge {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background: rgba(255, 255, 255, 0.05);
+}
+
+.pav-lume-fill {
+    position: absolute; bottom: 0; left: 0; width: 100%; background: #42d7b8; box-shadow: 0 0 10px #42d7b8;
+}
+
+.pav-empty { text-align: center; padding: 4rem 2rem; color: #555; font-style: italic; }
+
+.pav-archive-end {
+    padding: 3rem 0 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    opacity: 0.6;
+}
+
+.pav-divider {
+    width: 40px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-teal), transparent);
+}
+
+.pav-end-seal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: #808080;
+}
+
+.pav-end-seal i {
+    font-size: 1.2rem;
+    color: var(--accent-teal);
+    filter: drop-shadow(0 0 5px rgba(66, 215, 184, 0.3));
+}
+
+.pav-end-seal span {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 500;
+}
