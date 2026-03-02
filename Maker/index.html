@@ -407,7 +407,8 @@
                         else if (item.type === 'summary') {
                             element.className = 'summary-block';
                             let list = `<span class="summary-label">Summary</span><ul>`;
-                            item.points.forEach(p => list += `<li>${p}</li>`);
+                            const summaryData = item.items || item.points || [];
+                            summaryData.forEach(p => list += `<li>${p}</li>`);
                             element.innerHTML = list + '</ul>';
                         }
                         else if (item.type === 'definition-box') {
@@ -417,7 +418,8 @@
                         else if (item.type === 'box-block') {
                             element.className = 'box-block';
                             let list = '<ul>';
-                            item.items.forEach(li => list += `<li>${li}</li>`);
+                            const boxData = item.items || item.points || [];
+                            boxData.forEach(li => list += `<li>${li}</li>`);
                             element.innerHTML = list + '</ul>';
                         }
                         else if (item.type === 'list' || item.type === 'bullet-list') {
