@@ -468,6 +468,86 @@
             margin-right: 20px;
             font-size: 17px;
         }
+
+        /* HISTORY ENGINE STYLES */
+        .history-canvas { position: relative; overflow: hidden; }
+        .history-watermark::before {
+            content: 'History of Ethiopia and the Horn Module (Hist.1102)';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 45px;
+            color: rgba(200, 200, 200, 0.15);
+            white-space: nowrap;
+            z-index: 0;
+            pointer-events: none;
+            font-family: var(--font-serif);
+        }
+        .history-header-text {
+            text-align: center;
+            font-style: italic;
+            font-size: 14px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+        .history-unit-title {
+            text-align: center;
+            text-transform: uppercase;
+            font-weight: bold;
+            font-size: 22px;
+            margin: 20px 0;
+            line-height: 1.2;
+        }
+        .history-arrow-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        .history-arrow-list li {
+            position: relative;
+            padding-left: 30px;
+            margin-bottom: 10px;
+            text-align: justify;
+        }
+        .history-arrow-list li::before {
+            content: '➢';
+            position: absolute;
+            left: 0;
+            color: #000;
+            font-size: 18px;
+        }
+        .history-source-line {
+            font-size: 13px;
+            margin-top: 5px;
+            color: #333;
+        }
+        .history-cover-frame {
+            border: 4px solid #000;
+            outline: 1px solid #000;
+            outline-offset: -8px;
+            height: 100%;
+            padding: 40px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            /* The third inner line via shadow */
+            box-shadow: inset 0 0 0 10px white, inset 0 0 0 12px black;
+        }
+        .history-bolt {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #000;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .history-bolt::after { content: ''; width: 8px; height: 8px; background: #000; border-radius: 50%; }
     </style>
 </head>
 <body>
@@ -475,6 +555,7 @@
     <div id="ui-layer">
         <div style="display: flex; gap: 10px; margin-bottom: 8px;">
             <select id="engine-select" style="flex: 1; padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid #007bff;">
+                <option value="history">ENGINE: History (2021 Edition)</option>
                 <option value="logic">ENGINE: Logic (Ministry Edition)</option>
                 <option value="anthro">ENGINE: Anthropology (2026 Edition)</option>
                 <option value="psych">ENGINE: General Psychology (Legacy)</option>
@@ -497,7 +578,98 @@
                 drawAnthropology();
             } else if (engine === 'logic') {
                 drawLogic();
+            } else if (engine === 'history') {
+                drawHistory();
             }
+        }
+
+        function drawHistory() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas history-canvas';
+                    if (pageData.watermark !== false) pageDiv.classList.add('history-watermark');
+                    pageDiv.style.transform = `scale(${scale})`;
+
+                    // Check for Cover Pattern
+                    if (pageData.is_cover) {
+                        const frame = document.createElement('div');
+                        frame.className = 'history-cover-frame';
+                        // Bolts
+                        ['top:5px;left:5px','top:5px;right:5px','bottom:5px;left:5px','bottom:5px;right:5px'].forEach(pos => {
+                            const bolt = document.createElement('div');
+                            bolt.className = 'history-bolt';
+                            bolt.style.cssText = pos;
+                            pageDiv.appendChild(bolt);
+                        });
+                        pageDiv.appendChild(frame);
+                        // Render cover content inside frame
+                        pageData.content.forEach(item => {
+                            const el = renderHistoryItem(item);
+                            frame.appendChild(el);
+                        });
+                    } else {
+                        pageData.content.forEach(item => {
+                            const el = renderHistoryItem(item, pageKey);
+                            pageDiv.appendChild(el);
+                        });
+                    }
+
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+            } catch (err) { alert("History Engine Error: " + err); }
+        }
+
+        function renderHistoryItem(item, pageKey) {
+            const element = document.createElement('div');
+            if (item.type === 'history-header') {
+                element.className = 'history-header-text';
+                element.innerText = 'History of Ethiopia and the Horn Module (Hist.1102)';
+            }
+            else if (item.type === 'history-unit-header') {
+                element.innerHTML = `<div class="history-unit-title">UNIT ${item.number || ''}<br>${item.title || ''} (${item.hours || ''} hours)</div>`;
+            }
+            else if (item.type === 'history-arrow-list') {
+                element.className = 'history-arrow-list';
+                element.innerHTML = (item.items || []).map(i => `<li>${i}</li>`).join('');
+            }
+            else if (item.type === 'paragraph') {
+                element.className = 'p-block';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'header') {
+                element.className = 'h-block';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'history-footer') {
+                element.className = 'footer';
+                element.style.marginTop = 'auto';
+                element.innerText = item.page || pageKey;
+            }
+            else if (item.type === 'history-graphic') {
+                element.className = 'graphic-container';
+                element.innerHTML = `<img src="${item.url}" style="max-width:100%"><div class="history-source-line"><b>Source:</b> ${item.source || ''}</div>`;
+            }
+            else if (item.type === 'spacer') {
+                element.style.flexGrow = item.flex || '0';
+                element.style.height = item.height || '0px';
+            }
+
+            if (item.style) Object.assign(element.style, item.style);
+            return element;
         }
 
         function drawLogic() {
