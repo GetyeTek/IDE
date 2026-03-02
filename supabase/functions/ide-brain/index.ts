@@ -2161,6 +2161,60 @@ If you already give a payload, assume it's already applied, and give the next pl
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "proxy_web") {
+        const { url } = payload;
+        try {
+            const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+            const response = await fetch(targetUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+            });
+            let html = await response.text();
+
+            // 1. Inject Base Tag to fix assets
+            const baseTag = `<base href="${new URL(targetUrl).origin}/">`;
+            
+            // 2. Inject Conduit Bridge
+            const bridgeScript = `
+                <script>
+                (function() {
+                    window.IS_CONDUIT_PROXY = true;
+                    const originalConsole = { ...console };
+                    ['log','warn','error','info'].forEach(m => {
+                        console[m] = (...args) => {
+                            window.parent.postMessage({ 
+                                type: 'CONDUIT_LOG', method: m, 
+                                args: args.map(a => String(a)), 
+                                time: new Date().toLocaleTimeString() 
+                            }, '*');
+                            originalConsole[m](...args);
+                        };
+                    });
+                    const originalFetch = window.fetch;
+                    window.fetch = async (...args) => {
+                        const start = Date.now();
+                        const res = await originalFetch(...args);
+                        const clone = res.clone();
+                        window.parent.postMessage({
+                            type: 'CONDUIT_NETWORK',
+                            payload: {
+                                url: args[0], method: 'GET', status: res.status, 
+                                duration: Date.now() - start
+                            }
+                        }, '*');
+                        return res;
+                    };
+                    console.log("⚡ Conduit Interceptor Active on: " + location.href);
+                })();
+                </script>
+            `;
+
+            const modifiedHtml = html.replace('<head>', `<head>${baseTag}${bridgeScript}`);
+            return new Response(modifiedHtml, { headers: { ...corsHeaders, "Content-Type": "text/html" } });
+        } catch(e) {
+            return new Response(`Error proxying: ${e.message}`, { status: 500, headers: corsHeaders });
+        }
+    }
+
     if (action === "create_cron_job") {
         const { job_name, schedule, function_slug } = payload;
         const projectUrl = Deno.env.get("SUPABASE_URL");
