@@ -3357,14 +3357,20 @@ function addTerminalCard(data, options = {}) {
             // --- INJECT FLOATING HUD INTO PREVIEW ---
             const hudStyle = doc.createElement('style');
             hudStyle.textContent = `
-                #conduit-debug-ball { position: fixed; bottom: 20px; right: 20px; width: 44px; height: 44px; background: #222; border: 1px solid #444; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 2147483647; cursor: move; touch-action: none; color: #d946ef; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-                #conduit-debug-ui { position: fixed; inset: 0; background: rgba(5,5,5,0.9); z-index: 2147483646; display: none; flex-direction: column; font-family: sans-serif; color: white; padding-top: env(safe-area-inset-top); }
+                #conduit-debug-ball { position: fixed; bottom: 20px; right: 20px; width: 44px; height: 44px; background: #1a1a1c; border: 1px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 2147483647; cursor: move; touch-action: none; color: #d946ef; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-weight: bold; }
+                #conduit-debug-ui { position: fixed; inset: 0; background: rgba(5,5,5,0.95); z-index: 2147483646; display: none; flex-direction: column; font-family: -apple-system, system-ui, sans-serif; color: white; padding-top: env(safe-area-inset-top); }
                 #conduit-debug-ui.active { display: flex; }
-                .debug-header { padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 14px; }
-                .debug-scroll { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 11px; }
-                .debug-row { padding: 6px; border-bottom: 1px solid #222; white-space: pre-wrap; word-break: break-all; }
-                .log-error { border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
-                .log-warn { border-left: 3px solid #eab308; }
+                .debug-header { padding: 12px 16px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; background: #111; }
+                .debug-scroll { flex: 1; overflow-y: auto; padding: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+                .debug-row { padding: 8px 12px; border-bottom: 1px solid #1a1a1c; position: relative; display: flex; flex-direction: column; gap: 4px; }
+                .debug-row:hover .line-copy-btn { opacity: 1; }
+                .line-copy-btn { position: absolute; right: 8px; top: 8px; opacity: 0; background: #333; border: 1px solid #444; color: #aaa; font-size: 9px; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+                .debug-meta { display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #555; }
+                .log-error { border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.03); }
+                .log-warn { border-left: 3px solid #eab308; background: rgba(234, 179, 8, 0.02); }
+                .debug-footer { padding: 12px; border-top: 1px solid #222; display: flex; gap: 10px; background: #0a0a0a; }
+                .hud-btn { flex: 1; padding: 10px; border: 1px solid #333; background: #222; color: #ccc; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+                .hud-btn:active { background: #333; }
             `;
             doc.head.appendChild(hudStyle);
 
@@ -3372,9 +3378,18 @@ function addTerminalCard(data, options = {}) {
             hudHtml.innerHTML = `
                 <div id="conduit-debug-ball">⚡</div>
                 <div id="conduit-debug-ui">
-                    <div class="debug-header"><span>Preview Console</span><button onclick="document.getElementById('conduit-debug-ui').classList.remove('active')" style="background:none; border:none; color:white; font-size:20px;">×</button></div>
+                    <div class="debug-header">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="color:#d946ef; font-weight:bold; font-size:13px;">Conduit HUD</span>
+                            <button onclick="window.copyAllPreviewLogs()" style="background:none; border:1px solid #333; color:#888; font-size:10px; padding:2px 8px; border-radius:4px;">Copy All</button>
+                        </div>
+                        <button onclick="document.getElementById('conduit-debug-ui').classList.remove('active')" style="background:none; border:none; color:#666; font-size:24px;">×</button>
+                    </div>
                     <div id="conduit-debug-list" class="debug-scroll"></div>
-                    <div style="padding:10px; border-top:1px solid #333;"><button onclick="window.localLogs=[]; window.updateLocalLogUI();" style="width:100%; padding:8px; background:#333; border:none; color:white; border-radius:4px;">Clear Logs</button></div>
+                    <div class="debug-footer">
+                        <button class="hud-btn" onclick="window.localLogs=[]; window.updateLocalLogUI();">Clear Logs</button>
+                        <button class="hud-btn" onclick="document.getElementById('conduit-debug-ui').classList.remove('active')">Close</button>
+                    </div>
                 </div>
             `;
             doc.body.appendChild(hudHtml);
@@ -3391,8 +3406,28 @@ function addTerminalCard(data, options = {}) {
                     ball.addEventListener('touchmove', e => { dragging=true; x=e.touches[0].clientX-ix; y=e.touches[0].clientY-iy; ball.style.transform=\`translate(\${x}px, \${y}px)\`; });
                     ball.onclick = () => { if(!dragging) ui.classList.toggle('active'); };
 
+                    window.copyPreviewLine = (idx) => {
+                        const log = window.localLogs[idx];
+                        if(!log) return;
+                        navigator.clipboard.writeText(log.msg).then(() => alert("Copied line!"));
+                    };
+
+                    window.copyAllPreviewLogs = () => {
+                        const text = window.localLogs.map(l => \`[\${l.time}] \${l.msg}\`).join('\\n');
+                        navigator.clipboard.writeText(text).then(() => alert("Copied all logs!"));
+                    };
+
                     window.updateLocalLogUI = () => {
-                        list.innerHTML = window.localLogs.map(l => \`<div class="debug-row log-\${l.method}"><span style="color:#666">[\${l.time}]</span> \${l.msg}</div>\`).join('');
+                        list.innerHTML = window.localLogs.map((l, idx) => \`
+                            <div class="debug-row log-\${l.method}">
+                                <button class="line-copy-btn" onclick="window.copyPreviewLine(\${idx})">Copy</button>
+                                <div class="debug-meta">
+                                    <span>\${l.method.toUpperCase()}</span>
+                                    <span>\${l.time}</span>
+                                </div>
+                                <div style="white-space:pre-wrap; word-break:break-all; line-height:1.4;">\${l.msg}</div>
+                            </div>
+                        \`).join('');
                         list.scrollTop = list.scrollHeight;
                     };
                     window.updateLocalLogUI();
