@@ -633,9 +633,11 @@
             </div>
 
             <div class="browser-toolbar">
+                <button class="icon-btn" style="padding:6px;" onclick="proxyBack()" title="Back">←</button>
+                <button class="icon-btn" style="padding:6px;" onclick="proxyForward()" title="Forward">→</button>
                 <button class="icon-btn" style="padding:6px;" onclick="bundleAndPreview(null)" title="Reset to Local App">🏠</button>
-                <button class="icon-btn" style="padding:6px;" onclick="navigateProxy(null, true)" title="Reload Current Page">↻</button>
-                <input type="text" id="browser-url" class="url-bar" placeholder="Search or enter URL (e.g. google.com)" onkeydown="if(event.key==='Enter') navigateProxy()">
+                <button class="icon-btn" style="padding:6px;" onclick="navigateProxy(null, true)" title="Reload">↻</button>
+                <input type="text" id="browser-url" class="url-bar" placeholder="google.com" onkeydown="if(event.key==='Enter') navigateProxy()">
                 <button class="icon-btn" style="color:var(--prod)" onclick="navigateProxy()">Go</button>
             </div>
 
@@ -3148,12 +3150,22 @@ function addTerminalCard(data, options = {}) {
     }
 
     // --- BUNDLER & PREVIEW ---
-        async function navigateProxy(forcedUrl = null, isReload = false) {
+        let proxyHistory = [];
+    let proxyHistoryIndex = -1;
+
+    async function navigateProxy(forcedUrl = null, isReload = false) {
         const input = document.getElementById('browser-url');
         const url = forcedUrl || input.value.trim();
         if(!url) return;
+
+        if (!isReload && url !== proxyHistory[proxyHistoryIndex]) {
+            proxyHistory = proxyHistory.slice(0, proxyHistoryIndex + 1);
+            proxyHistory.push(url);
+            proxyHistoryIndex++;
+        }
+
         const iframe = document.getElementById('preview-frame');
-        iframe.srcdoc = '<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Proxying Connection to ' + url + '...</div>';
+        iframe.srcdoc = '<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Proxying ' + url + '...</div>';
 
         try {
             const res = await fetch(CONFIG.funcUrl, {
@@ -3163,9 +3175,23 @@ function addTerminalCard(data, options = {}) {
             const html = await res.text();
             iframe.srcdoc = html;
             document.getElementById('preview-url-display').innerText = 'Browsing: ' + url;
-            if (forcedUrl) input.value = forcedUrl;
+            input.value = url;
         } catch(e) {
             iframe.srcdoc = '<div style="color:red; padding:20px;">Proxy Error: ' + e.message + '</div>';
+        }
+    }
+
+    function proxyBack() {
+        if (proxyHistoryIndex > 0) {
+            proxyHistoryIndex--;
+            navigateProxy(proxyHistory[proxyHistoryIndex], true);
+        }
+    }
+
+    function proxyForward() {
+        if (proxyHistoryIndex < proxyHistory.length - 1) {
+            proxyHistoryIndex++;
+            navigateProxy(proxyHistory[proxyHistoryIndex], true);
         }
     }
 
