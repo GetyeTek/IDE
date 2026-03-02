@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate PDF Manufacturer</title>
     <style>
         :root {
@@ -280,35 +280,32 @@
 
         center { display: block; width: 100%; margin: 5px 0; }
 
-        /* AI ACTION BAR */
-        .ai-action-bar {
-            display: flex;
-            gap: 8px;
-            margin-top: -5px;
-            margin-bottom: 15px;
-            justify-content: flex-end;
-            opacity: 0.3;
-            transition: opacity 0.2s ease;
-        }
-        .ai-action-bar:hover { opacity: 1; }
-        .ai-btn {
-            background: #fff;
-            border: 1px solid #aaa;
+        /* AI INLINE BUTTON */
+        .ai-btn-inline {
+            display: inline-flex;
+            align-items: center;
+            background: #e8f0fe;
+            border: 1px solid #aec2ec;
             border-radius: 12px;
-            padding: 3px 10px;
-            font-size: 11px;
-            color: #333;
+            padding: 2px 8px;
+            font-size: 13px;
+            color: #1a73e8;
             cursor: pointer;
             font-family: sans-serif;
             font-weight: bold;
+            margin-left: 6px;
+            vertical-align: baseline;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .ai-btn-inline:hover {
+            background: #d2e3fc;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        .ai-btn:hover { background: #f9f9f9; color: #007bff; border-color: #007bff; }
-        body.viewer-active .ai-btn { background: #333; color: #ccc; border-color: #555; }
-        body.viewer-active .ai-btn:hover { color: #00ff41; border-color: #00ff41; }
-
+        body.viewer-active .ai-btn-inline { background: #333; color: #4ade80; border-color: #4ade80; }
+        
         @media print {
-            .ai-action-bar { display: none !important; }
+            .ai-btn-inline { display: none !important; }
         }
 
         /* TABLE OF CONTENTS STYLES */
@@ -566,15 +563,9 @@
 
                         pageDiv.appendChild(element);
 
-                        // INJECT AI ACTION BAR
+                        // INJECT INLINE AI BUTTON
                         if (item.ai_ready === true) {
-                            const actionBar = document.createElement('div');
-                            actionBar.className = 'ai-action-bar';
-                            actionBar.innerHTML = `
-                                <button class="ai-btn" onclick="triggerAI('amharic')">🌐 Amharic</button>
-                                <button class="ai-btn" onclick="triggerAI('explain')">🧠 Explain</button>
-                            `;
-                            pageDiv.appendChild(actionBar);
+                            element.innerHTML += ` <button class="ai-btn-inline" onclick="triggerAI('explore')">✨ AI Explore</button>`;
                         }
                     });
 
