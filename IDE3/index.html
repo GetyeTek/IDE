@@ -1351,6 +1351,9 @@
             <button class="fab-sub" data-label="Create App" onclick="initCreateApp()">
                 <svg width="20" height="20" fill="none" stroke="var(--prod)" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
             </button>
+            <button class="fab-sub" data-label="Cron Job" onclick="toggleFabMenu(); openCronManager();">
+                <svg width="20" height="20" fill="none" stroke="#fbbf24" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </button>
             <button class="fab-sub" data-label="AI Chat" onclick="toggleFabMenu(); toggleChat(true);">
                 <svg width="20" height="20" fill="none" stroke="var(--ai-accent)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
             </button>
@@ -1395,6 +1398,51 @@
                 <button class="icon-btn" style="background:var(--primary); color:white; border:none; height: 42px; width: 42px; border-radius: 12px;" onclick="sendChat()">
                     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRON MANAGER OVERLAY -->
+    <div id="cron-manager-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span class="viewer-title">Cron Job Scheduler</span>
+            <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeCronManager()">Close</button>
+        </div>
+        <div style="padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 20px;">
+            <div class="card" style="margin:0;">
+                <div class="input-group">
+                    <label class="input-label">Target Edge Function</label>
+                    <div id="cron-fn-selector" class="flex-gap" style="overflow-x: auto; padding-bottom: 8px; margin-top: 5px; scrollbar-width: none;">
+                        <!-- Populated by JS -->
+                    </div>
+                    <input type="text" id="cron-target-slug" class="input-field" placeholder="Or type slug manually..." style="margin-top:8px;">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Job Name</label>
+                    <input type="text" id="cron-job-name" class="input-field" placeholder="e.g. daily-cleanup">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Schedule (Cron Expression)</label>
+                    <div class="flex-gap" style="margin-bottom:10px;">
+                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('*/5 * * * *')">5 Mins</button>
+                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('0 * * * *')">Hourly</button>
+                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('0 0 * * *')">Daily</button>
+                    </div>
+                    <input type="text" id="cron-schedule" class="input-field" placeholder="* * * * *">
+                    <p style="font-size:10px; color:#666; margin-top:5px;">Min | Hour | Day | Month | Weekday</p>
+                </div>
+
+                <button class="btn btn-primary" style="background: #fbbf24; color: black; margin-top: 10px;" onclick="executeCreateCron()">
+                    ⏰ Schedule Job
+                </button>
+            </div>
+
+            <div class="card" style="border-color: var(--ai-accent); background: rgba(217, 70, 239, 0.02);">
+                <div style="font-size: 11px; color: var(--ai-accent); font-weight: bold; margin-bottom: 8px;">ENVIRONMENT SETUP</div>
+                <p style="font-size: 10px; color: #888; margin-bottom: 12px;">Required once per project to enable the Database Extensions.</p>
+                <button class="btn-outline" style="border-color: var(--ai-accent); color: var(--ai-accent); font-size: 11px;" onclick="enableCronExtensions()">Enable pg_cron & pg_net</button>
             </div>
         </div>
     </div>
@@ -2172,6 +2220,80 @@
             toast.innerText = "Error: " + e.message;
             setTimeout(() => toast.remove(), 4000);
         }
+    }
+
+    function openCronManager() {
+        document.getElementById('cron-manager-overlay').classList.add('active');
+        toggleFab(false);
+        
+        // Populate function list
+        const container = document.getElementById('cron-fn-selector');
+        const functions = new Set();
+        (window.repoFiles || []).forEach(f => {
+            if (f.path.includes('supabase/functions/')) {
+                const parts = f.path.split('supabase/functions/')[1].split('/');
+                if (parts[0]) functions.add(parts[0]);
+            }
+        });
+
+        container.innerHTML = Array.from(functions).map(name => `
+            <button class="filter-pill" onclick="selectCronFn('${name}', this)">${name}</button>
+        `).join('') || '<span style="font-size:10px; color:#444;">No functions found</span>';
+    }
+
+    function closeCronManager() {
+        document.getElementById('cron-manager-overlay').classList.remove('active');
+        toggleFab(true);
+    }
+
+    function selectCronFn(name, btn) {
+        document.querySelectorAll('#cron-fn-selector .filter-pill').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('cron-target-slug').value = name;
+        if(!document.getElementById('cron-job-name').value) {
+            document.getElementById('cron-job-name').value = 'run-' + name;
+        }
+    }
+
+    function setCronPreset(val) {
+        document.getElementById('cron-schedule').value = val;
+    }
+
+    async function executeCreateCron() {
+        const job_name = document.getElementById('cron-job-name').value.trim();
+        const schedule = document.getElementById('cron-schedule').value.trim();
+        const function_slug = document.getElementById('cron-target-slug').value.trim();
+
+        if(!job_name || !schedule || !function_slug) return showGlobalToast("Fill all fields", true);
+
+        showGlobalToast("Scheduling...");
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'create_cron_job', job_name, schedule, function_slug })
+            });
+            const data = await res.json();
+            if(data.success) {
+                showGlobalToast("✅ " + data.message);
+                closeCronManager();
+                fetchState(true);
+            } else throw new Error(data.error);
+        } catch(e) { showGlobalToast(e.message, true); }
+    }
+
+    async function enableCronExtensions() {
+        if(!confirm("Execute SQL to enable pg_cron and pg_net extensions?")) return;
+        try {
+            const sql = "CREATE EXTENSION IF NOT EXISTS pg_cron; CREATE EXTENSION IF NOT EXISTS pg_net;";
+            const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SQL_CONFIG.ANON, 'apikey': SQL_CONFIG.ANON },
+                body: JSON.stringify({ query: sql })
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+            showGlobalToast("✅ Extensions Enabled");
+        } catch(e) { showGlobalToast(e.message, true); }
     }
 
     function createBareboneFunction() {
