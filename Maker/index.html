@@ -553,43 +553,9 @@
                             }
                             element.innerHTML = html;
                         }
-                        else if (item.type === 'logic-venn') {
-                            element.className = 'logic-venn-container';
-                            element.innerHTML = `
-                                <svg width="200" height="120" viewBox="0 0 200 120">
-                                    <circle cx="70" cy="60" r="50" fill="none" stroke="black" stroke-width="1.5" />
-                                    <circle cx="130" cy="60" r="50" fill="none" stroke="black" stroke-width="1.5" />
-                                    <text x="20" y="65" font-size="14">S</text>
-                                    <text x="170" y="65" font-size="14">P</text>
-                                    ${item.shading === 'left' ? '<path d="M70,10 A50,50 0 0,0 70,110 A50,50 0 0,1 70,10" fill="#ccc" />' : ''}
-                                    ${item.shading === 'middle' ? '<path d="M70,10 A50,50 0 0,1 70,110 A50,50 0 0,1 70,10" fill="#ccc" />' : ''}
-                                    ${item.mark === 'x-left' ? '<text x="45" y="65" font-weight="bold" fill="red">X</text>' : ''}
-                                    ${item.mark === 'x-middle' ? '<text x="95" y="65" font-weight="bold" fill="red">X</text>' : ''}
-                                </svg>
-                                <div class="graphic-caption">${item.caption || ''}</div>`;
-                        }
-                        else if (item.type === 'logic-square') {
-                            element.className = 'logic-square-container';
-                            element.innerHTML = `
-                                <svg width="300" height="220" viewBox="0 0 300 220">
-                                    <!-- Corners -->
-                                    <text x="20" y="30" font-weight="bold" font-size="18">A</text>
-                                    <text x="270" y="30" font-weight="bold" font-size="18">E</text>
-                                    <text x="20" y="200" font-weight="bold" font-size="18">I</text>
-                                    <text x="270" y="200" font-weight="bold" font-size="18">O</text>
-                                    <!-- Outer Box -->
-                                    <line x1="45" y1="25" x2="260" y2="25" stroke="black" />
-                                    <line x1="45" y1="195" x2="260" y2="195" stroke="black" />
-                                    <line x1="30" y1="45" x2="30" y2="175" stroke="black" />
-                                    <line x1="280" y1="45" x2="280" y2="175" stroke="black" />
-                                    <!-- Diagonals -->
-                                    <line x1="50" y1="50" x2="260" y2="180" stroke="black" />
-                                    <line x1="260" y1="50" x2="50" y2="180" stroke="black" />
-                                    <!-- Labels -->
-                                    <text x="115" y="20" font-size="11">Contrary</text>
-                                    <text x="110" y="215" font-size="11">Subcontrary</text>
-                                    <text x="100" y="115" transform="rotate(35 150 110)" font-size="10">Contradictory</text>
-                                </svg>`;
+                        else if (item.type === 'graphic') {
+                            element.className = 'graphic-container';
+                            element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
                         }
                         else if (item.type === 'logic-quote') {
                             element.className = 'logic-quote-block';
