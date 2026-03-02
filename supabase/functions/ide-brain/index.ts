@@ -2191,11 +2191,9 @@ If you already give a payload, assume it's already applied, and give the next pl
             const bridgeScript = `
                 <script>
                 (function() {
-                    // Prevent Frame-Busting
-                    window.onbeforeunload = function() { return "Conduit prevented a redirect"; };
-                    Object.defineProperty(window, 'location', { value: window.location, configurable: false, writable: false });
-
-                    // Proxy Interceptor
+                    window.IS_CONDUIT_PROXY = true;
+                    
+                    // --- LOGGING --- 
                     const originalConsole = { ...console };
                     ['log','warn','error','info'].forEach(m => {
                         console[m] = (...args) => {
@@ -2208,19 +2206,24 @@ If you already give a payload, assume it's already applied, and give the next pl
                         };
                     });
 
-                    // Catch AJAX/Fetch calls
-                    const oldFetch = window.fetch;
-                    window.fetch = async (...args) => {
-                        window.parent.postMessage({ type: 'CONDUIT_LOG', method: 'info', args: ["Fetch: " + args[0]], time: '' }, '*');
-                        return oldFetch(...args);
-                    };
-
-                    // Intercept Navigations
+                    // --- NAVIGATION --- 
                     document.addEventListener('click', e => {
                         const a = e.target.closest('a');
-                        if(a && a.href) {
+                        if(a && a.href && !a.href.startsWith('#') && !a.getAttribute('target')) {
+                            // Only intercept if it's an actual URL change, not a hash/anchor
                             e.preventDefault();
                             window.parent.postMessage({ type: 'CONDUIT_NAVIGATE', url: a.href }, '*');
+                        }
+                    }, true);
+
+                    // Intercept Form Submits (Search Engines)
+                    document.addEventListener('submit', e => {
+                        const form = e.target;
+                        if(form.method.toLowerCase() === 'get') {
+                            e.preventDefault();
+                            const url = new URL(form.action || location.href);
+                            const params = new URLSearchParams(new FormData(form));
+                            window.parent.postMessage({ type: 'CONDUIT_NAVIGATE', url: url.origin + url.pathname + '?' + params.toString() }, '*');
                         }
                     }, true);
                 })();
