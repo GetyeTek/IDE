@@ -280,6 +280,37 @@
 
         center { display: block; width: 100%; margin: 5px 0; }
 
+        /* AI ACTION BAR */
+        .ai-action-bar {
+            display: flex;
+            gap: 8px;
+            margin-top: -5px;
+            margin-bottom: 15px;
+            justify-content: flex-end;
+            opacity: 0.3;
+            transition: opacity 0.2s ease;
+        }
+        .ai-action-bar:hover { opacity: 1; }
+        .ai-btn {
+            background: #fff;
+            border: 1px solid #aaa;
+            border-radius: 12px;
+            padding: 3px 10px;
+            font-size: 11px;
+            color: #333;
+            cursor: pointer;
+            font-family: sans-serif;
+            font-weight: bold;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .ai-btn:hover { background: #f9f9f9; color: #007bff; border-color: #007bff; }
+        body.viewer-active .ai-btn { background: #333; color: #ccc; border-color: #555; }
+        body.viewer-active .ai-btn:hover { color: #00ff41; border-color: #00ff41; }
+
+        @media print {
+            .ai-action-bar { display: none !important; }
+        }
+
         /* TABLE OF CONTENTS STYLES */
         .toc-container { margin: 10px 0; }
         .toc-entry {
@@ -534,6 +565,17 @@
                         }
 
                         pageDiv.appendChild(element);
+
+                        // INJECT AI ACTION BAR
+                        if (item.ai_ready === true) {
+                            const actionBar = document.createElement('div');
+                            actionBar.className = 'ai-action-bar';
+                            actionBar.innerHTML = `
+                                <button class="ai-btn" onclick="triggerAI('amharic')">🌐 Amharic</button>
+                                <button class="ai-btn" onclick="triggerAI('explain')">🧠 Explain</button>
+                            `;
+                            pageDiv.appendChild(actionBar);
+                        }
                     });
 
                     wrapper.appendChild(pageDiv);
@@ -555,6 +597,11 @@
             if (document.body.classList.contains('viewer-active')) {
                 window.scrollTo({ top: 0, behavior: 'auto' });
             }
+        }
+
+        function triggerAI(action) {
+            // Placeholder function for future backend hook
+            alert(`AI Action triggered: [${action.toUpperCase()}]\n\nIn the future, this will grab the JSON block data and send it to your backend for translation/explanation.`);
         }
     </script>
 </body>
