@@ -373,7 +373,7 @@
 
         /* LOGIC BOOK SPECIFIC STYLES */
         .logic-header {
-            border-top: 1px solid #ccc; /* Subtle grey */
+            border-top: 2px solid #444; /* Darker and thicker grey */
             height: 30px;
             margin-bottom: 25px;
             position: relative;
@@ -382,13 +382,13 @@
             content: '';
             position: absolute;
             right: 40px;
-            bottom: 30px; /* Positions it relative to the horizontal line */
-            width: 1px;
-            height: 35px; /* Extends upward */
-            background: #ccc;
+            bottom: 30px; 
+            width: 2px; /* Thicker tick */
+            height: 40px; /* Extends upward further */
+            background: #444;
         }
         .logic-footer {
-            border-top: 2.5px solid #800000; /* Single thick maroon line */
+            border-top: 5px solid #800000; /* Heavy maroon line */
             margin-top: auto;
             padding-top: 8px;
             display: flex;
@@ -396,6 +396,13 @@
             font-size: 14.5px;
             font-style: italic;
             font-family: var(--font-serif);
+        }
+        .logic-example-label {
+            font-weight: bold;
+            text-decoration: underline;
+            font-size: 16px;
+            display: inline-block;
+            margin-bottom: 8px;
         }
         .logic-chapter-num { font-size: 22px; font-weight: bold; display: block; text-align: center; margin-bottom: 5px; }
         .logic-chapter-title { font-size: 26px; font-weight: bold; display: block; text-align: center; text-transform: uppercase; margin-bottom: 30px; }
@@ -564,6 +571,9 @@
                         else if (item.type === 'logic-note') {
                             element.className = 'logic-note-box';
                             element.innerHTML = `<span class="logic-note-label">Note:</span><div style="font-style:italic;">${item.body}</div>`;
+                        }
+                        else if (item.type === 'logic-example') {
+                            element.innerHTML = `<div><span class="logic-example-label">${item.label || 'Example'}:</span> ${item.body || ''}</div>`;
                         }
                         else if (item.type === 'spacer') {
                             element.style.flexGrow = item.flex || '0';
