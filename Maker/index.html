@@ -282,27 +282,29 @@
 
         /* AI INLINE BUTTON */
         .ai-btn-inline {
-            display: inline-flex;
-            align-items: center;
-            background: #e8f0fe;
-            border: 1px solid #aec2ec;
-            border-radius: 12px;
-            padding: 2px 8px;
-            font-size: 13px;
-            color: #1a73e8;
+            display: inline-block;
+            width: auto !important; /* Overrides the global mobile button width */
+            background: #e8f0fe !important;
+            border: 1px solid #aec2ec !important;
+            border-radius: 12px !important;
+            padding: 2px 8px !important;
+            font-size: 12px !important;
+            color: #1a73e8 !important;
             cursor: pointer;
             font-family: sans-serif;
             font-weight: bold;
-            margin-left: 6px;
+            margin-left: 6px !important;
+            margin-top: 0 !important;
             vertical-align: baseline;
-            transition: all 0.2s ease;
+            white-space: nowrap; /* Keeps it pill-shaped */
+            line-height: 1.2;
             text-decoration: none;
         }
         .ai-btn-inline:hover {
-            background: #d2e3fc;
+            background: #d2e3fc !important;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        body.viewer-active .ai-btn-inline { background: #333; color: #4ade80; border-color: #4ade80; }
+        body.viewer-active .ai-btn-inline { background: #333 !important; color: #4ade80 !important; border-color: #4ade80 !important; }
         
         @media print {
             .ai-btn-inline { display: none !important; }
@@ -565,7 +567,20 @@
 
                         // INJECT INLINE AI BUTTON
                         if (item.ai_ready === true) {
-                            element.innerHTML += ` <button class="ai-btn-inline" onclick="triggerAI('explore')">✨ AI Explore</button>`;
+                            let target = element;
+                            
+                            // Smart Placement Logic
+                            const listItems = element.querySelectorAll('li');
+                            if (listItems.length > 0) {
+                                // If it's a list, append inside the last list item
+                                target = listItems[listItems.length - 1];
+                            } else {
+                                // If it's a box, append inside the actual box div, not the outer container
+                                const innerBox = element.querySelector('.interaction-box, .reflection-block, .brainstorming-block, .box-block');
+                                if (innerBox) target = innerBox;
+                            }
+                            
+                            target.innerHTML += ` <button class="ai-btn-inline" onclick="triggerAI('explore')">✨ AI Explore</button>`;
                         }
                     });
 
