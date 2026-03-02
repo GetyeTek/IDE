@@ -15,7 +15,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. ROTATION LOGIC: Get the least recently used active Gemini key
+// 1. ROTATION LOGIC: Pick the active Gemini key used longest ago
+    // This ensures even distribution across your key pool.
     const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
       .select('id, api_key')
