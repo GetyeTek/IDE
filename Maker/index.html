@@ -370,6 +370,35 @@
         .anthro-title-sub { font-size: 18px; margin-bottom: 10px; }
 
         .anthro-bullet-char { width: 22px; flex-shrink: 0; font-weight: bold; font-size: 18px; line-height: 1; margin-top: -2px; }
+
+        /* LOGIC BOOK SPECIFIC STYLES */
+        .logic-header {
+            border-top: 1.5px solid #666;
+            height: 30px;
+            margin-bottom: 25px;
+            position: relative;
+        }
+        .logic-header::after {
+            content: '';
+            position: absolute;
+            right: 40px;
+            top: -1.5px;
+            width: 2px;
+            height: 25px;
+            background: #666;
+        }
+        .logic-footer {
+            border-top: 4px double #800000; /* Maroon double line */
+            margin-top: auto;
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14.5px;
+            font-style: italic;
+            font-family: var(--font-serif);
+        }
+        .logic-chapter-num { font-size: 22px; font-weight: bold; display: block; text-align: center; margin-bottom: 5px; }
+        .logic-chapter-title { font-size: 26px; font-weight: bold; display: block; text-align: center; text-transform: uppercase; margin-bottom: 30px; }
     </style>
 </head>
 <body>
@@ -377,6 +406,7 @@
     <div id="ui-layer">
         <div style="display: flex; gap: 10px; margin-bottom: 8px;">
             <select id="engine-select" style="flex: 1; padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid #007bff;">
+                <option value="logic">ENGINE: Logic (Ministry Edition)</option>
                 <option value="anthro">ENGINE: Anthropology (2026 Edition)</option>
                 <option value="psych">ENGINE: General Psychology (Legacy)</option>
             </select>
@@ -396,7 +426,69 @@
                 drawPsychology();
             } else if (engine === 'anthro') {
                 drawAnthropology();
+            } else if (engine === 'logic') {
+                drawLogic();
             }
+        }
+
+        function drawLogic() {
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            try {
+                const doc = JSON.parse(raw);
+                container.innerHTML = '';
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'page-wrapper';
+                    wrapper.style.marginTop = '20px';
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-canvas';
+                    pageDiv.style.transform = `scale(${scale})`;
+                    pageDiv.id = `page-${pageKey}`;
+
+                    pageData.content.forEach(item => {
+                        const element = document.createElement('div');
+
+                        if (item.type === 'logic-header') {
+                            element.className = 'logic-header';
+                        }
+                        else if (item.type === 'logic-footer') {
+                            element.className = 'logic-footer';
+                            element.innerHTML = `<span>${item.authors || ''}</span><span>Page ${item.page || pageKey}</span>`;
+                        }
+                        else if (item.type === 'chapter-title') {
+                            element.innerHTML = `<span class="logic-chapter-num">CHAPTER ${item.number}</span><span class="logic-chapter-title">${item.title}</span>`;
+                        }
+                        else if (item.type === 'paragraph') {
+                            element.className = 'p-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'header') {
+                            element.className = 'h-block';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'bullet-list') {
+                            element.className = 'list-block';
+                            element.innerHTML = '<ul>' + (item.items || []).map(i => `<li>${i}</li>`).join('') + '</ul>';
+                        }
+                        else if (item.type === 'spacer') {
+                            element.style.flexGrow = item.flex || '0';
+                            element.style.height = item.height || '0px';
+                        }
+
+                        if (item.style) Object.assign(element.style, item.style);
+                        pageDiv.appendChild(element);
+                    });
+                    wrapper.appendChild(pageDiv);
+                    container.appendChild(wrapper);
+                });
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (err) { alert("Logic Engine Error: " + err); }
         }
 
         function drawAnthropology() {
