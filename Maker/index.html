@@ -344,7 +344,19 @@
         
 
 
-        .anthro-footnote { font-size: 12px; margin-top: 15px; border-top: 1px solid #000; padding-top: 5px; width: 100%; }
+        .anthro-footnote { font-size: 12.5px; margin-top: 25px; padding-top: 10px; position: relative; }
+        .anthro-footnote::before { content: ''; position: absolute; top: 0; left: 0; width: 120px; border-top: 1px solid #000; }
+
+        .anthro-reference { padding-left: 30px; text-indent: -30px; font-size: 14.5px; margin-bottom: 12px; line-height: 1.4; }
+        .anthro-term { font-weight: bold; margin-top: 18px; margin-bottom: 4px; font-size: 15.5px; }
+
+        .anthro-kv-container { margin: 20px 0; }
+        .anthro-kv-row { display: flex; align-items: flex-start; margin-bottom: 10px; font-size: 17px; }
+        .anthro-kv-label { font-weight: bold; width: 150px; flex-shrink: 0; }
+        .anthro-kv-separator { margin-right: 15px; font-weight: bold; }
+        .anthro-kv-value { flex-grow: 1; }
+
+        .anthro-table-header { background-color: #f2f2f2; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
@@ -455,10 +467,30 @@
                         }
                         else if (item.type === 'table') {
                             let t = '<table>';
-                            item.rows.forEach(row => {
-                                t += '<tr>' + row.map(c => `<td>${c}</td>`).join('') + '</tr>';
+                            item.rows.forEach((row, idx) => {
+                                const isHeader = idx === 0 && item.headerStyle;
+                                const tdClass = isHeader ? 'class="anthro-table-header"' : '';
+                                t += '<tr>' + row.map(c => `<td ${tdClass}>${c}</td>`).join('') + '</tr>';
                             });
                             element.innerHTML = t + '</table>';
+                        }
+                        else if (item.type === 'reference-item') {
+                            element.className = 'anthro-reference';
+                            element.innerHTML = item.body;
+                        }
+                        else if (item.type === 'term-header') {
+                            element.className = 'anthro-term';
+                            element.innerText = item.body;
+                        }
+                        else if (item.type === 'kv-list') {
+                            element.className = 'anthro-kv-container';
+                            element.innerHTML = item.items.map(row => `
+                                <div class="anthro-kv-row">
+                                    <div class="anthro-kv-label">${row.label}</div>
+                                    <div class="anthro-kv-separator">:</div>
+                                    <div class="anthro-kv-value">${row.value}</div>
+                                </div>
+                            `).join('');
                         }
                         else if (item.type === 'footnote') {
                             element.className = 'anthro-footnote';
