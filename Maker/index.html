@@ -242,6 +242,25 @@
         .list-block { padding-left: 40px; margin-bottom: 15px; }
         .list-block li { margin-bottom: 8px; text-align: justify; font-size: 15.5px; }
 
+        /* Page Flag Badge */
+        .manual-flag {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: #ff4757;
+            color: white;
+            padding: 6px 15px;
+            font-size: 12px;
+            font-weight: bold;
+            border-bottom-left-radius: 8px;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-family: sans-serif;
+        }
+        @media print {
+            .manual-flag { display: none !important; }
+        }
+
         /* The Graphic/SVG Container */
         .graphic-container {
             width: 100%;
@@ -374,6 +393,15 @@
                     pageDiv.className = 'page-canvas';
                     pageDiv.style.transform = `scale(${scale})`;
                     pageDiv.id = `page-${pageKey}`;
+
+                    // Apply Manual Image Flag
+                    if (pageData.requires_manual_image === true) {
+                        pageDiv.setAttribute('data-manual-image', 'true');
+                        const flag = document.createElement('div');
+                        flag.className = 'manual-flag';
+                        flag.innerText = '🖼️ MANUAL IMAGE REQUIRED';
+                        pageDiv.appendChild(flag);
+                    }
 
                     pageData.content.forEach(item => {
                         const element = document.createElement('div');
