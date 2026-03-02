@@ -482,7 +482,7 @@
         .entre-reflection-box { border: 1px solid #000; padding: 15px; margin: 15px 0; background: #f9f9f9; }
         .entre-reflection-label { font-weight: bold; display: block; margin-bottom: 8px; }
         .entre-bullet-item { display: flex; gap: 10px; margin-bottom: 6px; align-items: flex-start; text-align: justify; }
-        .entre-bullet-char { font-size: 18px; line-height: 1; flex-shrink: 0; }
+        .entre-bullet-char { font-size: 20px; line-height: 1; flex-shrink: 0; color: #000; font-family: serif; }
         .entre-likert-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13.5px; }
         .entre-likert-table th, .entre-likert-table td { border: 1px solid #000; padding: 8px; }
         .entre-likert-table th { background: #eee; }
@@ -678,7 +678,13 @@
             }
             else if (item.type === 'bullet-list') {
                 // Handles character-based bullets seen in PDF (Finger, Pen, Square)
-                const charMap = { 'finger': '', 'pen': '', 'square': '■', 'default': '•' };
+                const charMap = { 
+                    'finger': '☞', 
+                    'pen': '✍', 
+                    'arrow': '➢', 
+                    'square': '■', 
+                    'default': '•' 
+                };
                 const char = charMap[item.bullet] || charMap['default'];
                 element.innerHTML = (item.items || []).map(text => `
                     <div class="entre-bullet-item">
