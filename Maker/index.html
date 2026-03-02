@@ -477,18 +477,25 @@
         /* ENTREPRENEUR ENGINE STYLES */
         .entre-chapter-title { text-align: center; font-weight: bold; font-size: 24px; text-transform: uppercase; margin: 30px 0; padding: 15px 0; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; width: 100%; display: block; }
         .entre-section-h { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; border: none; padding-left: 0; }
-        .entre-case-box { border: 1.5px solid #000; padding: 20px; margin: 20px 0; background: #fff; position: relative; }
-        .entre-case-label { font-weight: bold; text-transform: uppercase; text-decoration: underline; display: block; margin-bottom: 10px; }
-        .entre-activity-box { border: 1px solid #000; padding: 15px; margin: 20px 0; }
-        .entre-activity-tag { background: #000; color: #fff; padding: 3px 12px; font-weight: bold; font-size: 14px; margin-bottom: 15px; display: inline-block; }
-        .entre-reflection-box { border: 1px solid #000; padding: 15px; margin: 15px 0; background: #f9f9f9; }
-        .entre-reflection-label { font-weight: bold; display: block; margin-bottom: 8px; }
-        .entre-bullet-item { display: flex; gap: 10px; margin-bottom: 6px; align-items: flex-start; text-align: justify; }
+        
+        /* Box Archetypes */
+        .entre-case-box { border: 2px solid #000; padding: 20px; margin: 25px 0; background: #fff; }
+        .entre-case-label { font-weight: bold; text-transform: uppercase; text-decoration: underline; display: block; margin-bottom: 12px; font-size: 16px; }
+        
+        .entre-activity-box { border: 1.5px solid #000; padding: 18px; margin: 25px 0; background: #fff; }
+        .entre-activity-tag { background: #000; color: #fff; padding: 4px 15px; font-weight: bold; font-size: 14px; margin-bottom: 15px; display: inline-block; text-transform: uppercase; }
+        
+        .entre-reflection-box { border: 1px solid #444; padding: 15px; margin: 20px 0; background: #f2f2f2; }
+        .entre-reflection-label { font-weight: bold; display: block; margin-bottom: 10px; font-style: normal; }
+
+        /* Bullets & Grids */
+        .entre-bullet-item { display: flex; gap: 12px; margin-bottom: 8px; align-items: flex-start; text-align: justify; }
         .entre-bullet-char { font-size: 20px; line-height: 1; flex-shrink: 0; color: #000; font-family: serif; }
         .entre-bullet-img { width: 22px; height: 22px; flex-shrink: 0; object-fit: contain; }
+        
         .entre-likert-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13.5px; }
         .entre-likert-table th, .entre-likert-table td { border: 1px solid #000; padding: 8px; }
-        .entre-likert-table th { background: #eee; }
+        .entre-likert-table th { background: #ddd; font-weight: bold; }
         .entre-chapter-title { text-align: center; font-weight: bold; font-size: 24px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
         .entre-section-h { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; }
         .entre-case-box { border: 1.5px solid #000; padding: 15px 25px; margin: 20px 0; background: #fff; }
@@ -677,7 +684,8 @@
             }
             else if (item.type === 'entre-reflection') {
                 element.className = 'entre-reflection-box';
-                element.innerHTML = `<span class="entre-reflection-label">${item.label || 'Reflection Questions'}:</span><ul>${(item.items || []).map(i => `<li>${i}</li>`).join('')}</ul>`;
+                let listHtml = item.items ? `<ul>${item.items.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
+                element.innerHTML = `<span class="entre-reflection-label">${item.label || 'Reflection Questions'}:</span><div style="font-style: italic;">${item.body || ''}</div>${listHtml}`;
             }
             else if (item.type === 'bullet-list') {
                 const charMap = { 
