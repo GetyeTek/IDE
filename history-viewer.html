@@ -121,10 +121,10 @@
         const SUPABASE_URL = 'https://xvldfsmxskhemkslsbym.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU';
         
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         async function fetchAndRender() {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('processed_history_pages')
                 .select('*')
                 .order('file_name', { ascending: true });
@@ -215,7 +215,7 @@
         }
 
         // REALTIME SUBSCRIPTION
-        supabase
+        supabaseClient
             .channel('any')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'processed_history_pages' }, payload => {
                 console.log('Change received!', payload);
