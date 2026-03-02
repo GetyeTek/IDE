@@ -373,7 +373,7 @@
 
         /* LOGIC BOOK SPECIFIC STYLES */
         .logic-header {
-            border-top: 1.5px solid #666;
+            border-top: 1px solid #ccc; /* Subtle grey */
             height: 30px;
             margin-bottom: 25px;
             position: relative;
@@ -382,13 +382,13 @@
             content: '';
             position: absolute;
             right: 40px;
-            top: -1.5px;
-            width: 2px;
-            height: 25px;
-            background: #666;
+            bottom: 30px; /* Positions it relative to the horizontal line */
+            width: 1px;
+            height: 35px; /* Extends upward */
+            background: #ccc;
         }
         .logic-footer {
-            border-top: 4px double #800000; /* Maroon double line */
+            border-top: 2.5px solid #800000; /* Single thick maroon line */
             margin-top: auto;
             padding-top: 8px;
             display: flex;
