@@ -343,13 +343,7 @@
         .anthro-list-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; text-align: justify; }
         .anthro-bullet-img { width: 22px; flex-shrink: 0; margin-top: 2px; }
         
-        /* CSS Feathered Checkmark */
-        .checkmark-feathered {
-            width: 14px; height: 8px; 
-            border-left: 3px solid #000; border-bottom: 3px solid #000;
-            transform: rotate(-45deg) skewX(-10deg);
-            margin-top: 4px; margin-left: 4px; flex-shrink: 0;
-        }
+
 
         .anthro-footnote { font-size: 12px; margin-top: 15px; border-top: 1px solid #000; padding-top: 5px; width: 100%; }
     </style>
@@ -435,12 +429,12 @@
                             listItems.forEach(text => {
                                 const row = document.createElement('div');
                                 row.className = 'anthro-list-item';
-                                if (item.bullet === 'checkmark') {
-                                    row.innerHTML = `<div class="checkmark-feathered"></div><div>${text}</div>`;
-                                } else {
-                                    const bImg = item.bullet === 'swirl' ? 'bullet-swirl.png' : 'bullet-spark.png';
-                                    row.innerHTML = `<img src="assets/${bImg}" class="anthro-bullet-img"><div>${text}</div>`;
-                                }
+                                
+                                let bImg = 'bullet-swirl.png'; // Default
+                                if (item.bullet === 'spark') bImg = 'bullet-spark.png';
+                                if (item.bullet === 'checkmark') bImg = 'bullet-check.png';
+                                
+                                row.innerHTML = `<img src="assets/${bImg}" class="anthro-bullet-img"><div>${text}</div>`;
                                 element.appendChild(row);
                             });
                         }
