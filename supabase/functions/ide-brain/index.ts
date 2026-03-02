@@ -2165,13 +2165,6 @@ If you already give a payload, assume it's already applied, and give the next pl
         const { url } = payload;
         try {
             const targetUrl = url.startsWith('http') ? url : `https://${url}`;
-            const response = await fetch(targetUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-            });
-    if (action === "proxy_web") {
-        const { url } = payload;
-        try {
-            const targetUrl = url.startsWith('http') ? url : `https://${url}`;
             const origin = new URL(targetUrl).origin;
             
             const response = await fetch(targetUrl, {
@@ -2184,16 +2177,13 @@ If you already give a payload, assume it's already applied, and give the next pl
             let html = await response.text();
 
             // --- SERVER-SIDE REWRITING ---
-            // Fix relative paths manually via regex for high reliability
-            html = html.replace(/(href|src|action)="\/\//g, `$1="https://`); // //google.com -> https://google.com
-            html = html.replace(/(href|src|action)="\//g, `$1="${origin}/`); // /search -> https://google.com/search
+            html = html.replace(/(href|src|action)="\/\//g, `$1="https://`); 
+            html = html.replace(/(href|src|action)="\//g, `$1="${origin}/`); 
 
             const bridgeScript = `
                 <script>
                 (function() {
                     window.IS_CONDUIT_PROXY = true;
-                    
-                    // --- LOGGING --- 
                     const originalConsole = { ...console };
                     ['log','warn','error','info'].forEach(m => {
                         console[m] = (...args) => {
@@ -2205,18 +2195,13 @@ If you already give a payload, assume it's already applied, and give the next pl
                             originalConsole[m](...args);
                         };
                     });
-
-                    // --- NAVIGATION --- 
                     document.addEventListener('click', e => {
                         const a = e.target.closest('a');
                         if(a && a.href && !a.href.startsWith('#') && !a.getAttribute('target')) {
-                            // Only intercept if it's an actual URL change, not a hash/anchor
                             e.preventDefault();
                             window.parent.postMessage({ type: 'CONDUIT_NAVIGATE', url: a.href }, '*');
                         }
                     }, true);
-
-                    // Intercept Form Submits (Search Engines)
                     document.addEventListener('submit', e => {
                         const form = e.target;
                         if(form.method.toLowerCase() === 'get') {
@@ -2232,7 +2217,6 @@ If you already give a payload, assume it's already applied, and give the next pl
 
             const modifiedHtml = html.replace('<head>', `<head><base href="${origin}/">${bridgeScript}`);
             
-            // Strip Security Headers to allow framing
             const headers = new Headers(corsHeaders);
             headers.set("Content-Type", "text/html");
             headers.delete("X-Frame-Options");
@@ -2250,7 +2234,6 @@ If you already give a payload, assume it's already applied, and give the next pl
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
         const fullUrl = `${projectUrl}/functions/v1/${function_slug}`;
 
-        // SQL to enable extensions and schedule the job
         const sql = `
             CREATE EXTENSION IF NOT EXISTS pg_cron;
             CREATE EXTENSION IF NOT EXISTS pg_net;
@@ -2268,7 +2251,6 @@ If you already give a payload, assume it's already applied, and give the next pl
             );
         `.trim();
 
-        // Use the internal SQL executor endpoint
         const sqlRes = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
             method: 'POST',
             headers: {
