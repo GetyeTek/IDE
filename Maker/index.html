@@ -357,6 +357,19 @@
         .anthro-kv-value { flex-grow: 1; }
 
         .anthro-table-header { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+
+        /* Anthropology TOC Style */
+        .anthro-toc-item { display: flex; align-items: flex-end; margin-bottom: 6px; font-size: 15px; }
+        .anthro-toc-dots { flex-grow: 1; border-bottom: 1px dotted #000; margin: 0 5px; position: relative; top: -4px; }
+        .anthro-toc-page { font-weight: bold; min-width: 25px; text-align: right; }
+        .anthro-toc-level-1 { padding-left: 20px; }
+        .anthro-toc-level-2 { padding-left: 40px; }
+
+        .anthro-title-block { text-align: center; width: 100%; }
+        .anthro-title-main { font-size: 28px; font-weight: bold; margin: 100px 0; }
+        .anthro-title-sub { font-size: 18px; margin-bottom: 10px; }
+
+        .anthro-bullet-char { width: 22px; flex-shrink: 0; font-weight: bold; font-size: 18px; line-height: 1; margin-top: -2px; }
     </style>
 </head>
 <body>
@@ -453,9 +466,34 @@
                                 if (item.bullet === 'spark') bImg = 'bullet-spark.png';
                                 if (item.bullet === 'checkmark') bImg = 'bullet-check.png';
                                 
-                                row.innerHTML = `<img src="assets/${bImg}" class="anthro-bullet-img"><div>${text}</div>`;
+                                if (item.bullet === 'char') {
+                                    row.innerHTML = `<div class="anthro-bullet-char">${item.char || '•'}</div><div>${text}</div>`;
+                                } else {
+                                    row.innerHTML = `<img src="assets/${bImg}" class="anthro-bullet-img"><div>${text}</div>`;
+                                }
                                 element.appendChild(row);
                             });
+                        }
+                        else if (item.type === 'anthro-toc') {
+                            element.innerHTML = item.items.map(i => `
+                                <div class="anthro-toc-item anthro-toc-level-${i.level || 0}">
+                                    <span>${i.text}</span>
+                                    <div class="anthro-toc-dots"></div>
+                                    <span class="anthro-toc-page">${i.page}</span>
+                                </div>
+                            `).join('');
+                        }
+                        else if (item.type === 'title-block') {
+                            element.className = 'anthro-title-block';
+                            element.innerHTML = `
+                                <div class="anthro-title-sub">${item.top || ''}</div>
+                                <div class="anthro-title-main">${item.main || ''}</div>
+                                <div class="anthro-title-sub">${item.bottom || ''}</div>
+                            `;
+                        }
+                        else if (item.type === 'graphic') {
+                            element.className = 'graphic-container';
+                            element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
                         }
                         else if (item.type === 'paragraph') {
                             element.className = 'p-block';
