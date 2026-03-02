@@ -627,12 +627,14 @@
                 Preview
                 <div class="flex-gap">
                     <button class="icon-btn" onclick="openInspector()" style="color:var(--ai-accent); border-color:var(--ai-accent);">📟 Inspector</button>
+                    <button class="icon-btn" onclick="openPopOut()">↗ Pop-out</button>
                     <button class="icon-btn" onclick="toggleFullscreen(true)">Expand</button>
                 </div>
             </div>
 
             <div class="browser-toolbar">
                 <button class="icon-btn" style="padding:6px;" onclick="bundleAndPreview(null)" title="Reset to Local App">🏠</button>
+                <button class="icon-btn" style="padding:6px;" onclick="navigateProxy(null, true)" title="Reload Current Page">↻</button>
                 <input type="text" id="browser-url" class="url-bar" placeholder="Search or enter URL (e.g. google.com)" onkeydown="if(event.key==='Enter') navigateProxy()">
                 <button class="icon-btn" style="color:var(--prod)" onclick="navigateProxy()">Go</button>
             </div>
@@ -1709,6 +1711,10 @@
             const req = e.data.payload;
             window.inspectorNetData.push(req);
             renderNetworkRow('app', req);
+        }
+
+        if (e.data.type === 'CONDUIT_NAVIGATE') {
+            navigateProxy(e.data.url);
         }
     });
 
@@ -3142,8 +3148,9 @@ function addTerminalCard(data, options = {}) {
     }
 
     // --- BUNDLER & PREVIEW ---
-        async function navigateProxy() {
-        const url = document.getElementById('browser-url').value.trim();
+        async function navigateProxy(forcedUrl = null, isReload = false) {
+        const input = document.getElementById('browser-url');
+        const url = forcedUrl || input.value.trim();
         if(!url) return;
         const iframe = document.getElementById('preview-frame');
         iframe.srcdoc = '<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Proxying Connection to ' + url + '...</div>';
@@ -3156,6 +3163,7 @@ function addTerminalCard(data, options = {}) {
             const html = await res.text();
             iframe.srcdoc = html;
             document.getElementById('preview-url-display').innerText = 'Browsing: ' + url;
+            if (forcedUrl) input.value = forcedUrl;
         } catch(e) {
             iframe.srcdoc = '<div style="color:red; padding:20px;">Proxy Error: ' + e.message + '</div>';
         }
