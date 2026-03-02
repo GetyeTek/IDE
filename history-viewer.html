@@ -197,11 +197,21 @@
             }
             else if (item.type === 'history-graphic') {
                 element.className = 'graphic-container';
-                // Handle SVG strings directly
-                if(item.url.startsWith('data:image/svg+xml')) {
+                
+                if (!item.url) {
+                    // Handle Manual Image Placeholder
+                    element.innerHTML = `
+                        <div style="width:100%; height:200px; border:1px dashed #999; background:#f9f9f9; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#666;">
+                            <span style="font-size:24px; margin-bottom:8px;">🖼️</span>
+                            <span style="font-size:12px; font-weight:bold; text-transform:uppercase; letter-spacing:1px;">Manual Image Insertion Required</span>
+                            <span style="font-size:10px; margin-top:4px;">${item.source || ''}</span>
+                        </div>`;
+                } else if (item.url.startsWith('data:image/svg+xml')) {
+                    // Handle SVG strings directly
                     const svgContent = decodeURIComponent(item.url.split(',')[1]);
                     element.innerHTML = `${svgContent}<div class="history-source-line"><b>Source:</b> ${item.source || ''}</div>`;
                 } else {
+                    // Handle Standard Image URLs
                     element.innerHTML = `<img src="${item.url}" style="max-width:100%"><div class="history-source-line"><b>Source:</b> ${item.source || ''}</div>`;
                 }
             }
