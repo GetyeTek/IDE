@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live History Reader - Ethiopia & The Horn</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --pdf-width: 794px;
+            --pdf-height: 1123px;
+            --font-serif: 'Times New Roman', Times, serif;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            margin: 0;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            background: #2c2c2c;
+            padding: 15px 20px;
+            box-sizing: border-box;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 2px solid #007bff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-online { background: #2ecc71; color: white; }
+
+        #document-container {
+            padding: 40px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        /* ENGINE STYLES */
+        .page-wrapper {
+            box-shadow: 0 0 50px #000;
+            background: white;
+            width: var(--pdf-width);
+            min-height: var(--pdf-height);
+            transform-origin: top center;
+        }
+
+        .page-canvas {
+            width: 100%;
+            height: 100%;
+            padding: 60px 70px 40px 70px;
+            box-sizing: border-box;
+            position: relative;
+            font-family: var(--font-serif);
+            color: #000;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* History Engine Specifics */
+        .history-watermark::before {
+            content: 'History of Ethiopia and the Horn Module (Hist.1102)';
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 45px; color: rgba(200, 200, 200, 0.15); white-space: nowrap; pointer-events: none;
+        }
+
+        .history-header-text { text-align: center; font-style: italic; font-weight: bold; font-size: 14px; margin-bottom: 30px; }
+        .history-unit-title { text-align: center; text-transform: uppercase; font-weight: bold; font-size: 22px; margin: 20px 0; line-height: 1.2; }
+        .history-arrow-list { list-style: none; padding-left: 0; }
+        .history-arrow-list li { position: relative; padding-left: 30px; margin-bottom: 10px; text-align: justify; }
+        .history-arrow-list li::before { content: '➢'; position: absolute; left: 0; font-size: 18px; }
+        .p-block { text-align: justify; margin-bottom: 14px; font-size: 15.5px; line-height: 1.5; }
+        .h-block { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; }
+        .footer { margin-top: auto; padding-top: 20px; display: flex; justify-content: center; font-size: 15px; }
+        .graphic-container { width: 100%; display: flex; flex-direction: column; align-items: center; margin: 15px 0; }
+        .history-source-line { font-size: 11px; margin-top: 5px; color: #555; }
+
+        .loading-skeleton {
+            display: flex; align-items: center; justify-content: center;
+            height: 400px; border: 2px dashed #444; color: #666;
+            font-style: italic;
+        }
+
+        @media (max-width: 800px) {
+            .page-wrapper { transform: scale(0.45); margin-bottom: -600px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <strong style="color: #007bff;">LIVE TEXTBOOK FEED</strong>
+            <span id="file-count" style="margin-left: 15px; font-size: 14px; color: #888;">Loading segments...</span>
+        </div>
+        <div class="status-badge status-online" id="conn-status">Supabase Connected</div>
+    </header>
+
+    <div id="document-container"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://xvldfsmxskhemkslsbym.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU';
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function fetchAndRender() {
+            const { data, error } = await supabase
+                .from('processed_history_pages')
+                .select('*')
+                .order('file_name', { ascending: true });
+
+            if (error) return console.error(error);
+            
+            document.getElementById('file-count').innerText = `${data.length} Segments Synced`;
+            const container = document.getElementById('document-container');
+            container.innerHTML = '';
+
+            data.forEach(row => {
+                const segmentWrap = document.createElement('div');
+                segmentWrap.id = `seg-${row.id}`;
+                
+                if (row.status === 'completed' && row.content_json) {
+                    // Render all pages in this segment
+                    Object.keys(row.content_json).forEach(pageKey => {
+                        const pageData = row.content_json[pageKey];
+                        const pageEl = createPage(pageData, pageKey);
+                        segmentWrap.appendChild(pageEl);
+                    });
+                } else {
+                    // Render Skeleton
+                    segmentWrap.innerHTML = `<div class="page-wrapper"><div class="page-canvas"><div class="loading-skeleton">Processing Segment: ${row.file_name}...</div></div></div>`;
+                }
+                container.appendChild(segmentWrap);
+            });
+        }
+
+        function createPage(pageData, pageKey) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'page-wrapper';
+            
+            const canvas = document.createElement('div');
+            canvas.className = 'page-canvas history-watermark';
+
+            pageData.content.forEach(item => {
+                const el = renderHistoryItem(item, pageKey);
+                canvas.appendChild(el);
+            });
+
+            wrapper.appendChild(canvas);
+            return wrapper;
+        }
+
+        function renderHistoryItem(item, pageKey) {
+            const element = document.createElement('div');
+            if (item.type === 'history-header') {
+                element.className = 'history-header-text';
+                element.innerText = 'History of Ethiopia and the Horn Module (Hist.1102)';
+            }
+            else if (item.type === 'history-unit-header') {
+                element.innerHTML = `<div class="history-unit-title">UNIT ${item.number || ''}<br>${item.title || ''} (${item.hours || ''} hours)</div>`;
+            }
+            else if (item.type === 'history-arrow-list') {
+                element.className = 'history-arrow-list';
+                element.innerHTML = (item.items || []).map(i => `<li>${i}</li>`).join('');
+            }
+            else if (item.type === 'paragraph') {
+                element.className = 'p-block';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'header') {
+                element.className = 'h-block';
+                element.innerHTML = item.body;
+            }
+            else if (item.type === 'history-footer') {
+                element.className = 'footer';
+                element.innerText = item.page || pageKey;
+            }
+            else if (item.type === 'history-graphic') {
+                element.className = 'graphic-container';
+                // Handle SVG strings directly
+                if(item.url.startsWith('data:image/svg+xml')) {
+                    const svgContent = decodeURIComponent(item.url.split(',')[1]);
+                    element.innerHTML = `${svgContent}<div class="history-source-line"><b>Source:</b> ${item.source || ''}</div>`;
+                } else {
+                    element.innerHTML = `<img src="${item.url}" style="max-width:100%"><div class="history-source-line"><b>Source:</b> ${item.source || ''}</div>`;
+                }
+            }
+            else if (item.type === 'spacer') {
+                element.style.flexGrow = item.flex || '0';
+                element.style.height = item.height || '0px';
+            }
+
+            if (item.style) Object.assign(element.style, item.style);
+            return element;
+        }
+
+        // REALTIME SUBSCRIPTION
+        supabase
+            .channel('any')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'processed_history_pages' }, payload => {
+                console.log('Change received!', payload);
+                fetchAndRender();
+            })
+            .subscribe();
+
+        // Initial Load
+        fetchAndRender();
+    </script>
+</body>
+</html>
