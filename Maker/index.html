@@ -8,6 +8,8 @@
         :root {
             --entre-blue: #007bff;
             --entre-grey: #f2f2f2;
+        }
+
         :root {
             --pdf-width: 794px;
             --pdf-height: 1123px;
@@ -711,69 +713,6 @@
                     <tr><th style="width:50px">S. No</th><th>Characteristic</th><th style="width:30px">1</th><th style="width:30px">2</th><th style="width:30px">3</th><th style="width:30px">4</th><th style="width:30px">5</th></tr>
                     ${(item.rows || []).map(r => `<tr><td style="text-align:center">${r.no}</td><td>${r.text}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
                 </table>`;
-            }
-            else if (item.type === 'footer') {
-                element.className = 'footer';
-                element.innerText = item.val || pageKey;
-            }
-            else if (item.type === 'spacer') {
-                element.style.flexGrow = item.flex || '0';
-                element.style.height = item.height || '0px';
-            }
-
-            if (item.style) Object.assign(element.style, item.style);
-            return element;
-        }
-            const element = document.createElement('div');
-            if (item.type === 'chapter-header') {
-                element.className = 'entre-chapter-title';
-                element.innerHTML = `CHAPTER ${item.number}: ${item.title}`;
-            } 
-            else if (item.type === 'header') {
-                element.className = 'entre-section-h';
-                element.innerHTML = item.body;
-            }
-            else if (item.type === 'paragraph') {
-                element.className = 'p-block';
-                element.innerHTML = item.body;
-            }
-            else if (item.type === 'entre-case') {
-                element.className = 'entre-case-box';
-                element.innerHTML = `<span class="entre-case-label">${item.label || ''}</span>${item.body}`;
-            }
-            else if (item.type === 'entre-activity') {
-                element.className = 'entre-activity-box';
-                element.innerHTML = `<div class="entre-activity-label">Activity ${item.number || ''}</div><div><b>Objective:</b> ${item.objective || ''}</div><div style="margin-top:10px">${item.body || ''}</div>`;
-            }
-            else if (item.type === 'entre-reflection') {
-                element.className = 'entre-reflection-box';
-                element.innerHTML = `<b>Reflection Questions:</b><ul>${(item.items || []).map(i => `<li>${i}</li>`).join('')}</ul>`;
-            }
-            else if (item.type === 'entre-likert-grid') {
-                element.innerHTML = `<table class="entre-likert-table">
-                    <tr><th>S. No</th><th>Characteristic</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th></tr>
-                    ${(item.rows || []).map(r => `<tr><td style="text-align:center">${r.no}</td><td>${r.text}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
-                </table>`;
-            }
-            else if (item.type === 'entre-ansoff') {
-                element.innerHTML = `
-                    <div style="text-align:center; font-weight:bold; margin-bottom:10px;">Ansoff Matrix</div>
-                    <div class="entre-ansoff-matrix">
-                        <div class="entre-ansoff-quadrant">${item.q1 || 'Market Penetration'}</div>
-                        <div class="entre-ansoff-quadrant">${item.q2 || 'Product Development'}</div>
-                    </div>
-                    <div class="entre-ansoff-matrix">
-                        <div class="entre-ansoff-quadrant">${item.q3 || 'Market Development'}</div>
-                        <div class="entre-ansoff-quadrant">${item.q4 || 'Diversification'}</div>
-                    </div>`;
-            }
-            else if (item.type === 'bullet-list') {
-                element.className = 'list-block';
-                element.innerHTML = '<ul>' + (item.items || []).map(i => `<li>${i}</li>`).join('') + '</ul>';
-            }
-            else if (item.type === 'graphic') {
-                element.className = 'graphic-container';
-                element.innerHTML = `${item.svgCode}${item.caption ? `<div class="graphic-caption">${item.caption}</div>` : ''}`;
             }
             else if (item.type === 'footer') {
                 element.className = 'footer';
