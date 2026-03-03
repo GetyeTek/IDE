@@ -117,7 +117,8 @@ async function runChunkRefinery() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${cleanKey}`, {
+          // Switched to Gemini 2.5 Flash for production stability
+          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -133,6 +134,11 @@ async function runChunkRefinery() {
           if (aiResp.status === 429) {
             await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
             throw new Error('API_RATE_LIMIT');
+          }
+          
+          if (aiResp.status === 503) {
+            console.warn(`[SERVER OVERLOAD] Google servers are currently at capacity (503). Signaling for graceful exit.`);
+            throw new Error('API_OVERLOAD');
           }
 
           const result = await aiResp.json();
@@ -240,7 +246,12 @@ async function runChunkRefinery() {
       finalParsed.data = finalParsed.data.filter((item: any) => item.word?.trim().length > 1 && item.root?.trim().length > 1);
 
       const { error: saveErr } = await supabase.from('processed_words').upsert({
-        source_file: currentPath, batch_index: 0, input_words: batch, words: finalParsed.data, summary: finalParsed.summary
+        source_file: currentPath, 
+        batch_index: 0, 
+        input_words: batch, 
+        words: finalParsed.data, 
+        summary: finalParsed.summary,
+        model_version: 'gemini-2.5-flash' // Marker for later filtering
       }, { onConflict: 'source_file,batch_index' });
       if (saveErr) throw saveErr;
 
@@ -261,7 +272,12 @@ async function runChunkRefinery() {
     } catch (err) {
       console.error(`[ERROR] ${currentPath}: ${err.message}`);
       if (chunkRecordId) {
-        if (err.message === 'API_RATE_LIMIT') {
+        if (err.message === 'API_RATE_LIMIT' || err.message === 'API_OVERLOAD') {
+          // RELEASE CHUNK: Set back to pending without increasing retry_count
+          await supabase.from('chunk_queue').update({ status: 'pending' }).eq('id', chunkRecordId);
+          const exitReason = err.message === 'API_OVERLOAD' ? 'Google Server Overload (503)' : 'Rate Limit (429)';
+          console.log(`[SHUTDOWN] ${exitReason}. Chunk ${currentPath} released. Ending worker cycle.`);
+          break;
           // RELEASE CHUNK: Set back to pending without increasing retry_count
           await supabase.from('chunk_queue').update({ status: 'pending' }).eq('id', chunkRecordId);
           console.log(`[SHUTDOWN] Rate limit reached. Chunk ${currentPath} released for retry later. Ending worker cycle.`);
