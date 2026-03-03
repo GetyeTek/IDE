@@ -132,7 +132,7 @@ async function runChunkRefinery() {
 
           if (aiResp.status === 429) {
             await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
-            throw new Error('Rate limit hit.');
+            throw new Error('API_RATE_LIMIT');
           }
 
           const result = await aiResp.json();
@@ -222,12 +222,14 @@ async function runChunkRefinery() {
 
         } catch (attemptErr) {
           console.warn(`[ATTEMPT FAIL] ${currentPath} attempt ${attempt}: ${attemptErr.message}`);
-          if (attempt === 3) {
-            // Ensure failure is logged even if it wasn't caught by the Forensic block
-            await supabase.from('refinery_stats').insert({
-              worker_id: WORKER_ID, source_file: currentPath, status: 'failed', 
-              error_message: `Final Attempt Error: ${attemptErr.message}`, input_data: batch, input_words: batch.length
-            });
+          // Immediate exit from attempt loop on Rate Limit or if all 3 attempts failed
+          if (attemptErr.message === 'API_RATE_LIMIT' || attempt === 3) {
+            if (attemptErr.message !== 'API_RATE_LIMIT') {
+               await supabase.from('refinery_stats').insert({
+                 worker_id: WORKER_ID, source_file: currentPath, status: 'failed', 
+                 error_message: `Final Attempt Error: ${attemptErr.message}`, input_data: batch, input_words: batch.length
+               });
+            }
             throw attemptErr;
           }
           await new Promise(r => setTimeout(r, 2000 * attempt));
@@ -259,11 +261,18 @@ async function runChunkRefinery() {
     } catch (err) {
       console.error(`[ERROR] ${currentPath}: ${err.message}`);
       if (chunkRecordId) {
-        const { data: currentChunk } = await supabase.from('chunk_queue').select('retry_count').eq('id', chunkRecordId).single();
-        await supabase.from('chunk_queue').update({ 
-          status: 'failed', 
-          retry_count: (currentChunk?.retry_count || 0) + 1 
-        }).eq('id', chunkRecordId);
+        if (err.message === 'API_RATE_LIMIT') {
+          // RELEASE CHUNK: Set back to pending without increasing retry_count
+          await supabase.from('chunk_queue').update({ status: 'pending' }).eq('id', chunkRecordId);
+          console.log(`[SHUTDOWN] Rate limit reached. Chunk ${currentPath} released for retry later. Ending worker cycle.`);
+          break; // Stop the 5-cycle loop
+        } else {
+          const { data: currentChunk } = await supabase.from('chunk_queue').select('retry_count').eq('id', chunkRecordId).single();
+          await supabase.from('chunk_queue').update({ 
+            status: 'failed', 
+            retry_count: (currentChunk?.retry_count || 0) + 1 
+          }).eq('id', chunkRecordId);
+        }
       }
     }
   }
