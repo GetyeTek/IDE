@@ -136,7 +136,27 @@ async function runChunkRefinery() {
 
           const result = await aiResp.json();
           const candidate = result.candidates?.[0];
-          if (!candidate || !candidate.content) throw new Error(`No AI Content. Reason: ${candidate?.finishReason || 'UNKNOWN'}`);
+
+          // --- FORENSICS BLOCK: Capture everything if response is empty or blocked ---
+          if (!candidate || !candidate.content || !candidate.content.parts) {
+            const stopReason = candidate?.finishReason || "NO_CANDIDATE";
+            const feedback = result.promptFeedback ? JSON.stringify(result.promptFeedback) : "No Feedback";
+            const safety = candidate?.safetyRatings ? JSON.stringify(candidate.safetyRatings) : "No Ratings";
+            const apiErr = result.error ? JSON.stringify(result.error) : "None";
+
+            const forensicLog = `Stop: ${stopReason} | Feedback: ${feedback} | Safety: ${safety} | API_Err: ${apiErr}`;
+            console.error(`[FORENSICS] ${currentPath}: ${forensicLog}`);
+
+            await supabase.from('refinery_stats').insert({
+              worker_id: WORKER_ID,
+              source_file: currentPath,
+              status: 'failed',
+              error_message: forensicLog,
+              raw_output: JSON.stringify(result) // Full API response for SQL analysis
+            });
+
+            throw new Error(`AI_SILENCE: ${stopReason}`);
+          }
 
           let actualText = candidate.content.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('').trim();
           if (!actualText) throw new Error('AI response body is empty.');
