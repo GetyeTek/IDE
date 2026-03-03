@@ -61,6 +61,7 @@ async function runChunkRefinery() {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           console.log(`[STAGE: AI] ${currentPath} - Session Attempt ${attempt}/3...`);
+          console.log(`[DEBUG] Sending ${batch.length} words: ${batch.slice(0, 5).join(', ')}${batch.length > 5 ? '...' : ''}`);
           
           const systemInstruction = `
     ROLE: You are the "Amharic Refinery Master," an elite linguistic engine specialized in Ethiopic script restoration, morphological analysis, and lexicographical enrichment.
@@ -152,7 +153,9 @@ async function runChunkRefinery() {
               source_file: currentPath,
               status: 'failed',
               error_message: forensicLog,
-              raw_output: JSON.stringify(result) // Full API response for SQL analysis
+              input_data: batch, // Save words even on failure
+              input_words: batch.length,
+              raw_output: JSON.stringify(result)
             });
 
             throw new Error(`AI_SILENCE: ${stopReason}`);
@@ -219,8 +222,15 @@ async function runChunkRefinery() {
 
         } catch (attemptErr) {
           console.warn(`[ATTEMPT FAIL] ${currentPath} attempt ${attempt}: ${attemptErr.message}`);
-          if (attempt === 3) throw attemptErr; // Final internal attempt failed
-          await new Promise(r => setTimeout(r, 2000 * attempt)); // Exponential backoff
+          if (attempt === 3) {
+            // Ensure failure is logged even if it wasn't caught by the Forensic block
+            await supabase.from('refinery_stats').insert({
+              worker_id: WORKER_ID, source_file: currentPath, status: 'failed', 
+              error_message: `Final Attempt Error: ${attemptErr.message}`, input_data: batch, input_words: batch.length
+            });
+            throw attemptErr;
+          }
+          await new Promise(r => setTimeout(r, 2000 * attempt));
         }
       }
 
