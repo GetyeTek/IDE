@@ -124,8 +124,17 @@ async function runChunkRefinery() {
             body: JSON.stringify({
               system_instruction: { parts: [{ text: systemInstruction }] },
               contents: [{ parts: [{ text: `INPUT BATCH: ${JSON.stringify(batch)}` }] }],
-              generationConfig: { responseMimeType: 'application/json', temperature: 0.1, thinkingConfig: { includeThoughts: true, thinkingLevel: 'HIGH' } },
-              safetySettings: [{ category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' }, { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }]
+              generationConfig: {
+                responseMimeType: 'application/json',
+                temperature: 0.1
+                // Thinking is native in 2.5 Flash; thinkingConfig parameter is removed to prevent 400 errors
+              },
+              safetySettings: [
+                { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+              ]
             }),
             signal: controller.signal
           });
