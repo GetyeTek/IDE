@@ -218,10 +218,12 @@ async function runRefinery() {
 
     let responseObj: { summary: string, data: any[] } | null = null;
     const MAX_RETRIES = 3;
+    const MODELS = ['gemini-3.1-flash-lite', 'gemini-2.5-flash'];
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       finalAttemptCount = attempt;
       const attemptStart = Date.now();
+      const currentModel = MODELS[Math.min(attempt - 1, MODELS.length - 1)];
       try {
         if (!activeKeyRecord) {
           const { data: keyData, error: keyError } = await supabase
@@ -242,12 +244,12 @@ async function runRefinery() {
         }
         const cleanKey = activeKeyRecord.api_key.trim();
 
-        console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES} starting with Key: ${String(activeKeyRecord.id).substring(0,8)}...`);
+        console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES} (Model: ${currentModel}) starting with Key: ${String(activeKeyRecord.id).substring(0,8)}...`);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
         const aiResp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${cleanKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
