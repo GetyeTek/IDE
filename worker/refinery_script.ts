@@ -218,7 +218,7 @@ async function runRefinery() {
 
     let responseObj: { summary: string, data: any[] } | null = null;
     const MAX_RETRIES = 3;
-    const MODELS = ['gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+    const MODELS = ['gemini-3.1-flash-lite-preview', 'gemini-2.5-flash'];
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       finalAttemptCount = attempt;
