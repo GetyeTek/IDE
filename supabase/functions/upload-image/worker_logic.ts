@@ -187,7 +187,7 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
     const runWorld = async (model: string, name: string) => {
       try {
         const raw = await callGeminiApi(supabase, model, null, geminiParts, REQUEST_ID);
-        return { name, json: JSON.parse(extractJson(raw)), success: true };
+        return { name, model, json: JSON.parse(extractJson(raw)), success: true };
       } catch (e) {
         console.error(`[${REQUEST_ID}] [${name}] OCR Failed:`, e.message);
         return { name, success: false };
@@ -223,7 +223,7 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
     // --- SOLVER STAGE ---
     const friendlyText = formatTranscriptionForAI(ocrJson, REQUEST_ID);
     // Use the model that won the OCR race for the solver stage
-    const solutionRaw = await callGeminiApi(supabase, bestWorld.name, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, REQUEST_ID);
+    const solutionRaw = await callGeminiApi(supabase, bestWorld.model, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, REQUEST_ID);
     const solutionJson = JSON.parse(extractJson(solutionRaw));
 
     // Merge confidence into final payload for app announcement
