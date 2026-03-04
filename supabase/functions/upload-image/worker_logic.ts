@@ -117,18 +117,20 @@ async function getGeminiKey(supabase: any, requestId: string) {
 }
 
 async function markKeyCooldown(supabase: any, keyId: number, requestId: string) {
-  console.warn(`[${requestId}] [COOLDOWN] Marking key ID ${keyId} for 60s cooldown due to 429.`);
-  const cooldownTime = new Date(Date.now() + 60000).toISOString();
+  console.warn(`[${requestId}] [COOLDOWN] Marking key ID ${keyId} for 30m cooldown due to 429.`);
+  // 30 minutes = 1,800,000 ms
+  const cooldownTime = new Date(Date.now() + 1800000).toISOString();
   await supabase.from('api_keys').update({ cooldown_until: cooldownTime }).eq('id', keyId);
 }
 
 async function callGeminiApi(supabase: any, model: string, prompt: string | null, parts?: any[], requestId?: string, retryCount = 0): Promise<string> {
-  if (retryCount > 5) throw new Error("Exceeded maximum key rotation retries due to persistent 429s.");
+  if (retryCount >= 3) throw new Error(`Exceeded maximum retries (3) for ${model}`);
+
   const { id: keyId, key } = await getGeminiKey(supabase, requestId || "");
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const payloadParts = parts || [{ text: prompt }];
   
-  console.log(`[${requestId}] [AI_REQUEST] Model: ${model} | Parts: ${payloadParts.length} | Retry: ${retryCount}`);
+  console.log(`[${requestId}] [AI_REQUEST] Model: ${model} | Retry: ${retryCount}`);
 
   const res = await fetch(url, {
     method: 'POST',
@@ -139,14 +141,24 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
     })
   });
 
+  const data = await res.json();
+  const errorMessage = data.error?.message || "";
+
+  // 1. Handle Rate Limit (429)
   if (res.status === 429) {
     await markKeyCooldown(supabase, keyId, requestId || "");
+    console.warn(`[${requestId}] [RETRY] 429 detected. Rotating key and switching model.`);
     const nextModel = model === PRIMARY_MODEL ? FALLBACK_MODEL : PRIMARY_MODEL;
     return callGeminiApi(supabase, nextModel, prompt, parts, requestId, retryCount + 1);
   }
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `AI API returned ${res.status}`);
+  // 2. Handle High Demand Spikes (Immediate Retry on same key)
+  if (errorMessage.toLowerCase().includes("high demand")) {
+    console.warn(`[${requestId}] [RETRY] High demand spike. Retrying immediately without rotation.`);
+    return callGeminiApi(supabase, model, prompt, parts, requestId, retryCount + 1);
+  }
+
+  if (!res.ok) throw new Error(errorMessage || `AI API returned ${res.status}`);
   
   const finalResponse = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join('') || "";
   console.log(`[${requestId}] [AI_RAW_RESPONSE_SUCCESS] Length: ${finalResponse.length}`);
@@ -190,7 +202,7 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
     const firstResult = await Promise.race([worldAPromise, worldBPromise]);
     results.push(firstResult);
 
-    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 30000));
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 60000));
     const secondResult = await Promise.race([worldAPromise === firstResult ? worldBPromise : worldAPromise, timeoutPromise]);
     if (!secondResult.timeout) results.push(secondResult);
 
