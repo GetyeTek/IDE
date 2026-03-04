@@ -162,16 +162,20 @@ async function runRefinery() {
     const batchLabel = `Words ${currentBatchOffset + 1}-${currentBatchOffset + batch.length} (Batch ${batchNumber}/${totalBatches})`;
 
     if (batch.length === 0) {
-      console.log(`[STAGE: EMPTY] File ${currentFilePath} is empty at offset ${currentBatchOffset}. Marking batch as completed to prevent re-fetch.`);
-      // If the batch is empty, we still save a placeholder so the Gap-Filler knows we checked it
-      await supabase.from('processed_words').upsert({
-        source_file: currentFilePath,
-        batch_index: currentBatchOffset,
-        words: [],
-        summary: "End of file reached or empty chunk."
-      }, { onConflict: 'source_file,batch_index' });
+      console.log(`[STAGE: EMPTY] File ${currentFilePath} reached EOF at offset ${currentBatchOffset}. Closing file.`);
       
+      // 1. Mark this specific batch as completed
       await supabase.from('refinery_batches').update({ status: 'completed' }).eq('id', batchRecordId);
+      
+      // 2. Mark the entire file as finished so the RPC stops suggesting it
+      await supabase.from('refinery_progress')
+        .update({ is_finished: true })
+        .eq('file_path', currentFilePath);
+      
+      // 3. Reset cache to force download of next file in next loop iteration
+      cachedPath = "";
+      cachedText = "";
+
       continue; 
     }
 
