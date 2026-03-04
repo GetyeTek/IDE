@@ -78,14 +78,14 @@ async function runChunkRefinery() {
        - ACTION: Split them into separate valid words.
        - EXAMPLE: "ጨምሯልለሶስተኛ" ➔ "ጨምሯል", "ለሶስተኛ".
 
-    2. PROTOCOL: THE JUDGE (Nonsense Removal)
-       - DETECT gibberish, non-Amharic noise, and unfixable OCR errors.
-       - CRITERIA: DELETE strings that are pure Latin characters, pure numbers, or random Ethiopic characters with no semantic meaning (e.g., "ድድድድ", "ቅቅቅ").
-       - DECISION: If a word cannot be corrected to a valid dictionary entry, DISCARD it.
+    2. PROTOCOL: THE JUDGE (Semantic Filtering)
+       - MISSION: Eliminate semantic nonsense. If an Amharic string is a meaningless combination of characters that cannot be logically corrected to a valid dictionary entry, DELETE it.
+       - ACTION: Never invent a "root" or "translation" for nonsense words. If the word provides no semantic value, exclude it entirely from the output array.
 
-    3. PROTOCOL: THE CORRECTOR (Visual Repair)
-       - FIX visual OCR confusions based on linguistic context (e.g., confusing 'ሀ' for 'ሃ' or 'ለ' for 'ሉ'). 
+    3. PROTOCOL: THE CORRECTOR (Repair vs. Discard)
+       - ACTION: Attempt to fix minor visual OCR spelling errors (e.g., 'ሀ' vs 'ሃ') ONLY if the context makes the correction certain.
        - STRIP attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
+       - RULE: If correction is a "guess" and the word remains ambiguous or meaningless, default to PROTOCOL 2 and DISCARD it.
 
     4. PROTOCOL: THE LEMMATIZER (Global Citation Form)
        - MISSION: Identify the base dictionary entry (Infinitive/መነሻ ቃል) for every valid word.
