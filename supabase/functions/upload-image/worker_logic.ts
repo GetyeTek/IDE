@@ -30,7 +30,16 @@ CATEGORIES:
 - wo: Mathematical Workout / Long Form
 
 OUTPUT JSON:
-{ "questions": [ { "number": "string", "type": "string", "question_text": "string", "options": ["string"] } ] }
+{ 
+  "confidence_score": number, 
+  "questions": [ { "number": "string", "type": "string", "question_text": "string", "options": ["string"] } ] 
+}
+
+CONFIDENCE SCORE RULES:
+- Rate 1-10 based on image clarity, readability, and context completeness.
+- 1-4: Unreadable, extremely blurry, or unrelated images.
+- 5-6: Partially readable but ambiguous; high risk of hallucination.
+- 7-10: Clear text, logically ordered, high certainty.
 `;
 
 const SOLVER_PROMPT_TEMPLATE = (friendlyText: string) => `
@@ -47,7 +56,8 @@ STRICT TTS RULES:
    - Instead of '1/2', say 'one half'.
    - Instead of '∫', say 'the integral of'.
 2. STEALTH & SPEED:
-   - For 'mc', 'tf', 'fill', 'ma', 'sa': Provide ONLY the answer. Example: "Answer is B" or "Answer is True". No explanations.
+   - For 'mc' (Multiple Choice): Provide the letter AND the full text of the option. Example: "Answer is B, Photosynthesis".
+   - For 'tf', 'fill', 'ma', 'sa': Provide ONLY the answer. Example: "Answer is True". No explanations.
 3. WORKOUT MODE ('wo'):
    - Provide a 'steps' array where each step is a short instruction the student can follow while writing.
    - Format: "First, write down the formula...", "Next, substitute three for x...", "The result is five."
@@ -161,12 +171,50 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
       }
     }
 
-    const ocrRaw = await callGeminiApi(supabase, PRIMARY_MODEL, null, geminiParts, REQUEST_ID);
-    const ocrJson = JSON.parse(extractJson(ocrRaw));
-    
+    // --- PARALLEL WORLD OCR ---
+    const runWorld = async (model: string, name: string) => {
+      try {
+        const raw = await callGeminiApi(supabase, model, null, geminiParts, REQUEST_ID);
+        return { name, json: JSON.parse(extractJson(raw)), success: true };
+      } catch (e) {
+        console.error(`[${REQUEST_ID}] [${name}] OCR Failed:`, e.message);
+        return { name, success: false };
+      }
+    };
+
+    console.log(`[${REQUEST_ID}] [OCR_STAGE] Launching Worlds A and B...`);
+    const worldAPromise = runWorld(PRIMARY_MODEL, "World_A");
+    const worldBPromise = runWorld(FALLBACK_MODEL, "World_B");
+
+    let results = [];
+    const firstResult = await Promise.race([worldAPromise, worldBPromise]);
+    results.push(firstResult);
+
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 30000));
+    const secondResult = await Promise.race([worldAPromise === firstResult ? worldBPromise : worldAPromise, timeoutPromise]);
+    if (!secondResult.timeout) results.push(secondResult);
+
+    const successfulWorlds = results.filter(r => r.success && r.json?.confidence_score);
+    if (successfulWorlds.length === 0) throw new Error("Both AI worlds failed to transcribe images.");
+
+    const bestWorld = successfulWorlds.reduce((prev, curr) => (prev.json.confidence_score > curr.json.confidence_score) ? prev : curr);
+    const ocrJson = bestWorld.json;
+    console.log(`[${REQUEST_ID}] [OCR_STAGE] Winner: ${bestWorld.name} Score: ${ocrJson.confidence_score}`);
+
+    // --- CONFIDENCE GATEKEEPER ---
+    if (ocrJson.confidence_score <= 6) {
+      console.warn(`[${REQUEST_ID}] REJECTED: Score ${ocrJson.confidence_score} too low.`);
+      await supabase.from('processed_images').update({ status: 'low_quality' }).eq('id', RECORD_ID);
+      return;
+    }
+
+    // --- SOLVER STAGE ---
     const friendlyText = formatTranscriptionForAI(ocrJson, REQUEST_ID);
     const solutionRaw = await callGeminiApi(supabase, PRIMARY_MODEL, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, REQUEST_ID);
     const solutionJson = JSON.parse(extractJson(solutionRaw));
+
+    // Merge confidence into final payload for app announcement
+    solutionJson.confidence_score = ocrJson.confidence_score;
 
     await supabase.from('processed_images').update({
       transcription: ocrJson,
@@ -174,7 +222,7 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
       status: 'completed'
     }).eq('id', RECORD_ID);
 
-    console.log(`[${REQUEST_ID}] [FINISH] Record ${RECORD_ID} updated successfully.`);
+    console.log(`[${REQUEST_ID}] [FINISH] Record ${RECORD_ID} completed.`);
   } catch (err) {
     console.error(`[${REQUEST_ID}] [FATAL_ERROR]:`, err);
     await supabase.from('processed_images').update({ status: 'error' }).eq('id', RECORD_ID);
