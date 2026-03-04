@@ -185,13 +185,15 @@ async function runRefinery() {
     - Do NOT use curly braces {} anywhere except in the final JSON structure.
 
     YOUR MISSION: Process messy OCR input through these 6 STRICT SCHOLARLY PROTOCOLS and return a structured dataset.
+    QUALITY GATE: Do NOT feel obligated to include every input word. If a word provides no semantic meaning or functional value to a dictionary, IGNORE IT. Do not fill the JSON with low-value words just to meet a count.
 
     1. PROTOCOL: THE SPLITTER (De-cluttering)
        - ANALYZE every string for merged words. Identify impossible morphological transitions.
        - ACTION: Split them into separate valid words. (e.g., "ጨምሯልለሶስተኛ" ➔ "ጨምሯል", "ለሶስተኛ").
 
     2. PROTOCOL: THE JUDGE (Nonsense Removal)
-       - DETECT gibberish, non-Amharic noise, and unfixable OCR errors. CRITERIA: DELETE pure Latin, pure numbers, or semantic-free noise.
+       - DETECT gibberish and unfixable visual OCR noise. 
+       - CRITERIA: If a word is uncorrectable nonsense or carries no functional/semantic meaning, DISCARD it. (Note: The source is already cleaned of Latin/Numbers).
 
     3. PROTOCOL: THE CORRECTOR (Visual Repair)
        - FIX visual OCR confusions (e.g., confusing 'ሀ' for 'ሃ' or 'ለ' for 'ሉ'). STRIP punctuation.
@@ -205,7 +207,9 @@ async function runRefinery() {
        - Provide comprehensive English synonyms capture the full breadth of the word.
 
     6. PROTOCOL: THE GRAMMARIAN (Linguistic Tagging)
-       - Identify the Part of Speech (POS) for the word (e.g., Noun, Verb, Adjective, Adverb, Conjunction, Preposition).
+       - Identify the MAJOR category for the Part of Speech (POS).
+       - CONSTRAINT: Use ONLY these groups: Noun, Verb, Adjective, Adverb, Pronoun, Preposition, Conjunction. 
+       - STRICT: Do NOT include morphological sub-details, tenses, or descriptions (e.g., Use 'Verb', NOT 'Verb (Relative Perfect)').
 
     7. PROTOCOL: THE FILTER (Size Constraint)
        - CRITICAL: Discard any word or root that consists of only a single character. Amharic words must be at least 2 characters long to be included in the dataset.
@@ -234,7 +238,7 @@ async function runRefinery() {
         const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
         const aiResp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${cleanKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
