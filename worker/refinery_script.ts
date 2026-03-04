@@ -247,8 +247,7 @@ async function runRefinery() {
               contents: [{ parts: [{ text: `INPUT BATCH: ${JSON.stringify(batch)}` }] }],
               generationConfig: {
                 responseMimeType: 'application/json',
-                temperature: 0.1,
-                thinkingConfig: { includeThoughts: true, thinkingLevel: 'HIGH' }
+                temperature: 0.1
               },
               safetySettings: [
                 { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -266,13 +265,15 @@ async function runRefinery() {
         
         if (!aiResp.ok) {
           errorType = `HTTP_${aiResp.status}`;
+          const errRaw = await aiResp.text().catch(() => 'No body');
+          console.error(`[RAW ERROR RESPONSE] ${errRaw}`);
+
           if (aiResp.status === 429) {
             console.warn(`[RATE LIMIT] 429 encountered after ${duration}ms`);
             await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
-            throw new Error('Gemini API Rate Limit (429)');
+            throw new Error(`Gemini API Rate Limit (429): ${errRaw}`);
           }
-          const errBody = await aiResp.text().catch(() => 'No body');
-          throw new Error(`Gemini API ${aiResp.status}: ${errBody.substring(0, 150)}`);
+          throw new Error(`Gemini API ${aiResp.status}: ${errRaw}`);
         }
 
         console.log(`[PERF] AI Request received response in ${duration}ms`);
@@ -288,12 +289,10 @@ async function runRefinery() {
 
         console.log(`[DEBUG: AI_RESPONSE] Finish Reason: ${candidate.finishReason}`);
         
-        // 1. DIFFERENTIATE THINKING AND CONTENT
-        const thoughts = candidate.content?.parts?.filter((p: any) => p.thought).map((p: any) => p.thought).join('\n').trim();
+        // 1. EXTRACT CONTENT
         const actualText = candidate.content?.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('\n').trim();
 
-        if (thoughts) console.log(`[AI THOUGHTS] ${thoughts.substring(0, 300)}...`);
-        if (!actualText) throw new Error('AI returned thoughts but no actual content text.');
+        if (!actualText) throw new Error('AI returned no actual content text.');
 
         // 2. STAGED RECOVERY SIEVE
         const sanitize = (val: string) => {
