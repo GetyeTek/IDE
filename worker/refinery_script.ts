@@ -242,7 +242,7 @@ async function runRefinery() {
         }
         const cleanKey = activeKeyRecord.api_key.trim();
 
-        console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES} starting with Key: ${activeKeyRecord.id.substring(0,8)}...`);
+        console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES} starting with Key: ${String(activeKeyRecord.id).substring(0,8)}...`);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
