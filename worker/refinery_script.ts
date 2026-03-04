@@ -116,22 +116,8 @@ async function runRefinery() {
 
     console.log(`[STAGE: CLAIMED] Worker ${WORKER_ID} reserved batch ${batchRecordId} (${currentFilePath} at ${currentBatchOffset})`);
 
-    // 2. Resource Management
-    const { data: keyRecord, error: keyError } = await supabase
-      .from('api_keys')
-      .select('*')
-      .eq('service', 'gemini')
-      .eq('is_active', true)
-      .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
-      .order('last_used_at', { ascending: true, nullsFirst: true })
-      .limit(1)
-      .single();
-
-    if (keyError || !keyRecord) {
-      errorType = "NO_API_KEY";
-      throw new Error('No available Gemini keys.');
-    }
-    const cleanKey = keyRecord.api_key.trim();
+    // 2. Resource Management (Moved inside retry loop for hot-swapping)
+    let activeKeyRecord = null;
 
     // 3. Gathering Material (with Caching & Timeout)
     if (currentFilePath !== cachedPath) {
@@ -237,7 +223,26 @@ async function runRefinery() {
       finalAttemptCount = attempt;
       const attemptStart = Date.now();
       try {
-        console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES} starting...`);
+        if (!activeKeyRecord) {
+          const { data: keyData, error: keyError } = await supabase
+            .from('api_keys')
+            .select('*')
+            .eq('service', 'gemini')
+            .eq('is_active', true)
+            .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
+            .order('last_used_at', { ascending: true, nullsFirst: true })
+            .limit(1)
+            .single();
+
+          if (keyError || !keyData) {
+            errorType = "NO_API_KEY";
+            throw new Error('No available Gemini keys for this attempt.');
+          }
+          activeKeyRecord = keyData;
+        }
+        const cleanKey = activeKeyRecord.api_key.trim();
+
+        console.log(`[STAGE: AI] Attempt ${attempt}/${MAX_RETRIES} starting with Key: ${activeKeyRecord.id.substring(0,8)}...`);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
@@ -274,7 +279,8 @@ async function runRefinery() {
 
           if (aiResp.status === 429) {
             console.warn(`[RATE LIMIT] 429 encountered after ${duration}ms`);
-            await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
+            await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', activeKeyRecord.id);
+            activeKeyRecord = null; // Clear key so next retry fetches a new one
             throw new Error(`Gemini API Rate Limit (429): ${errRaw}`);
           }
           throw new Error(`Gemini API ${aiResp.status}: ${errRaw}`);
@@ -384,7 +390,14 @@ async function runRefinery() {
 
         console.error(`[AI FAIL] Attempt ${attempt} failed: ${errorType} (${duration}ms)`);
 
-        if (errorType === 'RATE_LIMIT' || attempt === MAX_RETRIES) break;
+        if (errorType === 'RATE_LIMIT') {
+          if (attempt < MAX_RETRIES) {
+            console.log(`[RETRY] Rate limit hit. Attempting key-swap for attempt ${attempt + 1}...`);
+            continue; // Immediate retry with new key
+          }
+        }
+
+        if (attempt === MAX_RETRIES) break;
         await new Promise(r => setTimeout(r, 2000 * attempt));
       }
     }
@@ -424,7 +437,9 @@ async function runRefinery() {
     });
 
     await supabase.from('refinery_batches').update({ status: 'completed' }).eq('id', batchRecordId);
-    await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
+    if (activeKeyRecord) {
+      await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', activeKeyRecord.id);
+    }
     console.log(`[SUCCESS] Batch ${batchRecordId} done in ${Date.now() - batchStart}ms`);
 
     } catch (err) {
