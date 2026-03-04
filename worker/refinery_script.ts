@@ -389,6 +389,7 @@ async function runRefinery() {
         else if (!errorType) errorType = "UNKNOWN";
 
         console.error(`[AI FAIL] Attempt ${attempt} failed: ${errorType} (${duration}ms)`);
+        console.error("[DEBUG - FULL ERROR]:", err);
 
         if (errorType === 'RATE_LIMIT') {
           if (attempt < MAX_RETRIES) {
