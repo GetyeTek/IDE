@@ -8,8 +8,8 @@ const REQUEST_ID = Deno.env.get('REQUEST_ID') ?? 'WORKER';
 const IMAGE_PATHS_RAW = Deno.env.get('IMAGE_PATHS') ?? '[]';
 
 // --- MODELS (USER SPECIFIED ORDER) ---
-const PRIMARY_MODEL = "gemini-3-flash-preview";
-const FALLBACK_MODEL = "gemini-2.5-flash";
+const PRIMARY_MODEL = "gemini-2.5-flash";
+const FALLBACK_MODEL = "gemini-3-flash-preview";
 
 const OCR_PROMPT_TEMPLATE = `
 BATCH OCR & SPATIAL MAPPING TASK:
@@ -222,7 +222,8 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
 
     // --- SOLVER STAGE ---
     const friendlyText = formatTranscriptionForAI(ocrJson, REQUEST_ID);
-    const solutionRaw = await callGeminiApi(supabase, PRIMARY_MODEL, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, REQUEST_ID);
+    // Use the model that won the OCR race for the solver stage
+    const solutionRaw = await callGeminiApi(supabase, bestWorld.name, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, REQUEST_ID);
     const solutionJson = JSON.parse(extractJson(solutionRaw));
 
     // Merge confidence into final payload for app announcement
