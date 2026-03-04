@@ -96,7 +96,8 @@ async function runChunkRefinery() {
        - Provide comprehensive English synonyms capture the full breadth of the word.
 
     6. PROTOCOL: THE GRAMMARIAN (Linguistic Tagging)
-       - Identify the Part of Speech (POS) for the word (e.g., Noun, Verb, Adjective, Adverb, Conjunction, Preposition).
+       - CRITICAL: Assign the word to ONE of these categories ONLY: Noun, Verb, Adjective, Adverb, Pronoun, Preposition, Conjunction, Interjection.
+       - STRICT RULE: Do NOT include morphological details (like "relative," "passive," "3rd person") in the POS field. Use only the high-level category name.
 
     7. PROTOCOL: THE FILTER (Size Constraint)
        - CRITICAL: Discard any word or root that consists of only a single character. Amharic words must be at least 2 characters long to be included in the dataset.
