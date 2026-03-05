@@ -6,18 +6,36 @@ Deno.serve(async (req) => {
   // Handle CORS if necessary
   if (req.method === 'OPTIONS') return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } });
 
-  const { action, file_path, worker_id, error } = await req.json();
+  const body = await req.json();
+  const { action, file_path, worker_id, error } = body;
+  console.log(`[REQUEST] Action: ${action} | Worker: ${worker_id} | Timestamp: ${new Date().toISOString()}`);
 
   // ACTION: GET_WORK
   if (action === 'get_work') {
-    // 1. Check if we need to sync files (Only if queue is empty to save performance)
-    const { count } = await supabase.from('validation_tracking').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+    // DEBUG: Comprehensive Table Status Check
+    const { data: stats, error: statsErr } = await supabase.from('validation_tracking').select('status');
+    if (statsErr) {
+      console.error('[DEBUG_DB] Could not even select from table:', statsErr);
+    } else {
+      const counts = stats.reduce((acc: any, row: any) => {
+        acc[row.status] = (acc[row.status] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('[DEBUG_DB] Current Table State (All Rows):', JSON.stringify(counts));
+    }
+
+    // 1. Check if we need to sync files
+    const { count, error: countErr } = await supabase.from('validation_tracking').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+    if (countErr) console.error('[DEBUG_SYNC] Count query failed:', countErr);
+    console.log(`[DEBUG_SYNC] Pending count reported as: ${count}`);
     
-    if (!count || count === 0) {
+    if (count === 0 || count === null) {
       console.log('[SYNC] Queue empty. Fetching from inspection_bucket...');
       const { data: files, error: listErr } = await supabase.storage
         .from('inspection_bucket')
         .list('', { limit: 1000 });
+      
+      if (files) console.log(`[SYNC] Raw Storage objects found: ${files.length}. Names: ${files.map(f => f.name).join(', ')}`);
 
       if (listErr) {
         console.error('[SYNC_ERR] Storage List:', listErr);
@@ -58,6 +76,12 @@ Deno.serve(async (req) => {
       .lt('updated_at', tenMinsAgo);
 
     // 3. ATOMIC CLAIM: Find oldest pending file
+    console.log('[CLAIM_START] Attempting to claim 1 pending row...');
+    
+    // Detailed Step: Let's see exactly what the oldest pending file is BEFORE updating
+    const { data: peek } = await supabase.from('validation_tracking').select('file_path, status').eq('status', 'pending').order('file_path', { ascending: true }).limit(1);
+    console.log('[CLAIM_PEEK] Oldest pending row found by SELECT:', peek ? JSON.stringify(peek) : 'NONE');
+
     const { data: claim, error: claimErr } = await supabase
       .from('validation_tracking')
       .update({
@@ -68,13 +92,26 @@ Deno.serve(async (req) => {
       .match({ status: 'pending' })
       .order('file_path', { ascending: true })
       .limit(1)
-      .select()
-      .single();
+      .select(); // Removed .single() to see the raw array result first
 
-    if (claimErr || !claim) {
-      console.log('[CLAIM] No pending files found after sync attempt.');
-      return new Response(JSON.stringify({ error: 'NO_WORK', debug: 'Table empty or all files processing' }));
+    if (claimErr) {
+      console.error('[CLAIM_ERR] Update query failed:', claimErr);
     }
+
+    if (!claim || claim.length === 0) {
+      console.warn('[CLAIM_FAIL] No rows were updated. This usually means RLS blocked the update OR the status was changed by another worker millisecond ago.');
+      return new Response(JSON.stringify({ 
+        error: 'NO_WORK', 
+        debug_info: { 
+          peek_result: peek, 
+          claim_result: claim,
+          claim_error: claimErr
+        } 
+      }));
+    }
+
+    const claimData = claim[0];
+    console.log('[CLAIM_SUCCESS] Claimed file:', claimData.file_path);
 
     // 3. Get API Key
     const { data: key, error: keyErr } = await supabase.from('api_keys')
@@ -88,8 +125,9 @@ Deno.serve(async (req) => {
 
     if (keyErr || !key) return new Response(JSON.stringify({ error: 'NO_API_KEY' }), { status: 404 });
 
+    console.log('[WORK_READY] Dispatching work to worker.');
     return new Response(JSON.stringify({
-      file_path: claim.file_path,
+      file_path: claimData.file_path,
       api_key: key.api_key,
       key_id: key.id
     }));
