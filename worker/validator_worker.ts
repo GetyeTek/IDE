@@ -159,11 +159,33 @@ async function runValidator() {
       await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
 
     } catch (err) {
-      console.error(`[CRITICAL CYCLE ERROR] ${err.message}`);
-      if (err.message === 'API_RATE_LIMIT' || err.message === 'API_OVERLOAD') {
-        console.warn('Stopping worker due to API saturation.');
+      console.error(`[CRITICAL CYCLE ERROR] File: ${currentFilePath} | Error: ${err.message}`);
+
+      // Explicitly notify Orchestrator of failure so it can be re-queued/retried later
+      if (currentFilePath) {
+        try {
+          await fetch(ORCHESTRATOR_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              action: 'fail_work', 
+              file_path: currentFilePath, 
+              error: err.message 
+            })
+          });
+          console.log(`[RELEASED] ${currentFilePath} sent back to orchestrator.`);
+        } catch (postErr) {
+          console.error(`[FATAL] Could not notify orchestrator of failure: ${postErr.message}`);
+        }
+      }
+
+      // Stop the worker if the error is environment-related (API Limits or Overload)
+      if (err.message === 'API_RATE_LIMIT' || err.message === 'API_OVERLOAD' || err.message.includes('No active/available Gemini keys')) {
+        console.warn('Stopping worker to prevent sequential failures due to API/Key issues.');
         break;
       }
+
+      // Brief cooldown before next cycle attempt
       await new Promise(r => setTimeout(r, 5000));
     }
   }
