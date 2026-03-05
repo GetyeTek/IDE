@@ -42,17 +42,24 @@ async function runValidator() {
       // 3. Prompt Gemini 3.1 Flash Lite (Using the provided key rotation)
       const systemInstruction = `
         ROLE: Amharic Linguistic Auditor.
-        MISSION: Filter valid dictionary words from OCR noise.
-        STRICT RULES:
-        - If the string is morphological nonsense (invalid consonant clusters), DISCARD.
-        - If the string is a cut-off/fragment, DISCARD.
-        - If the string is OCR garbage (mixed characters), DISCARD.
-        - Only include words with a valid Amharic root (መነሻ ቃል).
-        - If uncertain, DISCARD. Do not guess.
+        MISSION: Filter candidates that are either definitely valid or highly likely to be valid Amharic words.
+        
+        CRITICAL FILTERING RULES:
+        1. RUTHLESSNESS: Remove any string that is linguistic nonsense (invalid consonant clusters or OCR artifacts).
+        2. NO TRANSLITERATIONS: Discard Amharic transliterations of foreign/English words (e.g., discard ቴክኖሎጂ, ኮምፒውተር, ኢንተርኔት).
+        3. PURE AMHARIC: Focus on words with legitimate Amharic roots (መነሻ ቃል).
+        4. SENSE CHECK: If the character sequence does not form a meaningful word in the Amharic language, DISCARD.
 
-        OUTPUT FORMAT (STRICT JSON):
-        [{"id": number, "score": 1-10}]
-        No preamble, no explanation.`;
+        SCORING DEFINITION:
+        - Score (1-10) represents the LIKELIHOOD of the word being a valid, sensical Amharic word.
+        - 10: Perfect, common Amharic word.
+        - 1: Highly suspicious but potentially a word.
+
+        OUTPUT FORMAT (STRICT JSON ONLY):
+        Template Example: [{"id": 1, "score": 10}, {"id": 2, "score": 7}]
+        - id: The integer number found at the start of the line.
+        - score: The validity likelihood (integer).
+        No preamble, no words, no explanations.`;
 
       const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${api_key}`, {
         method: 'POST', 
