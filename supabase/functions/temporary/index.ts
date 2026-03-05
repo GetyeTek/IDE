@@ -7,23 +7,26 @@ Deno.serve(async (req) => {
   )
 
   const WORDS_PER_FILE = 100;
-  const BATCH_SIZE = 5000; // How many words to process per trigger
+  const BATCH_SIZE = 25000; // PROCESS 25,000 WORDS PER TRIGGER (250 Files)
 
   try {
-    // 1. READ CHECKPOINT FROM DATABASE
+    const startTime = Date.now();
+
+    // 1. READ CHECKPOINT
     const { data: checkpoint, error: cpErr } = await supabase
       .from('export_checkpoint')
       .select('last_offset')
       .eq('id', 1)
       .single();
 
-    if (cpErr) throw new Error("Could not read checkpoint. Run the SQL first.");
+    if (cpErr) throw new Error("Checkpoint not found. Run SQL first.");
     const currentOffset = checkpoint.last_offset;
 
-    // 2. GET TOTAL COUNT (For progress reporting)
+    // 2. GET TOTAL REMAINING (For display)
     const { data: totalCount } = await supabase.rpc('get_low_confidence_count');
 
-    // 3. FETCH THE WORDS
+    // 3. FETCH LARGE BLOCK FROM DB
+    console.log(`[START] Fetching ${BATCH_SIZE} words from offset ${currentOffset}...`);
     const { data: wordList, error: fetchErr } = await supabase.rpc('get_low_confidence_words', {
       p_limit: BATCH_SIZE,
       p_offset: currentOffset
@@ -31,44 +34,52 @@ Deno.serve(async (req) => {
 
     if (fetchErr) throw fetchErr;
     if (!wordList || wordList.length === 0) {
-      return new Response(JSON.stringify({ message: "All caught up! No more words to export." }));
+      return new Response(JSON.stringify({ message: "COMPLETE: No more words to export." }));
     }
 
-    console.log(`Processing ${wordList.length} words starting from index ${currentOffset}...`);
+    // 4. GENERATE AND UPLOAD FILES
+    const totalFilesToCreate = Math.ceil(wordList.length / WORDS_PER_FILE);
+    console.log(`[PROCESS] Creating ${totalFilesToCreate} files...`);
 
-    // 4. GENERATE FILES
     for (let i = 0; i < wordList.length; i += WORDS_PER_FILE) {
       const chunk = wordList.slice(i, i + WORDS_PER_FILE);
       const globalStart = currentOffset + i + 1;
       const globalEnd = currentOffset + i + chunk.length;
 
-      // Format Content: "1. Word", "2. Word"
-      const fileContent = chunk
-        .map((item: any, idx: number) => `${currentOffset + i + idx + 1}. ${item.extracted_word}`)
-        .join('\n');
+      // Fast string builder
+      let fileContent = "";
+      for (let j = 0; j < chunk.length; j++) {
+        fileContent += `${currentOffset + i + j + 1}. ${chunk[j].extracted_word}\n`;
+      }
 
       const fileName = `inspection_set_${globalStart}_to_${globalEnd}.txt`;
 
-      await supabase.storage
+      // Upload (Wait for each to ensure we don't overwhelm the network)
+      const { error: uploadErr } = await supabase.storage
         .from('inspection_bucket')
         .upload(fileName, fileContent, { upsert: true });
+        
+      if (uploadErr) console.error(`Failed ${fileName}:`, uploadErr.message);
     }
 
-    // 5. UPDATE CHECKPOINT IN DATABASE
+    // 5. UPDATE PROGRESS
     const nextOffset = currentOffset + wordList.length;
     await supabase
       .from('export_checkpoint')
       .update({ last_offset: nextOffset, updated_at: new Date().toISOString() })
       .eq('id', 1);
 
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     const percent = ((nextOffset / Number(totalCount)) * 100).toFixed(2);
 
     return new Response(JSON.stringify({
-      status: "Batch Uploaded Successfully",
-      range: `${currentOffset + 1} to ${nextOffset}`,
-      progress: `${percent}% of total database completed`,
+      status: "SUCCESS",
+      time_taken: `${duration}s`,
+      files_created: totalFilesToCreate,
+      last_word_exported: nextOffset,
+      completion: `${percent}%`,
       remaining: Number(totalCount) - nextOffset,
-      action: "Trigger again to process the next 5,000 words."
+      instruction: "Refresh or trigger again to process next 25k words."
     }), { headers: { "Content-Type": "application/json" } });
 
   } catch (err) {
