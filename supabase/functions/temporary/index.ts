@@ -9,27 +9,27 @@ Deno.serve(async (req) => {
   const WORDS_PER_FILE = 100;
   const TARGET_BATCH_SIZE = 25000; 
   const INTERNAL_FETCH_SIZE = 1000; 
-  const CONCURRENCY_LIMIT = 50; // High speed
+  const CONCURRENCY_LIMIT = 40; 
+  const FOLDER = "imp_6"; // NEW FOLDER
 
   try {
     const startTime = Date.now();
 
-    // 1. Get Live Stats from DB
-    const { data: statsData } = await supabase.rpc('get_processing_stats');
-    // Fix: Handle the array return safely
-    const grandTotal = Array.isArray(statsData) ? statsData[0].total_low_confidence : (statsData?.total_low_confidence || 86627);
+    // 1. Get Live Stats for Importance 6
+    const { data: statsData } = await supabase.rpc('get_processing_stats_imp6');
+    const grandTotal = Array.isArray(statsData) ? statsData[0].total_imp6 : 88766;
 
-    // 2. Get Current Checkpoint
-    const { data: checkpoint } = await supabase.from('export_checkpoint').select('last_offset').eq('id', 1).single();
-    const currentOffset = checkpoint?.last_offset || 0;
+    // 2. Get Checkpoint from the NEW table
+    const { data: checkpoint } = await supabase.from('export_checkpoint_imp6').select('last_offset').eq('id', 1).single();
+    let currentOffset = checkpoint?.last_offset || 0;
 
-    // 3. Fetch words in a loop (Bypasses 1000 row API limit)
+    // 3. Parallel Fetch Loop
     let allWords = [];
     while (allWords.length < TARGET_BATCH_SIZE) {
       const remainingToFetch = TARGET_BATCH_SIZE - allWords.length;
       const fetchSize = Math.min(INTERNAL_FETCH_SIZE, remainingToFetch);
 
-      const { data: chunk, error: fetchErr } = await supabase.rpc('get_low_confidence_words', {
+      const { data: chunk, error: fetchErr } = await supabase.rpc('get_words_imp6', {
         p_limit: fetchSize,
         p_offset: currentOffset + allWords.length
       });
@@ -42,9 +42,9 @@ Deno.serve(async (req) => {
     }
 
     const wordsInThisRun = allWords.length;
-    let filesUploadedInThisRun = 0;
+    let filesCreated = 0;
 
-    // 4. Process Uploads
+    // 4. Batch Uploads to the NEW folder
     if (wordsInThisRun > 0) {
       const uploadTasks = [];
       for (let i = 0; i < wordsInThisRun; i += WORDS_PER_FILE) {
@@ -53,54 +53,41 @@ Deno.serve(async (req) => {
         const endIdx = currentOffset + i + chunk.length;
 
         const content = chunk.map((w: any, idx: number) => `${startIdx + idx}. ${w.extracted_word || 'N/A'}`).join('\n');
-        const fileName = `batch_${String(startIdx).padStart(6, '0')}_to_${String(endIdx).padStart(6, '0')}.txt`;
         
+        // SAVE IN imp_6/ SUBFOLDER
+        const fileName = `${FOLDER}/batch_6_${String(startIdx).padStart(6, '0')}_to_${String(endIdx).padStart(6, '0')}.txt`;
         uploadTasks.push(supabase.storage.from('inspection_bucket').upload(fileName, content, { upsert: true }));
       }
 
       for (let i = 0; i < uploadTasks.length; i += CONCURRENCY_LIMIT) {
           await Promise.all(uploadTasks.slice(i, i + CONCURRENCY_LIMIT)); 
       }
-      filesUploadedInThisRun = uploadTasks.length;
+      filesCreated = uploadTasks.length;
 
-      // Update Database Pointer
+      // Update the NEW checkpoint table
       const nextOffset = currentOffset + wordsInThisRun;
-      await supabase.from('export_checkpoint').update({ last_offset: nextOffset }).eq('id', 1);
+      await supabase.from('export_checkpoint_imp6').update({ last_offset: nextOffset }).eq('id', 1);
+      currentOffset = nextOffset;
     }
 
-    // 5. STORAGE AUDIT: Count actual files in bucket
-    const { data: bucketFiles } = await supabase.storage.from('inspection_bucket').list('', { limit: 10000 });
-    const actualFileCount = bucketFiles?.length || 0;
-
-    // 6. CALCULATE FINAL STATS
-    const newOffset = currentOffset + wordsInThisRun;
-    const remainingWords = Math.max(0, grandTotal - newOffset);
-    const progressPercent = ((newOffset / grandTotal) * 100).toFixed(2);
-    
-    // Sync Check: Does (Words Processed / 100) match the File Count?
-    const expectedFileCount = Math.floor(newOffset / WORDS_PER_FILE);
-    const isPerfectSync = actualFileCount === expectedFileCount;
-
+    // 5. Build Response Stats
+    const remaining = Math.max(0, grandTotal - currentOffset);
+    const progressPercent = ((currentOffset / grandTotal) * 100).toFixed(2);
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
     return new Response(JSON.stringify({
-      overall_status: remainingWords === 0 ? "COMPLETED" : "IN_PROGRESS",
-      sync_audit: {
-        is_perfect_sync: isPerfectSync,
-        files_in_bucket: actualFileCount,
-        files_expected: expectedFileCount,
-        sync_notes: isPerfectSync ? "Database and Storage are identical." : "Minor mismatch: Check if manual deletions occurred."
+      status: remaining === 0 ? "COMPLETED_IMP6" : "PROCESSING_IMP6",
+      stats: {
+        progress: `${progressPercent}%`,
+        total_imp6_target: grandTotal,
+        processed_so_far: currentOffset,
+        remaining: remaining
       },
-      progress_stats: {
-        completion: `${progressPercent}%`,
-        total_words_to_process: grandTotal,
-        total_words_processed: newOffset,
-        words_remaining: remainingWords
-      },
-      current_run_details: {
+      run_details: {
         words_extracted: wordsInThisRun,
-        new_files_created: filesUploadedInThisRun,
-        execution_time: `${duration}s`
+        files_uploaded: filesCreated,
+        folder_path: `inspection_bucket/${FOLDER}/`,
+        time: `${duration}s`
       }
     }), { headers: { "Content-Type": "application/json" } });
 
