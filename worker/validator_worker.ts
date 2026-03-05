@@ -54,18 +54,32 @@ async function runValidator() {
         [{"id": number, "score": 1-10}]
         No preamble, no explanation.`;
 
-      const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${api_key}`, {
-        method: 'POST',
+      const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${api_key}`, {
+        method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemInstruction }] },
           contents: [{ parts: [{ text: `BATCH:\n${text}` }] }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.1
+          },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+          ]
         })
       });
 
       const result = await aiResp.json();
-      if (!result.candidates) throw new Error("AI Refused/Blocked request");
+
+      if (!result.candidates || result.candidates.length === 0) {
+        const feedback = result.promptFeedback ? JSON.stringify(result.promptFeedback) : "No Feedback";
+        const err = result.error ? JSON.stringify(result.error) : "None";
+        throw new Error(`AI_REFUSAL for ${file_path}: Feedback: ${feedback} | Error: ${err} | Full: ${JSON.stringify(result)}`);
+      }
 
       const rawText = result.candidates[0].content.parts[0].text;
       const validatedList = JSON.parse(rawText);
