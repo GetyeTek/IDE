@@ -23,14 +23,14 @@ Deno.serve(async (req) => {
       console.log(`[ORCHESTRATOR][${reqId}] Starting GET_WORK process for ${worker_id}...`);
 
       // 1. Sync Logic (Only run if table is strictly empty)
-      const { count: totalCount, error: countErr } = await supabase.from('validation_tracking').select('*', { count: 'exact', head: true });
+      const { count: totalCount, error: countErr } = await supabase.from('validation_tracking_imp6').select('*', { count: 'exact', head: true });
       console.log(`[ORCHESTRATOR][${reqId}] Tracking Table Count: ${totalCount} | Count Error: ${countErr ? JSON.stringify(countErr) : 'None'}`);
 
       if (countErr) {
         console.error(`[ORCHESTRATOR][${reqId}][FATAL] Aborting sync to prevent lock-wiping due to count error:`, countErr);
       } else if (totalCount === 0) {
         console.log(`[ORCHESTRATOR][${reqId}] Table is empty. Initiating sync from inspection_bucket...`);
-        const { data: files, error: listErr } = await supabase.storage.from('inspection_bucket').list('', { limit: 1000 });
+        const { data: files, error: listErr } = await supabase.storage.from('inspection_bucket').list('imp_6', { limit: 1000 });
         
         if (listErr) {
           console.error(`[ORCHESTRATOR][${reqId}][ERROR] Storage list failed:`, listErr);
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
         const filePaths = (files ||[])
           .filter(f => f.name !== '.emptyFolderPlaceholder' && f.id !== null)
           .map(f => ({
-            file_path: f.name,
+            file_path: 'imp_6/' + f.name, // Ensure full path is stored
             status: 'pending',
             updated_at: new Date().toISOString()
           }));
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
         if (filePaths.length > 0) {
           // CRITICAL FIX: ignoreDuplicates: true prevents overwriting locked files if a race condition occurs
           console.log(`[ORCHESTRATOR][${reqId}] Upserting files into tracking table...`);
-          const { error: upsertErr } = await supabase.from('validation_tracking').upsert(filePaths, { onConflict: 'file_path', ignoreDuplicates: true });
+          const { error: upsertErr } = await supabase.from('validation_tracking_imp6').upsert(filePaths, { onConflict: 'file_path', ignoreDuplicates: true });
           if (upsertErr) {
             console.error(`[ORCHESTRATOR][${reqId}][ERROR] Sync Upsert failed:`, upsertErr);
           } else {
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
       // 2. Claim RPC
       console.log(`[ORCHESTRATOR][${reqId}] Executing claim_validation_batch RPC...`);
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('claim_validation_batch', { worker_id_param: worker_id });
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('claim_validation_batch_imp6', { worker_id_param: worker_id });
 
       if (rpcErr) {
         console.error(`[ORCHESTRATOR][${reqId}][ERROR] RPC Exception:`, rpcErr);
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     // ==========================================
     if (action === 'mark_done') {
       console.log(`[ORCHESTRATOR][${reqId}] Marking ${file_path} as completed...`);
-      const { error: updateErr } = await supabase.from('validation_tracking')
+      const { error: updateErr } = await supabase.from('validation_tracking_imp6')
         .update({ status: 'completed', updated_at: new Date().toISOString() })
         .eq('file_path', file_path);
       
@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
     // ==========================================
     if (action === 'fail_work') {
       console.log(`[ORCHESTRATOR][${reqId}] Processing FAILURE for ${file_path}. Error provided: ${error}`);
-      const { data: current, error: getErr } = await supabase.from('validation_tracking')
+      const { data: current, error: getErr } = await supabase.from('validation_tracking_imp6')
         .select('retry_count')
         .eq('file_path', file_path)
         .single();
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
 
       console.log(`[ORCHESTRATOR][${reqId}] File ${file_path} is on retry ${newRetryCount}/5. Should Give Up: ${shouldGiveUp}`);
 
-      const { error: updateErr } = await supabase.from('validation_tracking')
+      const { error: updateErr } = await supabase.from('validation_tracking_imp6')
         .update({
           status: shouldGiveUp ? 'failed_permanently' : 'pending',
           worker_id: null,
