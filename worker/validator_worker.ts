@@ -21,25 +21,14 @@ async function runValidator() {
       });
 
       const packet = await resp.json();
-      if (packet.error === 'NO_WORK') {
-        console.log("--- NO MORE FILES TO PROCESS ---");
+      if (packet.error === 'NO_WORK' || packet.error === 'NO_API_KEY') {
+        console.log(`--- WORKER STOPPING: ${packet.error} ---`);
         break;
       }
 
-      const { file_path } = packet;
+      const { file_path, api_key, key_id } = packet;
       currentFilePath = file_path;
-      console.log(`[CYCLE ${cycle}/10] Claimed: ${currentFilePath}`);
-
-      // 2. Rotate API Key (Cooldown aware)
-      const { data: keyRecord, error: keyError } = await supabase
-        .from('api_keys')
-        .select('*')
-        .eq('is_active', true)
-        .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
-        .order('last_used_at', { ascending: true, nullsFirst: true })
-        .limit(1).single();
-
-      if (keyError || !keyRecord) throw new Error('No active/available Gemini keys.');
+      console.log(`[CYCLE ${cycle}/10] Claimed: ${currentFilePath} using Key: ${key_id}`);
 
       // 3. Download Content
       const { data: blob, error: dlErr } = await supabase.storage.from('inspection_bucket').download(currentFilePath);
@@ -83,7 +72,7 @@ async function runValidator() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${keyRecord.api_key}`, {
+          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${api_key}`, {
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -96,7 +85,7 @@ async function runValidator() {
           clearTimeout(timeoutId);
 
           if (aiResp.status === 429) {
-            await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
+            await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', key_id);
             throw new Error('API_RATE_LIMIT');
           }
           if (aiResp.status === 503) throw new Error('API_OVERLOAD');
@@ -186,7 +175,7 @@ async function runValidator() {
         body: JSON.stringify({ action: 'mark_done', file_path: currentFilePath }) 
       });
       
-      await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
+      await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', key_id);
 
     } catch (err) {
       console.error(`[CRITICAL CYCLE ERROR] File: ${currentFilePath} | Error: ${err.message}`);
