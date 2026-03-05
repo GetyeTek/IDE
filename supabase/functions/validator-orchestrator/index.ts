@@ -14,10 +14,29 @@ Deno.serve(async (req) => {
     const { count } = await supabase.from('validation_tracking').select('*', { count: 'exact', head: true }).eq('status', 'pending');
     
     if (!count || count === 0) {
-      const { data: files } = await supabase.storage.from('inspection_bucket').list();
+      console.log('Queue empty. Attempting to sync from inspection_bucket...');
+      // List more files (limit 1000) and ignore folders (objects without metadata)
+      const { data: files, error: listErr } = await supabase.storage
+        .from('inspection_bucket')
+        .list('', { limit: 1000 });
+
+      if (listErr) {
+        console.error('Storage List Error:', listErr);
+        return new Response(JSON.stringify({ error: 'STORAGE_LIST_FAILED', details: listErr }), { status: 500 });
+      }
+
       if (files && files.length > 0) {
-        const filePaths = files.map(f => ({ file_path: f.name, status: 'pending' }));
-        await supabase.from('validation_tracking').upsert(filePaths, { onConflict: 'file_path' });
+        // Filter out folders (placeholders) and only take actual files
+        const filePaths = files
+          .filter(f => f.metadata) 
+          .map(f => ({ file_path: f.name, status: 'pending' }));
+
+        console.log(`Found ${filePaths.length} valid files. Syncing to tracking table...`);
+        
+        const { error: upsertErr } = await supabase.from('validation_tracking').upsert(filePaths, { onConflict: 'file_path' });
+        if (upsertErr) console.error('Upsert Error:', upsertErr);
+      } else {
+        console.warn('Inspection bucket appears to be empty or inaccessible.');
       }
     }
 
