@@ -89,7 +89,17 @@ async function runValidator() {
       }
 
       const rawText = result.candidates[0].content.parts[0].text;
-      const validatedList = JSON.parse(rawText);
+
+      // Robust JSON Extraction: Find the array boundaries in case of AI chatter
+      const startIdx = rawText.indexOf('[');
+      const endIdx = rawText.lastIndexOf(']');
+
+      if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
+        throw new Error(`JSON_NOT_FOUND: Could not find valid JSON array markers in response for ${file_path}`);
+      }
+
+      const cleanJson = rawText.substring(startIdx, endIdx + 1);
+      const validatedList = JSON.parse(cleanJson);
 
       // 4. Map back to words and save
       const finalWords = validatedList.map((item: any) => ({
