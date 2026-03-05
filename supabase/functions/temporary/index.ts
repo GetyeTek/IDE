@@ -35,7 +35,11 @@ Deno.serve(async (req) => {
       const startIdx = currentOffset + i + 1;
       const endIdx = currentOffset + i + chunk.length;
 
-      const content = chunk.map((w: any, idx: number) => `${startIdx + idx}. ${w.extracted_word}`).join('\n');
+      const content = chunk.map((w: any, idx: number) => {
+        // Use the clean string from the RPC; fallback to 'N/A' if empty
+        const word = w.extracted_word || 'N/A';
+        return `${startIdx + idx}. ${word}`;
+      }).join('\n');
       const fileName = `batch_${startIdx}_to_${endIdx}.txt`;
 
       // Define the upload task but don't "await" it yet
