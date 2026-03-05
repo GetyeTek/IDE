@@ -24,12 +24,12 @@ Deno.serve(async (req) => {
       console.log('[DEBUG_DB] Current Table State (All Rows):', JSON.stringify(counts));
     }
 
-    // 1. Check if we need to sync files
-    const { count, error: countErr } = await supabase.from('validation_tracking').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+    // 1. Check if we need to sync files (Only if table is TOTALLY empty to avoid collision loops)
+    const { count: totalCount, error: countErr } = await supabase.from('validation_tracking').select('*', { count: 'exact', head: true });
     if (countErr) console.error('[DEBUG_SYNC] Count query failed:', countErr);
-    console.log(`[DEBUG_SYNC] Pending count reported as: ${count}`);
+    console.log(`[DEBUG_SYNC] Total files in tracking table: ${totalCount}`);
     
-    if (count === 0 || count === null) {
+    if (totalCount === 0 || totalCount === null) {
       console.log('[SYNC] Queue empty. Fetching from inspection_bucket...');
       const { data: files, error: listErr } = await supabase.storage
         .from('inspection_bucket')
@@ -68,68 +68,26 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. RECOVER ZOMBIES: Unstick files processing for > 10 mins
-    const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    await supabase.from('validation_tracking')
-      .update({ status: 'pending', worker_id: null })
-      .eq('status', 'processing')
-      .lt('updated_at', tenMinsAgo);
+    // 2. ATOMIC RPC CLAIM
+    // This one call handles Zombie Recovery, Collision-Free Claiming, and Key Selection
+    console.log('[CLAIM_START] Calling claim_validation_batch RPC...');
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('claim_validation_batch', { worker_id_param: worker_id });
 
-    // 3. ATOMIC CLAIM: Find oldest pending file
-    console.log('[CLAIM_START] Attempting to claim 1 pending row...');
-    
-    // Detailed Step: Let's see exactly what the oldest pending file is BEFORE updating
-    const { data: peek } = await supabase.from('validation_tracking').select('file_path, status').eq('status', 'pending').order('file_path', { ascending: true }).limit(1);
-    console.log('[CLAIM_PEEK] Oldest pending row found by SELECT:', peek ? JSON.stringify(peek) : 'NONE');
-
-    const { data: claim, error: claimErr } = await supabase
-      .from('validation_tracking')
-      .update({
-        status: 'processing', 
-        worker_id, 
-        updated_at: new Date().toISOString()
-      })
-      .match({ status: 'pending' })
-      .order('file_path', { ascending: true })
-      .limit(1)
-      .select(); // Removed .single() to see the raw array result first
-
-    if (claimErr) {
-      console.error('[CLAIM_ERR] Update query failed:', claimErr);
-    }
-
-    if (!claim || claim.length === 0) {
-      console.warn('[CLAIM_FAIL] No rows were updated. This usually means RLS blocked the update OR the status was changed by another worker millisecond ago.');
+    if (rpcErr || !rpcData || rpcData.length === 0) {
+      console.warn('[CLAIM_FAIL] RPC returned no work. Error:', rpcErr);
       return new Response(JSON.stringify({ 
         error: 'NO_WORK', 
-        debug_info: { 
-          peek_result: peek, 
-          claim_result: claim,
-          claim_error: claimErr
-        } 
+        debug: rpcErr || 'Queue empty or all keys on cooldown'
       }));
     }
 
-    const claimData = claim[0];
-    console.log('[CLAIM_SUCCESS] Claimed file:', claimData.file_path);
+    const work = rpcData[0];
+    console.log(`[CLAIM_SUCCESS] Worker ${worker_id} claimed ${work.file_path_out}`);
 
-    // 3. Get API Key
-    const { data: key, error: keyErr } = await supabase.from('api_keys')
-      .select('*')
-      .eq('service', 'gemini')
-      .eq('is_active', true)
-      .or(`cooldown_until.is.null,cooldown_until.lt.${new Date().toISOString()}`)
-      .order('last_used_at', { ascending: true, nullsFirst: true })
-      .limit(1)
-      .single();
-
-    if (keyErr || !key) return new Response(JSON.stringify({ error: 'NO_API_KEY' }), { status: 404 });
-
-    console.log('[WORK_READY] Dispatching work to worker.');
     return new Response(JSON.stringify({
-      file_path: claimData.file_path,
-      api_key: key.api_key,
-      key_id: key.id
+      file_path: work.file_path_out,
+      api_key: work.api_key_out,
+      key_id: work.key_id_out
     }));
   }
 
