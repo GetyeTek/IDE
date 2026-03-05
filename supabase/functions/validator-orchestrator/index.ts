@@ -20,8 +20,16 @@ Deno.serve(async (req) => {
 
     await supabase.from('validation_tracking').update({ status: 'processing', worker_id, updated_at: new Date().toISOString() }).eq('file_path', claim.file_path);
 
-    // 3. Get API Key
-    const { data: key } = await supabase.from('api_keys').select('*').eq('is_active', true).order('last_used_at', { ascending: true }).limit(1).single();
+    // 3. Get API Key (Strictly Gemini)
+    const { data: key, error: keyErr } = await supabase.from('api_keys')
+      .select('*')
+      .eq('service', 'gemini')
+      .eq('is_active', true)
+      .order('last_used_at', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (keyErr || !key) return new Response(JSON.stringify({ error: 'NO_API_KEY' }), { status: 404 });
 
     return new Response(JSON.stringify({ file_path: claim.file_path, api_key: key.api_key, key_id: key.id }));
   }
