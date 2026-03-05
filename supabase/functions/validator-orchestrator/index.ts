@@ -21,8 +21,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. ATOMIC CLAIM: Find oldest pending file and mark as processing in one move
-    // We use a subquery/RPC approach or a strictly ordered update
+    // 2. RECOVER ZOMBIES: Unstick files processing for > 10 mins
+    const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    await supabase.from('validation_tracking')
+      .update({ status: 'pending', worker_id: null })
+      .eq('status', 'processing')
+      .lt('updated_at', tenMinsAgo);
+
+    // 3. ATOMIC CLAIM: Find oldest pending file
     const { data: claim, error: claimErr } = await supabase
       .from('validation_tracking')
       .update({
@@ -31,7 +37,7 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .match({ status: 'pending' })
-      .order('file_path', { ascending: true }) // Ensures sequential processing
+      .order('file_path', { ascending: true })
       .limit(1)
       .select()
       .single();
@@ -65,17 +71,28 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ status: 'ok' }));
   }
 
-  // ACTION: FAIL_WORK (The crucial addition for retries)
+  // ACTION: FAIL_WORK
   if (action === 'fail_work') {
-    console.error(`Worker ${worker_id} reported failure on ${file_path}: ${error}`);
+    // Get current retry count
+    const { data: current } = await supabase.from('validation_tracking')
+      .select('retry_count')
+      .eq('file_path', file_path)
+      .single();
+    
+    const newRetryCount = (current?.retry_count || 0) + 1;
+    const shouldGiveUp = newRetryCount >= 5;
+
     await supabase.from('validation_tracking')
       .update({
-        status: 'pending', // Put back in queue
+        status: shouldGiveUp ? 'failed_permanently' : 'pending',
         worker_id: null,
+        retry_count: newRetryCount,
+        last_error: error || 'Unknown Error',
         updated_at: new Date().toISOString()
       })
       .eq('file_path', file_path);
-    return new Response(JSON.stringify({ status: 'requeued' }));
+
+    return new Response(JSON.stringify({ status: shouldGiveUp ? 'abandoned' : 'requeued', retry_count: newRetryCount }));
   }
 
   return new Response('Invalid Action', { status: 400 });
