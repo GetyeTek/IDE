@@ -6,65 +6,69 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
+  // 1. Get Offset from Request Body (default to 0)
+  const { offset = 0 } = await req.json().catch(() => ({ offset: 0 }));
+  
   const WORDS_PER_FILE = 100;
-  const DB_FETCH_LIMIT = 5000; // Large batch fetch
-  let offset = 0;
-  let fileCount = 1;
-  let totalWordsProcessed = 0;
+  const DB_FETCH_LIMIT = 5000; // Large batch fetch per execution
+  let currentOffset = offset;
+  let wordsInThisRun = 0;
 
   try {
-    console.log("Starting export process...");
+    // 2. Get Global Progress Stats
+    const { data: totalCount, error: countErr } = await supabase.rpc('get_low_confidence_count');
+    if (countErr) throw countErr;
 
-    while (true) {
-      // 1. Fetch a large batch of words from the RPC
-      const { data, error } = await supabase.rpc('get_low_confidence_words', {
-        p_limit: DB_FETCH_LIMIT,
-        p_offset: offset
-      });
+    console.log(`Starting export from offset ${currentOffset}. Total words to process: ${totalCount}`);
 
-      if (error) throw error;
-      if (!data || data.length === 0) break;
+    // 3. Fetch the batch for this specific run
+    const { data, error } = await supabase.rpc('get_low_confidence_words', {
+      p_limit: DB_FETCH_LIMIT,
+      p_offset: currentOffset
+    });
 
-      // 2. Divide the batch into groups of 100
-      for (let i = 0; i < data.length; i += WORDS_PER_FILE) {
-        const chunk = data.slice(i, i + WORDS_PER_FILE);
-        
-        // 3. Format the text (1. Word1, 2. Word2...)
-        const fileContent = chunk
-          .map((item: any, index: number) => `${index + 1}. ${item.extracted_word}`)
-          .join('\n');
-
-        const fileName = `batch_${fileCount}.txt`;
-
-        // 4. Upload to Storage
-        const { error: uploadError } = await supabase.storage
-          .from('inspection_bucket')
-          .upload(fileName, fileContent, {
-            contentType: 'text/plain',
-            upsert: true
-          });
-
-        if (uploadError) {
-          console.error(`Error uploading ${fileName}:`, uploadError.message);
-        } else {
-          console.log(`Successfully uploaded ${fileName}`);
-        }
-
-        fileCount++;
-      }
-
-      totalWordsProcessed += data.length;
-      offset += DB_FETCH_LIMIT;
-
-      // Safety break: stop if we've processed a huge amount in one go to avoid timeout
-      // You can trigger the function again with a higher offset if needed
-      if (data.length < DB_FETCH_LIMIT) break;
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      return new Response(JSON.stringify({ message: "No more words to process", totalCount }), { status: 200 });
     }
 
+    // 4. Process the words into files
+    for (let i = 0; i < data.length; i += WORDS_PER_FILE) {
+      const chunk = data.slice(i, i + WORDS_PER_FILE);
+      
+      // Add global order number (Current Offset + Index in Batch + 1)
+      const fileContent = chunk
+        .map((item: any, index: number) => `${currentOffset + i + index + 1}. ${item.extracted_word}`)
+        .join('\n');
+
+      // Unique filename based on the starting word number
+      const startNum = currentOffset + i + 1;
+      const endNum = currentOffset + i + chunk.length;
+      const fileName = `words_${startNum}_to_${endNum}.txt`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('inspection_bucket')
+        .upload(fileName, fileContent, {
+          contentType: 'text/plain',
+          upsert: true
+        });
+
+      if (uploadError) console.error(`Error uploading ${fileName}:`, uploadError.message);
+    }
+
+    wordsInThisRun = data.length;
+    const nextOffset = currentOffset + wordsInThisRun;
+    const percentComplete = ((nextOffset / totalCount) * 100).toFixed(2);
+
     return new Response(JSON.stringify({ 
-      message: "Export Complete", 
-      files_created: fileCount - 1,
-      total_words: totalWordsProcessed 
+      status: "Success",
+      progress: {
+        total_low_confidence_words: totalCount,
+        processed_until_now: nextOffset,
+        remaining: totalCount - nextOffset,
+        percent_complete: `${percentComplete}%`
+      },
+      instructions: `To continue, call this function again with offset: ${nextOffset}`
     }), {
       headers: { "Content-Type": "application/json" },
     });
