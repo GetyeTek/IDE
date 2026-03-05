@@ -102,7 +102,15 @@ async function runValidator() {
           if (aiResp.status === 503) throw new Error('API_OVERLOAD');
 
           const result = await aiResp.json();
-          const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          
+          // Check if AI actually returned content
+          if (!result.candidates || result.candidates.length === 0) {
+            console.error(`[AI_NO_CANDIDATE] Full Response: ${JSON.stringify(result)}`);
+            throw new Error(`AI returned no candidates. FinishReason: ${result.candidates?.[0]?.finishReason || 'Unknown'}`);
+          }
+
+          const rawText = result.candidates[0].content.parts[0].text || "";
+          console.log(`[DEBUG: RAW_AI_RESPONSE]:\n${rawText}\n--- END RAW ---`);
 
           // --- THE SIEVE: Robust JSON extraction ---
           const sanitize = (val: string) => val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/""/g, '"').replace(/,\s*([\}\]])/g, '$1');
@@ -110,23 +118,45 @@ async function runValidator() {
           const starts = [...rawText.matchAll(/\[/g)].map(m => m.index || 0);
           const ends = [...rawText.matchAll(/\]/g)].map(m => m.index || 0).reverse();
 
-          for (const s of starts) {
-            for (const e of ends) {
-              if (e > s) {
-                try {
-                  const candidate = JSON.parse(sanitize(rawText.substring(s, e + 1)));
-                  if (Array.isArray(candidate)) {
-                    finalValidatedList = candidate;
-                    break;
-                  }
-                } catch { continue; }
-              }
-            }
-            if (finalValidatedList) break;
+          if (starts.length === 0 || ends.length === 0) {
+             // Fallback: Check if the rawText is a valid JSON object wrapping an array
+             try {
+               const parsed = JSON.parse(sanitize(rawText));
+               if (Array.isArray(parsed)) finalValidatedList = parsed;
+               else if (parsed.data && Array.isArray(parsed.data)) finalValidatedList = parsed.data;
+               else if (parsed.id && parsed.score) finalValidatedList = [parsed]; // Handle single object case
+             } catch (e) { 
+               console.error(`[PARSE_ERR] Direct parse failed: ${e.message}`);
+             }
           }
 
-          if (finalValidatedList) break; // Success! Break attempt loop
-          throw new Error('Sieve failed to extract valid JSON array');
+          if (!finalValidatedList) {
+            for (const s of starts) {
+              for (const e of ends) {
+                if (e > s) {
+                  const chunk = rawText.substring(s, e + 1);
+                  try {
+                    const candidate = JSON.parse(sanitize(chunk));
+                    if (Array.isArray(candidate)) {
+                      finalValidatedList = candidate;
+                      break;
+                    }
+                  } catch (err) {
+                    console.warn(`[SIEVE_LOG] Failed to parse chunk at ${s}-${e}: ${err.message}`);
+                    continue;
+                  }
+                }
+              }
+              if (finalValidatedList) break;
+            }
+          }
+
+          if (finalValidatedList) {
+             console.log(`[DEBUG] Successfully parsed ${finalValidatedList.length} items from JSON.`);
+             break; // Success!
+          }
+          
+          throw new Error(`Sieve failed. Raw output length: ${rawText.length}. Look at debug log above.`);
 
         } catch (attemptErr) {
           console.warn(`[ATTEMPT ${attempt} FAIL]: ${attemptErr.message}`);
