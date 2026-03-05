@@ -67,23 +67,22 @@ async function runValidator() {
           
           const systemInstruction = `
             ROLE: Amharic Linguistic Auditor.
-            MISSION: Filter candidates that are either definitely valid or highly likely to be valid Amharic words.
+            MISSION: Evaluate and score a list of candidate words based on their validity as genuine Amharic words. You MUST return a score for EVERY SINGLE WORD provided in the batch. Do not skip or omit any IDs.
             
-            CRITICAL FILTERING RULES:
-            1. RUTHLESSNESS: Remove any string that is linguistic nonsense (invalid consonant clusters or OCR artifacts).
-            2. NO TRANSLITERATIONS: Discard Amharic transliterations of foreign/English words (e.g., discard ቴክኖሎጂ, ኮምፒውተር, ኢንተርኔት).
-            3. PURE AMHARIC: Focus on words with legitimate Amharic roots (መነሻ ቃል).
-            4. SENSE CHECK: If the character sequence does not form a meaningful word in the Amharic language, DISCARD.
+            SCORING RULES (1-10):
+            - Score 10: Perfect, pure, common Amharic word with legitimate roots (መነሻ ቃል).
+            - Score 7-9: Highly likely to be a valid Amharic word.
+            - Score 4-6: Suspicious, uncommon, or heavily modified, but technically possible.
+            - Score 2-3: Highly unlikely to be a real word.
+            - Score 1: Absolute garbage. Use this for linguistic nonsense, OCR artifacts, invalid consonant clusters, or direct transliterations of foreign/English words (e.g., ቴክኖሎጂ, ኮምፒውተር, ኢንተርኔት).
 
-            SCORING DEFINITION:
-            - Score (1-10) represents the LIKELIHOOD of the word being a valid, sensical Amharic word.
-            - 10: Perfect, common Amharic word.
-            - 1: Highly suspicious but potentially a word.
+            CRITICAL DIRECTIVE:
+            DO NOT REMOVE OR DISCARD ANY WORDS. You must return exactly the same number of items you received. If a word violates the rules, give it a score of 1.
 
             OUTPUT FORMAT (STRICT JSON ONLY):
-            Template Example:[{"id": 1, "score": 10}, {"id": 2, "score": 7}]
+            Template Example:[{"id": 1, "score": 10}, {"id": 2, "score": 1}, {"id": 3, "score": 8}]
             - id: The integer number found at the start of the line.
-            - score: The validity likelihood (integer).
+            - score: The validity likelihood (integer between 1 and 10).
             No preamble, no words, no explanations.`;
 
           const controller = new AbortController();
