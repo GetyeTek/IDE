@@ -7,74 +7,74 @@ Deno.serve(async (req) => {
   )
 
   const WORDS_PER_FILE = 100;
-  const BATCH_SIZE = 25000; 
-  const CONCURRENCY_LIMIT = 20;
+  const TARGET_BATCH_SIZE = 25000; // Total words we WANT to process in this run
+  const INTERNAL_FETCH_SIZE = 1000; // Max allowed by Supabase API per call
+  const CONCURRENCY_LIMIT = 30;
 
   try {
     const startTime = Date.now();
 
-    // 1. Get the Total Count of Low Importance Words (The 86,627 value)
-    // We do this to ensure the stats are live and accurate.
-    const { count: totalWordsToProcess, error: countErr } = await supabase
-      .from('processed_words')
-      .select('words', { count: 'exact', head: true })
-      // This logic must match your RPC's internal filter exactly:
-      // Since 'words' is an array, we count the individual elements using a custom filter or RPC
-      // For speed, let's assume we use a small helper RPC or just the known target.
-    
-    // Note: If you want the exact live count, it's better to use a simple RPC:
+    // 1. Get Live Stats
     const { data: statsData } = await supabase.rpc('get_processing_stats');
-    const grandTotal = statsData?.total_low_confidence || 86627;
+    const grandTotal = statsData || 86627;
 
     // 2. Get Current Checkpoint
     const { data: checkpoint } = await supabase.from('export_checkpoint').select('last_offset').eq('id', 1).single();
-    const currentOffset = checkpoint?.last_offset || 0;
+    let currentOffset = checkpoint?.last_offset || 0;
 
-    // 3. Fetch words
-    const { data: wordList, error: fetchErr } = await supabase.rpc('get_low_confidence_words', {
-      p_limit: BATCH_SIZE,
-      p_offset: currentOffset
-    });
+    // 3. Fetch words in a loop until we hit TARGET_BATCH_SIZE or run out of data
+    let allWords = [];
+    console.log(`[START] Fetching words starting from ${currentOffset}...`);
+    
+    while (allWords.length < TARGET_BATCH_SIZE) {
+      const remainingToFetch = TARGET_BATCH_SIZE - allWords.length;
+      const fetchSize = Math.min(INTERNAL_FETCH_SIZE, remainingToFetch);
 
-    if (fetchErr) throw fetchErr;
+      const { data: chunk, error: fetchErr } = await supabase.rpc('get_low_confidence_words', {
+        p_limit: fetchSize,
+        p_offset: currentOffset + allWords.length
+      });
 
-    const wordsInThisRun = wordList?.length || 0;
+      if (fetchErr) throw fetchErr;
+      if (!chunk || chunk.length === 0) break; // No more words in DB
+
+      allWords.push(...chunk);
+      if (chunk.length < fetchSize) break; // Reached the end of the database
+    }
+
+    const wordsInThisRun = allWords.length;
     let filesCreated = 0;
 
-    // 4. Process Uploads only if there's data
+    // 4. Process Uploads
     if (wordsInThisRun > 0) {
       const uploadTasks = [];
       for (let i = 0; i < wordsInThisRun; i += WORDS_PER_FILE) {
-        const chunk = wordList.slice(i, i + WORDS_PER_FILE);
+        const chunk = allWords.slice(i, i + WORDS_PER_FILE);
         const startIdx = currentOffset + i + 1;
         const endIdx = currentOffset + i + chunk.length;
 
         const content = chunk.map((w: any, idx: number) => {
-          const word = w.extracted_word || 'N/A';
-          return `${startIdx + idx}. ${word}`;
+          return `${startIdx + idx}. ${w.extracted_word || 'N/A'}`;
         }).join('\n');
         
         const fileName = `batch_${String(startIdx).padStart(6, '0')}_to_${String(endIdx).padStart(6, '0')}.txt`;
-
-        const task = supabase.storage.from('inspection_bucket').upload(fileName, content, { upsert: true });
-        uploadTasks.push(task);
+        uploadTasks.push(supabase.storage.from('inspection_bucket').upload(fileName, content, { upsert: true }));
       }
 
       for (let i = 0; i < uploadTasks.length; i += CONCURRENCY_LIMIT) {
-          const group = uploadTasks.slice(i, i + CONCURRENCY_LIMIT);
-          await Promise.all(group); 
+          await Promise.all(uploadTasks.slice(i, i + CONCURRENCY_LIMIT)); 
       }
       filesCreated = uploadTasks.length;
 
-      // Update Checkpoint
+      // Update Checkpoint in DB
       const nextOffset = currentOffset + wordsInThisRun;
       await supabase.from('export_checkpoint').update({ last_offset: nextOffset }).eq('id', 1);
+      currentOffset = nextOffset;
     }
 
-    // 5. Final Stats Calculation
-    const finalOffset = currentOffset + wordsInThisRun;
-    const remaining = Math.max(0, grandTotal - finalOffset);
-    const progressPercent = ((finalOffset / grandTotal) * 100).toFixed(2);
+    // 5. Final Stats
+    const remaining = Math.max(0, grandTotal - currentOffset);
+    const progressPercent = ((currentOffset / grandTotal) * 100).toFixed(2);
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
     return new Response(JSON.stringify({
@@ -82,18 +82,14 @@ Deno.serve(async (req) => {
       stats: {
         progress: `${progressPercent}%`,
         total_target_words: grandTotal,
-        total_processed_so_far: finalOffset,
+        total_processed_so_far: currentOffset,
         words_remaining: remaining,
-        files_in_bucket_estimate: Math.ceil(finalOffset / WORDS_PER_FILE)
+        files_in_bucket_estimate: Math.ceil(currentOffset / WORDS_PER_FILE)
       },
       current_run: {
         words_extracted: wordsInThisRun,
         files_uploaded: filesCreated,
         time_taken: `${duration}s`
-      },
-      checkpoint: {
-        old_offset: currentOffset,
-        new_offset: finalOffset
       }
     }), { headers: { "Content-Type": "application/json" } });
 
