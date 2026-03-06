@@ -82,10 +82,18 @@ async function runValidator() {
             DO NOT REMOVE OR DISCARD ANY WORDS. You must return exactly the same number of items you received. If a word violates the rules, give it a score of 1.
 
             OUTPUT FORMAT (STRICT JSON ONLY):
-            Template Example:[{"id": 1, "score": 10}, {"id": 2, "score": 1}, {"id": 3, "score": 8}]
-            - id: The integer number found at the start of the line.
-            - score: The validity likelihood (integer between 1 and 10).
-            No preamble, no words, no explanations.`;
+            Template Example:[{"id": 1, "score": 10, "is_root": true, "root": "መብላት"}, {"id": 2, "score": 8, "is_root": false, "root": "መብላት"}, {"id": 3, "score": 1, "is_root": false, "root": "N/A"}]
+            
+            STRICT FIELDS:
+            - id: The integer ID from the list.
+            - score: Likelihood (1-10).
+            - is_root: Boolean. True only if the word is the CITATION form (መነሻ ቃል). Usually the infinitive or the 3rd person masc singular perfective (e.g., 'ሰበረ' or 'መስበር').
+            - root: 
+               * If the word is a variation (e.g. 'ሰበሩ', 'በመስበር'), put the absolute root/base form here.
+               * If the word itself IS the root, put the word itself here.
+               * If the word is absolute garbage (Score 1), put "N/A".
+            
+            No preamble, no extra words.`;
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => {
@@ -183,6 +191,8 @@ async function runValidator() {
       const finalWords = finalValidatedList.map((item: any) => ({
         word: wordMap[item.id],
         confidence_score: item.score,
+        is_root: item.is_root ?? false,
+        ai_extracted_root: item.root || null,
         source_batch_file: currentFilePath,
         original_order_index: item.id
       })).filter((w: any) => w.word !== undefined && w.word !== null);
