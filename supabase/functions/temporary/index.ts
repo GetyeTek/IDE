@@ -10,17 +10,17 @@ Deno.serve(async (req) => {
   const TARGET_BATCH_SIZE = 25000; 
   const INTERNAL_FETCH_SIZE = 1000; 
   const CONCURRENCY_LIMIT = 40; 
-  const FOLDER = "lone_wolves";
+  const FOLDER = "small_families";
 
   try {
     const startTime = Date.now();
 
     // 1. Get Live Stats for Importance 6
-    const { data: statsData } = await supabase.rpc('get_stats_lw');
-    const grandTotal = Array.isArray(statsData) ? statsData[0].total_count : 47649;
+    const { data: statsData } = await supabase.rpc('get_stats_sf');
+    const grandTotal = Array.isArray(statsData) ? statsData[0].total_count : 47995;
 
     // 2. Get Checkpoint from the NEW table
-    const { data: checkpoint } = await supabase.from('export_checkpoint_lw').select('last_offset').eq('id', 1).single();
+    const { data: checkpoint } = await supabase.from('export_checkpoint_sf').select('last_offset').eq('id', 1).single();
     let currentOffset = checkpoint?.last_offset || 0;
 
     // 3. Parallel Fetch Loop
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
       const remainingToFetch = TARGET_BATCH_SIZE - allWords.length;
       const fetchSize = Math.min(INTERNAL_FETCH_SIZE, remainingToFetch);
 
-      const { data: chunk, error: fetchErr } = await supabase.rpc('get_lone_wolf_words', {
+      const { data: chunk, error: fetchErr } = await supabase.rpc('get_words_sf', {
         p_limit: fetchSize,
         p_offset: currentOffset + allWords.length
       });
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
       // Update the NEW checkpoint table
       const nextOffset = currentOffset + wordsInThisRun;
-      await supabase.from('export_checkpoint_lw').update({ last_offset: nextOffset }).eq('id', 1);
+      await supabase.from('export_checkpoint_sf').update({ last_offset: nextOffset }).eq('id', 1);
       currentOffset = nextOffset;
     }
 
