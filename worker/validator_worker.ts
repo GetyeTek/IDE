@@ -187,7 +187,7 @@ async function runValidator() {
 
       if (finalWords.length > 0) {
         console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Inserting ${finalWords.length} highly validated words to DB...`);
-        const { error: insErr } = await supabase.from('candidate_words_imp6').insert(finalWords);
+        const { error: insErr } = await supabase.from('candidate_words_lw').insert(finalWords);
         if (insErr) throw insErr;
         console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] DB Insert Complete.`);
       } else {
