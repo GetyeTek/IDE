@@ -89,6 +89,9 @@ async function runValidator() {
             - score: Likelihood (1-10).
             - is_root: Boolean. True only if the word is the CITATION form (መነሻ ቃል). Usually the infinitive or the 3rd person masc singular perfective (e.g., 'ሰበረ' or 'መስበር').
             - root: 
+               * ABSOLUTE ROOT PRINCIPLE: Always identify the most primary citation form. 
+                 - If a word is a negative derivation like 'አልመጣም' or 'አለመምጣት', DO NOT use 'አለመምጣት' as the root. The absolute root is 'መምጣት' (or 'መጣ').
+                 - Strip all prefixes (negative, conditional, prepositional) to find the 'ancestor' root.
                * If the word is a variation (e.g. 'ሰበሩ', 'በመስበር'), put the absolute root/base form here.
                * If the word itself IS the root, put the word itself here.
                * If the word is absolute garbage (Score 1), put "N/A".
