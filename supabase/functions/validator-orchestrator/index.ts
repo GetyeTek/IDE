@@ -23,14 +23,14 @@ Deno.serve(async (req) => {
       console.log(`[ORCHESTRATOR][${reqId}] Starting GET_WORK process for ${worker_id}...`);
 
       // 1. Sync Logic (Only run if table is strictly empty)
-      const { count: totalCount, error: countErr } = await supabase.from('validation_tracking_imp6').select('*', { count: 'exact', head: true });
+      const { count: totalCount, error: countErr } = await supabase.from('validation_tracking_lw').select('*', { count: 'exact', head: true });
       console.log(`[ORCHESTRATOR][${reqId}] Tracking Table Count: ${totalCount} | Count Error: ${countErr ? JSON.stringify(countErr) : 'None'}`);
 
       if (countErr) {
         console.error(`[ORCHESTRATOR][${reqId}][FATAL] Aborting sync to prevent lock-wiping due to count error:`, countErr);
       } else if (totalCount === 0) {
         console.log(`[ORCHESTRATOR][${reqId}] Table is empty. Initiating sync from inspection_bucket...`);
-        const { data: files, error: listErr } = await supabase.storage.from('inspection_bucket').list('imp_6', { limit: 1000 });
+        const { data: files, error: listErr } = await supabase.storage.from('inspection_bucket').list('lone_wolves', { limit: 1000 });
         
         if (listErr) {
           console.error(`[ORCHESTRATOR][${reqId}][ERROR] Storage list failed:`, listErr);
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
         if (filePaths.length > 0) {
           // CRITICAL FIX: ignoreDuplicates: true prevents overwriting locked files if a race condition occurs
           console.log(`[ORCHESTRATOR][${reqId}] Upserting files into tracking table...`);
-          const { error: upsertErr } = await supabase.from('validation_tracking_imp6').upsert(filePaths, { onConflict: 'file_path', ignoreDuplicates: true });
+          const { error: upsertErr } = await supabase.from('validation_tracking_lw').upsert(filePaths, { onConflict: 'file_path', ignoreDuplicates: true });
           if (upsertErr) {
             console.error(`[ORCHESTRATOR][${reqId}][ERROR] Sync Upsert failed:`, upsertErr);
           } else {
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
       // 2. Claim RPC
       console.log(`[ORCHESTRATOR][${reqId}] Executing claim_validation_batch RPC...`);
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('claim_validation_batch_imp6', { worker_id_param: worker_id });
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('claim_batch_lw', { worker_id_param: worker_id });
 
       if (rpcErr) {
         console.error(`[ORCHESTRATOR][${reqId}][ERROR] RPC Exception:`, rpcErr);
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     // ==========================================
     if (action === 'mark_done') {
       console.log(`[ORCHESTRATOR][${reqId}] Marking ${file_path} as completed...`);
-      const { error: updateErr } = await supabase.from('validation_tracking_imp6')
+      const { error: updateErr } = await supabase.from('validation_tracking_lw')
         .update({ status: 'completed', updated_at: new Date().toISOString() })
         .eq('file_path', file_path);
       
