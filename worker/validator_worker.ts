@@ -199,7 +199,12 @@ async function runValidator() {
 
       if (finalWords.length > 0) {
         console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Inserting ${finalWords.length} highly validated words to DB...`);
-        const { error: insErr } = await supabase.from('candidate_words_sf').insert(finalWords);
+        const { error: insErr } = await supabase.from('candidate_roots_orphan_rev').insert(finalWords.map(w => ({
+          root_word: w.word,
+          confidence_score: w.confidence_score,
+          is_legit_root: w.is_root,
+          source_batch_file: w.source_batch_file
+        })));
         if (insErr) throw insErr;
         console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] DB Insert Complete.`);
       } else {
