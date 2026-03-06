@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
     // ==========================================
     if (action === 'fail_work') {
       console.log(`[ORCHESTRATOR][${reqId}] Processing FAILURE for ${file_path}. Error provided: ${error}`);
-      const { data: current, error: getErr } = await supabase.from('validation_tracking_sf')
+      const { data: current, error: getErr } = await supabase.from('validation_tracking_orphan_rev')
         .select('retry_count')
         .eq('file_path', file_path)
         .single();
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
 
       console.log(`[ORCHESTRATOR][${reqId}] File ${file_path} is on retry ${newRetryCount}/5. Should Give Up: ${shouldGiveUp}`);
 
-      const { error: updateErr } = await supabase.from('validation_tracking_sf')
+      const { error: updateErr } = await supabase.from('validation_tracking_orphan_rev')
         .update({
           status: shouldGiveUp ? 'failed_permanently' : 'pending',
           worker_id: null,
