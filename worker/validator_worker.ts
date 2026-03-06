@@ -72,9 +72,11 @@ async function runValidator() {
             SCORING RULES (1-10):
             - Score 10: Perfect, pure, common Amharic word with legitimate roots (መነሻ ቃል).
             - Score 7-9: Highly likely to be a valid Amharic word.
-            - Score 4-6: Suspicious, uncommon, or heavily modified, but technically possible.
-            - Score 2-3: Highly unlikely to be a real word.
-            - Score 1: Absolute garbage. Use this for linguistic nonsense, OCR artifacts, invalid consonant clusters, or direct transliterations of foreign/English words (e.g., ቴክኖሎጂ, ኮምፒውተር, ኢንተርኔት).
+            - Score 4-6: Suspicious, uncommon, or heavily modified.
+            - Score 1-3: Low Likelihood, Garbage, or PROPER NOUNS.
+              * PROPER NOUN PENALTY: Score 1-3 for names of specific people, specific geographic locations (countries, cities), and specific organizations (e.g., 'ኢትዮጵያ', 'አዲስ አበባ', 'ዮሐንስ'). We want a general vocabulary, not a name directory.
+              * EXCEPTION: Genuine common nouns (animals like 'አንበሳ', plants, objects, and verbs) should stay highly scored (7-10).
+            - Score 1: Absolute garbage (linguistic nonsense, OCR artifacts, invalid consonant clusters) or direct transliterations of foreign/English words (e.g., ቴክኖሎጂ, ኮምፒውተር, ኢንተርኔት).
 
             CRITICAL DIRECTIVE:
             DO NOT REMOVE OR DISCARD ANY WORDS. You must return exactly the same number of items you received. If a word violates the rules, give it a score of 1.
