@@ -633,12 +633,10 @@
             </div>
 
             <div class="browser-toolbar">
-                <button class="icon-btn" style="padding:6px;" onclick="proxyBack()" title="Back">←</button>
-                <button class="icon-btn" style="padding:6px;" onclick="proxyForward()" title="Forward">→</button>
-                <button class="icon-btn" style="padding:6px;" onclick="bundleAndPreview(null)" title="Reset to Local App">🏠</button>
-                <button class="icon-btn" style="padding:6px;" onclick="navigateProxy(null, true)" title="Reload">↻</button>
-                <input type="text" id="browser-url" class="url-bar" placeholder="google.com" onkeydown="if(event.key==='Enter') navigateProxy()">
-                <button class="icon-btn" style="color:var(--prod)" onclick="navigateProxy()">Go</button>
+                <button class="icon-btn" style="padding:6px;" onclick="bundleAndPreview(null)" title="Local Preview">🏠 Local</button>
+                <div style="width: 1px; height: 20px; background: var(--border);"></div>
+                <input type="text" id="browser-url" class="url-bar" placeholder="https://username.github.io/repo/" onkeydown="if(event.key==='Enter') loadExternalUrl()">
+                <button class="icon-btn" style="color:var(--prod)" onclick="loadExternalUrl()">Load URL</button>
             </div>
 
             <div class="preview-container">
@@ -3150,49 +3148,30 @@ function addTerminalCard(data, options = {}) {
     }
 
     // --- BUNDLER & PREVIEW ---
-        let proxyHistory = [];
-    let proxyHistoryIndex = -1;
-
-    async function navigateProxy(forcedUrl = null, isReload = false) {
+    function loadExternalUrl(forcedUrl = null) {
         const input = document.getElementById('browser-url');
-        const url = forcedUrl || input.value.trim();
-        if(!url) return;
+        let url = forcedUrl || input.value.trim();
+        if (!url) return;
 
-        if (!isReload && url !== proxyHistory[proxyHistoryIndex]) {
-            proxyHistory = proxyHistory.slice(0, proxyHistoryIndex + 1);
-            proxyHistory.push(url);
-            proxyHistoryIndex++;
+        // Auto-prefix with https if protocol is missing
+        if (!/^https?:\/\//i.test(url)) {
+            url = 'https://' + url;
+            input.value = url;
         }
 
         const iframe = document.getElementById('preview-frame');
-        iframe.srcdoc = '<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Proxying ' + url + '...</div>';
-
-        try {
-            const res = await fetch(CONFIG.funcUrl, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'proxy_web', url: url })
-            });
-            const html = await res.text();
-            iframe.srcdoc = html;
-            document.getElementById('preview-url-display').innerText = 'Browsing: ' + url;
-            input.value = url;
-        } catch(e) {
-            iframe.srcdoc = '<div style="color:red; padding:20px;">Proxy Error: ' + e.message + '</div>';
+        const display = document.getElementById('preview-url-display');
+        
+        // Revoke any existing local blob URLs to free memory
+        if (window.PREVIEW_BLOB_URL) {
+            URL.revokeObjectURL(window.PREVIEW_BLOB_URL);
+            window.PREVIEW_BLOB_URL = null;
         }
-    }
 
-    function proxyBack() {
-        if (proxyHistoryIndex > 0) {
-            proxyHistoryIndex--;
-            navigateProxy(proxyHistory[proxyHistoryIndex], true);
-        }
-    }
-
-    function proxyForward() {
-        if (proxyHistoryIndex < proxyHistory.length - 1) {
-            proxyHistoryIndex++;
-            navigateProxy(proxyHistory[proxyHistoryIndex], true);
-        }
+        iframe.srcdoc = ''; // Clear srcdoc to allow src to take over
+        iframe.src = url;
+        display.innerText = 'External: ' + url;
+        console.log("[Preview] Loading external URL:", url);
     }
 
     async function bundleAndPreview(index) {
