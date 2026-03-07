@@ -626,6 +626,7 @@
             <div class="header" style="flex-shrink:0; margin-bottom:10px;">
                 Preview
                 <div class="flex-gap">
+                    <button class="icon-btn" onclick="refreshPreview()" title="Refresh Current View">↻ Refresh</button>
                     <button class="icon-btn" onclick="openInspector()" style="color:var(--ai-accent); border-color:var(--ai-accent);">📟 Inspector</button>
                     <button class="icon-btn" onclick="openPopOut()">↗ Pop-out</button>
                     <button class="icon-btn" onclick="toggleFullscreen(true)">Expand</button>
@@ -3174,6 +3175,17 @@ function addTerminalCard(data, options = {}) {
         
         display.innerText = 'External: ' + url;
         console.log("[Preview] Loading external URL:", url);
+    }
+
+    function refreshPreview() {
+        const iframe = document.getElementById('preview-frame');
+        // If src exists and is not a local blob/srcdoc placeholder, it's an external URL
+        if (iframe.hasAttribute('src') && iframe.src !== "") {
+            loadExternalUrl();
+        } else {
+            // Fallback to local bundler
+            bundleAndPreview(null);
+        }
     }
 
     async function bundleAndPreview(index) {
