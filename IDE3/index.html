@@ -807,6 +807,33 @@
         </div>
     </div>
 
+    <!-- RENAME MODAL -->
+    <div id="rename-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span class="viewer-title">Rename / Move File</span>
+            <div class="flex-gap">
+                <button class="btn btn-prod" style="width:auto; padding:6px 20px;" onclick="executeRename()">Apply Rename</button>
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeRenameModal()">Cancel</button>
+            </div>
+        </div>
+        <div style="padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 20px; overflow-y: auto;">
+            <div class="card" style="background: rgba(59, 130, 246, 0.05); border-color: var(--primary-dim);">
+                <label class="input-label">Current Path</label>
+                <div id="rn-old-path-display" style="font-family: 'JetBrains Mono'; font-size: 13px; color: var(--text-muted); word-break: break-all;"></div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">New Path / Name</label>
+                <input type="text" id="rn-new-path" class="input-field" placeholder="path/to/file.js">
+                <p style="font-size: 10px; color: #666; margin-top: 8px;">Moving a file to a new folder will automatically create the folder structure.</p>
+            </div>
+
+            <div id="rn-warning" style="display:none; padding: 12px; background: rgba(234, 179, 8, 0.1); border: 1px solid var(--dev); border-radius: 8px; font-size: 12px; color: var(--dev);">
+                ⚠️ <b>Heads up:</b> Renaming this file might break imports in other files. You'll be prompted to fix this with AI after applying.
+            </div>
+        </div>
+    </div>
+
     <!-- NEW FILE MODAL -->
     <div id="new-file-overlay" class="viewer-overlay">
         <div class="viewer-header">
@@ -3751,32 +3778,75 @@ function addTerminalCard(data, options = {}) {
     }
 
     // --- RENAME ---
-    async function openRenameModal(path) {
-        const newPath = prompt("Enter new path/name:", path);
-        if (!newPath || newPath === path) return;
-        
-        showGlobalToast("Preparing Rename...");
+    let currentRenamePath = "";
+
+    function openRenameModal(path) {
+        currentRenamePath = path;
+        document.getElementById('rn-old-path-display').innerText = path;
+        document.getElementById('rn-new-path').value = path;
+        document.getElementById('rename-overlay').classList.add('active');
+        document.getElementById('rn-warning').style.display = 'block';
+        toggleFab(false);
+    }
+
+    function closeRenameModal() {
+        document.getElementById('rename-overlay').classList.remove('active');
+        toggleFab(true);
+    }
+
+    async function executeRename() {
+        const newPath = document.getElementById('rn-new-path').value.trim();
+        if (!newPath || newPath === currentRenamePath) return closeRenameModal();
+
+        if (isPerformingAction) return;
+        isPerformingAction = true;
+        showGlobalToast("Preparing move...");
+
         try {
-            const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
+            // 1. Get current content
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'preview_file', file_path: currentRenamePath })
+            });
             const data = await res.json();
-            
+            if (!data.content) throw new Error("Could not read source file content");
+
             const ops = [
-                { action: 'comment', text: `Rename ${path} to ${newPath}` },
-                { action: 'delete_file', file_path: path },
-                { action: 'create_file', file_path: newPath, content: b64DecodeUnicode(data.content) }
+                { "action": "comment", "text": `[Rename] ${currentRenamePath} -> ${newPath}` },
+                { "action": "delete_file", "file_path": currentRenamePath },
+                { "action": "create_file", "file_path": newPath, "content": b64DecodeUnicode(data.content) }
             ];
-            
+
+            closeRenameModal();
+
+            // 2. Load into Patcher
             document.getElementById('json-input').value = JSON.stringify(ops, null, 2);
             saveState();
+            
+            // 3. Switch to Patcher
             switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
             
-            if (confirm("Ask AI to heal broken imports in other files?")) {
-                startNewChat();
-                toggleChat(true);
-                chatHistory.push({ role: 'user', text: `I renamed "${path}" to "${newPath}". Scan the repo and provide a JSON patch to update files that import this path.` });
-                processAIResponse();
-            }
-        } catch(e) { alert("Rename failed: " + e.message); }
+            showGlobalToast("Rename loaded. Review and Test Patch.");
+
+            // 4. Prompt for AI Healing
+            setTimeout(() => {
+                if (confirm("File moved! Shall I ask AI to scan and heal imports in other files?")) {
+                    startNewChat();
+                    toggleChat(true);
+                    chatHistory.push({ 
+                        role: 'user', 
+                        text: `I just renamed "${currentRenamePath}" to "${newPath}". Please scan my project and provide a JSON patch to update any other files that import this file.` 
+                    });
+                    processAIResponse();
+                }
+            }, 1000);
+
+        } catch (e) {
+            alert("Move failed: " + e.message);
+        } finally {
+            isPerformingAction = false;
+        }
     }
 
     async function saveCurrentChat() {
