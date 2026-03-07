@@ -2843,7 +2843,15 @@
             }
         }
 
-        if (actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.g. v1.0):") || "v1.0";
+        if (actionType === 'commit_prod') {
+            const vName = prompt("Version Name (e.g. v1.0):");
+            if (vName === null) {
+                isPerformingAction = false;
+                btns.forEach(b => { if(b) { b.disabled = false; b.style.opacity = '1'; } });
+                return;
+            }
+            payload.version_name = vName || "v1.0";
+        }
 
         const termId = addTerminalCard(null, { loading: true });
 
