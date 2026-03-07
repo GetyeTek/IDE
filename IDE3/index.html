@@ -606,9 +606,9 @@
                 <textarea id="json-input" class="json-editor" placeholder="[ { 'action': '...' } ]" spellcheck="false" oninput="saveState()"></textarea>
                 
                 <div class="flex-gap" style="margin-bottom: 12px;">
-                    <button class="btn btn-dev" style="flex: 1; font-size: 12px;" onclick="runPatch('patch')">🧪 Test Patch</button>
-                    <button class="btn btn-outline" style="flex: 1; font-size: 12px; border-color: var(--ai-accent); color: var(--ai-accent);" onclick="stageChanges()">⚡ Stage Changes</button>
-                    <button class="btn btn-prod" style="flex: 1.2; font-size: 12px;" onclick="runPatch('commit_prod')">🚀 Deploy to Main</button>
+                    <button id="btn-patch-test" class="btn btn-dev" style="flex: 1; font-size: 12px;" onclick="runPatch('patch')">🧪 Test Patch</button>
+                    <button id="btn-patch-stage" class="btn btn-outline" style="flex: 1; font-size: 12px; border-color: var(--ai-accent); color: var(--ai-accent);" onclick="stageChanges()">⚡ Stage Changes</button>
+                    <button id="btn-patch-prod" class="btn btn-prod" style="flex: 1.2; font-size: 12px;" onclick="runPatch('commit_prod')">🚀 Deploy to Main</button>
                 </div>
 
                 <div class="flex-between" style="margin-top:10px;">
@@ -1529,6 +1529,7 @@
     let chatHistory = []; 
     let logOffset = 0;
     let historyOffset = 0;
+    let isPerformingAction = false;
     let sqlHistory = [];
     let sqlHistoryIndex = -1;
     let workflowPage = 1;
@@ -2548,6 +2549,7 @@
     }
 
     async function sendChat() {
+        if (isPerformingAction) return;
         const input = document.getElementById('chat-input');
         const msg = input.value.trim();
         if(!msg) return;
@@ -2787,6 +2789,12 @@
     }
 
     async function runPatch(actionType) {
+        if (isPerformingAction) return;
+        isPerformingAction = true;
+        
+        const btns = ['btn-patch-test', 'btn-patch-stage', 'btn-patch-prod'].map(id => document.getElementById(id));
+        btns.forEach(b => { if(b) { b.disabled = true; b.style.opacity = '0.5'; } });
+
         FILE_OP_MAP = {}; 
         document.querySelectorAll('.op-row').forEach(el => {
             el.style.borderLeft = ''; el.style.backgroundColor = '';
@@ -2861,7 +2869,7 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
                     operations: payload, 
                     version_name: payload.version_name,
                     project_path: CONFIG.projectPath,
-                    auto_sanity: CONFIG.autoSanity // NEW: Send Sanity Flag
+                    auto_sanity: CONFIG.autoSanity
                 })
             });
             const data = await res.json();
@@ -2870,11 +2878,13 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
 
             if(data.success) {
                 if(actionType === 'patch') setTimeout(() => bundleAndPreview(null), 1500);
-                // Update history (keep term) AND update file list (in case of create/delete)
                 setTimeout(() => { fetchState(false, false); fetchFileList(); }, 1000);
             }
         } catch (e) {
             updateTerminalCard(termId, { error: e.message });
+        } finally {
+            isPerformingAction = false;
+            btns.forEach(b => { if(b) { b.disabled = false; b.style.opacity = '1'; } });
         }
     }
 
@@ -5435,6 +5445,7 @@ async function downloadArtifact(runId) {
     }
 
     async function executeCreateFile() {
+        if (isPerformingAction) return;
         const path = document.getElementById('nf-path').value.trim();
         const content = document.getElementById('nf-content').value;
 
@@ -6767,6 +6778,7 @@ async function downloadArtifact(runId) {
     }
 
     async function runSqlQuery() {
+        if (isPerformingAction) return;
         const sql = document.getElementById('sqlEditor').value;
         saveSqlState(); 
         const loader = document.getElementById('sqlLoader');
@@ -6780,11 +6792,7 @@ async function downloadArtifact(runId) {
 
         loader.classList.remove('hidden');
         copyBtn.classList.add('hidden');
-        dlBtn.classList.add('hidden');
-        statusDot.className = "w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse";
-        statusText.innerText = "Running...";
-
-        try {
+            isPerformingAction = true;
             const result = await callSqlEdgeFunction(sql);
             lastSqlResultData = {
                 data: result.data,
@@ -6796,6 +6804,16 @@ async function downloadArtifact(runId) {
             statusText.innerText = 'Success: ' + (result.count || result.data.length) + ' rows';
             statusDot.className = "w-1.5 h-1.5 rounded-full bg-green-500";
             
+            document.getElementById('sqlResultFilter').classList.remove('hidden');
+            document.getElementById('sqlResultFilter').value = '';
+            copyBtn.innerText = 'COPY CSV';
+            copyBtn.classList.remove('hidden');
+            dlBtn.classList.remove('hidden');
+        } catch (err) {
+            // error handling...
+        } finally {
+            isPerformingAction = false;
+        }
             document.getElementById('sqlResultFilter').classList.remove('hidden');
             document.getElementById('sqlResultFilter').value = '';
             copyBtn.innerText = 'COPY CSV';
