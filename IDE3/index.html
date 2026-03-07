@@ -554,7 +554,10 @@
         <div id="tab-context" class="tab-content active">
             <div class="header">
                 Context
-                <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px;" onclick="fetchFileList()">Refresh</button>
+                <div class="flex-gap">
+                    <button id="btn-context-copy" class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px; color:var(--ai-accent); border-color:var(--ai-accent);" onclick="copySelectedFiles()" title="Copy selected files to clipboard">📋 Copy</button>
+                    <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px;" onclick="fetchFileList()">Refresh</button>
+                </div>
             </div>
             <div class="card">
                 <div class="flex-gap" style="margin-bottom: 12px;">
@@ -5960,6 +5963,61 @@ async function downloadArtifact(runId) {
             }
         } catch (e) {
             updateTerminalCard(termId, { error: e.message });
+        }
+    }
+
+    async function copySelectedFiles() {
+        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
+        if (checked.length === 0) return showGlobalToast("No files selected", true);
+        
+        if (isPerformingAction) return;
+        isPerformingAction = true;
+
+        const btn = document.getElementById('btn-context-copy');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = "⏳ Fetching...";
+        
+        try {
+            const fetchedFiles = [];
+            const BATCH_SIZE = 8;
+            
+            for (let i = 0; i < checked.length; i += BATCH_SIZE) {
+                const batch = checked.slice(i, i + BATCH_SIZE);
+                showGlobalToast(`⚡ Copying: ${i + 1}-${Math.min(i + BATCH_SIZE, checked.length)} of ${checked.length}...`);
+
+                const batchResults = await Promise.all(batch.map(async (path) => {
+                    const res = await fetch(CONFIG.funcUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: apiBody({ action: 'preview_file', file_path: path })
+                    });
+                    const data = await res.json();
+                    if (!data.content) return null;
+                    return { path, content: b64DecodeUnicode(data.content) };
+                }));
+
+                fetchedFiles.push(...batchResults.filter(f => f !== null));
+            }
+
+            const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
+            await navigator.clipboard.writeText(text);
+            
+            btn.innerHTML = "✔ Copied!";
+            btn.style.color = "var(--prod)";
+            btn.style.borderColor = "var(--prod)";
+            showGlobalToast(`Successfully copied ${fetchedFiles.length} files`);
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.style.color = "";
+                btn.style.borderColor = "";
+            }, 2000);
+
+        } catch (e) {
+            showGlobalToast("Copy failed: " + e.message, true);
+            btn.innerHTML = originalHtml;
+        } finally {
+            isPerformingAction = false;
         }
     }
 
