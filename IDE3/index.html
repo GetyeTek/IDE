@@ -858,6 +858,8 @@
                 </div>
             </div>
             <div class="flex-gap">
+                <button id="viewer-save-btn" class="btn btn-prod" style="display:none; width:auto; padding:6px 12px; font-size:12px;" onclick="saveFileEdits()">Save Changes</button>
+                <button id="viewer-edit-btn" class="icon-btn" onclick="toggleEditMode()" title="Edit File">✎ Edit</button>
                 <button class="icon-btn" onclick="copyViewerContent(this)" title="Copy Content">📋</button>
                 <button class="icon-btn" id="ace-search-toggle" onclick="toggleAceSearch()">🔍</button>
                 <button class="btn-outline" style="width: auto; padding: 6px 14px;" onclick="closeFileViewer()">Close</button>
@@ -1576,6 +1578,8 @@
     window.BUILD_CACHE = {}; 
     let FILE_OP_MAP = {}; 
     let aceEditorInstance = null;
+    let originalViewerContent = "";
+    let currentViewerPath = "";
     let diffLeft = null;
     let diffRight = null;
 
@@ -4825,6 +4829,14 @@ async function downloadArtifact(runId) {
             aceEditorInstance.setReadOnly(true);
         }
 
+        // Reset Mode & State
+        currentViewerPath = path;
+        originalViewerContent = "";
+        aceEditorInstance.setReadOnly(true);
+        document.getElementById('viewer-edit-btn').style.color = '';
+        document.getElementById('viewer-edit-btn').innerText = '✎ Edit';
+        document.getElementById('viewer-save-btn').style.display = 'none';
+
         // Clear stale content immediately
         aceEditorInstance.setValue("Loading content...", -1);
         
@@ -4848,7 +4860,16 @@ async function downloadArtifact(runId) {
             else if (path.endsWith('.css')) mode = "ace/mode/css";
             
             aceEditorInstance.session.setMode(mode);
-            aceEditorInstance.setValue(b64DecodeUnicode(data.content), -1);
+            const content = b64DecodeUnicode(data.content);
+            originalViewerContent = content;
+            aceEditorInstance.setValue(content, -1);
+
+            // Listen for changes to show Save button
+            aceEditorInstance.session.on('change', () => {
+                const currentContent = aceEditorInstance.getValue();
+                const hasChanged = currentContent !== originalViewerContent;
+                document.getElementById('viewer-save-btn').style.display = hasChanged ? 'block' : 'none';
+            });
         } catch (e) {
             aceEditorInstance.setValue(e.message, -1);
         }
@@ -4874,6 +4895,60 @@ async function downloadArtifact(runId) {
                 btn.style.color = '';
             }, 1500);
         }).catch(err => alert("Copy failed: " + err));
+    }
+
+    function toggleEditMode() {
+        if (!aceEditorInstance) return;
+        const isReadOnly = aceEditorInstance.getReadOnly();
+        const btn = document.getElementById('viewer-edit-btn');
+        
+        if (isReadOnly) {
+            aceEditorInstance.setReadOnly(false);
+            btn.innerText = '👓 View Mode';
+            btn.style.color = 'var(--dev)';
+            showGlobalToast("Edit Mode Enabled");
+        } else {
+            aceEditorInstance.setReadOnly(true);
+            btn.innerText = '✎ Edit';
+            btn.style.color = '';
+        }
+    }
+
+    async function saveFileEdits() {
+        const newContent = aceEditorInstance.getValue();
+        if (newContent === originalViewerContent) return;
+
+        const saveBtn = document.getElementById('viewer-save-btn');
+        saveBtn.disabled = true;
+        saveBtn.innerText = "Saving...";
+
+        const ops = [
+            { "action": "comment", "text": `Manual edit: ${currentViewerPath}` },
+            { "action": "create_file", "file_path": currentViewerPath, "content": newContent }
+        ];
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'patch', operations: ops, project_path: CONFIG.projectPath })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                originalViewerContent = newContent;
+                saveBtn.style.display = 'none';
+                showGlobalToast("File updated successfully");
+                // Log to terminal via existing state fetch
+                fetchState(false, true);
+            } else {
+                throw new Error(data.error || "Save failed");
+            }
+        } catch (e) {
+            alert("Error saving file: " + e.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerText = "Save Changes";
+        }
     }
 
     function closeFileViewer() {
