@@ -1813,7 +1813,8 @@
 
     function apiBody(obj) {
         // INJECT AI CONFIG INTO EVERY REQUEST
-        return JSON.stringify({ ...obj, repo_name: CONFIG.repoName, ai_config: window.aiConfig });
+        // Default to CONFIG.repoName, but allow 'obj' to override it (crucial for Discovery)
+        return JSON.stringify({ repo_name: CONFIG.repoName, ai_config: window.aiConfig, ...obj });
     }
 
     function resolvePath(base, relative) {
@@ -4524,12 +4525,12 @@ async function downloadArtifact(runId) {
 
     async function scanRepoForFunctions(repoName, isDeep) {
         const list = document.getElementById('discovery-list');
-        document.getElementById('disc-title').innerText = `Scanning: ${repoName}`;
+        const targetRepo = repoName === 'current_deep' ? CONFIG.repoName : repoName;
+        
+        document.getElementById('disc-title').innerText = `Scanning: ${targetRepo}`;
         list.innerHTML = '<div style="padding:20px; text-align:center;">Scanning file tree...</div>';
 
         try {
-            // Fetch tree for specific repo (or current)
-            const targetRepo = repoName === 'current_deep' ? CONFIG.repoName : repoName;
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: apiBody({ action: 'fetch', repo_name: targetRepo })
