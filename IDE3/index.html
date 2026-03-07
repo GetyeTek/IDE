@@ -6742,8 +6742,8 @@ async function downloadArtifact(runId) {
                     
                     let newQuery = "";
                     if (!isActive) {
-                        // First Tap: Append Table Structure Query
-                        newQuery = `-- Table Structure for ${row.table_name}\nSELECT column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;`;
+                        // First Tap: Append Table Structure Query (including table_name for row identification)
+                        newQuery = `-- Table Structure for ${row.table_name}\nSELECT table_name, column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;`;
                     } else {
                         // Second Tap: Append Table Data Query
                         newQuery = `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
