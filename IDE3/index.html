@@ -6733,16 +6733,26 @@ async function downloadArtifact(runId) {
                 btn.innerText = row.table_name;
                 btn.onclick = () => {
                     const isActive = btn.classList.contains('active');
+                    const editor = document.getElementById('sqlEditor');
+                    const currentVal = editor.value.trim();
+                    const separator = currentVal ? '\n\n' : '';
+                    
                     document.querySelectorAll('.table-pill').forEach(p => p.classList.remove('active'));
                     btn.classList.add('active');
                     
+                    let newQuery = "";
                     if (!isActive) {
-                        // First Tap: Fetch Table Structure
-                        document.getElementById('sqlEditor').value = `-- Table Structure for ${row.table_name}\nSELECT column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;`;
+                        // First Tap: Append Table Structure Query
+                        newQuery = `-- Table Structure for ${row.table_name}\nSELECT column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;`;
                     } else {
-                        // Second Tap: Fetch Table Data
-                        document.getElementById('sqlEditor').value = `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
+                        // Second Tap: Append Table Data Query
+                        newQuery = `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
                     }
+
+                    editor.value = currentVal + separator + newQuery;
+                    editor.focus();
+                    editor.scrollTop = editor.scrollHeight;
+                    saveSqlState();
                 };
                 container.appendChild(btn);
             });
