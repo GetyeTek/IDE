@@ -2521,13 +2521,16 @@
             });
             const data = await res.json();
             
-            if(data.history) { 
-                const validHistory = data.history.filter(h => h.type !== 'Chat');
-                if (isAppend) dbHistory = dbHistory.concat(validHistory);
-                else dbHistory = validHistory;
-                applyFiltersToHistory();
-                if (validHistory.length < 10) document.getElementById('load-more-history-btn').style.display = 'none';
-                else document.getElementById('load-more-history-btn').style.display = 'block';
+            const validHistory = (data.history || []).filter(h => h.type !== 'Chat');
+            if (isAppend) dbHistory = dbHistory.concat(validHistory);
+            else dbHistory = validHistory;
+            
+            applyFiltersToHistory();
+            
+            const historyBtn = document.getElementById('load-more-history-btn');
+            if (historyBtn) {
+                if (validHistory.length < 10) historyBtn.style.display = 'none';
+                else historyBtn.style.display = 'block';
             }
 
             if (updateTerminal) {
@@ -2553,7 +2556,11 @@
                     document.getElementById('load-more-logs-btn').style.display = 'none';
                 }
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            document.getElementById('history-container').innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);">Failed to sync history: ${e.message}</div>`;
+            if (updateTerminal) document.getElementById('terminal-list').innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);">Log Sync Error.</div>`;
+        }
     }
 
     function resetHistoryAndSync() {
