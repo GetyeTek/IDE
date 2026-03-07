@@ -2981,14 +2981,22 @@
             </div>
             <div class="log-body open" id="${termId}-body">${logHtml}</div>`;
     }
-function addTerminalCard(data, options = {}) {
+    function addTerminalCard(data, options = {}) {
         const container = document.getElementById('terminal-list');
         const id = 'term-' + Date.now();
         const div = document.createElement('div');
         div.id = id; div.className = 'log-entry';
         
-        if(options.loading) div.innerHTML = `<div class="log-header"><span>Processing...</span></div>`;
-        else if (options.error) div.innerHTML = `<div class="log-header" style="color:var(--danger)"><span>Error</span></div><div class="log-body open" style="padding:12px; color:var(--danger); font-size:11px; overflow-wrap:anywhere;">${escapeHtml(options.error)}</div>`;
+        if(options.loading) {
+            div.innerHTML = `<div class="log-header"><span>Processing...</span></div>`;
+        } else if (options.error) {
+            div.innerHTML = `
+                <div class="log-header" style="color:var(--danger)">
+                    <div class="log-meta"><span>Error</span></div>
+                    <button class="icon-btn" style="padding:4px 8px; font-size:10px;" onclick="copyText(this.parentElement.nextElementSibling.innerText)">Copy</button>
+                </div>
+                <div class="log-body open" style="padding:12px; color:var(--danger); font-size:11px; overflow-wrap:anywhere; background:rgba(239, 68, 68, 0.05);">${escapeHtml(options.error)}</div>`;
+        }
         
         container.prepend(div);
         return id;
@@ -3027,7 +3035,15 @@ function addTerminalCard(data, options = {}) {
         }
 
         if(response.error) {
-            el.innerHTML = `<div class="log-header" style="color:var(--danger)"><span>API Error</span><span class="status-pill pill-fail">500</span></div><div class="log-body open" style="padding:12px; color:var(--danger); font-size:11px; overflow-wrap:anywhere;">${escapeHtml(response.error)}</div>`;
+            el.innerHTML = `
+                <div class="log-header" style="color:var(--danger)">
+                    <div class="log-meta">
+                        <span class="status-pill pill-fail">${response.status || '500'}</span>
+                        <span>API Error</span>
+                    </div>
+                    <button class="icon-btn" style="padding:4px 8px; font-size:10px;" onclick="copyText(this.parentElement.nextElementSibling.innerText)">Copy Error</button>
+                </div>
+                <div class="log-body open" style="padding:12px; color:var(--danger); font-size:11px; overflow-wrap:anywhere; background:rgba(239, 68, 68, 0.05);">${escapeHtml(response.error)}</div>`;
             return;
         }
 
