@@ -644,7 +644,7 @@
             <div class="preview-container">
                 <iframe src="" id="preview-frame" sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-same-origin allow-scripts"></iframe>
             </div>
-            <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px; flex-shrink:0;">Conduit Proxy Environment</p>
+            <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px; flex-shrink:0;">Conduit Web Environment</p>
         </div>
 
         <!-- HISTORY TAB -->
@@ -2788,7 +2788,7 @@
         }
     }
 
-    async function runPatch(actionType) {
+        async function runPatch(actionType) {
         if (isPerformingAction) return;
         isPerformingAction = true;
         
@@ -2803,65 +2803,41 @@
         let inputVal = document.getElementById('json-input').value;
         let payload = {};
         
-        // --- SMART JSON PARSER ---
-        if (actionType === 'patch') {
+        if (actionType === 'patch' || actionType === 'commit_prod') {
             try {
                 const parsed = smartJSONParse(inputVal);
                 payload = parsed.operations || parsed;
-                // Update ref in case smartParse fixed it
-                inputVal = document.getElementById('json-input').value; 
             } catch(e) {
                 const errorMsg = `JSON PARSE ERROR:\n${e.message}`;
                 const errId = addTerminalCard(null, { error: errorMsg });
-                document.getElementById(errId).scrollIntoView({ behavior: 'smooth' });
+                isPerformingAction = false;
+                btns.forEach(b => { if(b) { b.disabled = false; b.style.opacity = '1'; } });
                 return; 
             }
         }
 
-if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.g. v1.0):") || "v1.0";
-
-        if (Array.isArray(payload)) {
-            for (let op of payload) {
-                // Normalize path to prevent double-prefixing
-                if (op.file_path) op.file_path = op.file_path.replace(/\\/g, '/').replace(/\/\//g, '/');
-
-                if (op.file_path === 'index.ts' && CONFIG.efDeploymentMode === 'default') {
-                    const resolved = await resolveEdgeFunctionPath(op.file_path);
-                    
-                    // ABORT if user cancelled the resolution prompt
-                    if (!resolved) {
-                        document.getElementById(termId).remove(); // Cleanup loading card
-                        alert("Operation Cancelled");
-                        return;
-                    }
-
-                    op.file_path = resolved;
-                    op.is_resolved_ef = true;
-                }
-                
-                // Prevent prefixing if it's already an EF resolution OR if the path explicitly targets supabase/functions/
-                const isEfPath = op.is_resolved_ef || (op.file_path && op.file_path.startsWith('supabase/functions/'));
-                
-                if (CONFIG.projectPath && op.file_path && !isEfPath) {
-                    // Remove any leading slashes and whitespace
-                    let cleanPath = op.file_path.trim().replace(/^\/+/, '');
-                    
-                    // Use a more robust check to see if the path is already prefixed
-                    const isAlreadyPrefixed = cleanPath.startsWith(CONFIG.projectPath) || 
-                                           cleanPath.startsWith('/' + CONFIG.projectPath);
-
-                    if (!isAlreadyPrefixed) {
-                        op.file_path = CONFIG.projectPath + cleanPath;
-                    } else {
-                        op.file_path = cleanPath;
-                    }
-                }
-            }
-        }
+        if (actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.g. v1.0):") || "v1.0";
 
         const termId = addTerminalCard(null, { loading: true });
 
         try {
+            if (Array.isArray(payload)) {
+                for (let op of payload) {
+                    if (op.file_path) op.file_path = op.file_path.replace(/\\/g, '/').replace(/\/\//g, '/');
+                    if (op.file_path === 'index.ts' && CONFIG.efDeploymentMode === 'default') {
+                        const resolved = await resolveEdgeFunctionPath(op.file_path);
+                        if (!resolved) throw new Error("Operation Cancelled");
+                        op.file_path = resolved;
+                        op.is_resolved_ef = true;
+                    }
+                    const isEfPath = op.is_resolved_ef || (op.file_path && op.file_path.startsWith('supabase/functions/'));
+                    if (CONFIG.projectPath && op.file_path && !isEfPath) {
+                        let cleanPath = op.file_path.trim().replace(/^\/+/, '');
+                        if (!cleanPath.startsWith(CONFIG.projectPath)) op.file_path = CONFIG.projectPath + cleanPath;
+                    }
+                }
+            }
+
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: apiBody({ 
@@ -2873,8 +2849,7 @@ if(actionType === 'commit_prod') payload.version_name = prompt("Version Name (e.
                 })
             });
             const data = await res.json();
-            
-            updateTerminalCard(termId, data, payload, true); 
+            updateTerminalCard(termId, data, payload, true);
 
             if(data.success) {
                 if(actionType === 'patch') setTimeout(() => bundleAndPreview(null), 1500);
@@ -6780,6 +6755,8 @@ async function downloadArtifact(runId) {
     async function runSqlQuery() {
         if (isPerformingAction) return;
         const sql = document.getElementById('sqlEditor').value;
+        if (!sql.trim()) return;
+
         saveSqlState(); 
         const loader = document.getElementById('sqlLoader');
         const output = document.getElementById('sqlResultOutput');
@@ -6787,12 +6764,18 @@ async function downloadArtifact(runId) {
         const statusDot = document.getElementById('sqlStatusDot');
         const copyBtn = document.getElementById('sqlCopyBtn');
         const dlBtn = document.getElementById('sqlDownloadBtn');
-        
-        if (!sql.trim()) return;
+        const filterInput = document.getElementById('sqlResultFilter');
 
         loader.classList.remove('hidden');
         copyBtn.classList.add('hidden');
-            isPerformingAction = true;
+        dlBtn.classList.add('hidden');
+        if(filterInput) filterInput.classList.add('hidden');
+        
+        isPerformingAction = true;
+        statusDot.className = "w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse";
+        statusText.innerText = "Running...";
+
+        try {
             const result = await callSqlEdgeFunction(sql);
             lastSqlResultData = {
                 data: result.data,
@@ -6804,31 +6787,22 @@ async function downloadArtifact(runId) {
             statusText.innerText = 'Success: ' + (result.count || result.data.length) + ' rows';
             statusDot.className = "w-1.5 h-1.5 rounded-full bg-green-500";
             
-            document.getElementById('sqlResultFilter').classList.remove('hidden');
-            document.getElementById('sqlResultFilter').value = '';
-            copyBtn.innerText = 'COPY CSV';
-            copyBtn.classList.remove('hidden');
-            dlBtn.classList.remove('hidden');
-        } catch (err) {
-            // error handling...
-        } finally {
-            isPerformingAction = false;
-        }
-            document.getElementById('sqlResultFilter').classList.remove('hidden');
-            document.getElementById('sqlResultFilter').value = '';
+            if(filterInput) {
+                filterInput.classList.remove('hidden');
+                filterInput.value = '';
+            }
             copyBtn.innerText = 'COPY CSV';
             copyBtn.classList.remove('hidden');
             dlBtn.classList.remove('hidden');
         } catch (err) {
             lastSqlResultData = { isError: true, message: err.message };
-            output.innerHTML = '<div class="p-6 bg-red-500/5 text-red-400 m-4 rounded-xl border border-red-500/20 font-mono text-xs"><p class="font-bold mb-1 uppercase">[Error]</p>' + err.message + '</div>';
+            output.innerHTML = `<div class="p-6 bg-red-500/5 text-red-400 m-4 rounded-xl border border-red-500/20 font-mono text-xs"><p class="font-bold mb-1 uppercase">[Error]</p>${err.message}</div>`;
             statusText.innerText = "Query Failed";
             statusDot.className = "w-1.5 h-1.5 rounded-full bg-red-500";
-            
-            // Allow copying the error message
             copyBtn.innerText = 'COPY ERROR';
             copyBtn.classList.remove('hidden');
         } finally {
+            isPerformingAction = false;
             loader.classList.add('hidden');
         }
     }
