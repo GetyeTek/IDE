@@ -4750,7 +4750,18 @@ async function downloadArtifact(runId) {
         files.forEach(file => {
             const div = document.createElement('div');
             div.className = 'file-item';
-            const fileName = file.path.split('/').pop();
+            
+            let fileName = file.path.split('/').pop();
+            // Intelligence: If it's an Edge Function entry, show the function name instead of index.ts
+            if (file.path.includes('supabase/functions/') && fileName === 'index.ts') {
+                const segments = file.path.split('/');
+                // Expected path: supabase/functions/{NAME}/index.ts
+                if (segments.length >= 2) {
+                    const functionName = segments[segments.length - 2];
+                    fileName = `λ ${functionName}`;
+                }
+            }
+
             const fileSize = formatBytes(file.size);
             const updated = timeAgo(file.last_updated);
 
