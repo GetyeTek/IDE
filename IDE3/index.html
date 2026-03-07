@@ -3221,7 +3221,6 @@
             <div class="log-header" onclick="toggleLogBody('${id}')">
                 <div class="log-meta">
                     ${signatureHtml}
-                    <button class="menu-btn favorite-btn" onclick="event.stopPropagation(); toggleFavorite('${id}', 'Patch', {title: '${patchTitle}', sha: '${response.sha || ''}'})" style="padding:0 5px; color:#555;">★</button>
                     <span class="log-time">${new Date().toLocaleTimeString()}</span>
                     ${hasAI ? '<span class="status-pill" style="background:rgba(217,70,239,0.2); color:#d946ef; margin-right:4px;">✨ AI</span>' : ''}
                     <span class="status-pill ${isFail ? 'pill-fail' : (isEvent ? 'pill-event' : 'pill-success')}" 
@@ -3230,7 +3229,8 @@
                     </span>
                     ${isEvent ? `<span style="font-size:11px; color:#666; margin-left:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px;">${escapeHtml(response.message)}</span>` : ''}
                 </div>
-                <div class="flex-gap" style="position: relative;">
+                <div class="flex-gap" style="position: relative; align-items: center;">
+                    <button class="menu-btn favorite-btn" onclick="event.stopPropagation(); toggleFavorite('${id}', 'Patch', {title: '${patchTitle}', sha: '${response.sha || ''}'})" style="padding:0 4px; color:#555; font-size:16px;">★</button>
                     <div style="cursor:pointer; padding: 4px; display: flex; align-items: center;" onclick="toggleLogBody('${id}')">
                         <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"></path></svg>
                     </div>
