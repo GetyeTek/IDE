@@ -6764,7 +6764,7 @@ async function downloadArtifact(runId) {
 
     async function runSqlQuery() {
         const sql = document.getElementById('sqlEditor').value;
-        saveSqlState(); // Ensure the current state is committed to history before running
+        saveSqlState(); 
         const loader = document.getElementById('sqlLoader');
         const output = document.getElementById('sqlResultOutput');
         const statusText = document.getElementById('sqlStatusText');
@@ -6782,7 +6782,12 @@ async function downloadArtifact(runId) {
 
         try {
             const result = await callSqlEdgeFunction(sql);
-            lastSqlResultData = result.data;
+            // Store data and the SQL used to generate it for metadata extraction
+            lastSqlResultData = {
+                data: result.data,
+                sql: sql,
+                count: result.count
+            };
             renderSqlResultTable(result.data);
             
             statusText.innerText = 'Success: ' + (result.count || result.data.length) + ' rows';
@@ -6969,18 +6974,34 @@ async function downloadArtifact(runId) {
         navigator.clipboard.writeText(logText).then(() => showGlobalToast("Log copied to clipboard"));
     }
 
-    function convertToCSV(data) {
-        if (!data || !data.length) return '';
+    function extractTableNames(sql) {
+        if (!sql) return [];
+        // Matches FROM or JOIN followed by table names, ignoring schemas
+        const regex = /(?:FROM|JOIN)\s+(?:(?:"?\w+"?\.)?"?(\w+)"?)/gi;
+        const tables = [];
+        let match;
+        while ((match = regex.exec(sql)) !== null) {
+            if (match[1] && !tables.includes(match[1])) tables.push(match[1]);
+        }
+        return tables;
+    }
+
+    function convertToCSV(resultObj) {
+        const data = resultObj.data || [];
+        if (!data.length) return '';
+        
+        const tables = extractTableNames(resultObj.sql);
+        const metaHeader = tables.length > 0 ? `# Source Tables: ${tables.join(', ')}\n# Export Date: ${new Date().toISOString()}\n` : '';
+
         const headers = Object.keys(data[0]);
         const rows = data.map(row => 
             headers.map(header => {
                 let cell = row[header] === null || row[header] === undefined ? '' : row[header];
                 if (typeof cell === 'object') cell = JSON.stringify(cell);
-                // Escape quotes and wrap in quotes
                 return '"' + String(cell).replace(/"/g, '""') + '"';
             }).join(',')
         );
-        return [headers.join(','), ...rows].join('\n');
+        return metaHeader + [headers.join(','), ...rows].join('\n');
     }
 
     function copySqlResults() {
@@ -7242,9 +7263,12 @@ async function downloadArtifact(runId) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const tables = extractTableNames(lastSqlResultData.sql);
+        const tableSlug = tables.length > 0 ? tables.join('_').substring(0, 30) + '_' : '';
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 10);
+        
         link.setAttribute('href', url);
-        link.setAttribute('download', 'query_export_' + timestamp + '.csv');
+        link.setAttribute('download', `${tableSlug}export_${timestamp}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
