@@ -68,9 +68,11 @@
         /* MAIN VIEW LAYOUT */
         .main-view {
             flex: 1; overflow-y: auto; padding: 20px;
+            padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
             padding-bottom: calc(var(--nav-height) + 40px);
             scrollbar-width: none;
             scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
         }
         /* Safe space for the bottom navigation and FAB */
         .bottom-spacer {
@@ -1650,7 +1652,19 @@
 
     // --- INIT ---
     window.onload = async () => {
-        if (window.IS_CONDUIT_PREVIEW) return; // Recursion Guard
+        if (window.IS_CONDUIT_PREVIEW) return;
+        
+        // Disable automatic scroll restoration
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+        
+        // Force scroll reset
+        const mv = document.querySelector('.main-view');
+        if (mv) mv.scrollTop = 0;
+        
+        // Ensure we aren't stuck in fullscreen mode on reload
+        document.body.classList.remove('fs-mode');
 
         // Auto-resize for chat textarea
         const ci = document.getElementById('chat-input');
