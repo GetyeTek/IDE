@@ -7537,7 +7537,7 @@ async function downloadArtifact(runId) {
     }
 
     function transitionToSql(sql) {
-        closeKeyTester();
+        closeKeyManager();
         setTimeout(() => {
             openSQLExecutor();
             const editor = document.getElementById('sqlEditor');
