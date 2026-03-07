@@ -5479,18 +5479,36 @@ async function downloadArtifact(runId) {
     }
 
     async function deleteHistory(index) {
-        if (confirm("Delete entry?")) {
+        const target = dbHistory[index];
+        const previous = dbHistory[index + 1];
+
+        let msg = `Delete this record?`;
+        if (previous && previous.sha) {
+            msg += `\n\n⚠️ This will also ROLLBACK your code on GitHub to the previous state: "${previous.title}" (${previous.sha.substring(0,7)})`;
+        }
+
+        if (confirm(msg)) {
+            showGlobalToast("Processing Deletion & Rollback...");
+            
+            // 1. If a previous state exists, rollback GitHub first
+            if (previous && previous.sha) {
+                try {
+                    await fetch(CONFIG.funcUrl, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: apiBody({ action: 'rollback', ref_sha: previous.sha })
+                    });
+                } catch (e) { console.error("Rollback failed during deletion", e); }
+            }
+
+            // 2. Delete the record from DB
             await fetch(CONFIG.funcUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: apiBody({
-                    action: 'delete_history',
-                    id: dbHistory[index].id
-                })
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'delete_history', id: target.id })
             });
+
             fetchState(true);
+            fetchFileList();
+            if (previous) setTimeout(() => bundleAndPreview(index + 1), 1000);
         }
     }
 
@@ -6434,19 +6452,57 @@ async function downloadArtifact(runId) {
         modal.style.display = 'flex';
     }
 
-    function deleteSelectedHistory() {
-        const checked = Array.from(document.querySelectorAll('.history-check:checked'));
-        if (!checked.length || !confirm(`Delete ${checked.length} entries?`)) return;
-        Promise.all(checked.map(c => fetch(CONFIG.funcUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: apiBody({
-                action: 'delete_history',
-                id: c.value
+    async function deleteSelectedHistory() {
+        const checkboxes = Array.from(document.querySelectorAll('.history-check:checked'));
+        if (!checkboxes.length) return;
+
+        const idsToDelete = checkboxes.map(cb => cb.value);
+        
+        // Find the oldest record among the selection to determine rollback target
+        // dbHistory is sorted newest -> oldest
+        let oldestSelectedIndex = -1;
+        checkboxes.forEach(cb => {
+            const idx = dbHistory.findIndex(h => String(h.id) === String(cb.value));
+            if (idx > oldestSelectedIndex) oldestSelectedIndex = idx;
+        });
+
+        // The target is the first record older than our selection that isn't also being deleted
+        let rollbackTarget = null;
+        for (let i = oldestSelectedIndex + 1; i < dbHistory.length; i++) {
+            if (!idsToDelete.includes(String(dbHistory[i].id))) {
+                rollbackTarget = dbHistory[i];
+                break;
+            }
+        }
+
+        let msg = `Delete ${checkboxes.length} selected records?`;
+        if (rollbackTarget) {
+            msg += `\n\n⚠️ This will ROLLBACK your GitHub repository to: "${rollbackTarget.title}"`;
+        }
+
+        if (!confirm(msg)) return;
+
+        showGlobalToast("Batch Deleting & Rolling back...");
+
+        // 1. Perform Rollback
+        if (rollbackTarget) {
+            await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'rollback', ref_sha: rollbackTarget.sha })
+            });
+        }
+
+        // 2. Perform Batch Deletion
+        await Promise.all(idsToDelete.map(id => 
+            fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'delete_history', id: id })
             })
-        }))).then(() => fetchState(true));
+        ));
+
+        fetchState(true);
+        fetchFileList();
+        if (rollbackTarget) setTimeout(() => bundleAndPreview(null), 1000);
     }
 
     function toggleDeleteFab() {
