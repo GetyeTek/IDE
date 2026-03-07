@@ -312,10 +312,10 @@
         }
         .viewer-overlay.active { transform: translateX(0); }
         .viewer-header {
-            height: 60px; border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: flex-start;
-            gap: 16px; padding: 0 16px; background: var(--card-bg); flex-shrink: 0;
-            overflow-x: auto; white-space: nowrap; scrollbar-width: none; -ms-overflow-style: none;
+            min-height: 60px; height: auto; padding: 10px 16px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; background: var(--card-bg); flex-shrink: 0;
+            overflow-x: auto; scrollbar-width: none;
             -webkit-overflow-scrolling: touch;
         }
         .viewer-header::-webkit-scrollbar { display: none; }
@@ -388,11 +388,26 @@
         .diff-remove { background: rgba(239, 68, 68, 0.1); border-left: 2px solid var(--danger); color: #fca5a5; }
         .diff-add { background: rgba(34, 197, 94, 0.1); border-left: 2px solid var(--prod); color: #86efac; }
 
-        /* Custom Diff Markers */
-        /* Enhanced Ace Diff Markers */
-        .marker-remove { position: absolute; background: rgba(239, 68, 68, 0.25); border-left: 3px solid var(--danger); z-index: 20; }
-        .marker-add { position: absolute; background: rgba(34, 197, 94, 0.25); border-left: 3px solid var(--prod); z-index: 20; }
-
+        /* MOBILE RESPONSIVE STACKS */
+        @media (max-width: 600px) {
+            #diff-viewer > div[style*="flex:1; display:flex"] {
+                flex-direction: column !important;
+            }
+            #diff-left, #diff-right {
+                height: 50% !important;
+                border-right: none !important;
+                border-bottom: 1px solid #333;
+            }
+            .log-header {
+                flex-wrap: wrap !important;
+                height: auto !important;
+                gap: 10px !important;
+            }
+            .log-meta {
+                flex-wrap: wrap !important;
+                width: 100% !important;
+            }
+        }
         /* ============================ */
         /*      NEW AI CHAT STYLES      */
         /* ============================ */
@@ -7011,8 +7026,9 @@ async function downloadArtifact(runId) {
             return;
         }
         const cols = Object.keys(data[0]);
-        let html = '<div class="overflow-auto h-full"><table id="sqlGridTable" class="w-full text-left border-collapse">';
-        html += '<thead class="sticky top-0 z-10 bg-[#0a0a0a]"><tr>';
+        // Container uses 'overflow: auto' for horizontal, and table uses 'sticky' for the header row
+        let html = '<div class="overflow-auto h-full" style="-webkit-overflow-scrolling: touch;"><table id="sqlGridTable" class="w-full text-left border-separate border-spacing-0">';
+        html += '<thead style="position: sticky; top: 0; z-index: 10; background: #0a0a0a;"><tr>';
         cols.forEach(c => {
             html += '<th class="p-3 border-b border-white/10 text-[9px] font-black uppercase text-blue-500 tracking-tighter">' + escapeHtml(c) + '</th>';
         });
