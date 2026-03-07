@@ -6633,13 +6633,31 @@ async function downloadArtifact(runId) {
         document.getElementById('sql-executor-overlay').classList.add('active');
         toggleFab(false);
         
-        const savedSql = localStorage.getItem('conduit_sql_autosave');
-        if(savedSql) {
-            document.getElementById('sqlEditor').value = savedSql;
-            if (sqlHistory.length === 0) {
-                sqlHistory.push(savedSql);
-                sqlHistoryIndex = 0;
+        // Restore persistent history
+        try {
+            const savedHistory = localStorage.getItem('conduit_sql_history');
+            const savedIndex = localStorage.getItem('conduit_sql_index');
+            
+            if (savedHistory) {
+                sqlHistory = JSON.parse(savedHistory);
+                sqlHistoryIndex = parseInt(savedIndex) || 0;
+                
+                if (sqlHistory.length > 0) {
+                    document.getElementById('sqlEditor').value = sqlHistory[sqlHistoryIndex];
+                }
+            } else {
+                // Legacy fallback or clean start
+                const legacySql = localStorage.getItem('conduit_sql_autosave');
+                if (legacySql) {
+                    document.getElementById('sqlEditor').value = legacySql;
+                    sqlHistory = [legacySql];
+                    sqlHistoryIndex = 0;
+                }
             }
+        } catch (e) {
+            console.error("Failed to restore SQL history", e);
+            sqlHistory = [];
+            sqlHistoryIndex = -1;
         }
 
         fetchSqlSchema();
@@ -6647,19 +6665,34 @@ async function downloadArtifact(runId) {
 
     function saveSqlState() {
         const val = document.getElementById('sqlEditor').value;
-        localStorage.setItem('conduit_sql_autosave', val);
+        if (!val.trim() && sqlHistory.length === 0) return;
+
         if (sqlHistoryIndex === -1 || sqlHistory[sqlHistoryIndex] !== val) {
+            // If we are editing in the middle of history, clear forward history (standard undo/redo behavior)
             sqlHistory = sqlHistory.slice(0, sqlHistoryIndex + 1);
             sqlHistory.push(val);
             sqlHistoryIndex++;
+
+            // Cap history at 50 items to keep localStorage clean
+            if (sqlHistory.length > 50) {
+                sqlHistory.shift();
+                sqlHistoryIndex--;
+            }
+
+            persistSqlHistory();
         }
+    }
+
+    function persistSqlHistory() {
+        localStorage.setItem('conduit_sql_history', JSON.stringify(sqlHistory));
+        localStorage.setItem('conduit_sql_index', sqlHistoryIndex.toString());
     }
 
     function undoSql() {
         if (sqlHistoryIndex > 0) {
             sqlHistoryIndex--;
             document.getElementById('sqlEditor').value = sqlHistory[sqlHistoryIndex];
-            localStorage.setItem('conduit_sql_autosave', sqlHistory[sqlHistoryIndex]);
+            persistSqlHistory();
         }
     }
 
@@ -6667,7 +6700,7 @@ async function downloadArtifact(runId) {
         if (sqlHistoryIndex < sqlHistory.length - 1) {
             sqlHistoryIndex++;
             document.getElementById('sqlEditor').value = sqlHistory[sqlHistoryIndex];
-            localStorage.setItem('conduit_sql_autosave', sqlHistory[sqlHistoryIndex]);
+            persistSqlHistory();
         }
     }
 
@@ -6721,6 +6754,7 @@ async function downloadArtifact(runId) {
 
     async function runSqlQuery() {
         const sql = document.getElementById('sqlEditor').value;
+        saveSqlState(); // Ensure the current state is committed to history before running
         const loader = document.getElementById('sqlLoader');
         const output = document.getElementById('sqlResultOutput');
         const statusText = document.getElementById('sqlStatusText');
