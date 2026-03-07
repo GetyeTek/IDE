@@ -558,9 +558,10 @@
             </div>
             <div class="card">
                 <div class="flex-gap" style="margin-bottom: 12px;">
-                    <button class="btn btn-primary" style="flex:1" onclick="handleBriefing('copy')">Copy Brief</button>
-                    <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('import-file-input').click()">Upload Import</button>
-                    <button class="btn btn-dev" style="flex:1; color:black;" onclick="openExportModal()">Export Files</button>
+                    <button class="btn btn-primary" style="flex:1" onclick="openNewFileModal()">+ New File</button>
+                    <button class="btn btn-outline" style="flex:1" onclick="handleBriefing('copy')">Copy Brief</button>
+                    <button class="btn btn-outline" style="flex:1" onclick="document.getElementById('import-file-input').click()">Import</button>
+                    <button class="btn btn-dev" style="flex:1; color:black;" onclick="openExportModal()">Export</button>
                 </div>
                 <input type="file" id="import-file-input" class="hidden" accept=".zip,.txt" onchange="handleImportFileSelect(this)">
                 <div class="flex-between">
@@ -802,6 +803,27 @@
             <div class="flex-gap" style="flex-direction:column;">
                 <button class="btn btn-prod" onclick="executeBatchImport()">🚀 Start Batch Upload</button>
                 <button class="btn btn-outline" onclick="cancelImport()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW FILE MODAL -->
+    <div id="new-file-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span class="viewer-title">Create New File</span>
+            <div class="flex-gap">
+                <button class="btn btn-prod" style="width:auto; padding:6px 20px;" onclick="executeCreateFile()">Create</button>
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeNewFileModal()">Cancel</button>
+            </div>
+        </div>
+        <div style="padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;">
+            <div class="input-group" style="margin-bottom: 0;">
+                <label class="input-label">File Path (relative to repo root)</label>
+                <input type="text" id="nf-path" class="input-field" placeholder="e.g. src/components/Header.jsx">
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column;">
+                <label class="input-label">Content</label>
+                <textarea id="nf-content" class="json-editor" style="flex: 1; margin-bottom: 0; resize: none;" placeholder="Paste or write code here..."></textarea>
             </div>
         </div>
     </div>
@@ -5317,6 +5339,41 @@ async function downloadArtifact(runId) {
             exportController = null;
         }
         document.getElementById('export-modal').style.display = 'none';
+    }
+
+    function openNewFileModal() {
+        document.getElementById('new-file-overlay').classList.add('active');
+        // Pre-fill with project path if exists
+        document.getElementById('nf-path').value = CONFIG.projectPath || "";
+        document.getElementById('nf-content').value = "";
+        toggleFab(false);
+    }
+
+    function closeNewFileModal() {
+        document.getElementById('new-file-overlay').classList.remove('active');
+        toggleFab(true);
+    }
+
+    async function executeCreateFile() {
+        const path = document.getElementById('nf-path').value.trim();
+        const content = document.getElementById('nf-content').value;
+
+        if (!path) return showGlobalToast("File path is required", true);
+
+        const ops = [
+            { "action": "comment", "text": `Create new file: ${path}` },
+            { "action": "create_file", "file_path": path, "content": content }
+        ];
+
+        closeNewFileModal();
+        
+        // Push to Patcher for execution
+        document.getElementById('json-input').value = JSON.stringify(ops, null, 2);
+        saveState();
+        
+        // Automatically trigger the patch
+        switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
+        runPatch('patch');
     }
 
     // --- AI SETTINGS LOGIC ---
