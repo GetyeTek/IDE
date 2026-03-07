@@ -4137,9 +4137,10 @@ function addTerminalCard(data, options = {}) {
                             </div>
                         </div>
 
-                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
-                            <div style="font-size:10px; color:#666; white-space:nowrap; font-family:'JetBrains Mono', monospace;">
-                                ${new Date(run.created_at).toLocaleDateString()} ${new Date(run.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                            <div style="display:flex; flex-direction:column; align-items:flex-end; font-family:'JetBrains Mono', monospace; line-height:1.2;">
+                                <span style="font-size:10px; color:var(--text-muted);" title="Time the event was triggered">Trig: ${timeAgo(run.created_at)}</span>
+                                ${run.run_started_at ? `<span style="font-size:9px; color:#555;" title="Time the runner actually started">Start: ${timeAgo(run.run_started_at)}</span>` : ''}
                             </div>
                             <div class="flex-gap">
                                 ${(run.status === 'in_progress' || run.status === 'queued') ? `
