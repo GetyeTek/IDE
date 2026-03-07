@@ -1341,7 +1341,10 @@
                 <div id="sqlStatusDot" class="w-1.5 h-1.5 rounded-full bg-slate-600"></div>
                 <span id="sqlStatusText" class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Ready</span>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 items-center">
+                <input type="text" id="sqlResultFilter" placeholder="Filter results..." 
+                       class="hidden bg-white/5 border border-white/10 rounded px-3 py-1 text-[10px] text-slate-300 outline-none focus:border-blue-500/50"
+                       onkeyup="filterSqlResults(this.value)">
                 <button id="sqlCopyBtn" onclick="copySqlResults()" class="hidden text-[10px] font-black bg-blue-500/10 text-blue-400 px-3 py-1 rounded border border-blue-500/20 active:bg-blue-500 active:text-white">
                     COPY CSV
                 </button>
@@ -6782,7 +6785,6 @@ async function downloadArtifact(runId) {
 
         try {
             const result = await callSqlEdgeFunction(sql);
-            // Store data and the SQL used to generate it for metadata extraction
             lastSqlResultData = {
                 data: result.data,
                 sql: sql,
@@ -6793,6 +6795,8 @@ async function downloadArtifact(runId) {
             statusText.innerText = 'Success: ' + (result.count || result.data.length) + ' rows';
             statusDot.className = "w-1.5 h-1.5 rounded-full bg-green-500";
             
+            document.getElementById('sqlResultFilter').classList.remove('hidden');
+            document.getElementById('sqlResultFilter').value = '';
             copyBtn.innerText = 'COPY CSV';
             copyBtn.classList.remove('hidden');
             dlBtn.classList.remove('hidden');
@@ -6817,26 +6821,37 @@ async function downloadArtifact(runId) {
             return;
         }
         const cols = Object.keys(data[0]);
-        let html = '<div class="overflow-auto h-full"><table class="w-full text-left border-collapse">';
+        let html = '<div class="overflow-auto h-full"><table id="sqlGridTable" class="w-full text-left border-collapse">';
         html += '<thead class="sticky top-0 z-10 bg-[#0a0a0a]"><tr>';
         cols.forEach(c => {
-            html += '<th class="p-3 border-b border-white/10 text-[9px] font-black uppercase text-blue-500 tracking-tighter">' + c + '</th>';
+            html += '<th class="p-3 border-b border-white/10 text-[9px] font-black uppercase text-blue-500 tracking-tighter">' + escapeHtml(c) + '</th>';
         });
         html += '</tr></thead><tbody class="divide-y divide-white/5">';
         data.forEach((row, idx) => {
             html += '<tr class="' + (idx % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.01]') + '">';
             cols.forEach(c => {
                 const val = row[c];
-                let display = val;
+                let display = '';
                 if (val === null) display = '<span class="opacity-20">NULL</span>';
                 else if (typeof val === 'object') display = '<span class="text-blue-400/80 underline">JSON</span>';
                 else if (typeof val === 'boolean') display = val ? 'TRUE' : 'FALSE';
+                else display = escapeHtml(String(val));
+                
                 html += '<td class="p-3 truncate text-slate-400 border-r border-white/5 result-cell">' + display + '</td>';
             });
             html += '</tr>';
         });
         html += '</tbody></table></div>';
         output.innerHTML = html;
+    }
+
+    function filterSqlResults(query) {
+        const q = query.toLowerCase();
+        const rows = document.querySelectorAll('#sqlGridTable tbody tr');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+        });
     }
 
     async function pasteToSqlEditor() {
