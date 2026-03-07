@@ -3499,24 +3499,19 @@
                 };
 
                 window.localLogs = [];
+                window.localNetwork = [];
                 ['log', 'warn', 'error', 'debug', 'info'].forEach(method => {
                     const original = console[method];
                     console[method] = (...args) => {
                         const time = new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
                         const msg = args.map(a => typeof a === 'object' ? JSON.parse(safeStringify(a)) : a);
-                        
-                        // Send to IDE
                         window.parent.postMessage({ type: 'CONDUIT_LOG', method, args: msg, time }, '*');
-                        
-                        // Store locally for the floating ball
                         window.localLogs.push({ method, msg: msg.join(' '), time });
                         if (window.updateLocalLogUI) window.updateLocalLogUI();
-                        
                         original.apply(console, args);
                     };
                 });
 
-                // --- NETWORK INTERCEPTOR (FETCH) ---
                 const originalFetch = window.fetch;
                 window.fetch = async (...args) => {
                     const start = Date.now();
@@ -3529,15 +3524,16 @@
                         let resBody = '[Binary Data]';
                         try { resBody = await clone.json(); } catch(e) { try { resBody = await clone.text(); } catch(e2){} }
                         
-                        window.parent.postMessage({
-                            type: 'CONDUIT_NETWORK',
-                            payload: {
-                                url, method: options.method || 'GET',
-                                status: response.status, duration,
-                                requestBody: options.body || null,
-                                responseBody: resBody
-                            }
-                        }, '*');
+                        const netEntry = {
+                            url, method: options.method || 'GET',
+                            status: response.status, duration,
+                            requestBody: options.body || null,
+                            responseBody: resBody,
+                            time: new Date().toLocaleTimeString()
+                        };
+                        window.parent.postMessage({ type: 'CONDUIT_NETWORK', payload: netEntry }, '*');
+                        window.localNetwork.push(netEntry);
+                        if (window.updateLocalNetworkUI) window.updateLocalNetworkUI();
                         return response;
                     } catch(err) {
                         window.parent.postMessage({ type: 'CONDUIT_LOG', method: 'error', args: ['Fetch Failed: ' + url, err.message], time: '' }, '*');
@@ -3546,110 +3542,76 @@
                 };
             `;
             // --- INJECT FLOATING HUD INTO PREVIEW ---
-            const hudStyle = doc.createElement('style');
-            hudStyle.textContent = `
-                #conduit-debug-ball { position: fixed; bottom: 20px; right: 20px; width: 44px; height: 44px; background: #1a1a1c; border: 1px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 2147483647; cursor: move; touch-action: none; color: #d946ef; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-weight: bold; }
-                #conduit-debug-ui { position: fixed; inset: 0; background: rgba(5,5,5,0.95); z-index: 2147483646; display: none; flex-direction: column; font-family: -apple-system, system-ui, sans-serif; color: white; padding-top: env(safe-area-inset-top); }
-                #conduit-debug-ui.active { display: flex; }
-                .debug-header { padding: 12px 16px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; background: #111; }
-                .debug-scroll { flex: 1; overflow-y: auto; padding: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-                .debug-row { padding: 8px 12px; border-bottom: 1px solid #1a1a1c; position: relative; display: flex; flex-direction: column; gap: 4px; }
-                .debug-row:hover .line-copy-btn { opacity: 1; }
-                .line-copy-btn { position: absolute; right: 8px; top: 8px; opacity: 0; background: #333; border: 1px solid #444; color: #aaa; font-size: 9px; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
-                .debug-meta { display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #555; }
-                .log-error { border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.03); }
-                .log-warn { border-left: 3px solid #eab308; background: rgba(234, 179, 8, 0.02); }
-                .debug-footer { padding: 12px; border-top: 1px solid #222; display: flex; gap: 10px; background: #0a0a0a; }
-                .hud-btn { flex: 1; padding: 10px; border: 1px solid #333; background: #222; color: #ccc; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
-                .hud-btn:active { background: #333; }
-            `;
-            doc.head.appendChild(hudStyle);
+                    window.currentHudTab = 'console';
+                    window.switchHudTab = (tab) => {
+                        window.currentHudTab = tab;
+                        document.getElementById('tab-console').classList.toggle('active', tab === 'console');
+                        document.getElementById('tab-network').classList.toggle('active', tab === 'network');
+                        document.getElementById('conduit-debug-list').style.display = tab === 'console' ? 'block' : 'none';
+                        document.getElementById('conduit-net-list').style.display = tab === 'network' ? 'block' : 'none';
+                        document.getElementById('hud-copy-all-btn').onclick = tab === 'console' ? window.copyAllPreviewLogs : window.copyAllPreviewNetwork;
+                    };
 
-            const hudHtml = doc.createElement('div');
-            hudHtml.innerHTML = `
-                <div id="conduit-debug-ball">⚡</div>
-                <div id="conduit-debug-ui">
-                    <div class="debug-header">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <span style="color:#d946ef; font-weight:bold; font-size:13px;">Conduit HUD</span>
-                            <button onclick="window.copyAllPreviewLogs()" style="background:none; border:1px solid #333; color:#888; font-size:10px; padding:2px 8px; border-radius:4px;">Copy All</button>
-                        </div>
-                        <button onclick="document.getElementById('conduit-debug-ui').classList.remove('active')" style="background:none; border:none; color:#666; font-size:24px;">×</button>
-                    </div>
-                    <div id="conduit-debug-list" class="debug-scroll"></div>
-                    <div class="debug-footer">
-                        <button class="hud-btn" onclick="window.localLogs=[]; window.updateLocalLogUI();">Clear Logs</button>
-                        <button class="hud-btn" onclick="document.getElementById('conduit-debug-ui').classList.remove('active')">Close</button>
-                    </div>
-                </div>
-            `;
-            doc.body.appendChild(hudHtml);
+                    window.clearHudData = () => {
+                        if(window.currentHudTab === 'console') { window.localLogs = []; window.updateLocalLogUI(); }
+                        else { window.localNetwork = []; window.updateLocalNetworkUI(); }
+                    };
 
-            const hudLogic = doc.createElement('script');
-            hudLogic.textContent = `
-                (function() {
-                    const ball = document.getElementById('conduit-debug-ball');
-                    const ui = document.getElementById('conduit-debug-ui');
-                    const list = document.getElementById('conduit-debug-list');
-                    let x=0, y=0, ix, iy, dragging=false;
-
-                    ball.addEventListener('touchstart', e => { dragging=false; ix=e.touches[0].clientX-x; iy=e.touches[0].clientY-y; });
-                    ball.addEventListener('touchmove', e => { dragging=true; x=e.touches[0].clientX-ix; y=e.touches[0].clientY-iy; ball.style.transform=\`translate(\${x}px, \${y}px)\`; });
-                    ball.onclick = () => { if(!dragging) ui.classList.toggle('active'); };
-
-                    window.copyPreviewLine = (idx) => {
-                        const log = window.localLogs[idx];
-                        if(!log) return;
-                        navigator.clipboard.writeText(log.msg).then(() => alert("Copied line!"));
+                    window.copyPreviewNetwork = (idx) => {
+                        const entry = window.localNetwork[idx];
+                        if(!entry) return;
+                        const text = JSON.stringify(entry, null, 2);
+                        navigator.clipboard.writeText(text).then(() => alert("Copied Request JSON"));
                     };
 
                     window.copyAllPreviewLogs = () => {
-                        const text = window.localLogs.map(l => \`[\${l.time}] \${l.msg}\`).join('\\n');
-                        navigator.clipboard.writeText(text).then(() => alert("Copied all logs!"));
+                        const text = window.localLogs.map(l => `[${l.time}] ${l.msg}`).join('\n');
+                        navigator.clipboard.writeText(text).then(() => alert("Copied All Logs"));
+                    };
+
+                    window.copyAllPreviewNetwork = () => {
+                        const text = window.localNetwork.map(n => `${n.method} ${n.status} ${n.url} (${n.duration}ms)`).join('\n');
+                        navigator.clipboard.writeText(text).then(() => alert("Copied Network Trace"));
                     };
 
                     window.updateLocalLogUI = () => {
-                        list.innerHTML = window.localLogs.map((l, idx) => \`
-                            <div class="debug-row log-\${l.method}">
-                                <button class="line-copy-btn" onclick="window.copyPreviewLine(\${idx})">Copy</button>
+                        list.innerHTML = window.localLogs.map((l, idx) => `
+                            <div class="debug-row log-${l.method}">
+                                <button class="line-copy-btn" onclick="window.copyPreviewLine(${idx})">Copy</button>
                                 <div class="debug-meta">
-                                    <span>\${l.method.toUpperCase()}</span>
-                                    <span>\${l.time}</span>
+                                    <span>${l.method.toUpperCase()}</span>
+                                    <span>${l.time}</span>
                                 </div>
-                                <div style="white-space:pre-wrap; word-break:break-all; line-height:1.4;">\${l.msg}</div>
+                                <div style="white-space:pre-wrap; word-break:break-all; line-height:1.4;">${l.msg}</div>
                             </div>
-                        \`).join('');
-                        list.scrollTop = list.scrollHeight;
+                        `).join('');
                     };
+
+                    window.updateLocalNetworkUI = () => {
+                        const netList = document.getElementById('conduit-net-list');
+                        netList.innerHTML = window.localNetwork.map((n, idx) => `
+                            <div class="debug-row">
+                                <button class="line-copy-btn" onclick="window.copyPreviewNetwork(${idx})">Copy JSON</button>
+                                <details style="width:100%">
+                                    <summary style="outline:none; list-style:none;">
+                                        <div class="net-grid">
+                                            <span style="color:#d946ef; font-weight:bold;">${n.method}</span>
+                                            <span style="color:${n.status >= 400 ? '#ef4444' : '#22c55e'};">${n.status}</span>
+                                            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#aaa;">${n.url.split('/').pop() || n.url}</span>
+                                        </div>
+                                    </summary>
+                                    <div style="margin-top:8px; padding:8px; background:#000; border-radius:4px; font-size:9px; color:#666; overflow-x:auto;">
+                                        <b>URL:</b> ${n.url}<br>
+                                        <b>TIME:</b> ${n.duration}ms<br>
+                                        <b>RES:</b> ${typeof n.responseBody === 'object' ? JSON.stringify(n.responseBody) : n.responseBody}
+                                    </div>
+                                </details>
+                            </div>
+                        `).join('');
+                    };
+
                     window.updateLocalLogUI();
-                })();
-            `;
-            doc.body.appendChild(hudLogic);
-
-            doc.head.prepend(baseScript);
-            doc.querySelectorAll('script[src]').forEach(el => {
-                const src = el.getAttribute('src');
-                if (src && !src.startsWith('http')) {
-                    const resolved = resolvePath(entryFile, src);
-                    if (fileCache[resolved]) {
-                        const inline = doc.createElement('script');
-                        inline.type = 'module';
-                        inline.textContent = 'import "' + resolved.substring(effectiveRoot.length) + '";';
-                        el.replaceWith(inline);
-                    }
-                }
-            });
-
-            const mapTag = doc.createElement('script');
-            mapTag.type = "importmap";
-            mapTag.textContent = JSON.stringify(importMap);
-            doc.head.prepend(mapTag);
-
-            if(window.PREVIEW_BLOB_URL) URL.revokeObjectURL(window.PREVIEW_BLOB_URL);
-            window.PREVIEW_BLOB_URL = URL.createObjectURL(new Blob([doc.documentElement.outerHTML], { type: 'text/html' }));
-            
-            // Ensure src is cleared so srcdoc/blob takes over
-            iframe.removeAttribute('src');
+                    window.updateLocalNetworkUI();
             iframe.srcdoc = doc.documentElement.outerHTML;
             if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
             document.getElementById('preview-url-display').innerText = sha ? 'Viewing: ' + entry.title : 'Viewing: Live Dev (' + CONFIG.repoName + ')';
