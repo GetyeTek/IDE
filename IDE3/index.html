@@ -3168,8 +3168,10 @@ function addTerminalCard(data, options = {}) {
             window.PREVIEW_BLOB_URL = null;
         }
 
-        iframe.srcdoc = ''; // Clear srcdoc to allow src to take over
+        // Critical: Must remove srcdoc attribute entirely for src to take precedence
+        iframe.removeAttribute('srcdoc');
         iframe.src = url;
+        
         display.innerText = 'External: ' + url;
         console.log("[Preview] Loading external URL:", url);
     }
@@ -3501,9 +3503,12 @@ function addTerminalCard(data, options = {}) {
             mapTag.textContent = JSON.stringify(importMap);
             doc.head.prepend(mapTag);
 
-            iframe.srcdoc = doc.documentElement.outerHTML;
             if(window.PREVIEW_BLOB_URL) URL.revokeObjectURL(window.PREVIEW_BLOB_URL);
-            window.PREVIEW_BLOB_URL = URL.createObjectURL(new Blob([iframe.srcdoc], { type: 'text/html' }));
+            window.PREVIEW_BLOB_URL = URL.createObjectURL(new Blob([doc.documentElement.outerHTML], { type: 'text/html' }));
+            
+            // Ensure src is cleared so srcdoc/blob takes over
+            iframe.removeAttribute('src');
+            iframe.srcdoc = doc.documentElement.outerHTML;
             if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
             document.getElementById('preview-url-display').innerText = sha ? 'Viewing: ' + entry.title : 'Viewing: Live Dev (' + CONFIG.repoName + ')';
             document.getElementById('browser-url').value = '';
