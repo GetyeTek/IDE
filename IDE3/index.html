@@ -1271,13 +1271,21 @@
 
             <div class="px-4 py-6">
                 <div class="grid grid-cols-2 gap-3 mb-6">
-                    <div class="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl">
-                        <span class="text-slate-500 text-[10px] uppercase font-bold tracking-widest">Total</span>
-                        <div id="count-total-keys" class="text-2xl font-mono mt-1">0</div>
+                    <div class="bg-slate-800/40 border border-slate-800 p-3 rounded-2xl">
+                        <span class="text-slate-500 text-[9px] uppercase font-bold tracking-widest">Total Fleet</span>
+                        <div id="count-total-keys" class="text-xl font-mono mt-1">0</div>
                     </div>
-                    <div class="bg-teal-900/10 border border-teal-900/20 p-4 rounded-2xl">
-                        <span class="text-teal-600 text-[10px] uppercase font-bold tracking-widest">Active</span>
-                        <div id="count-valid-keys" class="text-2xl font-mono mt-1 text-teal-400">0</div>
+                    <div class="bg-teal-900/10 border border-teal-900/20 p-3 rounded-2xl">
+                        <span class="text-teal-600 text-[9px] uppercase font-bold tracking-widest">Status: OK</span>
+                        <div id="count-valid-keys" class="text-xl font-mono mt-1 text-teal-400">0</div>
+                    </div>
+                    <div class="bg-yellow-900/10 border border-yellow-900/20 p-3 rounded-2xl">
+                        <span class="text-yellow-600 text-[9px] uppercase font-bold tracking-widest">Exhausted (429)</span>
+                        <div id="count-exhausted-keys" class="text-xl font-mono mt-1 text-yellow-400">0</div>
+                    </div>
+                    <div class="bg-red-900/10 border border-red-900/20 p-3 rounded-2xl">
+                        <span class="text-red-600 text-[9px] uppercase font-bold tracking-widest">Banned (403)</span>
+                        <div id="count-banned-keys" class="text-xl font-mono mt-1 text-red-400">0</div>
                     </div>
                 </div>
                 
@@ -7379,20 +7387,38 @@ async function downloadArtifact(runId) {
     async function runBatchTest() {
         if (activeKeysToTest.length === 0) return alert("Load some keys first.");
         const btn = document.getElementById('tester-start-batch-btn');
-        const validLabel = document.getElementById('count-valid-keys');
         
         btn.disabled = true; 
         btn.innerText = "TESTING...";
+        
+        const validLabel = document.getElementById('count-valid-keys');
+        const exhaustedLabel = document.getElementById('count-exhausted-keys');
+        const bannedLabel = document.getElementById('count-banned-keys');
+        
         validLabel.innerText = '0';
-        let validCount = 0;
+        exhaustedLabel.innerText = '0';
+        bannedLabel.innerText = '0';
+        
+        let validCount = 0, exhaustedCount = 0, bannedCount = 0;
 
         // Concurrent run
         const promises = activeKeysToTest.map(async (keyData, idx) => {
             const row = document.getElementById('tester-row-' + idx);
-            const success = await validateTesterKey(keyData.api_key, row);
-            if (success) {
+            await validateTesterKey(keyData.api_key, row);
+            
+            // Re-check the status updated on the object by validateTesterKey
+            const s = keyData.last_status;
+            const m = (keyData.last_msg || "").toLowerCase();
+
+            if (s == 200) {
                 validCount++;
                 validLabel.innerText = validCount;
+            } else if (s == 429 || s === "RESOURCE_EXHAUSTED") {
+                exhaustedCount++;
+                exhaustedLabel.innerText = exhaustedCount;
+            } else if (s == 403 || s === "PERMISSION_DENIED" || m.includes("not found") || m.includes("revoked")) {
+                bannedCount++;
+                bannedLabel.innerText = bannedCount;
             }
         });
 
@@ -7448,10 +7474,10 @@ async function downloadArtifact(runId) {
     function copyTesterReport() {
         let report = `KEY TEST AUDIT REPORT\nGenerated: ${new Date().toLocaleString()}\n${'='.repeat(30)}\n\n`;
         activeKeysToTest.forEach(k => {
-            const masked = k.api_key.substring(0, 8) + '...' + k.api_key.slice(-4);
-            report += `Name: ${k.name || 'Unnamed'}\nKey: ${masked}\nStatus: ${k.last_status || 'NOT TESTED'}\nMessage: ${k.last_msg || 'N/A'}\n${'-'.repeat(20)}\n`;
+            // Export full keys for administrative use
+            report += `Name: ${k.name || 'Unnamed'}\nKey: ${k.api_key}\nStatus: ${k.last_status || 'NOT TESTED'}\nMessage: ${k.last_msg || 'N/A'}\n${'-'.repeat(20)}\n`;
         });
-        navigator.clipboard.writeText(report).then(() => showGlobalToast("Audit report copied!"));
+        navigator.clipboard.writeText(report).then(() => showGlobalToast("Full audit report copied!"));
     }
 
     function transitionToSql(sql) {
