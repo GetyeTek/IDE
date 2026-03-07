@@ -6976,13 +6976,29 @@ async function downloadArtifact(runId) {
 
     function extractTableNames(sql) {
         if (!sql) return [];
-        // Matches FROM or JOIN followed by table names, ignoring schemas
-        const regex = /(?:FROM|JOIN)\s+(?:(?:"?\w+"?\.)?"?(\w+)"?)/gi;
         const tables = [];
+        const systemNoise = ['columns', 'tables', 'schemata', 'information_schema'];
+        
+        // Pattern 1: Standard FROM/JOIN (handles schema.table and "table")
+        const fromRegex = /(?:FROM|JOIN)\s+(?:(?:"?\w+"?\.)?"?(\w+)"?)/gi;
+        // Pattern 2: Metadata queries (WHERE table_name = '...')
+        const metaRegex = /table_name\s*=\s*'([^']+)'/gi;
+
         let match;
-        while ((match = regex.exec(sql)) !== null) {
-            if (match[1] && !tables.includes(match[1])) tables.push(match[1]);
+        while ((match = fromRegex.exec(sql)) !== null) {
+            const name = match[1];
+            if (name && !tables.includes(name) && !systemNoise.includes(name.toLowerCase())) {
+                tables.push(name);
+            }
         }
+        
+        while ((match = metaRegex.exec(sql)) !== null) {
+            const name = match[1];
+            if (name && !tables.includes(name) && !systemNoise.includes(name.toLowerCase())) {
+                tables.push(name);
+            }
+        }
+
         return tables;
     }
 
