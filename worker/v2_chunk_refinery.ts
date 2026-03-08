@@ -131,7 +131,7 @@ async function runChunkRefinery() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`, {
+          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${cleanKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -258,7 +258,7 @@ async function runChunkRefinery() {
         input_words: batch, 
         words: finalParsed.data, 
         summary: finalParsed.summary,
-        model_version: 'gemini-2.5-flash'
+        model_version: 'gemini-3.1-flash-lite-preview'
       }, { onConflict: 'source_file,batch_index' });
       
       if (saveErr) throw saveErr;
