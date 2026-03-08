@@ -18,51 +18,54 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Get the next available file to process (Natural Sort order)
-    const { data: state, error: stateError } = await supabase
-      .from('processing_state_union')
-      .select('*')
-      .neq('status', 'completed')
-      .order('source_filename', { ascending: true })
-      .limit(1)
-      .single();
+    let state = null;
+    let fileData = null;
+    let SOURCE_FILE = "";
+    let FOLDER = "";
 
-    if (stateError) {
-      console.error("[DB ERROR - SELECT]:", stateError);
-      throw stateError;
-    }
-    if (!state) {
-      console.log("[QUEUE EMPTY] No pending files.");
-      return new Response(JSON.stringify({ message: "No pending files in union queue." }), { status: 200 });
-    }
-    console.log(`[PROCESSING] File: ${state.source_filename}`);
+    // --- AUTO-SKIP LOOP ---
+    // Keep looking for a file until we find one that exists or run out of queue
+    while (true) {
+      const { data: nextFile, error: stateError } = await supabase
+        .from('processing_state_union')
+        .select('*')
+        .not('status', 'in', '("completed", "skipped_missing")')
+        .order('source_filename', { ascending: true })
+        .limit(1)
+        .single();
 
-    const SOURCE_FILE = state.source_filename;
-    const FOLDER = `union/${state.subfolder_name}`;
+      if (stateError || !nextFile) {
+        console.log("[QUEUE EMPTY] No more valid files to process.");
+        return new Response(JSON.stringify({ message: "Finished all available files." }), { status: 200 });
+      }
+
+      state = nextFile;
+      SOURCE_FILE = state.source_filename;
+      FOLDER = `union/${state.subfolder_name}`;
+
+      console.log(`[ATTEMPTING] ${SOURCE_FILE}...`);
+
+      const { data: dl, error: downloadError } = await supabase.storage
+        .from(BUCKET)
+        .download(SOURCE_FILE);
+
+      if (downloadError) {
+        console.error(`[MISSING/ERROR] ${SOURCE_FILE}. Marking as skipped_missing.`);
+        await supabase
+          .from('processing_state_union')
+          .update({ status: 'skipped_missing', updated_at: new Date().toISOString() })
+          .eq('source_filename', SOURCE_FILE);
+        
+        continue; // Go to next iteration of while(true)
+      }
+
+      fileData = dl;
+      console.log(`[FOUND] ${SOURCE_FILE} (${fileData.size} bytes)`);
+      break; // Exit loop, we have a valid file to process
+    }
 
     // Determine starting point based on DB state
     const startWordIndex = state.last_word_index_processed || 0;
-
-    // 2. Download the master file
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from(BUCKET)
-      .download(SOURCE_FILE);
-
-    if (downloadError) {
-      console.error(`[STORAGE ERROR - DOWNLOAD] ${SOURCE_FILE}:`, downloadError);
-      
-      // CRITICAL: Mark as failed in DB so the next run picks the next file
-      await supabase
-        .from('processing_state_union')
-        .update({ 
-          status: 'failed', 
-          updated_at: new Date().toISOString()
-        })
-        .eq('source_filename', SOURCE_FILE);
-        
-      throw downloadError;
-    }
-    console.log(`[DOWNLOADED] ${SOURCE_FILE} size: ${fileData.size} bytes`);
 
     const text = await fileData.text();
     const allWords = text.trim().split(/\s+/);
