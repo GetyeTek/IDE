@@ -50,6 +50,16 @@ serve(async (req) => {
 
     if (downloadError) {
       console.error(`[STORAGE ERROR - DOWNLOAD] ${SOURCE_FILE}:`, downloadError);
+      
+      // CRITICAL: Mark as failed in DB so the next run picks the next file
+      await supabase
+        .from('processing_state_union')
+        .update({ 
+          status: 'failed', 
+          updated_at: new Date().toISOString()
+        })
+        .eq('source_filename', SOURCE_FILE);
+        
       throw downloadError;
     }
     console.log(`[DOWNLOADED] ${SOURCE_FILE} size: ${fileData.size} bytes`);
