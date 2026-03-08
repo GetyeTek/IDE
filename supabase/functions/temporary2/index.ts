@@ -2,10 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const BUCKET = 'V2';
-const SOURCE_FILE = 'freq_2.txt';
-const FOLDER = 'freq_2';
+const SOURCE_FILE = 'freq_3.txt';
+const FOLDER = 'freq_3';
 const WORDS_PER_FILE = 100;
-const FILES_PER_BATCH = 25; 
+const FILES_PER_BATCH = 50; 
 
 serve(async (req) => {
   try {
@@ -16,7 +16,7 @@ serve(async (req) => {
 
     // 1. Get current progress from the database
     const { data: state, error: stateError } = await supabase
-      .from('processing_state')
+      .from('processing_state_v3')
       .select('*')
       .eq('source_filename', SOURCE_FILE)
       .single();
@@ -82,7 +82,7 @@ serve(async (req) => {
     // 6. Update the Tracking Table with new progress
     const isFinished = currentPointer >= totalWords;
     const { error: dbUpdateError } = await supabase
-      .from('processing_state')
+      .from('processing_state_v3')
       .update({ 
         total_words_found: totalWords,
         last_word_index_processed: currentPointer,
