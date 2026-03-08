@@ -83,9 +83,10 @@ async function runChunkRefinery() {
          1. Proper Names: Names of people (e.g., አበበ), specific organizations, or religious figures.
          2. Geopolitical Entities: Names of countries (e.g., ኢትዮጵያ, አሜሪካ), cities, or specific landmarks.
          3. Semantic Nonsense: Meaningless OCR gibberish.
-       - LOANWORD POLICY: Do NOT exclude loanwords that are standard, used extensively, or integrated into modern Amharic (e.g., ኮምፒውተር, ባቡር, ፖሊስ). Only exclude non-integrated, raw foreign transliterations that have no standing in the language.
+         4. Generic English Transliterations: Strictly exclude English words phonetically spelled in Amharic that have existing native equivalents. 
+            - EXAMPLE: Exclude 'አኒማል' (Animal) because 'እንስሳ' exists. Exclude 'ቡክ' (Book) because 'መጽሐፍ' exists. 
+       - LOANWORD POLICY: ONLY include loanwords that are officially integrated into the Amharic lexicon (e.g., ኮምፒውተር, ፓራግራፍ, ፖሊስ, ባቡር). If a common Amharic word exists for the concept, the English transliteration MUST be rejected.
        - ACTION: If a word falls into the exclusion categories, remove it entirely. Do NOT provide a root or translation for them.
-
     3. PROTOCOL: THE CORRECTOR (OCR Repair & Morphological Preservation)
        - THE 'word' FIELD: This must be the word as found in the text, preserving all original prefixes, suffixes, and conjugations (e.g., 'ለቤታቸው', 'እንዲቃኝና'). 
        - ACTION: Fix only visual OCR spelling errors or clear typos (e.g., 'ሀ' vs 'ሃ') if the correction is certain from context. 
@@ -134,8 +135,8 @@ async function runChunkRefinery() {
     }
     
     DEFINITION OF CONFIDENCE: A score of 1-10 representing how likely it is that this string is a sensical, legitimate Amharic word. 
-    - ATTENTION: Assign a LOW score (1-4) for words that are suspicious, appear to be fragments, or are likely hallucinations from messy OCR input.
-    - Assign HIGH scores (8-10) only for clear, unambiguous dictionary-grade entries.
+    - ATTENTION: Assign a LOW score (1-3) for English transliterations that slipped through the filter (e.g., 'አኒማል'), or for fragments and ambiguous OCR results.
+    - Assign HIGH scores (8-10) only for pure Amharic words or perfectly integrated, standard loanwords (like 'ፓራግራፍ').
     `;
 
           const controller = new AbortController();
