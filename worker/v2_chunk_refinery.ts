@@ -86,16 +86,18 @@ async function runChunkRefinery() {
          4. Semantic Nonsense: Meaningless OCR gibberish.
        - ACTION: If a word falls into any of these categories, exclude it entirely from the output array. Do NOT provide a root or translation for them.
 
-    3. PROTOCOL: THE CORRECTOR (Repair vs. Discard)
-       - ACTION: Attempt to fix minor visual OCR spelling errors (e.g., 'ሀ' vs 'ሃ') ONLY if the context makes the correction certain.
+    3. PROTOCOL: THE CORRECTOR (Repair & De-prefixing)
+       - ACTION 1: Strip prepositional prefixes (ለ-፣ በ-፣ ከ-፣ የ-፣ እንደ-፣ ስለ-) from the string. The 'word' field in your output should be the clean noun, verb, or adjective without these attachments.
+       - ACTION 2: Attempt to fix minor visual OCR spelling errors (e.g., 'ሀ' vs 'ሃ') ONLY if context makes the correction certain.
        - STRIP attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
-       - RULE: If correction is a "guess" and the word remains ambiguous or meaningless, default to PROTOCOL 2 and DISCARD it.
+       - RULE: If the word remains ambiguous or meaningless after these steps, DISCARD it.
 
-    4. PROTOCOL: THE LEMMATIZER (Global Citation Form)
+    4. PROTOCOL: THE LEMMATIZER (Normalization & Citation)
        - MISSION: Identify the base dictionary entry (Infinitive/መነሻ ቃል) for every valid word.
-       - LOGIC: Do NOT simply strip prefixes/suffixes from the given string. Analyze the word's morphology globally to find its true citation form.
-       - EXAMPLES: "እንድናጓጉዘው" ➔ "ማጓጓዝ", "የሚመጡት" ➔ "መምጣት", "ሲመለከቱ" ➔ "መመልከት".
-       - STRICTURE: If a word is a legitimate Amharic word but has no identifiable dictionary root (e.g. some loanwords or particles), set the root to "N/A".
+       - NORMALIZATION (CRITICAL): In the 'root' field, use Standard Modern Spelling by normalizing homophones. Use ሀ for (ሐ, ኀ, ኸ), use ሰ for (ሠ), and use ጸ for (ፀ).
+       - LOGIC: Analyze morphology globally to find the true citation form.
+       - EXAMPLES: "እንድናጓጉዘው" ➔ "ማጓጓዝ", "የሚመጡት" ➔ "መምጣት".
+       - STRICTURE: If no identifiable dictionary root exists, set root to "N/A".
 
     5. PROTOCOL: THE TRANSLATOR (Nuance Expansion)
        - Provide comprehensive English synonyms capture the full breadth of the word.
@@ -104,8 +106,9 @@ async function runChunkRefinery() {
        - CRITICAL: Assign the word to ONE of these categories ONLY: Noun, Verb, Adjective, Adverb, Pronoun, Preposition, Conjunction, Interjection.
        - STRICT RULE: Do NOT include morphological details (like "relative," "passive," "3rd person") in the POS field. Use only the high-level category name.
 
-    7. PROTOCOL: THE FILTER (Size Constraint)
-       - CRITICAL: Discard any word or root that consists of only a single character. Amharic words must be at least 2 characters long to be included in the dataset.
+    7. PROTOCOL: THE FILTER (Size & Numerals)
+       - CRITICAL: Discard any entry shorter than 2 characters.
+       - NUMERALS: Exclude all Western digits (0-9) and Ethiopic numerals (፩, ፪, ፫, etc.) entirely from the output.
 
     8. PROTOCOL: EXECUTIVE SUMMARY
        - Reflect on your decisions. Explain splits, discards, and "Scholarly Guesses."
