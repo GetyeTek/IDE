@@ -90,6 +90,7 @@ async function runChunkRefinery() {
        - MISSION: Identify the base dictionary entry (Infinitive/መነሻ ቃል) for every valid word.
        - LOGIC: Do NOT simply strip prefixes/suffixes from the given string. Analyze the word's morphology globally to find its true citation form.
        - EXAMPLES: "እንድናጓጉዘው" ➔ "ማጓጓዝ", "የሚመጡት" ➔ "መምጣት", "ሲመለከቱ" ➔ "መመልከት".
+       - STRICTURE: If a word is a legitimate Amharic word but has no identifiable dictionary root (e.g. some loanwords or particles), set the root to "N/A".
 
     5. PROTOCOL: THE TRANSLATOR (Nuance Expansion)
        - Provide comprehensive English synonyms capture the full breadth of the word.
@@ -108,10 +109,18 @@ async function runChunkRefinery() {
     Return a single JSON Object. NO Markdown. "summary" MUST come AFTER the "data" array.
     {
       "data": [
-        { "word": "[Cleaned]", "root": "[Citation Form]", "pos": "[Part of Speech]", "synonyms": [], "importance": 1-10 }
+        { 
+          "word": "[Cleaned]", 
+          "root": "[Citation Form or N/A]", 
+          "pos": "[Part of Speech]", 
+          "synonyms": [], 
+          "confidence": 1-10 
+        }
       ],
       "summary": "Reflective summary..."
     }
+    
+    DEFINITION OF CONFIDENCE: A score of 1-10 representing how likely it is that this string is a sensical, legitimate Amharic word rather than OCR gibberish.
     `;
 
           const controller = new AbortController();
@@ -232,7 +241,11 @@ async function runChunkRefinery() {
       }
 
       // 5. POST-AI PROCESSING & STORAGE IN V2 TABLES
-      finalParsed.data = finalParsed.data.filter((item: any) => item.word?.trim().length > 1 && item.root?.trim().length > 1);
+      // We allow root to be 'N/A' now, so we only filter out empty or single-char words
+      finalParsed.data = finalParsed.data.filter((item: any) => 
+        item.word?.trim().length > 1 && 
+        item.root?.trim().length >= 1
+      );
 
       const { error: saveErr } = await supabase.from('v2_refined_dictionary').upsert({
         source_file: currentPath, 
