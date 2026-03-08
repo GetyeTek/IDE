@@ -82,9 +82,9 @@ async function runChunkRefinery() {
        - STRICT EXCLUSIONS: 
          1. Proper Names: Names of people (e.g., አበበ), specific organizations, or religious figures.
          2. Geopolitical Entities: Names of countries (e.g., ኢትዮጵያ, አሜሪካ), cities, or specific landmarks.
-         3. English Transliterations: Phonetic spellings of English words or non-integrated foreign terms.
-         4. Semantic Nonsense: Meaningless OCR gibberish.
-       - ACTION: If a word falls into any of these categories, exclude it entirely from the output array. Do NOT provide a root or translation for them.
+         3. Semantic Nonsense: Meaningless OCR gibberish.
+       - LOANWORD POLICY: Do NOT exclude loanwords that are standard, used extensively, or integrated into modern Amharic (e.g., ኮምፒውተር, ባቡር, ፖሊስ). Only exclude non-integrated, raw foreign transliterations that have no standing in the language.
+       - ACTION: If a word falls into the exclusion categories, remove it entirely. Do NOT provide a root or translation for them.
 
     3. PROTOCOL: THE CORRECTOR (Repair & De-prefixing)
        - ACTION 1: Strip prepositional prefixes (ለ-፣ በ-፣ ከ-፣ የ-፣ እንደ-፣ ስለ-) from the string. The 'word' field in your output should be the clean noun, verb, or adjective without these attachments.
@@ -94,6 +94,8 @@ async function runChunkRefinery() {
 
     4. PROTOCOL: THE LEMMATIZER (Normalization & Citation)
        - MISSION: Identify the base dictionary entry (Infinitive/መነሻ ቃል) for every valid word.
+       - CITATION FORM: Use the main generic root (Infinitive), typically starting with the 'መ-' prefix. 
+       - STRICTURE: Do NOT use the 3rd person masculine singular (e.g., use መብላት, NOT በላ; use መሄድ, NOT ሄደ).
        - NORMALIZATION (CRITICAL): In the 'root' field, use Standard Modern Spelling by normalizing homophones. Use ሀ for (ሐ, ኀ, ኸ), use ሰ for (ሠ), and use ጸ for (ፀ).
        - LOGIC: Analyze morphology globally to find the true citation form.
        - EXAMPLES: "እንድናጓጉዘው" ➔ "ማጓጓዝ", "የሚመጡት" ➔ "መምጣት".
@@ -128,7 +130,9 @@ async function runChunkRefinery() {
       "summary": "Reflective summary..."
     }
     
-    DEFINITION OF CONFIDENCE: A score of 1-10 representing how likely it is that this string is a sensical, legitimate Amharic word rather than OCR gibberish.
+    DEFINITION OF CONFIDENCE: A score of 1-10 representing how likely it is that this string is a sensical, legitimate Amharic word. 
+    - ATTENTION: Assign a LOW score (1-4) for words that are suspicious, appear to be fragments, or are likely hallucinations from messy OCR input.
+    - Assign HIGH scores (8-10) only for clear, unambiguous dictionary-grade entries.
     `;
 
           const controller = new AbortController();
