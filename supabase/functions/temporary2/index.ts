@@ -22,15 +22,26 @@ serve(async (req) => {
     let fileData = null;
     let SOURCE_FILE = "";
     let FOLDER = "";
+    const processedInThisRun = new Set();
+    let attempts = 0;
 
     // --- AUTO-SKIP LOOP ---
     // Keep looking for a file until we find one that exists or run out of queue
-    while (true) {
-      const { data: nextFile, error: stateError } = await supabase
+    while (attempts < 20) {
+      attempts++;
+      let query = supabase
         .from('processing_state_union')
         .select('*')
-        .not('status', 'in', '("completed", "skipped_missing")')
-        .order('source_filename', { ascending: true })
+        .not('status', 'in', '(completed,skipped_missing)')
+        .order('source_filename', { ascending: true });
+
+      // Extra safety: exclude files we've already seen in this execution
+      if (processedInThisRun.size > 0) {
+        const excludeList = Array.from(processedInThisRun).map(f => `"${f}"`).join(',');
+        query = query.not('source_filename', 'in', `(${excludeList})`);
+      }
+
+      const { data: nextFile, error: stateError } = await query
         .limit(1)
         .single();
 
@@ -61,12 +72,18 @@ serve(async (req) => {
           throw updateError;
         }
         
-        continue; // Go to next iteration of while(true)
+        processedInThisRun.add(SOURCE_FILE);
+        continue; // Go to next iteration
       }
 
       fileData = dl;
       console.log(`[FOUND] ${SOURCE_FILE} (${fileData.size} bytes)`);
       break; // Exit loop, we have a valid file to process
+    }
+
+    if (!fileData) {
+      console.log("[STOPPED] Reached max skip attempts or no valid files found.");
+      return new Response(JSON.stringify({ message: "Reached skip limit or queue exhausted." }), { status: 200 });
     }
 
     // Determine starting point based on DB state
