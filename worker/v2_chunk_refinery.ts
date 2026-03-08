@@ -77,9 +77,14 @@ async function runChunkRefinery() {
        - ACTION: Split them into separate valid words.
        - EXAMPLE: "ጨምሯልለሶስተኛ" ➔ "ጨምሯል", "ለሶስተኛ".
 
-    2. PROTOCOL: THE JUDGE (Semantic Filtering)
-       - MISSION: Eliminate semantic nonsense. If an Amharic string is a meaningless combination of characters that cannot be logically corrected to a valid dictionary entry, DELETE it.
-       - ACTION: Never invent a "root" or "translation" for nonsense words. If the word provides no semantic value, exclude it entirely from the output array.
+    2. PROTOCOL: THE JUDGE (Lexicographical Filtering)
+       - MISSION: Eliminate entries that do not belong in a general-purpose dictionary.
+       - STRICT EXCLUSIONS: 
+         1. Proper Names: Names of people (e.g., አበበ), specific organizations, or religious figures.
+         2. Geopolitical Entities: Names of countries (e.g., ኢትዮጵያ, አሜሪካ), cities, or specific landmarks.
+         3. English Transliterations: Phonetic spellings of English words or non-integrated foreign terms.
+         4. Semantic Nonsense: Meaningless OCR gibberish.
+       - ACTION: If a word falls into any of these categories, exclude it entirely from the output array. Do NOT provide a root or translation for them.
 
     3. PROTOCOL: THE CORRECTOR (Repair vs. Discard)
        - ACTION: Attempt to fix minor visual OCR spelling errors (e.g., 'ሀ' vs 'ሃ') ONLY if the context makes the correction certain.
