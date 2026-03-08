@@ -12,7 +12,7 @@ async function runChunkRefinery() {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  for (let cycle = 0; cycle < 5; cycle++) {
+  for (let cycle = 0; cycle < 10; cycle++) {
     let chunkRecordId = 0;
     let currentPath = "";
     let batchStart = Date.now();
