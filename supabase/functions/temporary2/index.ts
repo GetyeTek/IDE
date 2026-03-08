@@ -51,10 +51,15 @@ serve(async (req) => {
 
       if (downloadError) {
         console.error(`[MISSING/ERROR] ${SOURCE_FILE}. Marking as skipped_missing.`);
-        await supabase
+        const { error: updateError } = await supabase
           .from('processing_state_union')
           .update({ status: 'skipped_missing', updated_at: new Date().toISOString() })
           .eq('source_filename', SOURCE_FILE);
+
+        if (updateError) {
+          console.error(`[CRITICAL] Failed to mark ${SOURCE_FILE} as skipped:`, updateError);
+          throw updateError;
+        }
         
         continue; // Go to next iteration of while(true)
       }
