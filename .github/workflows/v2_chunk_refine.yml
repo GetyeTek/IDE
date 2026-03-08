@@ -32,8 +32,4 @@ jobs:
           WORKER_ID: v2_worker_${{ matrix.worker_id }}
         run: deno run -A worker/v2_chunk_refinery.ts
 
-      - name: Trigger Next Run
-        if: success() && matrix.worker_id == 1
-        env:
-          GH_TOKEN: ${{ secrets.MY_PAT }}
-        run: gh workflow run v2_chunk_refine.yml
+      # Trigger Next Run step removed to avoid dispatching a disabled workflow
