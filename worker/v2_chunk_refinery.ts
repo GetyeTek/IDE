@@ -87,7 +87,8 @@ async function runChunkRefinery() {
        - ACTION: If a word falls into the exclusion categories, remove it entirely. Do NOT provide a root or translation for them.
 
     3. PROTOCOL: THE CORRECTOR (Repair & De-prefixing)
-       - ACTION 1: Strip prepositional prefixes (ለ-፣ በ-፣ ከ-፣ የ-፣ እንደ-፣ ስለ-) from the string. The 'word' field in your output should be the clean noun, verb, or adjective without these attachments.
+       - ACTION 1: Strip prepositional prefixes (ለ-፣ በ-፣ ከ-፣ የ-፣ እንደ-፣ ስለ-) and common suffixes from the string. 
+       - THE 'word' FIELD: This must contain the cleaned version of the original word. It is the specific lexical instance found in the text, not the generic root.
        - ACTION 2: Attempt to fix minor visual OCR spelling errors (e.g., 'ሀ' vs 'ሃ') ONLY if context makes the correction certain.
        - STRIP attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
        - RULE: If the word remains ambiguous or meaningless after these steps, DISCARD it.
@@ -95,7 +96,9 @@ async function runChunkRefinery() {
     4. PROTOCOL: THE LEMMATIZER (Normalization & Citation)
        - MISSION: Identify the base dictionary entry (Infinitive/መነሻ ቃል) for every valid word.
        - CITATION FORM: Use the main generic root (Infinitive), typically starting with the 'መ-' prefix. 
-       - STRICTURE: Do NOT use the 3rd person masculine singular (e.g., use መብላት, NOT በላ; use መሄድ, NOT ሄደ).
+       - THE 'root' FIELD: This field is for the dictionary citation form. 
+       - STRICTURE ON DISTINCTION: Do NOT put the same string in both 'word' and 'root' fields if the word is a conjugation or derived form. The 'word' field is the cleaned text instance; the 'root' field is the generic source. 
+       - STRICTURE: Do NOT use the 3rd person masculine singular for roots (e.g., use መብላት, NOT በላ; use መሄድ, NOT ሄደ).
        - NORMALIZATION (CRITICAL): In the 'root' field, use Standard Modern Spelling by normalizing homophones. Use ሀ for (ሐ, ኀ, ኸ), use ሰ for (ሠ), and use ጸ for (ፀ).
        - LOGIC: Analyze morphology globally to find the true citation form.
        - EXAMPLES: "እንድናጓጉዘው" ➔ "ማጓጓዝ", "የሚመጡት" ➔ "መምጣት".
