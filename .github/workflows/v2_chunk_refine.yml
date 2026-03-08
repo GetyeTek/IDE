@@ -33,7 +33,7 @@ jobs:
         run: deno run -A worker/v2_chunk_refinery.ts
 
       - name: Trigger Next Run
-        if: success() && matrix.worker_id == 1
+        if: false # success() && matrix.worker_id == 1
         env:
           GH_TOKEN: ${{ secrets.MY_PAT }}
         run: gh workflow run v2_chunk_refine.yml
