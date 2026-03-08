@@ -148,35 +148,81 @@ async function runChunkRefinery() {
           }
 
           const result = await aiResp.json();
-          const candidate = result.candidates?.[0];
+          
+          // --- RAW ERROR CATCHING ---
+          if (result.error) {
+            const rawErr = JSON.stringify(result.error);
+            await supabase.from('v2_refinery_logs').insert({
+              worker_id: WORKER_ID, source_file: currentPath, status: 'failed',
+              error_message: `API_ERROR: ${rawErr}`, raw_output: JSON.stringify(result)
+            });
+            throw new Error(`Gemini API returned error: ${rawErr}`);
+          }
 
+          const candidate = result.candidates?.[0];
           if (!candidate || !candidate.content || !candidate.content.parts) {
             const stopReason = candidate?.finishReason || "NO_CANDIDATE";
+            const safety = candidate?.safetyRatings ? JSON.stringify(candidate.safetyRatings) : "No Safety Info";
             await supabase.from('v2_refinery_logs').insert({
-              worker_id: WORKER_ID,
-              source_file: currentPath,
-              status: 'failed',
-              error_message: `AI_SILENCE: ${stopReason}`,
-              input_data: batch,
-              input_words: batch.length,
-              raw_output: JSON.stringify(result)
+              worker_id: WORKER_ID, source_file: currentPath, status: 'failed',
+              error_message: `AI_SILENCE: ${stopReason} | Safety: ${safety}`,
+              input_data: batch, input_words: batch.length, raw_output: JSON.stringify(result)
             });
             throw new Error(`AI_SILENCE: ${stopReason}`);
           }
 
           let actualText = candidate.content.parts?.filter((p: any) => p.text).map((p: any) => p.text).join('').trim();
           
+          // --- AGGRESSIVE SANITIZER ---
           const sanitize = (val: string) => {
-            return val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/""/g, '"').replace(/,\s*([\}\]])/g, '$1');           
+            return val
+              .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control chars
+              .replace(/""/g, '"')                       // Fix double-double quotes
+              .replace(/,\s*([\}\]])/g, '$1');           // Remove trailing commas
           };
 
+          let sieveError = "";
+          
+          // TIER 1: DIRECT PARSE
           try { 
-            const p = JSON.parse(sanitize(actualText)); 
+            const cleaned = sanitize(actualText);
+            const p = JSON.parse(cleaned); 
             if (p?.data && Array.isArray(p.data)) finalParsed = p;
-          } catch (e) { /* Sieve logic would follow if needed */ }
+          } catch (e) { sieveError += `[Direct: ${e.message}] `; }
 
-          if (finalParsed?.data && Array.isArray(finalParsed.data)) break;
-          else throw new Error('Parsing failed to recover JSON.');
+          // TIER 2: RECURSIVE BRACE EXHAUSTION (THE SIEVE)
+          if (!finalParsed) {
+            console.log(`[SIEVE] Direct parse failed for ${currentPath}. Exhausting brace pairs...`);
+            const starts = [...actualText.matchAll(/\{/g)].map(m => m.index || 0);
+            const ends = [...actualText.matchAll(/\}/g)].map(m => m.index || 0).reverse();
+
+            sieveLoop: for (const s of starts) {
+              for (const e of ends) {
+                if (e > s) {
+                  try {
+                    const candidateStr = sanitize(actualText.substring(s, e + 1));
+                    const p = JSON.parse(candidateStr);
+                    if (p?.data && Array.isArray(p.data)) {
+                      finalParsed = p;
+                      console.log(`[SIEVE] Recovered data at range ${s}-${e}`);
+                      break sieveLoop;
+                    }
+                  } catch (err) { continue; }
+                }
+              }
+            }
+          }
+
+          if (!finalParsed) {
+            sieveError += "[Exhaustive Sieve: No valid data block found]";
+            await supabase.from('v2_refinery_logs').insert({
+              worker_id: WORKER_ID, source_file: currentPath, status: 'failed', 
+              error_message: `SIEVE_FAILURE: ${sieveError}`, raw_output: actualText
+            });
+            throw new Error('Parsing Sieve failed to recover JSON.');
+          }
+
+          if (finalParsed?.data) break;
 
         } catch (attemptErr) {
           console.warn(`[ATTEMPT FAIL] ${currentPath} attempt ${attempt}: ${attemptErr.message}`);
