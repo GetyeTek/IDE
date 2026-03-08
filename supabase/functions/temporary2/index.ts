@@ -5,7 +5,13 @@ const BUCKET = 'V2';
 const WORDS_PER_FILE = 100;
 const FILES_PER_BATCH = 50; 
 
+// Global error listeners for Deno platform-level errors
+self.addEventListener("unhandledrejection", (e) => {
+  console.error("[FATAL UNHANDLED REJECTION]:", e.reason);
+});
+
 serve(async (req) => {
+  console.log("[START] Function Invoked");
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -21,9 +27,15 @@ serve(async (req) => {
       .limit(1)
       .single();
 
-    if (stateError || !state) {
+    if (stateError) {
+      console.error("[DB ERROR - SELECT]:", stateError);
+      throw stateError;
+    }
+    if (!state) {
+      console.log("[QUEUE EMPTY] No pending files.");
       return new Response(JSON.stringify({ message: "No pending files in union queue." }), { status: 200 });
     }
+    console.log(`[PROCESSING] File: ${state.source_filename}`);
 
     const SOURCE_FILE = state.source_filename;
     const FOLDER = `union/${state.subfolder_name}`;
@@ -36,7 +48,11 @@ serve(async (req) => {
       .from(BUCKET)
       .download(SOURCE_FILE);
 
-    if (downloadError) throw downloadError;
+    if (downloadError) {
+      console.error(`[STORAGE ERROR - DOWNLOAD] ${SOURCE_FILE}:`, downloadError);
+      throw downloadError;
+    }
+    console.log(`[DOWNLOADED] ${SOURCE_FILE} size: ${fileData.size} bytes`);
 
     const text = await fileData.text();
     const allWords = text.trim().split(/\s+/);
@@ -109,22 +125,20 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    // Create a detailed error object because JSON.stringify(Error) returns {}
-    const errorDetails = {
-      message: error.message,
-      stack: error.stack,
-      raw: error,
-      name: error.name
-    };
+    // LOG TO CONSOLE AS RAW (This is your best chance to see it in Supabase Logs)
+    console.error("--- CRITICAL EXECUTION FAILURE ---");
+    console.error("Error Name:", error?.name);
+    console.error("Error Message:", error?.message);
+    console.error("Stack Trace:", error?.stack);
+    console.error("Raw Error String:", String(error));
     
-    console.error("FATAL ERROR:", errorDetails);
-
     return new Response(
-      JSON.stringify(errorDetails, null, 2), 
-      { 
-        status: 500, 
-        headers: { "Content-Type": "application/json" } 
-      }
+      JSON.stringify({ 
+        error: "Execution Failed", 
+        msg: error?.message, 
+        name: error?.name 
+      }), 
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 })
