@@ -86,10 +86,10 @@ async function runChunkRefinery() {
        - LOANWORD POLICY: Do NOT exclude loanwords that are standard, used extensively, or integrated into modern Amharic (e.g., ኮምፒውተር, ባቡር, ፖሊስ). Only exclude non-integrated, raw foreign transliterations that have no standing in the language.
        - ACTION: If a word falls into the exclusion categories, remove it entirely. Do NOT provide a root or translation for them.
 
-    3. PROTOCOL: THE CORRECTOR (Repair & De-prefixing)
-       - ACTION 1: Strip prepositional prefixes (ለ-፣ በ-፣ ከ-፣ የ-፣ እንደ-፣ ስለ-) and common suffixes from the string. 
-       - THE 'word' FIELD: This must contain the cleaned version of the original word. It is the specific lexical instance found in the text, not the generic root.
-       - ACTION 2: Attempt to fix minor visual OCR spelling errors (e.g., 'ሀ' vs 'ሃ') ONLY if context makes the correction certain.
+    3. PROTOCOL: THE CORRECTOR (OCR Repair & Morphological Preservation)
+       - THE 'word' FIELD: This must be the word as found in the text, preserving all original prefixes, suffixes, and conjugations (e.g., 'ለቤታቸው', 'እንዲቃኝና'). 
+       - ACTION: Fix only visual OCR spelling errors or clear typos (e.g., 'ሀ' vs 'ሃ') if the correction is certain from context. 
+       - DO NOT strip prepositions (ለ-, በ-, ከ-, etc.) or suffixes from this field. Keep the morphology exactly as it appears in the source, but fixed for spelling.
        - STRIP attached punctuation (e.g., "ሰላም::" ➔ "ሰላም").
        - RULE: If the word remains ambiguous or meaningless after these steps, DISCARD it.
 
