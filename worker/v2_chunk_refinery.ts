@@ -4,8 +4,8 @@ const AI_TIMEOUT = 180000;
 const COOLDOWN_DURATION = 10 * 60 * 1000;
 
 async function runChunkRefinery() {
-  const WORKER_ID = Deno.env.get('WORKER_ID') || 'chunk_worker_v3_1';
-  console.log(`--- REFINERY V3 WORKER ${WORKER_ID} START ---`);
+  const WORKER_ID = Deno.env.get('WORKER_ID') || 'chunk_worker_v4_1';
+  console.log(`--- REFINERY V4 WORKER ${WORKER_ID} START ---`);
   
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -18,21 +18,22 @@ async function runChunkRefinery() {
     let batchStart = Date.now();
 
     try {
-      // 1. CLAIM SEQUENTIAL CHUNK FROM V3 QUEUE
-      const { data: claimData, error: claimErr } = await supabase.rpc('claim_v3_refinery_batch', { 
+      // 1. CLAIM SEQUENTIAL CHUNK FROM V4 QUEUE (STRICT SEQUENCE)
+      const { data: claimData, error: claimErr } = await supabase.rpc('claim_v4_refinery_batch', { 
         p_worker_id: WORKER_ID 
       });
 
       if (claimErr) throw new Error(`Claim RPC failed: ${claimErr.message}`);
       if (!claimData || claimData.length === 0) {
-        console.log("[FINISHED] No more chunks in V3 queue.");
+        console.log("[WAIT/FINISH] No available batches in current sequence or queue empty.");
         break;
       }
 
       const chunk = claimData[0];
       chunkRecordId = chunk.id;
       currentPath = chunk.chunk_path;
-      console.log(`[STAGE: CLAIMED] Reserved ${currentPath} (Attempt ${chunk.retry_count + 1})`);
+      const parentFile = chunk.parent_file;
+      console.log(`[STAGE: CLAIMED] ${parentFile} -> ${currentPath} (Attempt ${chunk.retry_count + 1})`);
 
       // 2. GET API KEY
       const { data: keyRecord, error: keyError } = await supabase
@@ -177,8 +178,8 @@ async function runChunkRefinery() {
           // --- RAW ERROR CATCHING ---
           if (result.error) {
             const rawErr = JSON.stringify(result.error);
-            await supabase.from('v3_refinery_logs').insert({
-              worker_id: WORKER_ID, source_file: currentPath, status: 'failed',
+            await supabase.from('v4_refinery_logs').insert({
+              worker_id: WORKER_ID, parent_file: parentFile, source_file: currentPath, status: 'failed',
               error_message: `API_ERROR: ${rawErr}`, raw_output: JSON.stringify(result)
             });
             throw new Error(`Gemini API returned error: ${rawErr}`);
@@ -263,7 +264,8 @@ async function runChunkRefinery() {
         item.root?.trim().length >= 1
       );
 
-      const { error: saveErr } = await supabase.from('v3_refined_dictionary').upsert({
+      const { error: saveErr } = await supabase.from('v4_refined_dictionary').upsert({
+        parent_file: parentFile,
         source_file: currentPath, 
         batch_index: 0, 
         input_words: batch, 
@@ -274,8 +276,9 @@ async function runChunkRefinery() {
       
       if (saveErr) throw saveErr;
 
-      await supabase.from('v3_refinery_logs').insert({
+      await supabase.from('v4_refinery_logs').insert({
         worker_id: WORKER_ID, 
+        parent_file: parentFile,
         source_file: currentPath, 
         status: 'success', 
         input_words: batch.length, 
@@ -284,7 +287,7 @@ async function runChunkRefinery() {
         raw_output: JSON.stringify(finalParsed)
       });
 
-      await supabase.from('v3_refinery_queue').update({ status: 'completed' }).eq('id', chunkRecordId);
+      await supabase.from('v4_refinery_queue').update({ status: 'completed' }).eq('id', chunkRecordId);
       await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
       console.log(`[SUCCESS] Chunk ${currentPath} processed.`);
 
@@ -292,11 +295,11 @@ async function runChunkRefinery() {
       console.error(`[ERROR] ${currentPath}: ${err.message}`);
       if (chunkRecordId) {
         if (err.message === 'API_RATE_LIMIT' || err.message === 'API_OVERLOAD') {
-          await supabase.from('v3_refinery_queue').update({ status: 'pending' }).eq('id', chunkRecordId);
+          await supabase.from('v4_refinery_queue').update({ status: 'pending' }).eq('id', chunkRecordId);
           break;
         } else {
-          const { data: currentChunk } = await supabase.from('v3_refinery_queue').select('retry_count').eq('id', chunkRecordId).single();
-          await supabase.from('v3_refinery_queue').update({ 
+          const { data: currentChunk } = await supabase.from('v4_refinery_queue').select('retry_count').eq('id', chunkRecordId).single();
+          await supabase.from('v4_refinery_queue').update({ 
             status: 'failed', 
             retry_count: (currentChunk?.retry_count || 0) + 1 
           }).eq('id', chunkRecordId);
