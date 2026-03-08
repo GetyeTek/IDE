@@ -109,6 +109,22 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    // Create a detailed error object because JSON.stringify(Error) returns {}
+    const errorDetails = {
+      message: error.message,
+      stack: error.stack,
+      raw: error,
+      name: error.name
+    };
+    
+    console.error("FATAL ERROR:", errorDetails);
+
+    return new Response(
+      JSON.stringify(errorDetails, null, 2), 
+      { 
+        status: 500, 
+        headers: { "Content-Type": "application/json" } 
+      }
+    );
   }
 })
