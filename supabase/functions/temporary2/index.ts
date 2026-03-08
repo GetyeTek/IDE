@@ -2,8 +2,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const BUCKET = 'V2';
-const SOURCE_FILE = 'freq_3.txt';
-const FOLDER = 'freq_3';
 const WORDS_PER_FILE = 100;
 const FILES_PER_BATCH = 50; 
 
@@ -14,16 +12,21 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Get current progress from the database
+    // 1. Get the next available file to process (Natural Sort order)
     const { data: state, error: stateError } = await supabase
-      .from('processing_state_v3')
+      .from('processing_state_union')
       .select('*')
-      .eq('source_filename', SOURCE_FILE)
+      .neq('status', 'completed')
+      .order('source_filename', { ascending: true })
+      .limit(1)
       .single();
 
     if (stateError || !state) {
-      throw new Error("Could not find processing state in DB. Ensure SQL was run.");
+      return new Response(JSON.stringify({ message: "No pending files in union queue." }), { status: 200 });
     }
+
+    const SOURCE_FILE = state.source_filename;
+    const FOLDER = `union/${state.subfolder_name}`;
 
     // Determine starting point based on DB state
     const startWordIndex = state.last_word_index_processed || 0;
@@ -82,7 +85,7 @@ serve(async (req) => {
     // 6. Update the Tracking Table with new progress
     const isFinished = currentPointer >= totalWords;
     const { error: dbUpdateError } = await supabase
-      .from('processing_state_v3')
+      .from('processing_state_union')
       .update({ 
         total_words_found: totalWords,
         last_word_index_processed: currentPointer,
