@@ -1,0 +1,39 @@
+name: Amharic V2 Refinery (Production)
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: v2-refinery-chain
+  cancel-in-progress: false
+
+jobs:
+  refine:
+    strategy:
+      matrix:
+        worker_id: [1, 2, 3, 4]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Run V2 Chunk Refinery
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          WORKER_ID: v2_worker_${{ matrix.worker_id }}
+        run: deno run -A worker/v2_chunk_refinery.ts
+
+      - name: Trigger Next Run
+        if: success() && matrix.worker_id == 1
+        env:
+          GH_TOKEN: ${{ secrets.MY_PAT }}
+        run: gh workflow run v2_chunk_refine.yml
