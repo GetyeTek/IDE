@@ -137,7 +137,7 @@ async function runChunkRefinery() {
     
     DEFINITION OF CONFIDENCE: A score of 1-10 representing how likely it is that this string is a sensical, legitimate Amharic word. 
     - ATTENTION: Assign a LOW score (1-3) for English transliterations that slipped through the filter (e.g., 'አኒማል'), or for fragments and ambiguous OCR results.
-    - Assign HIGH scores (8-10) only for pure Amharic words or perfectly integrated, standard loanwords (like 'ፓራግራፍ').
+    - Assign HIGH scores (8-10) only for pure Amharic words or perfectly integrated, standard loanwords (like 'ባቡር, ሀኪም').
     `;
 
           const controller = new AbortController();
