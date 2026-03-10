@@ -32,4 +32,8 @@ jobs:
           WORKER_ID: v2_worker_${{ matrix.worker_id }}
         run: deno run -A worker/v2_chunk_refinery.ts
 
-      # Trigger Next Run step removed to avoid dispatching a disabled workflow
+      # - name: Trigger Next Run
+      #   if: always()
+      #   run: gh workflow run v2_chunk_refine.yml
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
