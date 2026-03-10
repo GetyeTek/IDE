@@ -63,9 +63,11 @@ async function runChunkRefinery() {
       let finalParsed = null;
 
       // --- TIER 1: TACTICAL LOOP (3 Internal Attempts) ---
+      let activeModel = 'gemini-3.1-flash-lite-preview';
+      
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          console.log(`[STAGE: AI] ${currentPath} - Session Attempt ${attempt}/3...`);
+          console.log(`[STAGE: AI] ${currentPath} - Attempt ${attempt}/3 using ${activeModel}...`);
           
           const systemInstruction = `
     ROLE: You are the "Amharic Refinery Master," an elite linguistic engine specialized in Ethiopic script restoration, morphological analysis, and lexicographical enrichment.
@@ -147,7 +149,7 @@ async function runChunkRefinery() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${cleanKey}`, {
+          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${cleanKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -168,18 +170,25 @@ async function runChunkRefinery() {
           });
           clearTimeout(timeoutId);
 
-          if (aiResp.status === 429) {
+          const result = await aiResp.json();
+
+          // --- SMART ERROR DETECTION (429/503/UNAVAILABLE) ---
+          const isOverloaded = aiResp.status === 503 || result.error?.status === 'UNAVAILABLE' || result.error?.code === 503;
+          const isRateLimited = aiResp.status === 429 || result.error?.status === 'RESOURCE_EXHAUSTED' || result.error?.code === 429;
+
+          if (isRateLimited) {
+            console.warn(`[RETRY] Rate limited on ${activeModel}. Switching model...`);
+            activeModel = 'gemini-2.5-flash'; // Pivot to fallback
             await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', keyRecord.id);
             throw new Error('API_RATE_LIMIT');
           }
           
-          if (aiResp.status === 503) {
+          if (isOverloaded) {
+            console.warn(`[RETRY] Server overloaded on ${activeModel}. Switching model...`);
+            activeModel = 'gemini-2.5-flash'; // Pivot to fallback
             throw new Error('API_OVERLOAD');
           }
-
-          const result = await aiResp.json();
           
-          // --- RAW ERROR CATCHING ---
           if (result.error) {
             const rawErr = JSON.stringify(result.error);
             await supabase.from('union_refinery_logs').insert({
@@ -273,7 +282,7 @@ async function runChunkRefinery() {
         file_path: currentPath, 
         words: finalParsed.data, 
         summary: finalParsed.summary,
-        model_version: 'gemini-3.1-flash-lite-preview'
+        model_version: activeModel
       });
       
       if (saveErr) throw saveErr;
