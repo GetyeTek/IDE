@@ -17,22 +17,38 @@ async function discoverUnionFiles() {
 
   console.log(`--- DISCOVERING BATCH: ${pendingFolders.length} FOLDERS ---`);
 
-  for (const record of pendingFolders) {
+    for (const record of pendingFolders) {
     const folder = record.folder_name;
     const path = `union/${folder}`;
-    const { data: files, error } = await supabase.storage.from('V2').list(path);
+    let allFiles: any[] = [];
+    let offset = 0;
+    const limit = 100;
 
-    if (error) {
-      console.error(`Error listing ${path}:`, error?.message || 'Unknown storage error');
-      continue;
+    while (true) {
+      const { data: files, error } = await supabase.storage.from('V2').list(path, {
+        limit: limit,
+        offset: offset
+      });
+
+      if (error) {
+        console.error(`Error listing ${path} at offset ${offset}:`, error.message);
+        break;
+      }
+
+      if (!files || files.length === 0) break;
+
+      allFiles.push(...files);
+      if (files.length < limit) break; // Reached the end
+      offset += limit;
     }
 
-    if (!files || !Array.isArray(files) || files.length === 0) {
+    if (allFiles.length === 0) {
       console.log(`[SKIP] No files found in ${path}`);
+      await supabase.from('union_discovery_tracker').update({ status: 'discovered' }).eq('folder_name', folder);
       continue;
     }
 
-    const insertData = files
+    const insertData = allFiles
       .filter(f => f && f.name && f.name.endsWith('.txt'))
       .map(f => ({
         folder_name: folder,
@@ -41,17 +57,17 @@ async function discoverUnionFiles() {
       }));
 
     if (insertData.length > 0) {
-      const { error: insertErr } = await supabase
-        .from('union_refinery_queue')
-        .upsert(insertData, { onConflict: 'file_path' });
-
-      if (insertErr) {
-         console.error(`Error inserting ${folder}:`, insertErr?.message);
-         continue;
+      // Split inserts into chunks of 100 to avoid large payload errors
+      for (let i = 0; i < insertData.length; i += 100) {
+        const chunk = insertData.slice(i, i + 100);
+        const { error: insertErr } = await supabase
+          .from('union_refinery_queue')
+          .upsert(chunk, { onConflict: 'file_path' });
+        
+        if (insertErr) console.error(`Error inserting chunk for ${folder}:`, insertErr.message);
       }
-      console.log(`✅ Discovered ${insertData.length} files in ${folder}`);
       
-      // Mark as discovered
+      console.log(`✅ Discovered ${insertData.length} total files in ${folder}`);
       await supabase.from('union_discovery_tracker').update({ status: 'discovered' }).eq('folder_name', folder);
     }
 
