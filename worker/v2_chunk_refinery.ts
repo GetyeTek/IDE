@@ -4,8 +4,8 @@ const AI_TIMEOUT = 180000;
 const COOLDOWN_DURATION = 10 * 60 * 1000;
 
 async function runChunkRefinery() {
-  const WORKER_ID = Deno.env.get('WORKER_ID') || 'chunk_worker_v4_1';
-  console.log(`--- REFINERY V4 WORKER ${WORKER_ID} START ---`);
+  const WORKER_ID = Deno.env.get('WORKER_ID') || 'union_worker_v1';
+  console.log(`--- UNION REFINERY WORKER ${WORKER_ID} START ---`);
   
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -18,22 +18,22 @@ async function runChunkRefinery() {
     let batchStart = Date.now();
 
     try {
-      // 1. CLAIM SEQUENTIAL CHUNK FROM V4 QUEUE (STRICT SEQUENCE)
-      const { data: claimData, error: claimErr } = await supabase.rpc('claim_v4_refinery_batch', { 
+      // 1. CLAIM FROM UNION QUEUE
+      const { data: claimData, error: claimErr } = await supabase.rpc('claim_union_batch', { 
         p_worker_id: WORKER_ID 
       });
 
       if (claimErr) throw new Error(`Claim RPC failed: ${claimErr.message}`);
       if (!claimData || claimData.length === 0) {
-        console.log("[WAIT/FINISH] No available batches in current sequence or queue empty.");
+        console.log("[WAIT/FINISH] No available union batches found.");
         break;
       }
 
       const chunk = claimData[0];
       chunkRecordId = chunk.id;
-      currentPath = chunk.chunk_path;
-      const parentFile = chunk.parent_file;
-      console.log(`[STAGE: CLAIMED] ${parentFile} -> ${currentPath} (Attempt ${chunk.retry_count + 1})`);
+      currentPath = chunk.file_path;
+      const folderName = chunk.folder_name;
+      console.log(`[STAGE: CLAIMED] ${folderName} -> ${currentPath} (Attempt ${chunk.retry_count + 1})`);
 
       // 2. GET API KEY
       const { data: keyRecord, error: keyError } = await supabase
@@ -55,7 +55,11 @@ async function runChunkRefinery() {
       if (dlErr) throw dlErr;
 
       const text = await fileData.text();
-      const batch = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      // Regex: Strip leading numbers (e.g., "1. Word" -> "Word")
+      const batch = text
+        .split(/\r?\n/)
+        .map(line => line.replace(/^\d+\.\s*/, '').trim())
+        .filter(l => l.length > 1);
       let finalParsed = null;
 
       // --- TIER 1: TACTICAL LOOP (3 Internal Attempts) ---
@@ -178,8 +182,8 @@ async function runChunkRefinery() {
           // --- RAW ERROR CATCHING ---
           if (result.error) {
             const rawErr = JSON.stringify(result.error);
-            await supabase.from('v4_refinery_logs').insert({
-              worker_id: WORKER_ID, parent_file: parentFile, source_file: currentPath, status: 'failed',
+            await supabase.from('union_refinery_logs').insert({
+              worker_id: WORKER_ID, file_path: currentPath, status: 'failed',
               error_message: `API_ERROR: ${rawErr}`, raw_output: JSON.stringify(result)
             });
             throw new Error(`Gemini API returned error: ${rawErr}`);
@@ -189,10 +193,10 @@ async function runChunkRefinery() {
           if (!candidate || !candidate.content || !candidate.content.parts) {
             const stopReason = candidate?.finishReason || "NO_CANDIDATE";
             const safety = candidate?.safetyRatings ? JSON.stringify(candidate.safetyRatings) : "No Safety Info";
-            await supabase.from('v3_refinery_logs').insert({
-              worker_id: WORKER_ID, source_file: currentPath, status: 'failed',
+            await supabase.from('union_refinery_logs').insert({
+              worker_id: WORKER_ID, file_path: currentPath, status: 'failed',
               error_message: `AI_SILENCE: ${stopReason} | Safety: ${safety}`,
-              input_data: batch, input_words: batch.length, raw_output: JSON.stringify(result)
+              raw_output: JSON.stringify(result)
             });
             throw new Error(`AI_SILENCE: ${stopReason}`);
           }
@@ -241,8 +245,8 @@ async function runChunkRefinery() {
 
           if (!finalParsed) {
             sieveError += "[Exhaustive Sieve: No valid data block found]";
-            await supabase.from('v3_refinery_logs').insert({
-              worker_id: WORKER_ID, source_file: currentPath, status: 'failed', 
+            await supabase.from('union_refinery_logs').insert({
+              worker_id: WORKER_ID, file_path: currentPath, status: 'failed', 
               error_message: `SIEVE_FAILURE: ${sieveError}`, raw_output: actualText
             });
             throw new Error('Parsing Sieve failed to recover JSON.');
@@ -264,30 +268,25 @@ async function runChunkRefinery() {
         item.root?.trim().length >= 1
       );
 
-      const { error: saveErr } = await supabase.from('v4_refined_dictionary').upsert({
-        parent_file: parentFile,
-        source_file: currentPath, 
-        batch_index: 0, 
-        input_words: batch, 
+      const { error: saveErr } = await supabase.from('union_refined_dictionary').insert({
+        folder_name: folderName,
+        file_path: currentPath, 
         words: finalParsed.data, 
         summary: finalParsed.summary,
         model_version: 'gemini-3.1-flash-lite-preview'
-      }, { onConflict: 'source_file,batch_index' });
+      });
       
       if (saveErr) throw saveErr;
 
-      await supabase.from('v4_refinery_logs').insert({
+      await supabase.from('union_refinery_logs').insert({
         worker_id: WORKER_ID, 
-        parent_file: parentFile,
-        source_file: currentPath, 
+        file_path: currentPath, 
         status: 'success', 
-        input_words: batch.length, 
-        output_words: finalParsed.data.length, 
-        total_duration_ms: Date.now() - batchStart,
+        duration_ms: Date.now() - batchStart,
         raw_output: JSON.stringify(finalParsed)
       });
 
-      await supabase.from('v4_refinery_queue').update({ status: 'completed' }).eq('id', chunkRecordId);
+      await supabase.from('union_refinery_queue').update({ status: 'completed' }).eq('id', chunkRecordId);
       await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRecord.id);
       console.log(`[SUCCESS] Chunk ${currentPath} processed.`);
 
@@ -295,11 +294,11 @@ async function runChunkRefinery() {
       console.error(`[ERROR] ${currentPath}: ${err.message}`);
       if (chunkRecordId) {
         if (err.message === 'API_RATE_LIMIT' || err.message === 'API_OVERLOAD') {
-          await supabase.from('v4_refinery_queue').update({ status: 'pending' }).eq('id', chunkRecordId);
+          await supabase.from('union_refinery_queue').update({ status: 'pending' }).eq('id', chunkRecordId);
           break;
         } else {
-          const { data: currentChunk } = await supabase.from('v4_refinery_queue').select('retry_count').eq('id', chunkRecordId).single();
-          await supabase.from('v4_refinery_queue').update({ 
+          const { data: currentChunk } = await supabase.from('union_refinery_queue').select('retry_count').eq('id', chunkRecordId).single();
+          await supabase.from('union_refinery_queue').update({ 
             status: 'failed', 
             retry_count: (currentChunk?.retry_count || 0) + 1 
           }).eq('id', chunkRecordId);
