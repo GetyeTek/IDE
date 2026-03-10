@@ -11,26 +11,34 @@ async function discoverUnionFiles() {
     const { data: files, error } = await supabase.storage.from('V2').list(path);
 
     if (error) {
-      console.error(`Error listing ${path}:`, error.message);
+      console.error(`Error listing ${path}:`, error?.message || 'Unknown storage error');
       continue;
     }
 
-    if (!files || files.length === 0) continue;
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      console.log(`[SKIP] No files found in ${path}`);
+      continue;
+    }
 
     const insertData = files
-      .filter(f => f.name.endsWith('.txt'))
+      .filter(f => f && f.name && f.name.endsWith('.txt'))
       .map(f => ({
         folder_name: folder,
         file_path: `${path}/${f.name}`,
         status: 'pending'
       }));
 
-    const { error: insertErr } = await supabase
-      .from('union_refinery_queue')
-      .upsert(insertData, { onConflict: 'file_path' });
+    if (insertData.length > 0) {
+      const { error: insertErr } = await supabase
+        .from('union_refinery_queue')
+        .upsert(insertData, { onConflict: 'file_path' });
 
-    if (insertErr) console.error(`Error inserting ${folder}:`, insertErr.message);
-    else console.log(`Discovered ${files.length} files in ${folder}`);
+      if (insertErr) console.error(`Error inserting ${folder}:`, insertErr?.message || 'Unknown DB error');
+      else console.log(`✅ Discovered ${insertData.length} files in ${folder}`);
+    }
+
+    // Take a breath so we don't hit rate limits
+    await new Promise(r => setTimeout(r, 200));
   }
 }
 
