@@ -1,258 +1,115 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
-const ORCHESTRATOR_URL = 'https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/validator-orchestrator';
 const WORKER_ID = Deno.env.get('WORKER_ID') || `val_worker_${Math.random().toString(36).substring(7)}`;
-const AI_TIMEOUT = 120000; // 2 minutes
-const COOLDOWN_DURATION = 10 * 60 * 1000; // 10 minutes
+const AI_TIMEOUT = 120000; 
+const COOLDOWN_DURATION = 10 * 60 * 1000; 
 
 async function runValidator() {
   console.log(`\n======================================================`);
-  console.log(`🚀[WORKER START] ID: ${WORKER_ID} | Timestamp: ${new Date().toISOString()}`);
+  console.log(`🚀[WORKER START] ID: ${WORKER_ID} | Direct DB Mode`);
   console.log(`======================================================`);
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!, 
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
 
   for (let cycle = 1; cycle <= 10; cycle++) {
-    let currentFilePath = "";
+    let currentJobId = null;
     console.log(`\n>>> [WORKER ${WORKER_ID}] Starting CYCLE ${cycle}/10 <<<`);
 
     try {
-      // 1. Get Work
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Requesting work from orchestrator...`);
-      const resp = await fetch(ORCHESTRATOR_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_work', worker_id: WORKER_ID })
-      });
+      // 1. Get Work via RPC
+      const { data: packet, error: rpcErr } = await supabase.rpc('get_validation_work', { p_worker_id: WORKER_ID });
 
-      const packet = await resp.json();
+      if (rpcErr) throw new Error(`RPC Error: ${rpcErr.message}`);
       if (packet.error === 'NO_WORK' || packet.error === 'NO_API_KEY') {
-        console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Orchestrator returned NO WORK: ${packet.error}. Stopping gracefully.`);
+        console.log(`[WORKER ${WORKER_ID}] No work or no keys available: ${packet.error}.`);
         break;
       }
-      if (packet.error) {
-         console.warn(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Orchestrator returned explicit error: ${packet.error}. Aborting cycle.`);
-         break;
-      }
 
-      const { file_path, api_key, key_id } = packet;
-      currentFilePath = file_path;
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] CLAIMED: ${currentFilePath} | Assigned Key ID: ${key_id}`);
+      const { job_id, words, api_key, key_id } = packet;
+      currentJobId = job_id;
+      console.log(`[WORKER ${WORKER_ID}] CLAIMED Job ID: ${currentJobId} | Words to process: ${words.length}`);
 
-      // 2. Download Content
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Downloading blob for ${currentFilePath}...`);
-      const { data: blob, error: dlErr } = await supabase.storage.from('inspection_bucket').download(currentFilePath);
-      if (dlErr) throw dlErr; 
-
-      const text = await blob.text();
-      const lines = text.split('\n').filter(l => l.trim().length > 0);
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Blob downloaded. Extracted ${lines.length} non-empty lines.`);
-      
-      const wordMap: Record<number, string> = {};
-      let parsedLinesCount = 0;
-      lines.forEach(line => {
-        const match = line.match(/^(\d+)\.\s+(.+)$/);
-        if (match) {
-          wordMap[parseInt(match[1])] = match[2].trim();
-          parsedLinesCount++;
-        }
-      });
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Parsed ${parsedLinesCount} numbered words into memory map.`);
+      // 2. Prepare AI Prompt Input
+      // We format the array into a numbered list for the AI to maintain ID mapping
+      const formattedList = words.map((w: string, idx: number) => `${idx}. ${w}`).join('\n');
 
       // 3. AI Processing Loop
-      let finalValidatedList = null;
+      let finalResults = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          console.log(`\n[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI] Attempt ${attempt}/3 starting...`);
+          console.log(`[AI] Attempt ${attempt}/3 for Job ${currentJobId}...`);
           
-          const systemInstruction = `
-            ROLE: Amharic Linguistic Auditor.
-            MISSION: Evaluate and score a list of candidate words based on their validity as genuine Amharic words. You MUST return a score for EVERY SINGLE WORD provided in the batch. Do not skip or omit any IDs.
-            
-            SCORING RULES (1-10):
-            - Score 10: Perfect, pure, common Amharic word with legitimate roots (መነሻ ቃል).
-            - Score 7-9: Highly likely to be a valid Amharic word.
-            - Score 4-6: Suspicious, uncommon, or heavily modified.
-            - Score 1-3: Low Likelihood, Garbage, or PROPER NOUNS.
-              * PROPER NOUN PENALTY: Score 1-3 for names of specific people, specific geographic locations (countries, cities), and specific organizations (e.g., 'ኢትዮጵያ', 'አዲስ አበባ', 'ዮሐንስ'). We want a general vocabulary, not a name directory.
-              * EXCEPTION: Genuine common nouns (animals like 'አንበሳ', plants, objects, and verbs) should stay highly scored (7-10).
-            - Score 1: Absolute garbage (linguistic nonsense, OCR artifacts, invalid consonant clusters) or direct transliterations of foreign/English words (e.g., ቴክኖሎጂ, ኮምፒውተር, ኢንተርኔት).
-
-            CRITICAL DIRECTIVE:
-            DO NOT REMOVE OR DISCARD ANY WORDS. You must return exactly the same number of items you received. If a word violates the rules, give it a score of 1.
-
-            OUTPUT FORMAT (STRICT JSON ONLY):
-            Template Example:[{"id": 1, "score": 10, "is_root": true, "root": "መብላት"}, {"id": 2, "score": 8, "is_root": false, "root": "መብላት"}, {"id": 3, "score": 1, "is_root": false, "root": "N/A"}]
-            
-            STRICT FIELDS:
-            - id: The integer ID from the list.
-            - score: Likelihood (1-10).
-            - is_root: Boolean. True only if the word is the CITATION form (መነሻ ቃል). Usually the infinitive or the 3rd person masc singular perfective (e.g., 'ሰበረ' or 'መስበር').
-            - root: 
-               * ABSOLUTE ROOT PRINCIPLE: Always identify the most primary citation form. 
-                 - If a word is a negative derivation like 'አልመጣም' or 'አለመምጣት', DO NOT use 'አለመምጣት' as the root. The absolute root is 'መምጣት' (or 'መጣ').
-                 - Strip all prefixes (negative, conditional, prepositional) to find the 'ancestor' root.
-               * If the word is a variation (e.g. 'ሰበሩ', 'በመስበር'), put the absolute root/base form here.
-               * If the word itself IS the root, put the word itself here.
-               * If the word is absolute garbage (Score 1), put "N/A".
-            
-            No preamble, no extra words.`;
+          const systemInstruction = `YOU ARE AN AMHARIC LINGUIST. (Prompt Placeholder - To be updated) task: identify if words are roots.`;
 
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => {
-            console.error(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI] Timeout exceeded (${AI_TIMEOUT}ms)!`);
-            controller.abort();
-          }, AI_TIMEOUT);
+          const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-          console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI] Sending POST request to Gemini...`);
-          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${api_key}`, {
+          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${api_key}`, {
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              system_instruction: { parts: [{ text: systemInstruction }] },
-              contents: [{ parts: [{ text: `BATCH:\n${text}` }] }],
+              contents: [{ parts: [{ text: `SYSTEM: ${systemInstruction}\n\nDATA TO PROCESS:\n${formattedList}` }] }],
               generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
             }),
             signal: controller.signal
           });
           clearTimeout(timeoutId);
 
-          console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI] Response received. HTTP Status: ${aiResp.status}`);
-
-          // CRITICAL FIX: Punish the key immediately on BOTH 429 and 503 so other workers don't burn alive
           if (aiResp.status === 429 || aiResp.status === 503) {
-            console.warn(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI] Critical API failure (${aiResp.status}). Applying cooldown to Key ID: ${key_id}`);
-            await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', key_id);
-            throw new Error(aiResp.status === 429 ? 'API_RATE_LIMIT' : 'API_OVERLOAD');
-          }
-          if (!aiResp.ok) {
-             throw new Error(`Non-200 HTTP Response: ${aiResp.status} - ${aiResp.statusText}`);
+             await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', key_id);
+             throw new Error('API_LIMIT_REACHED');
           }
 
           const result = await aiResp.json();
+          const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
           
-          if (!result.candidates || result.candidates.length === 0) {
-            console.error(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI_SIEVE] AI returned NO candidates. Body: ${JSON.stringify(result)}`);
-            throw new Error(`AI returned no candidates. FinishReason: ${result.candidates?.[0]?.finishReason || 'Unknown'}`);
-          }
-
-          const rawText = result.candidates[0].content.parts[0].text || "";
-          console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI_SIEVE] Raw response length: ${rawText.length} chars. Parsing JSON...`);
-
-          const sanitize = (val: string) => val.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/""/g, '"').replace(/,\s*([\}\]])/g, '$1');
-          
-          const starts =[...rawText.matchAll(/\[/g)].map(m => m.index || 0);
-          const ends = [...rawText.matchAll(/\]/g)].map(m => m.index || 0).reverse();
-
+          // Basic JSON extraction logic
           try {
-            const parsed = JSON.parse(sanitize(rawText));
-            if (Array.isArray(parsed)) finalValidatedList = parsed;
-            else if (parsed.data && Array.isArray(parsed.data)) finalValidatedList = parsed.data;
-            else if (parsed.id && parsed.score) finalValidatedList = [parsed];
-          } catch (e) { 
-            console.warn(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI_SIEVE] Direct parse failed. Attempting deep chunk extraction...`);
+            const parsed = JSON.parse(rawText);
+            finalResults = Array.isArray(parsed) ? parsed : (parsed.data || null);
+          } catch (e) {
+            console.warn("[AI] JSON Parse failed, retrying chunk extraction...");
+            // Fallback to extraction if AI wraps JSON in markdown or text
+            const match = rawText.match(/\\[[\\s\\S]*\\]/);
+            if (match) finalResults = JSON.parse(match[0]);
           }
 
-          if (!finalValidatedList) {
-            for (const s of starts) {
-              for (const e of ends) {
-                if (e > s) {
-                  const chunk = rawText.substring(s, e + 1);
-                  try {
-                    const candidate = JSON.parse(sanitize(chunk));
-                    if (Array.isArray(candidate)) {
-                      finalValidatedList = candidate;
-                      break;
-                    }
-                  } catch (err) { continue; }
-                }
-              }
-              if (finalValidatedList) break;
-            }
-          }
-
-          if (finalValidatedList) {
-             console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI_SIEVE] SUCCESS! Parsed ${finalValidatedList.length} items from AI output.`);
-             break; // Success!
-          }
-          
-          console.error(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][AI_SIEVE] FATAL PARSE ERROR. Raw output:\n${rawText.substring(0, 200)}...`);
-          throw new Error(`Sieve failed. Raw text could not be parsed to JSON.`);
-
-        } catch (attemptErr) {
-          console.warn(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][ATTEMPT ${attempt} FAIL]: ${attemptErr.message}`);
-          if (attemptErr.message === 'API_RATE_LIMIT' || attemptErr.message === 'API_OVERLOAD' || attempt === 3) throw attemptErr;
-          console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Retrying in ${2000 * attempt}ms...`);
+          if (finalResults) break;
+        } catch (err) {
+          console.error(`[AI ERROR] ${err.message}`);
+          if (attempt === 3) throw err;
           await new Promise(r => setTimeout(r, 2000 * attempt));
         }
       }
 
-      // 4. Finalize and Save
-      if (!finalValidatedList) throw new Error("All AI attempts failed. finalValidatedList is null.");
+      // 4. Save to root_validation_results
+      if (finalResults) {
+        const toInsert = finalResults.map((item: any) => ({
+          original_word: words[item.id], 
+          is_root: !!item.is_root,
+          real_root: item.is_root ? null : (item.real_root || null)
+        }));
 
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Mapping ${finalValidatedList.length} scored items to original words...`);
-      const finalWords = finalValidatedList.map((item: any) => ({
-        word: wordMap[item.id],
-        confidence_score: item.score,
-        is_root: item.is_root ?? false,
-        ai_extracted_root: item.root || null,
-        source_batch_file: currentFilePath,
-        original_order_index: item.id
-      })).filter((w: any) => w.word !== undefined && w.word !== null);
-
-      if (finalWords.length > 0) {
-        console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Inserting ${finalWords.length} highly validated words to DB...`);
-        const { error: insErr } = await supabase.from('candidate_roots_orphan_rev').insert(finalWords.map(w => ({
-          root_word: w.word,
-          confidence_score: w.confidence_score,
-          is_legit_root: w.is_root,
-          source_batch_file: w.source_batch_file
-        })));
+        const { error: insErr } = await supabase.from('root_validation_results').upsert(toInsert, { onConflict: 'original_word' });
         if (insErr) throw insErr;
-        console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] DB Insert Complete.`);
-      } else {
-        console.warn(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] WARNING: AI parsed successfully but mapped to ZERO actual words. Checking wordMap...`);
-      }
 
-      // 5. Mark Done
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Notifying Orchestrator that file is DONE...`);
-      await fetch(ORCHESTRATOR_URL, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark_done', file_path: currentFilePath }) 
-      });
-      
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] File complete. Cycle finished successfully.`);
+        // 5. Mark Done
+        await supabase.rpc('mark_validation_done', { p_job_id: currentJobId });
+        console.log(`[SUCCESS] Job ${currentJobId} completed.`);
+      }
 
     } catch (err) {
-      console.error(`\n[WORKER ${WORKER_ID}][CYCLE ${cycle}][CRITICAL ERROR] File: ${currentFilePath || 'UNKNOWN'} | Error: ${err.message}`);
-
-      if (currentFilePath) {
-        try {
-          console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Returning failed file to Orchestrator...`);
-          await fetch(ORCHESTRATOR_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'fail_work', file_path: currentFilePath, error: err.message })
-          });
-          console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] File returned to orchestrator pool.`);
-        } catch (postErr) {
-          console.error(`[WORKER ${WORKER_ID}][CYCLE ${cycle}][FATAL] Could not notify orchestrator of failure:`, postErr.message);
-        }
+      console.error(`[CRITICAL] Job ${currentJobId} failed: ${err.message}`);
+      if (currentJobId) {
+        await supabase.rpc('fail_validation_work', { p_job_id: currentJobId, p_error: err.message });
       }
-
-      if (err.message === 'API_RATE_LIMIT' || err.message === 'API_OVERLOAD' || err.message.includes('No active/available')) {
-        console.warn(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] API Overload detected. Shutting down worker entirely to prevent cascading failure.`);
-        break;
-      }
-
-      console.log(`[WORKER ${WORKER_ID}][CYCLE ${cycle}] Brief cooldown before next cycle...`);
       await new Promise(r => setTimeout(r, 5000));
     }
   }
-  console.log(`\n======================================================`);
-  console.log(`🛑 [WORKER ${WORKER_ID}] Process terminated natively.`);
-  console.log(`======================================================\n`);
+  console.log(`🛑 [WORKER ${WORKER_ID}] Finished session.`);
 }
 
 runValidator();
