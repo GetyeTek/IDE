@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 const WORKER_ID = Deno.env.get('WORKER_ID') || `val_worker_${Math.random().toString(36).substring(7)}`;
 const AI_TIMEOUT = 120000; 
-const COOLDOWN_DURATION = 10 * 60 * 1000; 
+const COOLDOWN_DURATION = 60 * 60 * 1000; // 1 hour for rate limits 
 
 async function runValidator() {
   console.log(`\n======================================================`);
@@ -89,9 +89,15 @@ async function runValidator() {
           });
           clearTimeout(timeoutId);
 
-          if (aiResp.status === 429 || aiResp.status === 503) {
+          if (aiResp.status === 429) {
+             console.warn(`[429] Rate limit hit. Cooling down key ${key_id} for 1 hour.`);
              await supabase.from('api_keys').update({ cooldown_until: new Date(Date.now() + COOLDOWN_DURATION).toISOString() }).eq('id', key_id);
              throw new Error('API_LIMIT_REACHED');
+          }
+
+          if (aiResp.status === 503 || (await aiResp.clone().text()).includes('UNAVAILABLE')) {
+             console.warn(`[503] Gemini temporarily unavailable. Retrying attempt ${attempt}...`);
+             throw new Error('TEMPORARY_UNAVAILABLE');
           }
 
           const result = await aiResp.json();
