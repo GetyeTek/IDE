@@ -58,12 +58,20 @@ async function runValidator() {
             
             SCENARIOS & OUTPUT RULES:
             1. IF WORD IS PERFECT ROOT: Set "is_root": true. (No real_root needed).
-            2. IF WORD IS VARIATION/CONJUGATION: Set "is_root": false, provide "real_root" (the infinitive).
+            2. IF WORD IS VARIATION/CONJUGATION/DERIVATION: Set "is_root": false, provide "real_root".
+               - Strip verb conjugations (e.g., 'ተሳሳተ' -> 'መሳሳት').
+               - Strip derivational suffixes like '-ማ', '-ነት', '-ዊ', '-ኛ', '-አዊ'.
+                 * EXAMPLE: 'ኮረብታማ' -> is_root: false, real_root: 'ኮረብታ'.
+                 * EXAMPLE: 'ኢትዮጵያዊነት' -> is_root: false, real_root: null (proper noun base).
+                 * EXAMPLE: 'ደግነት' -> is_root: false, real_root: 'ደግ'.
             3. IF WORD HAS TYPO/ORTHOGRAPHY ERROR: Set "is_root": false, provide the correctly spelled version in "real_root".
-            4. NO TRANSLITERATIONS: Direct transliterations of foreign words (e.g., 'ቴክኖሎጂ', 'ኮምፒውተር', 'ኢንተርኔት', 'ስፖርት') are NOT native roots. 
+            4. NO TRANSLITERATIONS: Foreign loanwords (e.g., 'ኮምፒውተር', 'ኢንተርኔት') are NOT roots. 
                - Set "is_root": false.
-               - If a native Amharic synonym exists, put it in "real_root" (e.g., for 'ቴሌፎን' put 'ስልክ'). If no clear native root exists, leave "real_root" null.
-            5. IF WORD IS TOTAL GARBAGE: Set "is_root": false. (No real_root needed).
+               - Provide native synonym in "real_root" if one exists, otherwise null.
+            5. NO PROPER NOUNS: Names of people, cities, countries, or specific entities (e.g., 'አዲስ አበባ', 'ዮሐንስ', 'ካሳ') are NOT roots.
+               - Set "is_root": false.
+               - Leave "real_root": null.
+            6. IF WORD IS TOTAL GARBAGE: Set "is_root": false. (No real_root needed).
 
             STRICT JSON FORMAT:
             You will receive a list where each line starts with a number followed by a dot (e.g., "0. ቃል"). 
