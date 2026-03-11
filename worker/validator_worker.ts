@@ -76,7 +76,7 @@ async function runValidator() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
-          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${api_key}`, {
+          const aiResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${api_key}`, {
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
