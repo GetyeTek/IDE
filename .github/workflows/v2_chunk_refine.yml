@@ -33,7 +33,9 @@ jobs:
         run: deno run -A worker/v2_chunk_refinery.ts
 
       - name: Trigger Next Run
-        if: always()
-        run: gh workflow run v2_chunk_refine.yml
+        # ONLY run this if worker 1 succeeds (prevents 4 triggers and loop-on-failure)
+        if: success() && matrix.worker_id == 1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_PAT }}
+        # Make sure this filename matches your actual .yml file name!
+        run: gh workflow run v2_chunk_refine.yml
