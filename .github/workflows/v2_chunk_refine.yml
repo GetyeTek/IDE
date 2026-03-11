@@ -32,8 +32,8 @@ jobs:
           WORKER_ID: v2_worker_${{ matrix.worker_id }}
         run: deno run -A worker/v2_chunk_refinery.ts
 
-      # - name: Trigger Next Run
-      #   if: always()
-      #   run: gh workflow run v2_chunk_refine.yml
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trigger Next Run
+        if: always()
+        run: gh workflow run v2_chunk_refine.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
