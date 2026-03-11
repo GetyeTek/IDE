@@ -42,7 +42,36 @@ async function runValidator() {
         try {
           console.log(`[AI] Attempt ${attempt}/3 for Job ${currentJobId}...`);
           
-          const systemInstruction = `YOU ARE AN AMHARIC LINGUIST. (Prompt Placeholder - To be updated) task: identify if words are roots.`;
+          const systemInstruction = `
+            ROLE: Expert Amharic Linguistic Auditor.
+            MISSION: Validate if the provided words are the ABSOLUTE GENERIC INFINITIVE or CITATION form (መነሻ ቃል).
+
+            DEFINITION OF ABSOLUTE ROOT:
+            - For verbs: Must be the infinitive form (usually starts with 'መ'). 
+              * WRONG: 'ተሳሳተች', 'ተሳሳተ', 'ተሳሳቱ' -> FALSE.
+              * CORRECT ROOT: 'መሳሳት'.
+              * WRONG: 'ሄደ', 'ሄደች', 'ሄዱ' -> FALSE.
+              * CORRECT ROOT: 'መሄድ'.
+            - For Nouns/Actions: Map to the base action or generic singular noun.
+              * EXAMPLE: 'ሩጫ' (running) -> FALSE. CORRECT ROOT: 'መሮጥ'.
+              * EXAMPLE: 'ማዘን' (to be sad) -> TRUE. (Note: 'ሃዘን' is a related noun, but 'ማዘን' is the infinitive).
+            
+            SCENARIOS & OUTPUT RULES:
+            1. IF WORD IS PERFECT ROOT: Set "is_root": true. (No real_root needed).
+            2. IF WORD IS VARIATION/CONJUGATION: Set "is_root": false, provide "real_root" (the infinitive).
+            3. IF WORD HAS TYPO/ORTHOGRAPHY ERROR: Set "is_root": false, provide the correctly spelled version in "real_root".
+            4. IF WORD IS TOTAL GARBAGE: Set "is_root": false. (No real_root needed).
+
+            STRICT JSON FORMAT:
+            Return an array of objects matching the input IDs.
+            [
+              {"id": 0, "is_root": true},
+              {"id": 1, "is_root": false, "real_root": "መሄድ"},
+              {"id": 2, "is_root": false, "real_root": "መሳሳት"},
+              {"id": 3, "is_root": false}
+            ]
+
+            NO PREAMBLE. NO EXPLANATIONS. ONLY JSON.`;
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
@@ -87,11 +116,13 @@ async function runValidator() {
 
       // 4. Save to root_validation_results
       if (finalResults) {
-        const toInsert = finalResults.map((item: any) => ({
-          original_word: words[item.id], 
-          is_root: !!item.is_root,
-          real_root: item.is_root ? null : (item.real_root || null)
-        }));
+        const toInsert = finalResults
+          .filter((item: any) => words[item.id] !== undefined)
+          .map((item: any) => ({
+            original_word: words[item.id],
+            is_root: !!item.is_root,
+            real_root: item.is_root ? null : (item.real_root || null)
+          }));
 
         const { error: insErr } = await supabase.from('root_validation_results').upsert(toInsert, { onConflict: 'original_word' });
         if (insErr) throw insErr;
