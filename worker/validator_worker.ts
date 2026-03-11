@@ -63,12 +63,14 @@ async function runValidator() {
             4. IF WORD IS TOTAL GARBAGE: Set "is_root": false. (No real_root needed).
 
             STRICT JSON FORMAT:
-            Return an array of objects matching the input IDs.
+            You will receive a list where each line starts with a number followed by a dot (e.g., "0. ቃል"). 
+            You MUST return a JSON array of objects. Each object MUST include the "id" field matching that number.
+            
+            TEMPLATE:
             [
               {"id": 0, "is_root": true},
               {"id": 1, "is_root": false, "real_root": "መሄድ"},
-              {"id": 2, "is_root": false, "real_root": "መሳሳት"},
-              {"id": 3, "is_root": false}
+              {"id": 2, "is_root": false, "real_root": "መሳሳት"}
             ]
 
             NO PREAMBLE. NO EXPLANATIONS. ONLY JSON.`;
@@ -117,7 +119,7 @@ async function runValidator() {
       // 4. Save to root_validation_results
       if (finalResults) {
         const toInsert = finalResults
-          .filter((item: any) => words[item.id] !== undefined)
+          .filter((item: any) => item && typeof item.id === 'number' && words[item.id])
           .map((item: any) => ({
             original_word: words[item.id],
             is_root: !!item.is_root,
