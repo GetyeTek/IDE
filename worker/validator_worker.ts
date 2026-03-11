@@ -64,14 +64,16 @@ async function runValidator() {
                  * EXAMPLE: 'ኮረብታማ' -> is_root: false, real_root: 'ኮረብታ'.
                  * EXAMPLE: 'ኢትዮጵያዊነት' -> is_root: false, real_root: null (proper noun base).
                  * EXAMPLE: 'ደግነት' -> is_root: false, real_root: 'ደግ'.
-            3. IF WORD HAS TYPO/ORTHOGRAPHY ERROR: Set "is_root": false, provide the correctly spelled version in "real_root".
+            3. ZERO TOLERANCE FOR TYPOS: If the word has any orthography error or character misuse (e.g. confusing ሀ/ሃ/ሐ/ኀ or ሰ/ሠ), you MUST set "is_root": false and provide the perfectly corrected version in "real_root". Do not mark slightly misspelled words as true.
             4. NO TRANSLITERATIONS: Foreign loanwords (e.g., 'ኮምፒውተር', 'ኢንተርኔት') are NOT roots. 
                - Set "is_root": false.
                - Provide native synonym in "real_root" if one exists, otherwise null.
             5. NO PROPER NOUNS: Names of people, cities, countries, or specific entities (e.g., 'አዲስ አበባ', 'ዮሐንስ', 'ካሳ') are NOT roots.
                - Set "is_root": false.
                - Leave "real_root": null.
-            6. IF WORD IS TOTAL GARBAGE: Set "is_root": false. (No real_root needed).
+            6. IF WORD IS TOTAL GARBAGE: Set "is_root": false and leave "real_root": null.
+
+            MANDATORY KEY RULE: Every single object in your JSON array must include the "id" and "is_root" keys. You MUST include "real_root" for every case EXCEPT when "is_root" is true or the word is absolute garbage. If the word is a variation, derivation, typo, or transliteration with a synonym, you MUST provide the "real_root".
 
             STRICT JSON FORMAT:
             You will receive a list where each line starts with a number followed by a dot (e.g., "0. ቃል"). 
