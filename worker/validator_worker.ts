@@ -60,7 +60,10 @@ async function runValidator() {
             1. IF WORD IS PERFECT ROOT: Set "is_root": true. (No real_root needed).
             2. IF WORD IS VARIATION/CONJUGATION: Set "is_root": false, provide "real_root" (the infinitive).
             3. IF WORD HAS TYPO/ORTHOGRAPHY ERROR: Set "is_root": false, provide the correctly spelled version in "real_root".
-            4. IF WORD IS TOTAL GARBAGE: Set "is_root": false. (No real_root needed).
+            4. NO TRANSLITERATIONS: Direct transliterations of foreign words (e.g., 'ቴክኖሎጂ', 'ኮምፒውተር', 'ኢንተርኔት', 'ስፖርት') are NOT native roots. 
+               - Set "is_root": false.
+               - If a native Amharic synonym exists, put it in "real_root" (e.g., for 'ቴሌፎን' put 'ስልክ'). If no clear native root exists, leave "real_root" null.
+            5. IF WORD IS TOTAL GARBAGE: Set "is_root": false. (No real_root needed).
 
             STRICT JSON FORMAT:
             You will receive a list where each line starts with a number followed by a dot (e.g., "0. ቃል"). 
