@@ -129,16 +129,8 @@ async function runRefinement() {
           };
         }).filter((v: any) => v !== null);
 
-        // Upsert into the final table
-        const { error: finalErr } = await supabase.from('audited_dictionary_final').upsert({
-          master_root: finalRoot,
-          variations: cleanedVars,
-          variation_count: cleanedVars.length,
-          audited_at: new Date().toISOString()
-        }, { onConflict: 'master_root' });
-
-        if (finalErr) throw finalErr;
-        console.log(`[SAVED] "${finalRoot}" with ${cleanedVars.length} variations.`);
+        // STORAGE DISABLED: Results are recorded in refinement_audit_logs only.
+        console.log(`[AUDITED] "${finalRoot}" - Results logged for manual review.`);
       }
 
       // 5. Mark Done
