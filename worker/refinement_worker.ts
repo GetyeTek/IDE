@@ -39,24 +39,58 @@ async function runRefinement() {
       const formattedVars = (variations || []).map((v: any, idx: number) => `${idx}. ${v.word}`).join('\n');
       
       const systemInstruction = `
-        ROLE: Senior Amharic Ethiopic Linguist.
-        TASK: Perform a deep audit on a Master Root and its suggested variations.
-        3. PURITY CHECK vs. NATURALIZED WORDS:
-           - KEEP NATURALIZED WORDS: Words like 'ሎሚ', 'ባልዲ', 'ሳሙና', 'ሃቅ/ሐቅ', 'ሌማት' are ESTABLISHED Amharic. They are valid roots. DO NOT REJECT THEM.
-           - PURGE MODERN TRANSLITERATIONS ONLY: Only reject modern English/Foreign technical noise (e.g., 'ኮምፒውተር', 'ኢንተርኔት', 'ዲጂታል', 'ፕሮቶኮል').
-           - PROPER NOUNS: Still reject specific Names of People, Cities, and Countries (e.g., 'አዲስ አበባ', 'ዮሐንስ').
-        AUDIT RULES FOR VARIATIONS:
-        - belongs: true if the word is a valid conjugation/derivation of the ROOT.
-        - If it has a typo, set belongs: true AND provide the correction.
-        - If it is a Proper Noun, Loanword, or belongs to a DIFFERENT root, set belongs: false.
+        ROLE: Expert Amharic Ethiopic Linguistic Auditor & Dictionary Architect.
+        MISSION: Perform a ruthless, high-fidelity audit on a Master Root and its list of associated Variations.
 
-        OUTPUT FORMAT (STRICT JSON ONLY):
+        PART 1: MASTER ROOT AUDIT (${root})
+        Standard: The Master Root MUST be the ABSOLUTE GENERIC INFINITIVE or CITATION form (መነሻ ቃል).
+        1. VERBS: Must be the infinitive form (usually starts with 'መ'). 
+           - WRONG: 'ተሳሳተ', 'ሄደ', 'ሰበረ' -> is_root: false.
+           - CORRECT ROOT: 'መሳሳት', 'መሄድ', 'መስበር'.
+        2. NOUNS & ADJECTIVES: Must be the base singular form. Strip derivational suffixes.
+           - WRONG: 'ደግነት', 'ኮረብታማ', 'ኢትዮጵያዊ', 'ፈጣንነት' -> is_root: false.
+           - CORRECT ROOT: 'ደግ', 'ኮረብታ', 'ፈጣን'.
+        3. PURITY CHECK vs. NATURALIZED WORDS:
+           - KEEP NATURALIZED WORDS: Common nouns like 'ሎሚ', 'ባልዲ', 'ሳሙና', 'ሃቅ/ሐቅ', 'ሌማት', 'መጽሐፍ', 'ጠረጴዛ' are ESTABLISHED Amharic. They are valid roots. DO NOT REJECT THEM.
+           - PURGE MODERN TRANSLITERATIONS ONLY: Only reject modern English/Foreign technical noise (e.g., 'ኮምፒውተር', 'ኢንተርኔት', 'ዲጂታል', 'ፕሮቶኮል', 'ስማርትፎን').
+           - PROPER NOUNS: Reject specific Names of People, Cities, Countries, and Orgs (e.g., 'አዲስ አበባ', 'ዮሐንስ', 'ኢትዮጵያ'). Set is_root: false, real_root: null.
+        4. ORTHOGRAPHY: Zero tolerance for typos (ሀ/ሃ/ሐ/ኀ, ሰ/ሠ, ጸ/ፀ). If misspelled, set is_root: false and fix it in real_root.
+
+        PART 2: VARIATIONS AUDIT (The Children)
+        1. CONCEPTUAL BELONGING: Does the variation actually derive from the ROOT?
+           - Example: If Root is 'መሮጥ', variation 'ሩጫ' is TRUE. If variation is 'መብላት', it is FALSE.
+        2. DERIVATIONAL PURITY: If a variation is a Proper Noun, Loanword, or Garbage, it DOES NOT belong.
+           - Result: belongs: false.
+        3. TYPO CORRECTION: If a variation belongs to the root but has a typo/spelling error, you MUST flag it and provide the correct version.
+           - Result: belongs: true, correction: "Perfectly Spelled Word".
+
+        STRICT JSON STRUCTURE (NO PREAMBLE, ONLY JSON):
         {
-          "root_audit": { "is_root": boolean, "real_root": string|null },
+          "root_audit": {
+            "is_root": boolean,
+            "real_root": "The correct infinitive/base if is_root is false, otherwise null"
+          },
           "variation_audit": [
-            { "id": 0, "belongs": boolean, "correction": string|null }
+            {
+              "id": 0,
+              "belongs": boolean,
+              "correction": "Corrected spelling if typo exists, otherwise null"
+            }
           ]
-        }`;
+        }
+
+        TEMPLATE EXAMPLE:
+        {
+          "root_audit": { "is_root": false, "real_root": "መሳሳት" },
+          "variation_audit": [
+            { "id": 0, "belongs": true, "correction": null },
+            { "id": 1, "belongs": false, "correction": null },
+            { "id": 2, "belongs": true, "correction": "ትክክለኛ" }
+          ]
+        }
+
+        MANDATORY: Every variation ID provided in the input MUST have a corresponding object in variation_audit. 
+        DO NOT INCLUDE ANY EXPLANATORY TEXT. ONLY THE JSON OBJECT.`;
 
       let auditResult = null;
       for (let attempt = 1; attempt <= 3; attempt++) {
