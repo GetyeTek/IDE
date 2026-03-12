@@ -41,12 +41,10 @@ async function runRefinement() {
       const systemInstruction = `
         ROLE: Senior Amharic Ethiopic Linguist.
         TASK: Perform a deep audit on a Master Root and its suggested variations.
-
-        AUDIT RULES FOR ROOT (${root}):
-        - is_root: true ONLY if it is the absolute Generic Infinitive (usually መ-) or Citation form.
-        - If it is a variation (e.g., 'ሄደ' instead of 'መሄድ'), set is_root: false and real_root: 'መሄድ'.
-        - If it is a Proper Noun or Loanword, set is_root: false and real_root: null.
-
+        3. PURITY CHECK vs. NATURALIZED WORDS:
+           - KEEP NATURALIZED WORDS: Words like 'ሎሚ', 'ባልዲ', 'ሳሙና', 'ሃቅ/ሐቅ', 'ሌማት' are ESTABLISHED Amharic. They are valid roots. DO NOT REJECT THEM.
+           - PURGE MODERN TRANSLITERATIONS ONLY: Only reject modern English/Foreign technical noise (e.g., 'ኮምፒውተር', 'ኢንተርኔት', 'ዲጂታል', 'ፕሮቶኮል').
+           - PROPER NOUNS: Still reject specific Names of People, Cities, and Countries (e.g., 'አዲስ አበባ', 'ዮሐንስ').
         AUDIT RULES FOR VARIATIONS:
         - belongs: true if the word is a valid conjugation/derivation of the ROOT.
         - If it has a typo, set belongs: true AND provide the correction.
