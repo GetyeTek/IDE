@@ -104,6 +104,15 @@ async function runRefinement() {
 
       if (!auditResult) throw new Error("AI_FAILED_AFTER_RETRIES");
 
+      // LOG THE RAW RESPONSE FOR POST-MORTEM AUDIT
+      await supabase.from('refinement_audit_logs').insert({
+        job_id: jobId,
+        original_root: root,
+        original_vars_count: variations?.length || 0,
+        ai_raw_response: auditResult,
+        worker_id: WORKER_ID
+      });
+
       // 4. Update the Data based on Audit
       const finalRoot = auditResult.root_audit.is_root ? root : auditResult.root_audit.real_root;
       
