@@ -2473,6 +2473,13 @@ If you already give a payload, assume it's already applied, and give the next pl
     }
 
     if (action === "move_storage_object") {
+
+    if (action === "get_storage_signed_url") {
+        const { bucket, path } = payload;
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600); // 1 hour
+        if (error) throw error;
+        return new Response(JSON.stringify({ url: data.signedUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
         const { bucket, from_path, to_path } = payload;
         const { data: copyData, error: copyError } = await supabase.storage.from(bucket).copy(from_path, to_path);
         if (copyError) throw copyError;
