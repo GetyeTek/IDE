@@ -2273,6 +2273,37 @@ If you already give a payload, assume it's already applied, and give the next pl
         return new Response(JSON.stringify({ success: true, message: `Cron job '${job_name}' scheduled.` }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "fetch_cron_jobs") {
+        const sql = "SELECT jobid, schedule, command, active, jobname FROM cron.job ORDER BY jobid DESC;";
+        const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+                'apikey': Deno.env.get("SUPABASE_ANON_KEY")
+            },
+            body: JSON.stringify({ query: sql })
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (action === "unschedule_cron_job") {
+        const { job_name } = payload;
+        const sql = `SELECT cron.unschedule('${job_name}');`;
+        const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+                'apikey': Deno.env.get("SUPABASE_ANON_KEY")
+            },
+            body: JSON.stringify({ query: sql })
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     if (action === "rollback") {
         if(!ref_sha) throw new Error("Target SHA required");
         await githubFetch(TARGET_REPO, `/git/refs/heads/${DEV_BRANCH}`, { method: "PATCH", body: JSON.stringify({ sha: ref_sha, force: true }) });
