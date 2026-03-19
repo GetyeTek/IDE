@@ -1658,30 +1658,35 @@
         <div id="st-viewer-content" style="flex:1; overflow:auto; background:#050505; display:flex; align-items:center; justify-content:center;"></div>
     </div>
     <div id="bucket-manager-overlay" class="viewer-overlay">
-        <div class="viewer-header" style="min-height: 60px;">
-            <div id="storage-header-main" style="display:flex; align-items:center; flex:1; min-width:0; gap:8px;">
-                <div id="storage-title-wrap" style="display:flex; align-items:center; min-width:0; flex:1; gap:8px;">
-                    <span class="viewer-title" id="storage-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px;">Storage</span>
-                    <div id="storage-breadcrumbs" style="display:none; font-size:9px; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
-                </div>
-                <input type="text" id="storage-filter-input" placeholder="Search objects..." 
-                       style="display:none; height:34px;" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-xs text-slate-300 outline-none focus:border-ai-accent/50"
-                       onkeyup="filterStorageList(this.value)">
-            </div>
+        <div class="viewer-header" style="min-height: auto; flex-direction: column; align-items: stretch; padding: 10px 16px; gap: 10px;">
+            <!-- Row 1: Breadcrumbs -->
+            <div id="storage-breadcrumbs" style="display:none; font-size:10px; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow-x:auto; scrollbar-width: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 5px;"></div>
             
-            <div class="flex-gap" style="align-items:center; margin-left:8px;">
-                <div id="storage-controls" style="display:none; align-items:center; gap:5px;">
-                    <button id="btn-storage-search-toggle" class="icon-btn" onclick="toggleStorageSearch(true)" title="Search">🔍</button>
-                    <select id="storage-sort-by" style="height:30px; width:70px;" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects()">
-                        <option value="name">Name</option>
-                        <option value="size">Size</option>
-                        <option value="created_at">Created</option>
-                    </select>
-                    <button onclick="toggleStorageSortOrder()" id="btn-storage-sort-order" class="icon-btn" style="padding:4px 8px;">▼</button>
+            <!-- Row 2: Actions -->
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div id="storage-header-main" style="display:flex; align-items:center; flex:1; min-width:0; gap:8px;">
+                    <div id="storage-title-wrap" style="display:flex; align-items:center; min-width:0; flex:1;">
+                        <span class="viewer-title" id="storage-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Storage</span>
+                    </div>
+                    <input type="text" id="storage-filter-input" placeholder="Search objects..." 
+                           style="display:none; height:34px;" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-xs text-slate-300 outline-none focus:border-ai-accent/50"
+                           onkeyup="filterStorageList(this.value)">
                 </div>
-                <input type="file" id="storage-upload-input" class="hidden" onchange="handleStorageUpload(this)">
-                <button id="btn-storage-upload" class="btn-primary" style="display:none; width:auto; padding:6px 12px; font-size:11px;" onclick="document.getElementById('storage-upload-input').click()">Upload</button>
-                <button class="btn-outline" style="width:auto; padding:6px 12px; font-size:11px;" onclick="closeBucketManager()">Close</button>
+                
+                <div class="flex-gap" style="align-items:center; flex-shrink:0;">
+                    <div id="storage-controls" style="display:none; align-items:center; gap:5px;">
+                        <button id="btn-storage-search-toggle" class="icon-btn" onclick="toggleStorageSearch(true)" title="Search">🔍</button>
+                        <select id="storage-sort-by" style="height:30px; width:70px;" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects()">
+                            <option value="name">Name</option>
+                            <option value="size">Size</option>
+                            <option value="created_at">Created</option>
+                        </select>
+                        <button onclick="toggleStorageSortOrder()" id="btn-storage-sort-order" class="icon-btn" style="padding:4px 8px;">▼</button>
+                    </div>
+                    <input type="file" id="storage-upload-input" class="hidden" onchange="handleStorageUpload(this)">
+                    <button id="btn-storage-upload" class="btn-primary" style="display:none; width:auto; padding:6px 12px; font-size:11px;" onclick="document.getElementById('storage-upload-input').click()">Upload</button>
+                    <button class="btn-outline" style="width:auto; padding:6px 12px; font-size:11px;" onclick="closeBucketManager()">Close</button>
+                </div>
             </div>
         </div>
         <div id="storage-content" style="flex:1; overflow-y:auto; padding:10px;">
