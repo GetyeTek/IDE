@@ -1265,9 +1265,14 @@ serve(async (req) => {
             ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content) : "(omitted)"}\n`).join("\n---\n") 
             : "No files selected.";
 
-        const { use_system_prompt } = payload;
-            
-        const sysPrompt = use_system_prompt ? `Your goal is not just to write code, but to ensure the architecture is sound, secure, and maintainable. 
+        const { use_system_prompt, custom_system_prompt } = payload;
+        
+        // Priority: 1. Custom Prompt, 2. IDE Protocol, 3. Empty
+        let sysPrompt = "";
+        if (custom_system_prompt) {
+            sysPrompt = custom_system_prompt;
+        } else if (use_system_prompt) {
+            sysPrompt = `Your goal is not just to write code, but to ensure the architecture is sound, secure, and maintainable. 
 
 === CORE INTERACTION PROTOCOL ===
 1. **CONSULTATIVE FIRST**: 
