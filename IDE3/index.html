@@ -6311,8 +6311,6 @@ async function downloadArtifact(runId) {
         reader.readAsDataURL(file);
     }
 
-    async function renameStorageObject(oldName) {
-
     async function openStorageObject(name) {
         const prefix = storageCurrentPath.length > 0 ? storageCurrentPath.join('/') + '/' : '';
         const path = prefix + name;
@@ -6353,6 +6351,7 @@ async function downloadArtifact(runId) {
         } catch(e) { content.innerHTML = `<div style="color:var(--danger);">${e.message}</div>`; }
     }
 
+    async function renameStorageObject(oldName) {
         const newName = prompt("New filename:", oldName);
         if(!newName || newName === oldName) return;
 
