@@ -2257,8 +2257,8 @@ If you already give a payload, assume it's already applied, and give the next pl
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-                'apikey': Deno.env.get("SUPABASE_ANON_KEY")
+                'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                'apikey': Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
             },
             body: JSON.stringify({ query: sql })
         });
@@ -2323,7 +2323,8 @@ If you already give a payload, assume it's already applied, and give the next pl
 
     if (action === "toggle_cron_job") {
         const { job_id, active } = payload;
-        const sql = `UPDATE cron.job SET active = ${active} WHERE jobid = ${job_id};`;
+        // Use official pg_cron function to avoid permission issues on system tables
+        const sql = `SELECT cron.alter_job(${job_id}, active := ${active});`;
         const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
             method: 'POST',
             headers: {
