@@ -2241,11 +2241,7 @@ If you already give a payload, assume it's already applied, and give the next pl
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
         const fullUrl = `${projectUrl}/functions/v1/${function_slug}`;
 
-        const sql = `
-            CREATE EXTENSION IF NOT EXISTS pg_cron;
-            CREATE EXTENSION IF NOT EXISTS pg_net;
-            
-            SELECT cron.schedule(
+        const sql = `SELECT cron.schedule(
                 '${job_name}',
                 '${schedule}',
                 $$
@@ -2255,8 +2251,7 @@ If you already give a payload, assume it's already applied, and give the next pl
                     body:=jsonb_build_object('job', '${job_name}', 'triggered_at', now())
                 )
                 $$
-            );
-        `.trim();
+        );`;
 
         const sqlRes = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
             method: 'POST',
@@ -2339,7 +2334,7 @@ If you already give a payload, assume it's already applied, and give the next pl
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
         const fullUrl = `${projectUrl}/functions/v1/${function_slug}`;
 
-        const sql = `SELECT cron.alter_job(${job_id}, schedule := '${schedule}', command := $ SELECT net.http_post(url:='${fullUrl}', headers:='{"Content-Type": "application/json", "Authorization": "Bearer ${serviceKey}"}'::jsonb, body:=jsonb_build_object('job_id', '${job_id}', 'triggered_at', now())) $);`;
+        const sql = `SELECT cron.alter_job(${job_id}, schedule := '${schedule}', command := $SELECT net.http_post(url:='${fullUrl}', headers:='{"Content-Type": "application/json", "Authorization": "Bearer ${serviceKey}"}'::jsonb, body:=jsonb_build_object('job_id', '${job_id}', 'triggered_at', now()))$);`;
         const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
             method: 'POST',
             headers: {
