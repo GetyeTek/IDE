@@ -1569,6 +1569,16 @@
                 <p style="font-size: 10px; color: #888; margin-bottom: 12px;">Required once per project to enable the Database Extensions.</p>
                 <button class="btn-outline" style="border-color: var(--ai-accent); color: var(--ai-accent); font-size: 11px;" onclick="enableCronExtensions()">Enable pg_cron & pg_net</button>
             </div>
+
+            <div class="card" style="margin:0; flex: 1; display: flex; flex-direction: column; min-height: 200px;">
+                <div class="flex-between" style="margin-bottom: 12px;">
+                    <div style="font-size: 11px; color: var(--text-muted); font-weight: bold;">ACTIVE JOBS</div>
+                    <button class="icon-btn" style="padding: 2px 8px; font-size: 10px;" onclick="fetchCronJobs()">↻ Refresh</button>
+                </div>
+                <div id="cron-jobs-list" style="flex: 1; overflow-y: auto; font-family: 'JetBrains Mono'; font-size: 10px;">
+                    <div style="color:#444; text-align:center; padding: 20px;">No jobs loaded.</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2372,6 +2382,8 @@
         document.getElementById('cron-manager-overlay').classList.add('active');
         toggleFab(false);
         
+        fetchCronJobs();
+
         // Populate function list
         const container = document.getElementById('cron-fn-selector');
         const functions = new Set();
@@ -2403,6 +2415,48 @@
 
     function setCronPreset(val) {
         document.getElementById('cron-schedule').value = val;
+    }
+
+    async function fetchCronJobs() {
+        const container = document.getElementById('cron-jobs-list');
+        container.innerHTML = '<div style="color:var(--ai-accent); padding:20px; text-align:center;">Fetching...</div>';
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'fetch_cron_jobs' })
+            });
+            const result = await res.json();
+            
+            if (!result.data || result.data.length === 0) {
+                container.innerHTML = '<div style="color:#444; text-align:center; padding:20px;">No active cron jobs.</div>';
+                return;
+            }
+
+            container.innerHTML = result.data.map(job => `
+                <div style="padding:10px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="color:#eee; font-weight:bold; overflow:hidden; text-overflow:ellipsis;">${job.jobname || 'Unnamed'}</div>
+                        <div style="color:#666; font-size:9px;">${job.schedule} • ID: ${job.jobid}</div>
+                    </div>
+                    <button class="btn-outline" style="width:auto; padding:4px 8px; color:var(--danger); border-color:rgba(239,68,68,0.2); font-size:9px;" onclick="deleteCronJob('${job.jobname}')">Kill</button>
+                </div>
+            `).join('');
+        } catch(e) { container.innerHTML = '<div style="color:var(--danger); padding:20px;">Error loading jobs.</div>'; }
+    }
+
+    async function deleteCronJob(name) {
+        if (!confirm(`Permanently stop and delete job '${name}'?`)) return;
+        showGlobalToast("Stopping job...");
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'unschedule_cron_job', job_name: name })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            showGlobalToast("✅ Job Deleted");
+            fetchCronJobs();
+        } catch(e) { showGlobalToast(e.message, true); }
     }
 
     async function executeCreateCron() {
