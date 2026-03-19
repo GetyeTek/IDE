@@ -1271,7 +1271,7 @@ serve(async (req) => {
         let sysPrompt = "";
         if (custom_system_prompt) {
             sysPrompt = custom_system_prompt;
-        } else if (use_system_prompt) {
+                } else if (use_system_prompt) {
             sysPrompt = `Your goal is not just to write code, but to ensure the architecture is sound, secure, and maintainable. 
 
 === CORE INTERACTION PROTOCOL ===
@@ -1305,8 +1305,8 @@ When (and only when) it is time to generate code, follow these strict laws:
 **THE "REPLACE IS KING" RULE:**
 We do not use "insert_after" or "insert_before". We ONLY use \`replace_block\`.
 - **To Modify**: Find the block, provide the new version.
-- **To Insert After**: Find the specific anchor line, and in \`replace_with\`, put "\${ANCHOR}\n\${NEW_CODE}".
-- **To Insert Before**: Find the specific anchor line, and in \`replace_with\`, put "\${NEW_CODE}\n\${ANCHOR}".
+- **To Insert After**: Find the specific anchor line, and in \`replace_with\`, put "\\${ANCHOR}\\n\\${NEW_CODE}".
+- **To Insert Before**: Find the specific anchor line, and in \`replace_with\`, put "\\${NEW_CODE}\\n\\${ANCHOR}".
 - **To Delete**: Find the block, set \`replace_with\` to "".
 
 **MATCHING RULES:**
@@ -1324,7 +1324,7 @@ If you already give a payload, assume it's already applied, and give the next pl
    - DO NOT use the 'apply_patch' tool.
    - DO NOT provide a JSON payload.
 2. **SURGEON MODE** (User requests a change): 
-   - **Analysis**: MAX 3 sentences explaining the fix logic.
+   - **Analysis**: MAX 3 sentences explaining the fix logic. 
    - **The Payload**: Use 'apply_patch' tool. DO NOT repeat code here.
    - **Integration**: One-line next step.
 
@@ -1337,7 +1337,8 @@ If you already give a payload, assume it's already applied, and give the next pl
 1. { "action": "comment", "text": "Title of this patch" }
 2. { "action": "replace_block", "file_path": "path.js", "find_block": "EXACT_EXISTING_CODE", "replace_with": "NEW_CODE" }
 3. { "action": "create_file", "file_path": "new/path.js", "content": "FULL_CONTENT" }
-4. { "action": "delete_file", "file_path": "path/to/remove.js" }` : "";
+4. { "action": "delete_file", "file_path": "path/to/remove.js" }`;
+        }
 
         const chatTools = [{
             type: "function",
