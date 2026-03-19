@@ -2282,17 +2282,23 @@ If you already give a payload, assume it's already applied, and give the next pl
 
     if (action === "fetch_cron_jobs") {
         const sql = "SELECT jobid, schedule, command, active, jobname FROM cron.job ORDER BY jobid DESC;";
-        const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-                'apikey': Deno.env.get("SUPABASE_ANON_KEY")
-            },
-            body: JSON.stringify({ query: sql })
-        });
-        const data = await res.json();
-        return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        try {
+            const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+                    'apikey': Deno.env.get("SUPABASE_ANON_KEY")
+                },
+                body: JSON.stringify({ query: sql })
+            });
+            const result = await res.json();
+            // Normalize: always return { data: [...] }
+            const finalData = Array.isArray(result) ? result : (result.data || []);
+            return new Response(JSON.stringify({ data: finalData }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        } catch (e) {
+            return new Response(JSON.stringify({ data: [], error: e.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
     }
 
     if (action === "unschedule_cron_job") {
