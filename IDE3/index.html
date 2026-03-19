@@ -758,6 +758,9 @@
                     <button class="btn btn-outline" onclick="openEFManager()">
                         ⚡ Manage Edge Functions
                     </button>
+                    <button class="btn btn-outline" onclick="openBucketManager()">
+                        📦 Manage Buckets
+                    </button>
                     <button class="btn btn-outline" onclick="openAIManager()">
                         🧠 Manage AI Routing
                     </button>
@@ -1655,6 +1658,31 @@
         #cp-editor:not(.hidden) + #cp-empty-state { display: none; }
     </style>
 
+    <!-- BUCKET MANAGER OVERLAY -->
+    <div id="bucket-manager-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <div style="display:flex; align-items:center; gap:10px; flex:1;">
+                <span class="viewer-title" id="storage-title">Storage Buckets</span>
+                <div id="storage-breadcrumbs" style="display:none; font-size:10px; color:var(--text-muted); font-family:monospace;"></div>
+            </div>
+            <div class="flex-gap">
+                <button id="btn-storage-upload" class="btn-primary" style="display:none; width:auto; padding:6px 12px; font-size:11px;" onclick="document.getElementById('storage-upload-input').click()">Upload</button>
+                <input type="file" id="storage-upload-input" class="hidden" onchange="handleStorageUpload(this)">
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeBucketManager()">Close</button>
+            </div>
+        </div>
+        <div id="storage-content" style="flex:1; overflow-y:auto; padding:10px;">
+            <div style="text-align:center; padding:40px; color:#666;">Initialising Storage...</div>
+        </div>
+        <div id="storage-footer" class="flex-between" style="display:none; padding:10px; border-top:1px solid var(--border); background:#0a0a0a;">
+            <span id="storage-selection-count" style="font-size:11px; color:#666;">0 items selected</span>
+            <div class="flex-gap">
+                <button class="btn-outline" style="padding:4px 10px; font-size:11px; color:var(--danger); border-color:var(--danger);" onclick="deleteSelectedStorage()">Delete Selected</button>
+                <button class="btn-outline" style="padding:4px 10px; font-size:11px;" onclick="toggleAllStorage(true)">Select All</button>
+            </div>
+        </div>
+    </div>
+
     <!-- NAVIGATION -->
     <nav class="nav-bar">
         <button class="nav-item active" onclick="switchTab('tab-context', this)">Context</button>
@@ -1699,6 +1727,9 @@
     let workflowPage = 1;
     let currentFilterTab = null;
     let currentEditingJobId = null;
+    let storageCurrentBucket = null;
+    let storageCurrentPath = [];
+    let storageObjects = [];
     let chatUseSystemPrompt = false;
     let activeCustomPrompt = null;
     let customPrompts = JSON.parse(localStorage.getItem('conduit_custom_prompts') || '[]');
@@ -6056,6 +6087,176 @@ async function downloadArtifact(runId) {
         document.getElementById('setting-repo-name').value = name;
         closeRepoSelector();
         showGlobalToast(`Repo set to: ${name}`);
+    }
+
+    function openBucketManager() {
+        document.getElementById('bucket-manager-overlay').classList.add('active');
+        toggleFab(false);
+        fetchBuckets();
+    }
+
+    function closeBucketManager() {
+        document.getElementById('bucket-manager-overlay').classList.remove('active');
+        toggleFab(true);
+        storageCurrentBucket = null;
+        storageCurrentPath = [];
+    }
+
+    async function fetchBuckets() {
+        const container = document.getElementById('storage-content');
+        container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Scanning Buckets...</div>';
+        document.getElementById('storage-title').innerText = "Storage Buckets";
+        document.getElementById('storage-breadcrumbs').style.display = 'none';
+        document.getElementById('btn-storage-upload').style.display = 'none';
+        document.getElementById('storage-footer').style.display = 'none';
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'list_buckets' }) });
+            const data = await res.json();
+            
+            if(!data.buckets || data.buckets.length === 0) {
+                container.innerHTML = '<div style="padding:40px; text-align:center; color:#666;">No buckets found.</div>';
+                return;
+            }
+
+            container.innerHTML = data.buckets.map(b => `
+                <div class="model-item" onclick="openBucket('${b.name}')" style="cursor:pointer;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span style="font-size:18px;">${b.public ? '🌍' : '🔒'}</span>
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-weight:600; color:#eee;">${b.name}</span>
+                            <small style="color:#555; font-size:9px;">ID: ${b.id}</small>
+                        </div>
+                    </div>
+                    <span style="color:#444;">📁</span>
+                </div>
+            `).join('');
+        } catch(e) { container.innerHTML = `<div style="color:var(--danger); padding:20px;">${e.message}</div>`; }
+    }
+
+    function openBucket(name) {
+        storageCurrentBucket = name;
+        storageCurrentPath = [];
+        fetchStorageObjects();
+    }
+
+    async function fetchStorageObjects() {
+        const container = document.getElementById('storage-content');
+        const bread = document.getElementById('storage-breadcrumbs');
+        container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Reading Objects...</div>';
+        
+        document.getElementById('storage-title').innerText = storageCurrentBucket;
+        bread.style.display = 'block';
+        bread.innerHTML = `<span onclick="fetchBuckets()" style="cursor:pointer; color:var(--primary);">buckets</span> / ` + 
+            storageCurrentPath.map((p, i) => `<span onclick="navigateToStorageDepth(${i})" style="cursor:pointer; color:var(--primary);">${p}</span>`).join(' / ');
+
+        document.getElementById('btn-storage-upload').style.display = 'block';
+        document.getElementById('storage-footer').style.display = 'flex';
+
+        try {
+            const path = storageCurrentPath.join('/');
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'list_storage_objects', bucket: storageCurrentBucket, path: path })
+            });
+            const data = await res.json();
+            storageObjects = data.objects || [];
+            renderStorageList();
+        } catch(e) { container.innerHTML = `<div style="color:var(--danger); padding:20px;">${e.message}</div>`; }
+    }
+
+    function renderStorageList() {
+        const container = document.getElementById('storage-content');
+        if(storageObjects.length === 0) {
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:#444;">Folder is empty.</div>';
+            return;
+        }
+
+        container.innerHTML = storageObjects.map((obj, i) => {
+            const isFolder = !obj.id;
+            const icon = isFolder ? '📁' : '📄';
+            return `
+                <div class="file-item" style="padding:10px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex:1; cursor:pointer; min-width:0;" onclick="${isFolder ? `enterStorageFolder('${obj.name}')` : ''}">
+                        <span style="font-size:16px;">${icon}</span>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:12px; color:#eee; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${obj.name}</div>
+                            ${!isFolder ? `<small style="color:#555; font-size:9px;">${formatBytes(obj.metadata?.size)} • ${obj.metadata?.mimetype}</small>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex-gap">
+                        <input type="checkbox" class="storage-check" data-index="${i}" onchange="updateStorageSelectionCount()" style="accent-color:var(--ai-accent);">
+                    </div>
+                </div>`;
+        }).join('');
+        updateStorageSelectionCount();
+    }
+
+    function enterStorageFolder(name) {
+        storageCurrentPath.push(name);
+        fetchStorageObjects();
+    }
+
+    function navigateToStorageDepth(index) {
+        storageCurrentPath = storageCurrentPath.slice(0, index + 1);
+        fetchStorageObjects();
+    }
+
+    function updateStorageSelectionCount() {
+        const count = document.querySelectorAll('.storage-check:checked').length;
+        document.getElementById('storage-selection-count').innerText = `${count} items selected`;
+    }
+
+    function toggleAllStorage(force) {
+        document.querySelectorAll('.storage-check').forEach(cb => cb.checked = force);
+        updateStorageSelectionCount();
+    }
+
+    async function handleStorageUpload(input) {
+        const file = input.files[0];
+        if(!file) return;
+        
+        showGlobalToast("Uploading to " + storageCurrentBucket + "...");
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = e.target.result.split(',')[1];
+            const path = (storageCurrentPath.length > 0 ? storageCurrentPath.join('/') + '/' : '') + file.name;
+            try {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'upload_storage_object', bucket: storageCurrentBucket, path, file_body: base64, file_type: file.type })
+                });
+                const data = await res.json();
+                if(data.error) throw new Error(data.error);
+                showGlobalToast("✅ Uploaded Successfully");
+                fetchStorageObjects();
+            } catch(err) { showGlobalToast(err.message, true); }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function deleteSelectedStorage() {
+        const checked = Array.from(document.querySelectorAll('.storage-check:checked'));
+        if(checked.length === 0) return;
+
+        if(!confirm(`Delete ${checked.length} items? This cannot be undone.`)) return;
+        
+        const paths = checked.map(cb => {
+            const obj = storageObjects[cb.dataset.index];
+            return (storageCurrentPath.length > 0 ? storageCurrentPath.join('/') + '/' : '') + obj.name;
+        });
+
+        showGlobalToast("Deleting from " + storageCurrentBucket + "...");
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'delete_storage_objects', bucket: storageCurrentBucket, paths })
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+            showGlobalToast("✅ Deleted");
+            fetchStorageObjects();
+        } catch(err) { showGlobalToast(err.message, true); }
     }
 
     function closeRepoSelector() {
