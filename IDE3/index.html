@@ -861,6 +861,14 @@
                 <label class="input-label">New Path / Name</label>
                 <input type="text" id="rn-new-path" class="input-field" placeholder="path/to/file.js">
                 <p style="font-size: 10px; color: #666; margin-top: 8px;">Moving a file to a new folder will automatically create the folder structure.</p>
+                
+                <label id="rn-folder-move-wrap" style="display:flex; align-items:center; gap:8px; margin-top:12px; cursor:pointer; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px dashed #333;">
+                    <input type="checkbox" id="rn-move-folder" style="accent-color:var(--ai-accent); transform: scale(1.1);">
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:12px; color:#eee; font-weight:600;">Move entire directory</span>
+                        <span style="font-size:10px; color:var(--text-muted);">Apply this path change to all sibling files in the same folder</span>
+                    </div>
+                </label>
             </div>
 
             <div id="rn-warning" style="display:none; padding: 12px; background: rgba(234, 179, 8, 0.1); border: 1px solid var(--dev); border-radius: 8px; font-size: 12px; color: var(--dev);">
@@ -4119,27 +4127,48 @@
 
     async function executeRename() {
         const newPath = document.getElementById('rn-new-path').value.trim();
+        const moveFolder = document.getElementById('rn-move-folder').checked;
+        
         if (!newPath || newPath === currentRenamePath) return closeRenameModal();
-
         if (isPerformingAction) return;
         isPerformingAction = true;
-        showGlobalToast("Preparing move...");
+
+        const getDir = (p) => p.substring(0, p.lastIndexOf('/') + 1);
+        const oldDir = getDir(currentRenamePath);
+        const newDir = getDir(newPath);
+
+        showGlobalToast(moveFolder ? "Analyzing folder structure..." : "Preparing move...");
 
         try {
-            // 1. Get current content
-            const res = await fetch(CONFIG.funcUrl, {
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'preview_file', file_path: currentRenamePath })
-            });
-            const data = await res.json();
-            if (!data.content) throw new Error("Could not read source file content");
+            let ops = [{ "action": "comment", "text": moveFolder ? `[Bulk Move] ${oldDir} -> ${newDir}` : `[Rename] ${currentRenamePath} -> ${newPath}` }];
+            let filesToProcess = [];
 
-            const ops = [
-                { "action": "comment", "text": `[Rename] ${currentRenamePath} -> ${newPath}` },
-                { "action": "delete_file", "file_path": currentRenamePath },
-                { "action": "create_file", "file_path": newPath, "content": b64DecodeUnicode(data.content) }
-            ];
+            if (moveFolder && oldDir) {
+                // Find all siblings
+                filesToProcess = window.repoFiles.filter(f => f.path.startsWith(oldDir)).map(f => f.path);
+            } else {
+                filesToProcess = [currentRenamePath];
+            }
+
+            // Concurrent Content Fetching
+            const BATCH_SIZE = 5;
+            for (let i = 0; i < filesToProcess.length; i += BATCH_SIZE) {
+                const batch = filesToProcess.slice(i, i + BATCH_SIZE);
+                const batchResults = await Promise.all(batch.map(async (path) => {
+                    const res = await fetch(CONFIG.funcUrl, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: apiBody({ action: 'preview_file', file_path: path })
+                    });
+                    const data = await res.json();
+                    return { path, content: b64DecodeUnicode(data.content || "") };
+                }));
+
+                batchResults.forEach(res => {
+                    const targetPath = moveFolder ? res.path.replace(oldDir, newDir) : newPath;
+                    ops.push({ "action": "delete_file", "file_path": res.path });
+                    ops.push({ "action": "create_file", "file_path": targetPath, "content": res.content });
+                });
+            }
 
             closeRenameModal();
 
