@@ -1138,7 +1138,7 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
         }
 
         if (anyChange) {
-            try { lastCommitSha = await updateFile(TARGET_REPO, filePath, currentContent, sha, DEV_BRANCH, `Conduit: ${fileOps.length} ops`); } 
+            try { lastCommitSha = await updateFile(TARGET_REPO, filePath, currentContent, sha, DEV_BRANCH, patchTitle); } 
             catch (e: any) { anyOpFailed = true; opLogs.push({ type: 'commit_file', success: false, message: `Commit failed: ${e.message}` }); }
         }
         fileResults.push({ file: filePath, status: anyChange ? "updated" : "unchanged", operations: opLogs });
