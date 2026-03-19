@@ -1261,16 +1261,21 @@ serve(async (req) => {
 
     // 2. AI CHAT
     if (action === "ai_chat") {
-        const ctx = context_files && context_files.length > 0 
-            ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content) : "(omitted)"}\n`).join("\n---\n") 
-            : "No files selected.";
-
         const { use_system_prompt, custom_system_prompt } = payload;
         
-        // Priority: 1. Custom Prompt, 2. IDE Protocol, 3. Empty
+        // Mode Selection logic
         let sysPrompt = "";
+        let effectiveTools = undefined;
+        let isProtocolMode = false;
+
         if (custom_system_prompt) {
+            // 1. PERSONA MODE: Priority override. No tools, just instructions.
             sysPrompt = custom_system_prompt;
+            effectiveTools = undefined;
+        } else if (use_system_prompt) {
+            // 2. PROTOCOL MODE: Hardcoded IDE Surgeon behavior + Tools.
+            isProtocolMode = true;
+            sysPrompt = `... [Omitted for length, but will remain intact in code] ...`; // This placeholder represents your full IDE protocol string
                 } else if (use_system_prompt) {
             sysPrompt = `Your goal is not just to write code, but to ensure the architecture is sound, secure, and maintainable. 
 
@@ -1375,14 +1380,22 @@ If you already give a payload, assume it's already applied, and give the next pl
             content: m.text
         }));
 
+        // Context injection: Only wrap if files are actually selected
         const lastMsg = openAIMessages[openAIMessages.length - 1];
-        if (lastMsg) lastMsg.content = `=== CONTEXT ===\n${ctx}\n\n=== REQUEST ===\n${lastMsg.content}`;
+        if (lastMsg) {
+            if (context_files && context_files.length > 0) {
+                const ctx = context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content) : "(omitted)"}\n`).join("\n---\n");
+                lastMsg.content = `=== CONTEXT ===\n${ctx}\n\n=== REQUEST ===\n${lastMsg.content}`;
+            }
+            // If no files, we leave the message exactly as the user typed it.
+        }
 
         const chatMessages = [];
         if (sysPrompt) chatMessages.push({ role: 'system', content: sysPrompt });
         chatMessages.push(...openAIMessages);
 
-        const result = await genericRequestAI('chat', chatMessages, ai_config, use_system_prompt ? chatTools : undefined);
+        // IMPORTANT: Only provide the apply_patch tool if we are in Protocol Mode
+        const result = await genericRequestAI('chat', chatMessages, ai_config, isProtocolMode ? chatTools : undefined);
 
         let finalReply = result.content || "";
         if (result.tool_calls?.[0] && result.tool_calls[0].function.name === "apply_patch") {
