@@ -6331,7 +6331,28 @@ async function downloadArtifact(runId) {
             
             if(!data.url) throw new Error("URL missing");
             
-            dlBtn.onclick = () => window.open(data.url, '_blank');
+            dlBtn.onclick = async () => {
+                const originalText = dlBtn.innerText;
+                dlBtn.innerText = '⏳ Fetching...';
+                dlBtn.disabled = true;
+                try {
+                    const res = await fetch(data.url);
+                    const blob = await res.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = name;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(blobUrl);
+                } catch (err) {
+                    showGlobalToast("Download failed: " + err.message, true);
+                } finally {
+                    dlBtn.innerText = originalText;
+                    dlBtn.disabled = false;
+                }
+            };
 
             const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'];
             const textExts = ['txt', 'js', 'ts', 'json', 'html', 'css', 'md', 'log'];
