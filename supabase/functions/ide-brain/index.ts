@@ -2245,7 +2245,7 @@ If you already give a payload, assume it's already applied, and give the next pl
                 SELECT net.http_post(
                     url:='${fullUrl}',
                     headers:='{"Content-Type": "application/json", "Authorization": "Bearer ${serviceKey}"}'::jsonb,
-                    body:='{"job": "${job_name}", "triggered_at": "' || now() || '"}'::jsonb
+                    body:=jsonb_build_object('job', '${job_name}', 'triggered_at', now())
                 )
                 $
             );
