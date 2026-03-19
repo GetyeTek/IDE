@@ -1332,7 +1332,7 @@ If you already give a payload, assume it's already applied, and give the next pl
 1. { "action": "comment", "text": "Title of this patch" }
 2. { "action": "replace_block", "file_path": "path.js", "find_block": "EXACT_EXISTING_CODE", "replace_with": "NEW_CODE" }
 3. { "action": "create_file", "file_path": "new/path.js", "content": "FULL_CONTENT" }
-4. { "action": "delete_file", "file_path": "path/to/remove.js" }` : "You are a technical AI assistant. Answer the user's questions clearly and accurately.";
+4. { "action": "delete_file", "file_path": "path/to/remove.js" }` : "";
 
         const chatTools = [{
             type: "function",
@@ -1372,7 +1372,11 @@ If you already give a payload, assume it's already applied, and give the next pl
         const lastMsg = openAIMessages[openAIMessages.length - 1];
         if (lastMsg) lastMsg.content = `=== CONTEXT ===\n${ctx}\n\n=== REQUEST ===\n${lastMsg.content}`;
 
-        const result = await genericRequestAI('chat', [{ role: 'system', content: sysPrompt }, ...openAIMessages], ai_config, chatTools);
+        const chatMessages = [];
+        if (sysPrompt) chatMessages.push({ role: 'system', content: sysPrompt });
+        chatMessages.push(...openAIMessages);
+
+        const result = await genericRequestAI('chat', chatMessages, ai_config, use_system_prompt ? chatTools : undefined);
 
         let finalReply = result.content || "";
         if (result.tool_calls?.[0] && result.tool_calls[0].function.name === "apply_patch") {
