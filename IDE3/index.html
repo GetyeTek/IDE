@@ -5054,16 +5054,19 @@ async function downloadArtifact(runId) {
 
     function copyViewerContent(btn) {
         let content = "";
+        let pathHeader = "";
         // Check context: Editor or Log View?
         if (document.getElementById('ace-container').style.display !== 'none' && aceEditorInstance) {
             content = aceEditorInstance.getValue();
+            pathHeader = `FILE: ${currentViewerPath}\n`;
         } else {
             content = document.getElementById('log-custom-container').innerText;
         }
 
         if (!content) return showGlobalToast("No content to copy", true);
 
-        navigator.clipboard.writeText(content).then(() => {
+        const finalPayload = pathHeader + content;
+        navigator.clipboard.writeText(finalPayload).then(() => {
             const original = btn.innerHTML;
             btn.innerHTML = '✔';
             btn.style.color = 'var(--prod)';
