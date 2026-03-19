@@ -661,8 +661,13 @@
                 <button class="icon-btn" style="color:var(--prod)" onclick="loadExternalUrl()">Load URL</button>
             </div>
 
-            <div class="preview-container">
-                <iframe src="" id="preview-frame" sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-same-origin allow-scripts"></iframe>
+                <div class="viewer-title" id="storage-title">Storage Buckets</span>
+                <div id="storage-breadcrumbs" style="display:none; font-size:10px; color:var(--text-muted); font-family:monospace;"></div>
+                <div id="storage-filter-wrap" style="display:none; flex: 1; max-width: 200px;">
+                    <input type="text" id="storage-filter-input" placeholder="Filter objects..." 
+                           class="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] text-slate-300 outline-none focus:border-ai-accent/50"
+                           onkeyup="filterStorageList(this.value)">
+                </div>
             </div>
             <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px; flex-shrink:0;">Conduit Web Environment</p>
         </div>
@@ -1730,6 +1735,7 @@
     let storageCurrentBucket = null;
     let storageCurrentPath = [];
     let storageObjects = [];
+    let storageSearchQuery = '';
     let chatUseSystemPrompt = false;
     let activeCustomPrompt = null;
     let customPrompts = JSON.parse(localStorage.getItem('conduit_custom_prompts') || '[]');
@@ -6107,6 +6113,7 @@ async function downloadArtifact(runId) {
         container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Scanning Buckets...</div>';
         document.getElementById('storage-title').innerText = "Storage Buckets";
         document.getElementById('storage-breadcrumbs').style.display = 'none';
+        document.getElementById('storage-filter-wrap').style.display = 'none';
         document.getElementById('btn-storage-upload').style.display = 'none';
         document.getElementById('storage-footer').style.display = 'none';
 
@@ -6150,6 +6157,7 @@ async function downloadArtifact(runId) {
         bread.innerHTML = `<span onclick="fetchBuckets()" style="cursor:pointer; color:var(--primary);">buckets</span> / ` + 
             storageCurrentPath.map((p, i) => `<span onclick="navigateToStorageDepth(${i})" style="cursor:pointer; color:var(--primary);">${p}</span>`).join(' / ');
 
+        document.getElementById('storage-filter-wrap').style.display = 'block';
         document.getElementById('btn-storage-upload').style.display = 'block';
         document.getElementById('storage-footer').style.display = 'flex';
 
@@ -6165,14 +6173,22 @@ async function downloadArtifact(runId) {
         } catch(e) { container.innerHTML = `<div style="color:var(--danger); padding:20px;">${e.message}</div>`; }
     }
 
+    function filterStorageList(q) {
+        storageSearchQuery = q.toLowerCase();
+        renderStorageList();
+    }
+
     function renderStorageList() {
         const container = document.getElementById('storage-content');
-        if(storageObjects.length === 0) {
-            container.innerHTML = '<div style="padding:40px; text-align:center; color:#444;">Folder is empty.</div>';
+        const filtered = storageObjects.filter(obj => obj.name.toLowerCase().includes(storageSearchQuery));
+
+        if(filtered.length === 0) {
+            container.innerHTML = `<div style="padding:40px; text-align:center; color:#444;">${storageObjects.length === 0 ? 'Folder is empty.' : 'No items match filter.'}</div>`;
             return;
         }
 
-        container.innerHTML = storageObjects.map((obj, i) => {
+        container.innerHTML = filtered.map((obj) => {
+            const realIndex = storageObjects.indexOf(obj);
             const isFolder = !obj.id;
             const icon = isFolder ? '📁' : '📄';
             return `
@@ -6184,8 +6200,9 @@ async function downloadArtifact(runId) {
                             ${!isFolder ? `<small style="color:#555; font-size:9px;">${formatBytes(obj.metadata?.size)} • ${obj.metadata?.mimetype}</small>` : ''}
                         </div>
                     </div>
-                    <div class="flex-gap">
-                        <input type="checkbox" class="storage-check" data-index="${i}" onchange="updateStorageSelectionCount()" style="accent-color:var(--ai-accent);">
+                    <div class="flex-gap" style="align-items:center;">
+                        ${!isFolder ? `<button class="menu-btn" style="padding:5px;" onclick="renameStorageObject('${obj.name}')" title="Rename">✎</button>` : ''}
+                        <input type="checkbox" class="storage-check" data-index="${realIndex}" onchange="updateStorageSelectionCount()" style="accent-color:var(--ai-accent);">
                     </div>
                 </div>`;
         }).join('');
@@ -6233,6 +6250,27 @@ async function downloadArtifact(runId) {
             } catch(err) { showGlobalToast(err.message, true); }
         };
         reader.readAsDataURL(file);
+    }
+
+    async function renameStorageObject(oldName) {
+        const newName = prompt("New filename:", oldName);
+        if(!newName || newName === oldName) return;
+
+        const prefix = storageCurrentPath.length > 0 ? storageCurrentPath.join('/') + '/' : '';
+        const from_path = prefix + oldName;
+        const to_path = prefix + newName;
+
+        showGlobalToast("Renaming...");
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'move_storage_object', bucket: storageCurrentBucket, from_path, to_path })
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+            showGlobalToast("✅ Renamed");
+            fetchStorageObjects();
+        } catch(err) { showGlobalToast(err.message, true); }
     }
 
     async function deleteSelectedStorage() {
