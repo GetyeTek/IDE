@@ -1658,30 +1658,30 @@
         <div id="st-viewer-content" style="flex:1; overflow:auto; background:#050505; display:flex; align-items:center; justify-content:center;"></div>
     </div>
     <div id="bucket-manager-overlay" class="viewer-overlay">
-        <div class="viewer-header">
-            <div style="display:flex; flex-direction:column; justify-content:center; flex:1; min-width:0; padding: 5px 0;">
-                <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
-                    <span class="viewer-title" id="storage-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;">Storage Buckets</span>
-                    <div id="storage-breadcrumbs" style="display:none; font-size:10px; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;"></div>
+        <div class="viewer-header" style="min-height: 60px;">
+            <div id="storage-header-main" style="display:flex; align-items:center; flex:1; min-width:0; gap:8px;">
+                <div id="storage-title-wrap" style="display:flex; align-items:center; min-width:0; flex:1; gap:8px;">
+                    <span class="viewer-title" id="storage-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px;">Storage</span>
+                    <div id="storage-breadcrumbs" style="display:none; font-size:9px; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
                 </div>
-                
-                <div id="storage-filter-wrap" style="display:none; gap: 5px; align-items: center; margin-top:8px;">
-                    <input type="text" id="storage-filter-input" placeholder="Search..." 
-                           style="height:28px;" class="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] text-slate-300 outline-none focus:border-ai-accent/50"
-                           onkeyup="filterStorageList(this.value)">
-                    <select id="storage-sort-by" style="height:28px;" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects()">
+                <input type="text" id="storage-filter-input" placeholder="Search objects..." 
+                       style="display:none; height:34px;" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-xs text-slate-300 outline-none focus:border-ai-accent/50"
+                       onkeyup="filterStorageList(this.value)">
+            </div>
+            
+            <div class="flex-gap" style="align-items:center; margin-left:8px;">
+                <div id="storage-controls" style="display:none; align-items:center; gap:5px;">
+                    <button id="btn-storage-search-toggle" class="icon-btn" onclick="toggleStorageSearch(true)" title="Search">🔍</button>
+                    <select id="storage-sort-by" style="height:30px; width:70px;" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects()">
                         <option value="name">Name</option>
                         <option value="size">Size</option>
                         <option value="created_at">Created</option>
-                        <option value="updated_at">Updated</option>
                     </select>
-                    <button onclick="toggleStorageSortOrder()" id="btn-storage-sort-order" class="p-1 text-slate-500" title="Toggle Order">▼</button>
+                    <button onclick="toggleStorageSortOrder()" id="btn-storage-sort-order" class="icon-btn" style="padding:4px 8px;">▼</button>
                 </div>
-            </div>
-            <div class="flex-gap">
                 <input type="file" id="storage-upload-input" class="hidden" onchange="handleStorageUpload(this)">
-                <button id="btn-storage-upload" class="btn-primary" style="display:none; width:auto; padding:6px 14px; font-size:12px;" onclick="document.getElementById('storage-upload-input').click()">Upload</button>
-                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeBucketManager()">Close</button>
+                <button id="btn-storage-upload" class="btn-primary" style="display:none; width:auto; padding:6px 12px; font-size:11px;" onclick="document.getElementById('storage-upload-input').click()">Upload</button>
+                <button class="btn-outline" style="width:auto; padding:6px 12px; font-size:11px;" onclick="closeBucketManager()">Close</button>
             </div>
         </div>
         <div id="storage-content" style="flex:1; overflow-y:auto; padding:10px;">
@@ -6146,12 +6146,34 @@ async function downloadArtifact(runId) {
         storageCurrentPath = [];
     }
 
+    function toggleStorageSearch(show) {
+        const input = document.getElementById('storage-filter-input');
+        const titleWrap = document.getElementById('storage-title-wrap');
+        const searchBtn = document.getElementById('btn-storage-search-toggle');
+
+        if (show) {
+            input.style.display = 'block';
+            titleWrap.style.display = 'none';
+            searchBtn.innerText = '×';
+            searchBtn.onclick = () => toggleStorageSearch(false);
+            input.focus();
+        } else {
+            input.style.display = 'none';
+            titleWrap.style.display = 'flex';
+            searchBtn.innerText = '🔍';
+            searchBtn.onclick = () => toggleStorageSearch(true);
+            input.value = '';
+            filterStorageList('');
+        }
+    }
+
     async function fetchBuckets() {
         const container = document.getElementById('storage-content');
         container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Scanning Buckets...</div>';
         document.getElementById('storage-title').innerText = "Storage Buckets";
         document.getElementById('storage-breadcrumbs').style.display = 'none';
-        document.getElementById('storage-filter-wrap').style.display = 'none';
+        document.getElementById('storage-controls').style.display = 'none';
+        toggleStorageSearch(false);
         document.getElementById('btn-storage-upload').style.display = 'none';
         document.getElementById('storage-footer').style.display = 'none';
 
@@ -6203,7 +6225,7 @@ async function downloadArtifact(runId) {
         bread.innerHTML = `<span onclick="fetchBuckets()" style="cursor:pointer; color:var(--primary);">buckets</span> / ` + 
             storageCurrentPath.map((p, i) => `<span onclick="navigateToStorageDepth(${i})" style="cursor:pointer; color:var(--primary);">${p}</span>`).join(' / ');
 
-        document.getElementById('storage-filter-wrap').style.display = 'flex';
+        document.getElementById('storage-controls').style.display = 'flex';
         document.getElementById('btn-storage-upload').style.display = 'block';
         document.getElementById('storage-footer').style.display = 'flex';
 
