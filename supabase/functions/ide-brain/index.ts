@@ -2297,8 +2297,8 @@ If you already give a payload, assume it's already applied, and give the next pl
                 body: JSON.stringify({ query: sql })
             });
             const result = await res.json();
-            // Normalize: always return { data: [...] }
-            const finalData = Array.isArray(result) ? result : (result.data || []);
+            // If the executor returned a standardized object, use its data member
+            const finalData = result.data || (Array.isArray(result) ? result : []);
             return new Response(JSON.stringify({ data: finalData }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } catch (e) {
             return new Response(JSON.stringify({ data: [], error: e.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
