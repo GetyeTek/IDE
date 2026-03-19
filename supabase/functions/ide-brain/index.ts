@@ -2423,9 +2423,14 @@ If you already give a payload, assume it's already applied, and give the next pl
     }
 
     if (action === "list_storage_objects") {
-        const { bucket, path } = payload;
+        const { bucket, path, sort_by, sort_order } = payload;
         const { data, error } = await supabase.storage.from(bucket).list(path || '', {
-            limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' }
+            limit: 100, 
+            offset: 0, 
+            sortBy: { 
+                column: sort_by || 'name', 
+                order: sort_order || 'asc' 
+            }
         });
         if (error) throw error;
         return new Response(JSON.stringify({ objects: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
