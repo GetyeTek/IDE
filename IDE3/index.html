@@ -1548,10 +1548,12 @@
 
                 <div class="input-group">
                     <label class="input-label">Schedule (Cron Expression)</label>
-                    <div class="flex-gap" style="margin-bottom:10px;">
-                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('*/5 * * * *')">5 Mins</button>
+                    <div class="flex-gap" style="margin-bottom:10px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; scrollbar-width: none;">
+                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('30s')">30s</button>
+                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('1')">1m</button>
+                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('2')">2m</button>
+                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('*/5 * * * *')">5m</button>
                         <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('0 * * * *')">Hourly</button>
-                        <button class="btn-outline" style="font-size:10px; padding:4px 8px;" onclick="setCronPreset('0 0 * * *')">Daily</button>
                     </div>
                     <input type="text" id="cron-schedule" class="input-field" placeholder="* * * * *">
                     <p style="font-size:10px; color:#666; margin-top:5px;">Min | Hour | Day | Month | Weekday</p>
@@ -2405,10 +2407,17 @@
 
     async function executeCreateCron() {
         const job_name = document.getElementById('cron-job-name').value.trim();
-        const schedule = document.getElementById('cron-schedule').value.trim();
+        let schedule = document.getElementById('cron-schedule').value.trim();
         const function_slug = document.getElementById('cron-target-slug').value.trim();
 
         if(!job_name || !schedule || !function_slug) return showGlobalToast("Fill all fields", true);
+
+        // --- HUMAN LANGUAGE TRANSLATOR ---
+        if (schedule.toLowerCase() === '30s') {
+            schedule = '*/30 * * * * *'; // 6-part cron for seconds
+        } else if (!isNaN(schedule)) {
+            schedule = `*/${schedule} * * * *`; // Treat plain numbers as minutes
+        }
 
         showGlobalToast("Scheduling...");
         try {
