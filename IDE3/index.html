@@ -1559,10 +1559,26 @@
                     <p style="font-size:10px; color:#666; margin-top:5px;">Min | Hour | Day | Month | Weekday</p>
                 </div>
 
-                <button class="btn btn-primary" style="background: #fbbf24; color: black; margin-top: 10px;" onclick="executeCreateCron()">
-                    ⏰ Schedule Job
-                </button>
-            </div>
+        try {
+            // ... (fetch call from previous block) ...
+            const data = await res.json();
+            if(data.success || !data.error) {
+                showGlobalToast(isEditing ? "✅ Job Updated" : "✅ Job Scheduled");
+                
+                // Reset Form
+                currentEditingJobId = null;
+                document.getElementById('cron-job-name').disabled = false;
+                document.getElementById('cron-job-name').value = '';
+                document.getElementById('cron-schedule').value = '';
+                const submitBtn = document.querySelector('#cron-manager-overlay .btn-primary');
+                submitBtn.innerHTML = '⏰ Schedule Job';
+                submitBtn.style.background = '#fbbf24';
+                submitBtn.style.color = 'black';
+                
+                fetchCronJobs();
+                fetchState(true);
+            } else throw new Error(data.error);
+        } catch(e) { showGlobalToast(e.message, true); }
 
             <div class="card" style="border-color: var(--ai-accent); background: rgba(217, 70, 239, 0.02);">
                 <div style="font-size: 11px; color: var(--ai-accent); font-weight: bold; margin-bottom: 8px;">ENVIRONMENT SETUP</div>
@@ -1625,6 +1641,7 @@
     let sqlHistoryIndex = -1;
     let workflowPage = 1;
     let currentFilterTab = null;
+    let currentEditingJobId = null;
     let filters = {
         patcher: { time: 'all', files: [], categories: ['patch', 'sql', 'ai', 'system'] },
         history: { time: 'all', files: [] },
@@ -2432,16 +2449,71 @@
                 return;
             }
 
-            container.innerHTML = result.data.map(job => `
-                <div style="padding:10px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center;">
+            container.innerHTML = result.data.map(job => {
+                const isActive = job.active === true;
+                return `
+                <div style="padding:12px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center; background: ${job.jobid === currentEditingJobId ? 'rgba(59,130,246,0.1)' : 'transparent'}">
                     <div style="flex:1; min-width:0;">
-                        <div style="color:#eee; font-weight:bold; overflow:hidden; text-overflow:ellipsis;">${job.jobname || 'Unnamed'}</div>
-                        <div style="color:#666; font-size:9px;">${job.schedule} • ID: ${job.jobid}</div>
+                        <div style="color:#eee; font-weight:bold; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:8px;">
+                             <span style="width:6px; height:6px; border-radius:50%; background:${isActive ? 'var(--prod)' : '#444'}"></span>
+                             ${job.jobname || 'Unnamed'}
+                        </div>
+                        <div style="color:#666; font-size:9px; margin-top:2px;">${job.schedule} • ID: ${job.jobid}</div>
                     </div>
-                    <button class="btn-outline" style="width:auto; padding:4px 8px; color:var(--danger); border-color:rgba(239,68,68,0.2); font-size:9px;" onclick="deleteCronJob('${job.jobname}')">Kill</button>
-                </div>
-            `).join('');
+                    <div class="flex-gap">
+                        <button class="icon-btn" style="color:${isActive ? 'var(--prod)' : '#666'}; border:none;" onclick="toggleCronJob(${job.jobid}, ${!isActive})" title="${isActive ? 'Disable' : 'Enable'}">
+                            ${isActive ? 'ON' : 'OFF'}
+                        </button>
+                        <button class="icon-btn" style="color:var(--dev); border:none;" onclick="editCronJob(${JSON.stringify(job).replace(/"/g, '&quot;')})" title="Edit">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button class="icon-btn" style="color:var(--danger); border:none;" onclick="deleteCronJob('${job.jobname}')" title="Delete">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
         } catch(e) { container.innerHTML = '<div style="color:var(--danger); padding:20px;">Error loading jobs.</div>'; }
+    }
+
+    function editCronJob(job) {
+        currentEditingJobId = job.jobid;
+        document.getElementById('cron-job-name').value = job.jobname || '';
+        document.getElementById('cron-job-name').disabled = true; // Name is usually immutable in pg_cron schedule
+        document.getElementById('cron-schedule').value = job.schedule;
+        
+        // Extract function slug from command using regex
+        const slugMatch = job.command.match(/\/functions\/v1\/([^\/\s']+)/);
+        if (slugMatch && slugMatch[1]) {
+            const slug = slugMatch[1];
+            document.getElementById('cron-target-slug').value = slug;
+            // Try to find and activate the pill
+            document.querySelectorAll('#cron-fn-selector .filter-pill').forEach(p => {
+                p.classList.toggle('active', p.innerText === slug);
+            });
+        }
+
+        const submitBtn = document.querySelector('#cron-manager-overlay .btn-primary');
+        submitBtn.innerHTML = '💾 Update Job';
+        submitBtn.style.background = 'var(--ai-accent)';
+        submitBtn.style.color = 'white';
+
+        // Scroll to top of overlay
+        document.getElementById('cron-manager-overlay').querySelector('div[style*="padding: 20px"]').scrollTop = 0;
+        fetchCronJobs(); // Refresh to show highlight
+    }
+
+    async function toggleCronJob(id, active) {
+        showGlobalToast(active ? "Enabling..." : "Disabling...");
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'toggle_cron_job', job_id: id, active: active })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            fetchCronJobs();
+        } catch(e) { showGlobalToast(e.message, true); }
     }
 
     async function deleteCronJob(name) {
@@ -2473,11 +2545,18 @@
             schedule = `*/${schedule} * * * *`; // Treat plain numbers as minutes
         }
 
-        showGlobalToast("Scheduling...");
+        const isEditing = !!currentEditingJobId;
+        showGlobalToast(isEditing ? "Updating..." : "Scheduling...");
+        
         try {
+            const action = isEditing ? 'alter_cron_job' : 'create_cron_job';
+            const body = isEditing 
+                ? apiBody({ action, job_id: currentEditingJobId, schedule, function_slug }) 
+                : apiBody({ action, job_name, schedule, function_slug });
+
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'create_cron_job', job_name, schedule, function_slug })
+                body: body
             });
             const data = await res.json();
             if(data.success) {
