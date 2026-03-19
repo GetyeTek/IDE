@@ -16,10 +16,10 @@ serve(async (req) => {
     const { query } = await req.json()
     await client.connect()
 
-    const result = await client.queryArray(query)
+    const result = await client.queryArray(query);
     
-    // Extract column names from metadata
-    const columns = result.columns.map(col => col.name);
+    // Defensive check: DDL commands (CREATE/UPDATE) have no columns
+    const columns = result.columns ? result.columns.map(col => col.name) : [];
 
     // Safe serialization for BigInt and other non-JSON types
     const payload = JSON.stringify({
