@@ -1264,8 +1264,10 @@ serve(async (req) => {
         const ctx = context_files && context_files.length > 0 
             ? context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content) : "(omitted)"}\n`).join("\n---\n") 
             : "No files selected.";
+
+        const { use_system_prompt } = payload;
             
-        const sysPrompt = `Your goal is not just to write code, but to ensure the architecture is sound, secure, and maintainable. 
+        const sysPrompt = use_system_prompt ? `Your goal is not just to write code, but to ensure the architecture is sound, secure, and maintainable. 
 
 === CORE INTERACTION PROTOCOL ===
 1. **CONSULTATIVE FIRST**: 
@@ -1330,7 +1332,7 @@ If you already give a payload, assume it's already applied, and give the next pl
 1. { "action": "comment", "text": "Title of this patch" }
 2. { "action": "replace_block", "file_path": "path.js", "find_block": "EXACT_EXISTING_CODE", "replace_with": "NEW_CODE" }
 3. { "action": "create_file", "file_path": "new/path.js", "content": "FULL_CONTENT" }
-4. { "action": "delete_file", "file_path": "path/to/remove.js" }`;
+4. { "action": "delete_file", "file_path": "path/to/remove.js" }` : "You are a technical AI assistant. Answer the user's questions clearly and accurately.";
 
         const chatTools = [{
             type: "function",
