@@ -1955,11 +1955,6 @@ If you already give a payload, assume it's already applied, and give the next pl
             console.error("[EF_LOGS_DEBUG] JSON Parse Failed:", e.message);
             return new Response(JSON.stringify({ error: "Failed to parse REST response", raw: rawText }), { headers: corsHeaders });
         }
-        try {
-            parsed = JSON.parse(rawText);
-        } catch(e) {
-            return new Response(JSON.stringify({ error: "Failed to parse REST response", raw: rawText }), { headers: corsHeaders });
-        }
 
         // The logs.all endpoint returns { result: [...] }
         const rawRows = parsed.result || parsed.data || (Array.isArray(parsed) ? parsed : []);
@@ -2357,9 +2352,21 @@ If you already give a payload, assume it's already applied, and give the next pl
         await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'rollback', data: { message: `Rolled back to ${ref_sha.substring(0,7)}` } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    if (action === "update_note") { await supabase.from('conduit_history').update({ note: payload.note }).eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
-    if (action === "delete_history") { await supabase.from('conduit_history').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
-    if (action === "delete_log") { await supabase.from('conduit_logs').delete().eq('id', payload.id); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+    if (action === "update_note") {
+        const { error } = await supabase.from('conduit_history').update({ note: payload.note }).eq('id', payload.id);
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (action === "delete_history") {
+        const { error } = await supabase.from('conduit_history').delete().eq('id', payload.id);
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (action === "delete_log") {
+        const { error } = await supabase.from('conduit_logs').delete().eq('id', payload.id);
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (action === "delete_run") { await githubFetch(TARGET_REPO, `/actions/runs/${run_id}`, { method: "DELETE" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
     if (action === "cancel_run") { await githubFetch(TARGET_REPO, `/actions/runs/${run_id}/cancel`, { method: "POST" }); return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
 
