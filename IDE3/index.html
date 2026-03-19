@@ -1676,11 +1676,11 @@
                         <option value="updated_at">Updated</option>
                     </select>
                     <button onclick="toggleStorageSortOrder()" id="btn-storage-sort-order" class="p-1 text-slate-500" title="Toggle Order">▼</button>
-                    <button id="btn-storage-upload" class="btn-primary" style="height:28px; width:auto; padding:0 10px; font-size:10px;" onclick="document.getElementById('storage-upload-input').click()">Upload</button>
                 </div>
             </div>
             <div class="flex-gap">
                 <input type="file" id="storage-upload-input" class="hidden" onchange="handleStorageUpload(this)">
+                <button id="btn-storage-upload" class="btn-primary" style="display:none; width:auto; padding:6px 14px; font-size:12px;" onclick="document.getElementById('storage-upload-input').click()">Upload</button>
                 <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeBucketManager()">Close</button>
             </div>
         </div>
