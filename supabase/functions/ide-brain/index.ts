@@ -2263,7 +2263,16 @@ If you already give a payload, assume it's already applied, and give the next pl
             body: JSON.stringify({ query: sql })
         });
 
-        const sqlData = await sqlRes.json();
+        const rawSqlText = await sqlRes.text();
+        console.log("[CRON_SQL_RAW]:", rawSqlText);
+        
+        let sqlData;
+        try {
+            sqlData = JSON.parse(rawSqlText);
+        } catch(e) {
+            throw new Error(`SQL Executor returned invalid JSON: ${rawSqlText.substring(0, 100)}`);
+        }
+
         if (sqlData.error) throw new Error(sqlData.error);
 
         await supabase.from('conduit_logs').insert({
