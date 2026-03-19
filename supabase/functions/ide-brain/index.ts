@@ -2448,6 +2448,15 @@ If you already give a payload, assume it's already applied, and give the next pl
         return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    if (action === "move_storage_object") {
+        const { bucket, from_path, to_path } = payload;
+        const { data: copyData, error: copyError } = await supabase.storage.from(bucket).copy(from_path, to_path);
+        if (copyError) throw copyError;
+        const { error: removeError } = await supabase.storage.from(bucket).remove([from_path]);
+        if (removeError) throw removeError;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     if (action === "save_chat") {
         // Defensively ensure messages is an array
         const chatMsgs = Array.isArray(messages) ? messages : [];
