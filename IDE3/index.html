@@ -660,6 +660,11 @@
                 <input type="text" id="browser-url" class="url-bar" placeholder="https://username.github.io/repo/" onkeydown="if(event.key==='Enter') loadExternalUrl()">
                 <button class="icon-btn" style="color:var(--prod)" onclick="loadExternalUrl()">Load URL</button>
             </div>
+
+            <div class="preview-container">
+                <iframe id="preview-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+            </div>
+
             <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px; flex-shrink:0;">Conduit Web Environment</p>
         </div>
 
