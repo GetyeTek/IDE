@@ -2304,6 +2304,42 @@ If you already give a payload, assume it's already applied, and give the next pl
         return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    if (action === "toggle_cron_job") {
+        const { job_id, active } = payload;
+        const sql = `UPDATE cron.job SET active = ${active} WHERE jobid = ${job_id};`;
+        const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+                'apikey': Deno.env.get("SUPABASE_ANON_KEY")
+            },
+            body: JSON.stringify({ query: sql })
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (action === "alter_cron_job") {
+        const { job_id, schedule, function_slug } = payload;
+        const projectUrl = Deno.env.get("SUPABASE_URL");
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        const fullUrl = `${projectUrl}/functions/v1/${function_slug}`;
+
+        const sql = `SELECT cron.alter_job(${job_id}, schedule := '${schedule}', command := $ SELECT net.http_post(url:='${fullUrl}', headers:='{"Content-Type": "application/json", "Authorization": "Bearer ${serviceKey}"}'::jsonb, body:=jsonb_build_object('job_id', '${job_id}', 'triggered_at', now())) $);`;
+        const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+                'apikey': Deno.env.get("SUPABASE_ANON_KEY")
+            },
+            body: JSON.stringify({ query: sql })
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     if (action === "rollback") {
         if(!ref_sha) throw new Error("Target SHA required");
         await githubFetch(TARGET_REPO, `/git/refs/heads/${DEV_BRANCH}`, { method: "PATCH", body: JSON.stringify({ sha: ref_sha, force: true }) });
