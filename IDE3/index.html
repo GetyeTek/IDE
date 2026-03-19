@@ -1025,12 +1025,20 @@
         <div class="ef-layout">
             <!-- Sidebar / Top Bar -->
             <div class="ef-sidebar">
-                <div class="flex-between" style="padding:12px; border-bottom:1px solid var(--border);">
-                    <span style="font-size:11px; color:var(--text-muted); font-weight:bold; text-transform:uppercase;">Functions</span>
-                    <div class="flex-gap">
-                        <button class="icon-btn" onclick="createBareboneFunction()" title="New">+</button>
-                        <button class="icon-btn" onclick="openFunctionDiscovery()" title="Discover from other Repos/Folders">👁</button>
-                        <button class="icon-btn" onclick="fetchEdgeFunctions(true)" title="Rescan Repo">↻</button>
+                <div style="padding:12px; border-bottom:1px solid var(--border);">
+                    <div class="flex-between" style="margin-bottom:8px;">
+                        <span style="font-size:11px; color:var(--text-muted); font-weight:bold; text-transform:uppercase;">Functions</span>
+                        <div class="flex-gap">
+                            <button class="icon-btn" onclick="toggleEFSearch()" title="Search">🔍</button>
+                            <button class="icon-btn" onclick="createBareboneFunction()" title="New">+</button>
+                            <button class="icon-btn" onclick="openFunctionDiscovery()" title="Discover">👁</button>
+                            <button class="icon-btn" onclick="fetchEdgeFunctions(true)" title="Rescan">↻</button>
+                        </div>
+                    </div>
+                    <div id="efSearchWrap" class="hidden">
+                        <input type="text" id="efSearchInput" placeholder="Filter functions..." 
+                               class="w-full bg-white/5 border border-white/10 rounded px-2 py-1.5 text-[11px] text-slate-300 outline-none focus:border-ai-accent/50"
+                               onkeyup="filterEdgeFunctions(this.value)">
                     </div>
                 </div>
                 <div id="ef-list-sidebar" class="ef-list"></div>
@@ -2104,13 +2112,49 @@
         toggleFab(true);
     }
 
+    function toggleEFSearch() {
+        const wrap = document.getElementById('efSearchWrap');
+        const input = document.getElementById('efSearchInput');
+        const isHidden = wrap.classList.contains('hidden');
+        wrap.classList.toggle('hidden');
+        if (isHidden) input.focus();
+        else { input.value = ''; filterEdgeFunctions(''); }
+    }
+
+    function filterEdgeFunctions(q) {
+        if (!window.allEdgeFunctions) return;
+        const filtered = window.allEdgeFunctions.filter(name => name.toLowerCase().includes(q.toLowerCase()));
+        renderEFList(filtered);
+    }
+
+    function renderEFList(functions) {
+        const sidebar = document.getElementById('ef-list-sidebar');
+        const status = document.getElementById('ef-status-msg');
+        sidebar.innerHTML = '';
+        if (functions.length === 0) {
+            sidebar.innerHTML = '<div style="padding:20px; color:#666; font-size:11px; text-align:center;">No functions match.</div>';
+            return;
+        }
+        functions.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'ef-list-item';
+            item.style.cssText = 'padding:10px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; font-size:12px; cursor:pointer; color:#ccc; transition:0.2s; text-align:center;';
+            item.innerText = name;
+            item.onclick = () => {
+                document.querySelectorAll('.ef-list-item').forEach(el => el.style.borderColor = 'var(--border)');
+                item.style.borderColor = 'var(--ai-accent)';
+                document.getElementById('ef-name').value = name;
+                loadEdgeFunctionCode(name);
+            };
+            sidebar.appendChild(item);
+        });
+    }
+
     async function fetchEdgeFunctions(force = false) {
         const sidebar = document.getElementById('ef-list-sidebar');
         const status = document.getElementById('ef-status-msg');
         sidebar.innerHTML = '<div style="padding:20px; text-align:center; font-size:11px; color:var(--ai-accent); animation:pulse 1.5s infinite;">Scanning...</div>';
-        
         try {
-            // Always fetch fresh if the sidebar is currently empty or if forced
             if (force || !window.repoFiles || window.repoFiles.length === 0) {
                 const res = await fetch(CONFIG.funcUrl, { 
                     method: 'POST', 
@@ -2118,43 +2162,21 @@
                     body: apiBody({ action: 'fetch' }) 
                 });
                 const data = await res.json();
-                if (data.error) throw new Error(data.error);
                 window.repoFiles = data.files || [];
             }
-
-            const functions = new Set();
+            const functions = [];
             window.repoFiles.forEach(f => {
-                // Match path like: supabase/functions/my-fn/index.ts
                 if (f.path.includes('supabase/functions/')) {
                     const parts = f.path.split('supabase/functions/')[1].split('/');
-                    if (parts[0]) functions.add(parts[0]);
+                    if (parts[0] && !functions.includes(parts[0])) functions.push(parts[0]);
                 }
             });
-
-            sidebar.innerHTML = '';
-            if (functions.size === 0) {
-                sidebar.innerHTML = '<div style="padding:20px; color:#666; font-size:11px; text-align:center;">No functions found in /supabase/functions/</div>';
-                status.innerText = "Scan complete: 0 found.";
-            } else {
-                functions.forEach(name => {
-                    const item = document.createElement('div');
-                    item.className = 'ef-list-item';
-                    item.style.cssText = 'padding:10px; background:var(--card-bg); border:1px solid var(--border); border-radius:8px; font-size:12px; cursor:pointer; color:#ccc; transition:0.2s; text-align:center;';
-                    item.innerText = name;
-                    item.onclick = () => {
-                        document.querySelectorAll('.ef-list-item').forEach(el => el.style.borderColor = 'var(--border)');
-                        item.style.borderColor = 'var(--ai-accent)';
-                        document.getElementById('ef-name').value = name;
-                        loadEdgeFunctionCode(name);
-                    };
-                    sidebar.appendChild(item);
-                });
-                status.innerText = `Scan complete: Found ${functions.size} functions.`;
-            }
+            window.allEdgeFunctions = functions;
+            renderEFList(functions);
+            status.innerText = `Scan complete: Found ${functions.length} functions.`;
         } catch(e) {
             sidebar.innerHTML = `<div style="padding:20px; color:var(--danger); font-size:11px; text-align:center;">Scan Error: ${e.message}</div>`;
-            status.innerText = "Scan failed. Check settings.";
-            status.style.color = "var(--danger)";
+            status.innerText = "Scan failed.";
         }
     }
 
