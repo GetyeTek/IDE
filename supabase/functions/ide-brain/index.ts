@@ -2415,6 +2415,39 @@ If you already give a payload, assume it's already applied, and give the next pl
         return new Response(JSON.stringify({ messages: data?.ops || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // --- STORAGE ACTIONS ---
+    if (action === "list_buckets") {
+        const { data, error } = await supabase.storage.listBuckets();
+        if (error) throw error;
+        return new Response(JSON.stringify({ buckets: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (action === "list_storage_objects") {
+        const { bucket, path } = payload;
+        const { data, error } = await supabase.storage.from(bucket).list(path || '', {
+            limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' }
+        });
+        if (error) throw error;
+        return new Response(JSON.stringify({ objects: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (action === "upload_storage_object") {
+        const { bucket, path, file_body, file_type } = payload;
+        const binary = Uint8Array.from(atob(file_body), c => c.charCodeAt(0));
+        const { data, error } = await supabase.storage.from(bucket).upload(path, binary, {
+            contentType: file_type, upsert: true
+        });
+        if (error) throw error;
+        return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (action === "delete_storage_objects") {
+        const { bucket, paths } = payload;
+        const { data, error } = await supabase.storage.from(bucket).remove(paths);
+        if (error) throw error;
+        return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     if (action === "save_chat") {
         // Defensively ensure messages is an array
         const chatMsgs = Array.isArray(messages) ? messages : [];
