@@ -663,10 +663,17 @@
 
                 <div class="viewer-title" id="storage-title">Storage Buckets</span>
                 <div id="storage-breadcrumbs" style="display:none; font-size:10px; color:var(--text-muted); font-family:monospace;"></div>
-                <div id="storage-filter-wrap" style="display:none; flex: 1; max-width: 200px;">
-                    <input type="text" id="storage-filter-input" placeholder="Filter objects..." 
-                           class="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] text-slate-300 outline-none focus:border-ai-accent/50"
+                <div id="storage-filter-wrap" style="display:none; flex: 1; max-width: 250px; display: flex; gap: 5px; align-items: center;">
+                    <input type="text" id="storage-filter-input" placeholder="Filter..." 
+                           class="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] text-slate-300 outline-none focus:border-ai-accent/50"
                            onkeyup="filterStorageList(this.value)">
+                    <select id="storage-sort-by" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects()">
+                        <option value="name">Name</option>
+                        <option value="size">Size</option>
+                        <option value="created_at">Created</option>
+                        <option value="updated_at">Updated</option>
+                    </select>
+                    <button onclick="toggleStorageSortOrder()" id="btn-storage-sort-order" class="p-1 text-slate-500" title="Toggle Order">▼</button>
                 </div>
             </div>
             <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px; flex-shrink:0;">Conduit Web Environment</p>
@@ -1736,6 +1743,7 @@
     let storageCurrentPath = [];
     let storageObjects = [];
     let storageSearchQuery = '';
+    let storageSortOrder = 'asc';
     let chatUseSystemPrompt = false;
     let activeCustomPrompt = null;
     let customPrompts = JSON.parse(localStorage.getItem('conduit_custom_prompts') || '[]');
@@ -6147,9 +6155,17 @@ async function downloadArtifact(runId) {
         fetchStorageObjects();
     }
 
+    function toggleStorageSortOrder() {
+        storageSortOrder = (storageSortOrder === 'asc') ? 'desc' : 'asc';
+        document.getElementById('btn-storage-sort-order').innerText = storageSortOrder === 'asc' ? '▲' : '▼';
+        fetchStorageObjects();
+    }
+
     async function fetchStorageObjects() {
         const container = document.getElementById('storage-content');
         const bread = document.getElementById('storage-breadcrumbs');
+        const sortBy = document.getElementById('storage-sort-by')?.value || 'name';
+        
         container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Reading Objects...</div>';
         
         document.getElementById('storage-title').innerText = storageCurrentBucket;
@@ -6157,7 +6173,7 @@ async function downloadArtifact(runId) {
         bread.innerHTML = `<span onclick="fetchBuckets()" style="cursor:pointer; color:var(--primary);">buckets</span> / ` + 
             storageCurrentPath.map((p, i) => `<span onclick="navigateToStorageDepth(${i})" style="cursor:pointer; color:var(--primary);">${p}</span>`).join(' / ');
 
-        document.getElementById('storage-filter-wrap').style.display = 'block';
+        document.getElementById('storage-filter-wrap').style.display = 'flex';
         document.getElementById('btn-storage-upload').style.display = 'block';
         document.getElementById('storage-footer').style.display = 'flex';
 
@@ -6165,7 +6181,13 @@ async function downloadArtifact(runId) {
             const path = storageCurrentPath.join('/');
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'list_storage_objects', bucket: storageCurrentBucket, path: path })
+                body: apiBody({ 
+                    action: 'list_storage_objects', 
+                    bucket: storageCurrentBucket, 
+                    path: path,
+                    sort_by: sortBy,
+                    sort_order: storageSortOrder
+                })
             });
             const data = await res.json();
             storageObjects = data.objects || [];
@@ -6180,14 +6202,21 @@ async function downloadArtifact(runId) {
 
     function renderStorageList() {
         const container = document.getElementById('storage-content');
-        const filtered = storageObjects.filter(obj => obj.name.toLowerCase().includes(storageSearchQuery));
+        
+        // Filter
+        let list = storageObjects.filter(obj => obj.name.toLowerCase().includes(storageSearchQuery));
 
-        if(filtered.length === 0) {
+        // Folders First Logic (Manual client-side grouping)
+        const folders = list.filter(obj => !obj.id);
+        const files = list.filter(obj => obj.id);
+        const sortedList = [...folders, ...files];
+
+        if(sortedList.length === 0) {
             container.innerHTML = `<div style="padding:40px; text-align:center; color:#444;">${storageObjects.length === 0 ? 'Folder is empty.' : 'No items match filter.'}</div>`;
             return;
         }
 
-        container.innerHTML = filtered.map((obj) => {
+        container.innerHTML = sortedList.map((obj) => {
             const realIndex = storageObjects.indexOf(obj);
             const isFolder = !obj.id;
             const icon = isFolder ? '📁' : '📄';
