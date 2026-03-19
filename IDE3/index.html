@@ -660,22 +660,6 @@
                 <input type="text" id="browser-url" class="url-bar" placeholder="https://username.github.io/repo/" onkeydown="if(event.key==='Enter') loadExternalUrl()">
                 <button class="icon-btn" style="color:var(--prod)" onclick="loadExternalUrl()">Load URL</button>
             </div>
-
-                <div class="viewer-title" id="storage-title">Storage Buckets</span>
-                <div id="storage-breadcrumbs" style="display:none; font-size:10px; color:var(--text-muted); font-family:monospace;"></div>
-                <div id="storage-filter-wrap" style="display:none; flex: 1; max-width: 250px; display: flex; gap: 5px; align-items: center;">
-                    <input type="text" id="storage-filter-input" placeholder="Filter..." 
-                           class="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] text-slate-300 outline-none focus:border-ai-accent/50"
-                           onkeyup="filterStorageList(this.value)">
-                    <select id="storage-sort-by" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects()">
-                        <option value="name">Name</option>
-                        <option value="size">Size</option>
-                        <option value="created_at">Created</option>
-                        <option value="updated_at">Updated</option>
-                    </select>
-                    <button onclick="toggleStorageSortOrder()" id="btn-storage-sort-order" class="p-1 text-slate-500" title="Toggle Order">▼</button>
-                </div>
-            </div>
             <p id="preview-url-display" style="text-align:center; font-size:10px; color:var(--text-muted); margin-top:10px; flex-shrink:0;">Conduit Web Environment</p>
         </div>
 
@@ -1663,9 +1647,22 @@
     <!-- BUCKET MANAGER OVERLAY -->
     <div id="bucket-manager-overlay" class="viewer-overlay">
         <div class="viewer-header">
-            <div style="display:flex; align-items:center; gap:10px; flex:1;">
-                <span class="viewer-title" id="storage-title">Storage Buckets</span>
-                <div id="storage-breadcrumbs" style="display:none; font-size:10px; color:var(--text-muted); font-family:monospace;"></div>
+            <div style="display:flex; align-items:center; gap:10px; flex:1; overflow:hidden;">
+                <span class="viewer-title" id="storage-title" style="white-space:nowrap;">Storage Buckets</span>
+                <div id="storage-breadcrumbs" style="display:none; font-size:10px; color:var(--text-muted); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+                
+                <div id="storage-filter-wrap" style="display:none; flex: 1; max-width: 250px; gap: 5px; align-items: center;">
+                    <input type="text" id="storage-filter-input" placeholder="Filter..." 
+                           class="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] text-slate-300 outline-none focus:border-ai-accent/50"
+                           onkeyup="filterStorageList(this.value)">
+                    <select id="storage-sort-by" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects()">
+                        <option value="name">Name</option>
+                        <option value="size">Size</option>
+                        <option value="created_at">Created</option>
+                        <option value="updated_at">Updated</option>
+                    </select>
+                    <button onclick="toggleStorageSortOrder()" id="btn-storage-sort-order" class="p-1 text-slate-500" title="Toggle Order">▼</button>
+                </div>
             </div>
             <div class="flex-gap">
                 <button id="btn-storage-upload" class="btn-primary" style="display:none; width:auto; padding:6px 12px; font-size:11px;" onclick="document.getElementById('storage-upload-input').click()">Upload</button>
