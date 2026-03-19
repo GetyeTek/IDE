@@ -1371,8 +1371,18 @@
         <!-- Dynamic Table Pills -->
         <section class="bg-black/40 border-b border-white/5 p-3">
             <div class="flex justify-between items-center mb-2 px-1">
-                <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Tables</span>
-                <button onclick="fetchSqlSchema()" class="text-[10px] text-blue-400 font-bold uppercase">Sync Schema</button>
+                <div class="flex items-center gap-2 flex-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Tables</span>
+                    <div id="sqlTableSearchWrap" class="hidden flex-1 max-w-[150px]">
+                        <input type="text" id="sqlTableSearch" placeholder="Filter tables..." 
+                               class="w-full bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[10px] text-slate-300 outline-none focus:border-blue-400/50"
+                               onkeyup="filterSqlTables(this.value)">
+                    </div>
+                    <button onclick="toggleSqlTableSearch()" class="p-1 text-slate-500 hover:text-blue-400 transition-colors">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+                    </button>
+                </div>
+                <button onclick="fetchSqlSchema()" class="text-[10px] text-blue-400 font-bold uppercase">Sync</button>
             </div>
             <div id="sqlPillContainer" class="flex gap-2 overflow-x-auto no-scrollbar">
                 <div class="shimmer w-20 h-8 rounded-full"></div>
@@ -7156,42 +7166,54 @@ async function downloadArtifact(runId) {
         return result;
     }
 
-    async function fetchSqlSchema() {
+    function toggleSqlTableSearch() {
+        const wrap = document.getElementById('sqlTableSearchWrap');
+        const input = document.getElementById('sqlTableSearch');
+        const isHidden = wrap.classList.contains('hidden');
+        wrap.classList.toggle('hidden');
+        if (isHidden) input.focus();
+        else { input.value = ''; filterSqlTables(''); }
+    }
+
+    function filterSqlTables(q) {
+        if (!window.allSqlTables) return;
+        const filtered = window.allSqlTables.filter(t => t.table_name.toLowerCase().includes(q.toLowerCase()));
+        renderSqlTablePills(filtered);
+    }
+
+    function renderSqlTablePills(tables) {
         const container = document.getElementById('sqlPillContainer');
+        container.innerHTML = '';
+        tables.forEach(row => {
+            const btn = document.createElement('button');
+            btn.className = 'table-pill px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-400 active:scale-95';
+            btn.innerText = row.table_name;
+            btn.onclick = () => {
+                const isActive = btn.classList.contains('active');
+                const editor = document.getElementById('sqlEditor');
+                const currentVal = editor.value.trim();
+                const separator = currentVal ? '\n\n' : '';
+                document.querySelectorAll('.table-pill').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                let newQuery = !isActive 
+                    ? `-- Table Structure for ${row.table_name}\nSELECT table_name, column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;` 
+                    : `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
+                editor.value = currentVal + separator + newQuery;
+                editor.focus();
+                editor.scrollTop = editor.scrollHeight;
+                saveSqlState();
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    async function fetchSqlSchema() {
         const status = document.getElementById('sqlStatusText');
         try {
             const sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name;";
             const res = await callSqlEdgeFunction(sql);
-            container.innerHTML = '';
-            res.data.forEach(row => {
-                const btn = document.createElement('button');
-                btn.className = 'table-pill px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-400 active:scale-95';
-                btn.innerText = row.table_name;
-                btn.onclick = () => {
-                    const isActive = btn.classList.contains('active');
-                    const editor = document.getElementById('sqlEditor');
-                    const currentVal = editor.value.trim();
-                    const separator = currentVal ? '\n\n' : '';
-                    
-                    document.querySelectorAll('.table-pill').forEach(p => p.classList.remove('active'));
-                    btn.classList.add('active');
-                    
-                    let newQuery = "";
-                    if (!isActive) {
-                        // First Tap: Append Table Structure Query (including table_name for row identification)
-                        newQuery = `-- Table Structure for ${row.table_name}\nSELECT table_name, column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;`;
-                    } else {
-                        // Second Tap: Append Table Data Query
-                        newQuery = `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
-                    }
-
-                    editor.value = currentVal + separator + newQuery;
-                    editor.focus();
-                    editor.scrollTop = editor.scrollHeight;
-                    saveSqlState();
-                };
-                container.appendChild(btn);
-            });
+            window.allSqlTables = res.data;
+            renderSqlTablePills(window.allSqlTables);
             status.innerText = "Schema Updated";
         } catch (err) {
             status.innerText = "Schema Sync Error";
