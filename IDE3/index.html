@@ -1606,26 +1606,8 @@
                     <p style="font-size:10px; color:#666; margin-top:5px;">Min | Hour | Day | Month | Weekday</p>
                 </div>
 
-        try {
-            // ... (fetch call from previous block) ...
-            const data = await res.json();
-            if(data.success || !data.error) {
-                showGlobalToast(isEditing ? "✅ Job Updated" : "✅ Job Scheduled");
-                
-                // Reset Form
-                currentEditingJobId = null;
-                document.getElementById('cron-job-name').disabled = false;
-                document.getElementById('cron-job-name').value = '';
-                document.getElementById('cron-schedule').value = '';
-                const submitBtn = document.querySelector('#cron-manager-overlay .btn-primary');
-                submitBtn.innerHTML = '⏰ Schedule Job';
-                submitBtn.style.background = '#fbbf24';
-                submitBtn.style.color = 'black';
-                
-                fetchCronJobs();
-                fetchState(true);
-            } else throw new Error(data.error);
-        } catch(e) { showGlobalToast(e.message, true); }
+                <button class="btn btn-primary" style="background:#fbbf24; color:black;" onclick="executeCreateCron()">⏰ Schedule Job</button>
+            </div>
 
             <div class="card" style="border-color: var(--ai-accent); background: rgba(217, 70, 239, 0.02);">
                 <div style="font-size: 11px; color: var(--ai-accent); font-weight: bold; margin-bottom: 8px;">ENVIRONMENT SETUP</div>
