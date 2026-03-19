@@ -3875,7 +3875,15 @@
                     }
                 };
             `;
-            iframe.srcdoc = doc.documentElement.outerHTML;
+            const finalHtml = doc.documentElement.outerHTML;
+            const finalBlob = new Blob([finalHtml], { type: 'text/html' });
+            
+            if (window.PREVIEW_BLOB_URL) URL.revokeObjectURL(window.PREVIEW_BLOB_URL);
+            window.PREVIEW_BLOB_URL = URL.createObjectURL(finalBlob);
+            
+            iframe.removeAttribute('srcdoc');
+            iframe.src = window.PREVIEW_BLOB_URL;
+
             if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
             document.getElementById('preview-url-display').innerText = sha ? 'Viewing: ' + entry.title : 'Viewing: Live Dev (' + CONFIG.repoName + ')';
             document.getElementById('browser-url').value = '';
