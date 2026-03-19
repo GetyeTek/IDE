@@ -2473,19 +2473,19 @@ If you already give a payload, assume it's already applied, and give the next pl
     }
 
     if (action === "move_storage_object") {
-
-    if (action === "get_storage_signed_url") {
-        const { bucket, path } = payload;
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600); // 1 hour
-        if (error) throw error;
-        return new Response(JSON.stringify({ url: data.signedUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
         const { bucket, from_path, to_path } = payload;
         const { data: copyData, error: copyError } = await supabase.storage.from(bucket).copy(from_path, to_path);
         if (copyError) throw copyError;
         const { error: removeError } = await supabase.storage.from(bucket).remove([from_path]);
         if (removeError) throw removeError;
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (action === "get_storage_signed_url") {
+        const { bucket, path } = payload;
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600); // 1 hour
+        if (error) throw error;
+        return new Response(JSON.stringify({ url: data.signedUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (action === "save_chat") {
@@ -2533,7 +2533,7 @@ If you already give a payload, assume it's already applied, and give the next pl
         return new Response(JSON.stringify({ success: true, chat_id: savedId }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return new Response("Invalid Action", { status: 400, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: `Invalid Action: ${action}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
