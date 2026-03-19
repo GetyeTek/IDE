@@ -1617,8 +1617,8 @@
         // Project context prefers sessionStorage for tab isolation
         repoName: sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE',
         projectPath: sessionStorage.getItem('conduit_projectPath') || localStorage.getItem('conduit_projectPath') || '',
-        autoFix: sessionStorage.getItem('conduit_auto_fix') === 'true',
-        autoSanity: sessionStorage.getItem('conduit_auto_sanity') === 'true',
+        autoFix: false,
+        autoSanity: false,
         showPreview: localStorage.getItem('conduit_showPreview') !== 'false',
         efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
@@ -2617,8 +2617,7 @@
         // Tab-Specific Context & Automation (Isolated)
         sessionStorage.setItem('conduit_repoName', repoName);
         sessionStorage.setItem('conduit_projectPath', projectPath);
-        sessionStorage.setItem('conduit_auto_fix', autoFix);
-        sessionStorage.setItem('conduit_auto_sanity', autoSanity);
+
 
         // Also update localStorage as a fallback for new tabs
         localStorage.setItem('conduit_repoName', repoName);
