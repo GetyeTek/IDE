@@ -1600,7 +1600,7 @@
 
 
 
-            <div class="card" style="margin:0; flex: 1; display: flex; flex-direction: column; min-height: 200px;">
+            <div class="card" style="margin:0; flex: 1; display: flex; flex-direction: column; min-height: 70vh;">
                 <div class="flex-between" style="margin-bottom: 12px;">
                     <div style="font-size: 11px; color: var(--text-muted); font-weight: bold;">ACTIVE JOBS</div>
                     <button class="icon-btn" style="padding: 2px 8px; font-size: 10px;" onclick="fetchCronJobs()">↻ Refresh</button>
@@ -2559,7 +2559,7 @@
             container.innerHTML = result.data.map(job => {
                 const isActive = job.active === true;
                 return `
-                <div style="padding:12px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center; background: ${job.jobid === currentEditingJobId ? 'rgba(59,130,246,0.1)' : 'transparent'}">
+                <div style="padding:8px 12px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center; background: ${job.jobid === currentEditingJobId ? 'rgba(59,130,246,0.1)' : 'transparent'}">
                     <div style="flex:1; min-width:0;">
                         <div style="color:#eee; font-weight:bold; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:8px;">
                              <span style="width:6px; height:6px; border-radius:50%; background:${isActive ? 'var(--prod)' : '#444'}"></span>
