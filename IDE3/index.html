@@ -2679,7 +2679,7 @@
                 if (!isAppend) termContainer.innerHTML = ''; 
                 
                 if(data.logs && data.logs.length > 0) {
-                    const visibleLogs = data.logs.filter(l => l.type !== 'auto_fix_trigger' && l.type !== 'job_analysis');
+                    const visibleLogs = data.logs;
                     visibleLogs.forEach(log => {
                         const id = 'term-saved-' + log.id;
                         if (document.getElementById(id)) return; // Avoid duplicates
@@ -3362,7 +3362,8 @@
         let category = 'system';
         if (response.results) category = 'patch';
         if (originalPayload && Array.isArray(originalPayload) && originalPayload.some(p => p.action === 'execute_sql')) category = 'sql';
-        if (response.stage || response.analysis) category = 'ai';
+        // Automation and AI triggers are now visible and categorized
+        if (response.stage || response.analysis || response.trigger || response.fix_applied !== undefined) category = 'ai';
         el.dataset.category = category;
 
         // --- UPDATED SIGNATURE LOGIC ---
