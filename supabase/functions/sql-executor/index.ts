@@ -16,9 +16,8 @@ serve(async (req) => {
     const { query } = await req.json()
     await client.connect()
 
-    const result = await client.queryArray(query);
-    
-    // Defensive check: DDL commands (CREATE/UPDATE) have no columns
+    // Switch to queryObject so results are self-describing {key: value}
+    const result = await client.queryObject(query);
     const columns = result.columns ? result.columns.map(col => col.name) : [];
 
     // Safe serialization for BigInt and other non-JSON types
