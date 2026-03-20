@@ -3032,13 +3032,13 @@
                         currentContent = b64DecodeUnicode(fData.content || "");
                     }
                     
-                    // Check if file is "dirty" (different from what's on GitHub)
+                    // Always send content if the state in this session is new or changed
                     const isDirty = (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path] && window.CURRENT_FILE_CACHE[path].isModified);
-                    if (lastSentFileStates[path] !== currentContent || isDirty) {
+                    if (lastSentFileStates[path] !== currentContent) {
                         contextPayload.push({ 
                             path: path, 
-                            content: isDirty ? b64EncodeUnicode(currentContent) : null, 
-                            is_dirty: !!isDirty 
+                            content: b64EncodeUnicode(currentContent), 
+                            is_dirty: true 
                         });
                         lastSentFileStates[path] = currentContent;
                     }
