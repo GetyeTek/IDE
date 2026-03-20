@@ -154,8 +154,11 @@ function base64ToText(str: string) {
     try {
         const binString = atob(str.replace(/\s/g, ''));
         const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0)!);
-        return new TextDecoder().decode(bytes);
-    } catch (e) { return ""; }
+        const decoded = new TextDecoder().decode(bytes);
+        return decodeURIComponent(decoded);
+    } catch (e) {
+        try { return atob(str); } catch(e2) { return ""; }
+    }
 }
 
 function textToBase64(str: string) {
@@ -1261,7 +1264,7 @@ serve(async (req) => {
 
     // 2. AI CHAT
         if (action === "ai_chat") {
-        const { use_system_prompt, custom_system_prompt, new_message, chat_id, context_files } = payload;
+        const { use_system_prompt, custom_system_prompt, new_message, chat_id } = payload;
 
         // 1. Hydrate Last 10 Messages (Sliding Window)
         let historyMsgs = [];
