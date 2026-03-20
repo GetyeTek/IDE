@@ -1736,6 +1736,7 @@
     let editHistory = []; 
     let historyIndex = -1;
     let chatHistory = []; 
+    let lastSentFileStates = {};
     let logOffset = 0;
     let historyOffset = 0;
     let isPerformingAction = false;
@@ -3009,27 +3010,31 @@
     async function processAIResponse() {
         const loadingId = addChatMessage('ai', 'Thinking...', true);
         const contextPayload = [];
+        const lastUserMsg = chatHistory[chatHistory.length - 1]?.text || "";
 
         try {
-            // --- SURGICAL DEBUG OVERRIDE ---
             if (window.SURGICAL_DEBUG_DATA) {
                 contextPayload.push({
                     path: window.SURGICAL_DEBUG_DATA.path,
                     content: b64EncodeUnicode(window.SURGICAL_DEBUG_DATA.content)
                 });
-                // Clear after use to prevent polluting next chat
                 window.SURGICAL_DEBUG_DATA = null;
             } else {
-                // Standard: Grab all checked files
                 const checkedBoxes = document.querySelectorAll('#file-list-container .file-check:checked');
-                const filePaths = Array.from(checkedBoxes).map(cb => cb.value);
-                for (const path of filePaths) {
+                for (const cb of Array.from(checkedBoxes)) {
+                    const path = cb.value;
+                    let currentContent = "";
                     if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path]) {
-                        contextPayload.push({ path: path, content: b64EncodeUnicode(window.CURRENT_FILE_CACHE[path].content) });
+                        currentContent = window.CURRENT_FILE_CACHE[path].content;
                     } else {
-                        const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
-                        const data = await res.json();
-                        contextPayload.push({ path: path, content: data.content });
+                        const fRes = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: path }) });
+                        const fData = await fRes.json();
+                        currentContent = b64DecodeUnicode(fData.content || "");
+                    }
+                    
+                    if (lastSentFileStates[path] !== currentContent) {
+                        contextPayload.push({ path: path, content: b64EncodeUnicode(currentContent) });
+                        lastSentFileStates[path] = currentContent;
                     }
                 }
             }
@@ -3038,7 +3043,8 @@
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: apiBody({ 
                     action: 'ai_chat', 
-                    messages: chatHistory, 
+                    chat_id: currentChatId,
+                    new_message: lastUserMsg,
                     context_files: contextPayload,
                     use_system_prompt: chatUseSystemPrompt,
                     custom_system_prompt: activeCustomPrompt
@@ -3046,17 +3052,15 @@
             });
             const data = await res.json();
             
-            // Remove loading bubble (it's not in chatHistory yet)
             const loadingEl = document.getElementById(loadingId);
             if (loadingEl && loadingEl.parentElement) loadingEl.parentElement.remove();
 
+            if (data.chat_id) currentChatId = data.chat_id;
             let replyText = data.reply || "No response";
             chatHistory.push({ role: 'model', text: replyText });
 
-            // Re-render to show the new message with proper actions
             renderChatFromHistory();
             
-            // Handle JSON artifacts
             const jsonMatch = replyText.match(/```json\s*([\s\S]*?)\s*```/) || replyText.match(/\[\s*\{[\s\S]*\}\s*\]/);
             if (jsonMatch) {
                 const jsonStr = jsonMatch[1] || jsonMatch[0];
@@ -3064,14 +3068,11 @@
                     JSON.parse(jsonStr); 
                     document.getElementById('json-input').value = jsonStr;
                     saveState();
-                    const patcherTabBtn = document.querySelectorAll('.nav-item')[1];
-                    patcherTabBtn.style.color = "#d946ef";
-                    setTimeout(() => patcherTabBtn.style.color = "", 2000);
-                } catch(e) { console.error("Bad JSON", e); }
+                    const pb = document.querySelectorAll('.nav-item')[1];
+                    pb.style.color = "#d946ef";
+                    setTimeout(() => pb.style.color = "", 2000);
+                } catch(e) { }
             }
-
-            saveCurrentChat();
-
         } catch (e) {
             document.getElementById(loadingId).innerText = "Error: " + e.message;
         }
@@ -3958,6 +3959,7 @@
     function startNewChat() {
         currentChatId = null;
         chatHistory = [];
+        lastSentFileStates = {};
         const container = document.getElementById('chat-messages');
         container.innerHTML = `<div class="msg msg-ai">Started a new session. How can I help?</div>`;
         document.getElementById('chat-history-list').classList.remove('active');
