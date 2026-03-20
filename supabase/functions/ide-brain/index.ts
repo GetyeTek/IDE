@@ -1260,150 +1260,75 @@ serve(async (req) => {
     }
 
     // 2. AI CHAT
-    if (action === "ai_chat") {
-        const { use_system_prompt, custom_system_prompt } = payload;
-        
-        // Mode Selection logic
+        if (action === "ai_chat") {
+        const { use_system_prompt, custom_system_prompt, new_message, chat_id } = payload;
+
+        // 1. Hydrate History from Database
+        let historyMsgs = [];
+        if (chat_id) {
+            const { data } = await supabase.from('conduit_history').select('ops').eq('id', chat_id).single();
+            historyMsgs = data?.ops || [];
+        }
+
+        // 2. Format Context Bundle (IDE Export Format)
+        let processedUserMessage = new_message || messages?.[messages.length - 1]?.text || "";
+        if (context_files && context_files.length > 0) {
+            const contextBundle = context_files
+                .map((f: any) => "FILE: " + f.path + "\n" + base64ToText(f.content))
+                .join("\n\n");
+            processedUserMessage = "=== CONTEXT BUNDLE ===\n" + contextBundle + "\n\n=== USER REQUEST ===\n" + processedUserMessage;
+        }
+
+        // 3. Prepare AI Message Stack
+        const aiMessages = [
+            ...historyMsgs.map((m: any) => ({ 
+                role: m.role === 'model' ? 'assistant' : 'user', 
+                content: m.text 
+            })),
+            { role: 'user', content: processedUserMessage }
+        ];
+
+        // 4. System Instruction Logic
         let sysPrompt = "";
-        let effectiveTools = undefined;
         let isProtocolMode = false;
 
         if (custom_system_prompt) {
-            // 1. PERSONA MODE: Priority override. No tools, just instructions.
             sysPrompt = custom_system_prompt;
-            effectiveTools = undefined;
         } else if (use_system_prompt) {
-            // 2. PROTOCOL MODE: Hardcoded IDE Surgeon behavior + Tools.
             isProtocolMode = true;
-            sysPrompt = `... [Omitted for length, but will remain intact in code] ...`; // This placeholder represents your full IDE protocol string
-                } else if (use_system_prompt) {
-            sysPrompt = `Your goal is not just to write code, but to ensure the architecture is sound, secure, and maintainable. 
-
-=== CORE INTERACTION PROTOCOL ===
-1. **CONSULTATIVE FIRST**: 
-   - When I propose an idea, DO NOT jump straight to coding. 
-   - **Reflect**: specific critique of the idea. Is it efficient? Is it secure?
-   - **Brainstorm**: If my idea is suboptimal, propose a better architecture.
-   - **Only generate the JSON Payload when I explicitly ask (e.g., "Do it," "Give me the code," "Implement this," "Generate payload"). Until then, we are in discussion mode.**
-   - **TRIGGER ACTIVATION**: As soon as I use a trigger phrase, the 'CONSULTATIVE' phase is CLOSED. You MUST immediately transition to the 'SURGEON' role and provide the JSON payload using the \`apply_patch\` tool. Do not repeat your architectural analysis if you have already provided it; proceed directly to the payload.
-2. **INCREMENTAL CONTEXT**:
-   - Assume any previous operations we discussed have *already been applied*. 
-   - Do not try to fix code based on its state 5 minutes ago. Fix it based on the state *after* your last payload.
-   - **Chaos Prevention**: If a previous fix failed or the code is getting messy, DO NOT pile more changes on top. Explicitly tell me: "Please revert the previous change first, then apply this fresh payload."
-
-Always write the comment op at the top, it should be a very concise of what this playload is about. 
-
-=== THE JSON PAYLOAD PROTOCOL ===
-When (and only when) it is time to generate code, follow these strict laws:
-
-**FORMAT:**
-- Output a single JSON Array [...] wrapped in a \`\`\`json code block.
-- **NO** plain text outside the explanation sections.
-- The **first operation** must always be: \`{ "action": "comment", "text": "SUMMARY_OF_CHANGE" }\`.
-- **BATCHING**: You CAN and SHOULD stack multiple operations in a single call. If a feature requires changes to 5 files, send one payload with all 5 files.
-
-**FILE SAFETY LAWS (CRITICAL):**
-1. **NO ILLEGAL CREATION**: You generally CANNOT use \`create_file\` on a path that already exists. 
-2. **THE OVERWRITE PATTERN**: If you must completely rewrite an existing file (because it's corrupted or needs a full refresh), you MUST issue a \`delete_file\` action first, followed immediately by a \`create_file\`.
-   - Example: \`[ { "action": "delete_file", ...}, { "action": "create_file", ...} ]\`
-
-**THE "REPLACE IS KING" RULE:**
-We do not use "insert_after" or "insert_before". We ONLY use \`replace_block\`.
-- **To Modify**: Find the block, provide the new version.
-- **To Insert After**: Find the specific anchor line, and in \`replace_with\`, put "\\${ANCHOR}\\n\\${NEW_CODE}".
-- **To Insert Before**: Find the specific anchor line, and in \`replace_with\`, put "\\${NEW_CODE}\\n\\${ANCHOR}".
-- **To Delete**: Find the block, set \`replace_with\` to "".
-
-**MATCHING RULES:**
-- \`find_block\`: Must be an **EXACT STRING MATCH** of the code as it exists in the file. No regex, no comments like "// ... code". Copy-paste precision is required.
-- **NO TRUNCATION**: Do not use "..." or comments inside a find_block. Provide the full literal block.
-- **WHITESPACE**: Do not guess indentation; copy it exactly from the source.
-- **AMBIGUITY**: If a block exists multiple times, include unique surrounding lines.
-
-Important:
-If you already give a payload, assume it's already applied, and give the next playload on top of the previous one as a fix or update. You can't update the same thing twice.
-
-=== RESPONSE MODES ===
-1. **INQUIRY MODE** (User asks a question): 
-   - Provide a direct, technical answer immediately. 
-   - DO NOT use the 'apply_patch' tool.
-   - DO NOT provide a JSON payload.
-2. **SURGEON MODE** (User requests a change): 
-   - **Analysis**: MAX 3 sentences explaining the fix logic. 
-   - **The Payload**: Use 'apply_patch' tool. DO NOT repeat code here.
-   - **Integration**: One-line next step.
-
-=== CRITICAL RESTRAINT PROTOCOL ===
-- **ZERO REPETITION**: State a fact or URL exactly ONCE. 
-- **NO THOUGHT LOGGING**: Do not explain what you are 'scanning' or 'looking for'. Just give results.
-- **D2D BREVITY**: If the user asks 'What URL?', simply reply with the URL and the file it was found in. Nothing else.
-
-=== JSON SCHEMA REFERENCE ===
-1. { "action": "comment", "text": "Title of this patch" }
-2. { "action": "replace_block", "file_path": "path.js", "find_block": "EXACT_EXISTING_CODE", "replace_with": "NEW_CODE" }
-3. { "action": "create_file", "file_path": "new/path.js", "content": "FULL_CONTENT" }
-4. { "action": "delete_file", "file_path": "path/to/remove.js" }`;
+            sysPrompt = `You are the Conduit IDE Surgeon. You generate JSON patches. Protocol: 1. Consultative first. 2. Surgeon mode on user request. 3. Output valid JSON in tool calls.`;
         }
 
-        const chatTools = [{
-            type: "function",
-            function: {
-                name: "apply_patch",
-                description: "Apply a JSON patch array to the repository files based on the context.",
-                parameters: {
-                    type: "object",
-                    properties: {
-                        explanation: { type: "string", description: "A brief technical summary of what this patch does." },
-                        operations: {
-                            type: "array",
-                            description: "A batch of atomic operations to be applied in sequence. Stack multiple files here if the task requires it.",
-                            items: {
-                                type: "object",
-                                properties: {
-                                    action: { type: "string", enum: ["comment", "replace_block", "create_file"] },
-                                    file_path: { type: "string" },
-                                    find_block: { type: "string" },
-                                    replace_with: { type: "string" },
-                                    content: { type: "string" }
-                                },
-                                required: ["action"]
-                            }
-                        }
-                    },
-                    required: ["explanation", "operations"]
-                }
-            }
-        }];
-        
-        const openAIMessages = messages.map((m: any) => ({
-            role: m.role === 'model' ? 'assistant' : 'user',
-            content: m.text
-        }));
+        if (sysPrompt) aiMessages.unshift({ role: 'system', content: sysPrompt });
 
-        // Context injection: Only wrap if files are actually selected
-        const lastMsg = openAIMessages[openAIMessages.length - 1];
-        if (lastMsg) {
-            if (context_files && context_files.length > 0) {
-                const ctx = context_files.map((f: any) => `FILE: ${f.path}\nCONTENT:\n${f.content ? base64ToText(f.content) : "(omitted)"}\n`).join("\n---\n");
-                lastMsg.content = `=== CONTEXT ===\n${ctx}\n\n=== REQUEST ===\n${lastMsg.content}`;
-            }
-            // If no files, we leave the message exactly as the user typed it.
+        // 5. Execute AI Request
+        const result = await genericRequestAI('chat', aiMessages, ai_config);
+        const finalReply = result.content || "";
+
+        // 6. Auto-Update History Table
+        const updatedHistory = [
+            ...historyMsgs,
+            { role: 'user', text: new_message || "(context updated)" },
+            { role: 'model', text: finalReply }
+        ];
+
+        let finalChatId = chat_id;
+        const chatTitle = updatedHistory.find(m => m.role === 'user')?.text?.substring(0, 50) || "New Chat";
+
+        if (chat_id) {
+            await supabase.from('conduit_history').update({ ops: updatedHistory, title: chatTitle }).eq('id', chat_id);
+        } else {
+            const { data } = await supabase.from('conduit_history').insert({
+                repo_name: TARGET_REPO, type: 'Chat', title: chatTitle, ops: updatedHistory
+            }).select('id').single();
+            finalChatId = data?.id;
         }
 
-        const chatMessages = [];
-        if (sysPrompt) chatMessages.push({ role: 'system', content: sysPrompt });
-        chatMessages.push(...openAIMessages);
-
-        // IMPORTANT: Only provide the apply_patch tool if we are in Protocol Mode
-        const result = await genericRequestAI('chat', chatMessages, ai_config, isProtocolMode ? chatTools : undefined);
-
-        let finalReply = result.content || "";
-        if (result.tool_calls?.[0] && result.tool_calls[0].function.name === "apply_patch") {
-            const patchData = JSON.parse(result.tool_calls[0].function.arguments);
-            const jsonOps = JSON.stringify(patchData.operations, null, 2);
-            finalReply += `\n\n### 🪄 Surgeon's Plan:\n${patchData.explanation}\n\n\`\`\`json\n${jsonOps}\n\`\`\``;
-        }
-        return new Response(JSON.stringify({ reply: finalReply || "(Empty Response from AI)" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ 
+            reply: finalReply, 
+            chat_id: finalChatId, 
+            history_updated: true 
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // --- REFINED GENERATE OPS (ROBUST PROMPT & PARSER) ---
