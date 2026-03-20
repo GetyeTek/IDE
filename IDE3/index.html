@@ -3032,8 +3032,14 @@
                         currentContent = b64DecodeUnicode(fData.content || "");
                     }
                     
-                    if (lastSentFileStates[path] !== currentContent) {
-                        contextPayload.push({ path: path, content: b64EncodeUnicode(currentContent) });
+                    // Check if file is "dirty" (different from what's on GitHub)
+                    const isDirty = (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path] && window.CURRENT_FILE_CACHE[path].isModified);
+                    if (lastSentFileStates[path] !== currentContent || isDirty) {
+                        contextPayload.push({ 
+                            path: path, 
+                            content: isDirty ? b64EncodeUnicode(currentContent) : null, 
+                            is_dirty: !!isDirty 
+                        });
                         lastSentFileStates[path] = currentContent;
                     }
                 }
@@ -3706,36 +3712,25 @@
         const fileCache = {}; window.CURRENT_FILE_CACHE = fileCache;
 
         try {
-            const treeRes = await fetch(CONFIG.funcUrl, {
+            // ONE SINGLE REQUEST to fetch everything in the project scope
+            const bundleRes = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'fetch_tree', project_path: effectiveRoot, ref_sha: sha })
+                body: apiBody({ action: 'fetch_project_bundle', project_path: effectiveRoot, ref_sha: sha })
             });
-            const treeData = await treeRes.json();
-            const files = (treeData.files || []).filter(f => f.path.startsWith(effectiveRoot));
+            const bundleData = await bundleRes.json();
+            const files = bundleData.files || {};
             
-            if (files.length === 0) throw new Error(`No files found in scope: ${effectiveRoot}`);
+            if (Object.keys(files).length === 0) throw new Error(`No files found in scope: ${effectiveRoot}`);
 
-            const BATCH_SIZE = 12;
             const binaryExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'woff', 'woff2', 'ttf', 'webp'];
-            for (let i = 0; i < files.length; i += BATCH_SIZE) {
-                const batch = files.slice(i, i + BATCH_SIZE);
-                await Promise.all(batch.map(async (file) => {
-                    try {
-                        const res = await fetch(CONFIG.funcUrl, {
-                            method: 'POST', headers: {'Content-Type': 'application/json'},
-                            body: apiBody({ action: 'preview_file', file_path: file.path, ref_sha: sha })
-                        });
-                        const data = await res.json();
-                        if (data.content) {
-                            const ext = file.path.split('.').pop().toLowerCase();
-                            const isBinary = binaryExts.includes(ext);
-                            fileCache[file.path] = { 
-                                content: isBinary ? base64ToUint8Array(data.content) : b64DecodeUnicode(data.content),
-                                ext, isBinary, sha: file.sha 
-                            };
-                        }
-                    } catch(e) { console.error('Fetch Failed:', file.path, e); }
-                }));
+            for (const path in files) {
+                const f = files[path];
+                const ext = path.split('.').pop().toLowerCase();
+                const isBinary = binaryExts.includes(ext);
+                fileCache[path] = {
+                    content: isBinary ? base64ToUint8Array(f.content) : b64DecodeUnicode(f.content),
+                    ext, isBinary, sha: f.sha
+                };
             }
 
             // Robust lookup: check exact, prefixed by repo name, or relative
