@@ -69,7 +69,7 @@ jobs:
           URL=$(echo "\$RESPONSE" | jq -r '.url')
           
           if [[ "\$TOKEN" == *"error"* ]] || [ -z "\$TOKEN" ] || [ "\$TOKEN" = "null" ]; then 
-            echo "❌ Error: Failed to claim token from Conduit Relay."
+            echo "â Error: Failed to claim token from Conduit Relay."
             echo "Raw Response: \$RESPONSE"
             exit 1 
           fi
@@ -634,7 +634,7 @@ You are the final line of defense for a code-patching engine. A developer's 'fin
     ];
     
     const result = await genericRequestAI('fast_fix', messages, config, tools);
-    console.log("🔥 [HEALER RAW DEBUG]:", JSON.stringify(result, null, 2));
+    console.log("ð¥ [HEALER RAW DEBUG]:", JSON.stringify(result, null, 2));
     
     let args: any = null;
 
@@ -926,7 +926,7 @@ function applyOperation(content: string, op: any) {
         if (op.ai_strategy === "range_replace" && op.start_line && op.end_line) {
             lines.splice(op.start_line - 1, (op.end_line - op.start_line) + 1, op.replace_with || op.content || "");
                         const shortMsg = op.explanation ? (op.explanation.substring(0, 150) + "...") : "AI Fixed";
-            return { newContent: lines.join("\n"), success: true, score: 95, message: `✨ AI: ${shortMsg}` };
+            return { newContent: lines.join("\n"), success: true, score: 95, message: `â¨ AI: ${shortMsg}` };
         }
 
         if (op.ai_strategy === "line_insert" && op.anchor_line) {
@@ -940,7 +940,7 @@ function applyOperation(content: string, op: any) {
                 lines[idx] = payload;
             }
             const shortMsg = op.explanation ? (op.explanation.substring(0, 150) + "...") : "AI Fixed";
-            return { newContent: lines.join("\n"), success: true, score: 95, message: `✨ AI: ${shortMsg}` };
+            return { newContent: lines.join("\n"), success: true, score: 95, message: `â¨ AI: ${shortMsg}` };
         }
     }
 
@@ -1264,7 +1264,7 @@ serve(async (req) => {
 
     // 2. AI CHAT
         if (action === "ai_chat") {
-        const { use_system_prompt, custom_system_prompt, new_message, chat_id } = payload;
+        const { use_system_prompt, custom_system_prompt, new_message } = payload;
 
         // 1. Hydrate Last 10 Messages (Sliding Window)
         let historyMsgs = [];
@@ -2439,7 +2439,7 @@ serve(async (req) => {
         if (chat_id) {
             // Update existing session
             res = await supabase.from('conduit_history')
-                .update({ ops: chatMsgs, title: chatTitle, repo_name: TARGET_REPO }) // Ensure repo stays in sync
+                .update({ ops: chatMsgs, title: chatTitle, repo_name: TARGET_REPO })
                 .eq('id', chat_id)
                 .select();
         } else {
