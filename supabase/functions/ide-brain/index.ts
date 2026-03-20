@@ -1261,74 +1261,61 @@ serve(async (req) => {
 
     // 2. AI CHAT
         if (action === "ai_chat") {
-        const { use_system_prompt, custom_system_prompt, new_message, chat_id } = payload;
+        const { use_system_prompt, custom_system_prompt, new_message, chat_id, context_files } = payload;
 
-        // 1. Hydrate History from Database
+        // 1. Hydrate Last 10 Messages (Sliding Window)
         let historyMsgs = [];
         if (chat_id) {
             const { data } = await supabase.from('conduit_history').select('ops').eq('id', chat_id).single();
-            historyMsgs = data?.ops || [];
+            historyMsgs = (data?.ops || []).slice(-10);
         }
 
-        // 2. Format Context Bundle (IDE Export Format)
-        let processedUserMessage = new_message || messages?.[messages.length - 1]?.text || "";
+        // 2. Optimized Hybrid Context Hydration (Server-Side Fetch)
+        let contextBundle = "";
         if (context_files && context_files.length > 0) {
-            const contextBundle = context_files
-                .map((f: any) => "FILE: " + f.path + "\n" + base64ToText(f.content))
-                .join("\n\n");
-            processedUserMessage = "=== CONTEXT BUNDLE ===\n" + contextBundle + "\n\n=== USER REQUEST ===\n" + processedUserMessage;
+            const bundleParts = await Promise.all(context_files.map(async (f: any) => {
+                let rawContent = "";
+                if (f.is_dirty && f.content) {
+                    rawContent = base64ToText(f.content);
+                } else {
+                    const { content } = await getFileRaw(TARGET_REPO, f.path, DEV_BRANCH);
+                    rawContent = base64ToText(content);
+                }
+                return "FILE: " + f.path + "\n" + rawContent;
+            }));
+            contextBundle = "=== CONTEXT BUNDLE ===\n" + bundleParts.join("\n\n");
         }
 
-        // 3. Prepare AI Message Stack
+        // 3. System Prompt Hydration
+        let sysPrompt = custom_system_prompt || (use_system_prompt ? "You are the Conduit IDE Surgeon. Generate JSON patches with atomic precision." : "");
+
+        // 4. Construct AI Stack
         const aiMessages = [
+            ...(sysPrompt ? [{ role: 'system', content: sysPrompt }] : []),
             ...historyMsgs.map((m: any) => ({ 
                 role: m.role === 'model' ? 'assistant' : 'user', 
                 content: m.text 
             })),
-            { role: 'user', content: processedUserMessage }
+            { role: 'user', content: contextBundle ? contextBundle + "\n\n=== USER REQUEST ===\n" + new_message : new_message }
         ];
 
-        // 4. System Instruction Logic
-        let sysPrompt = "";
-        let isProtocolMode = false;
-
-        if (custom_system_prompt) {
-            sysPrompt = custom_system_prompt;
-        } else if (use_system_prompt) {
-            isProtocolMode = true;
-            sysPrompt = `You are the Conduit IDE Surgeon. You generate JSON patches. Protocol: 1. Consultative first. 2. Surgeon mode on user request. 3. Output valid JSON in tool calls.`;
-        }
-
-        if (sysPrompt) aiMessages.unshift({ role: 'system', content: sysPrompt });
-
-        // 5. Execute AI Request
+        // 5. Execute AI with Context Caching hint (where supported)
         const result = await genericRequestAI('chat', aiMessages, ai_config);
         const finalReply = result.content || "";
 
-        // 6. Auto-Update History Table
-        const updatedHistory = [
-            ...historyMsgs,
-            { role: 'user', text: new_message || "(context updated)" },
-            { role: 'model', text: finalReply }
-        ];
-
+        // 6. Update Persistent History
+        const fullHistory = [...(historyMsgs), { role: 'user', text: new_message }, { role: 'model', text: finalReply }];
         let finalChatId = chat_id;
-        const chatTitle = updatedHistory.find(m => m.role === 'user')?.text?.substring(0, 50) || "New Chat";
-
         if (chat_id) {
-            await supabase.from('conduit_history').update({ ops: updatedHistory, title: chatTitle }).eq('id', chat_id);
+            await supabase.from('conduit_history').update({ ops: fullHistory }).eq('id', chat_id);
         } else {
-            const { data } = await supabase.from('conduit_history').insert({
-                repo_name: TARGET_REPO, type: 'Chat', title: chatTitle, ops: updatedHistory
+            const { data } = await supabase.from('conduit_history').insert({ 
+                repo_name: TARGET_REPO, type: 'Chat', title: new_message.substring(0, 50), ops: fullHistory 
             }).select('id').single();
             finalChatId = data?.id;
         }
 
-        return new Response(JSON.stringify({ 
-            reply: finalReply, 
-            chat_id: finalChatId, 
-            history_updated: true 
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ reply: finalReply, chat_id: finalChatId }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // --- REFINED GENERATE OPS (ROBUST PROMPT & PARSER) ---
@@ -1581,17 +1568,22 @@ serve(async (req) => {
       return new Response(JSON.stringify({ files }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (action === "fetch_tree") {
+    if (action === "fetch_project_bundle") {
         const ref = ref_sha || DEV_BRANCH;
         const scope = (project_path || "").trim();
-        // Get the full tree structure
         const treeData = await githubFetch(TARGET_REPO, `/git/trees/${ref}?recursive=1`);
-        // Filter strictly by scope
-        const files = (treeData.tree || [])
-            .filter((f: any) => f.type === "blob" && (!scope || f.path.startsWith(scope)))
-            .map((f: any) => ({ path: f.path, sha: f.sha, size: f.size }));
-            
-        return new Response(JSON.stringify({ files }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const blobs = (treeData.tree || []).filter((f: any) => f.type === "blob" && (!scope || f.path.startsWith(scope)));
+        
+        const bundle: Record<string, any> = {};
+        // Aggressive server-side parallel fetch
+        await Promise.all(blobs.map(async (f: any) => {
+            try {
+                const { content } = await getFileRaw(TARGET_REPO, f.path, ref);
+                bundle[f.path] = { content, sha: f.sha, size: f.size };
+            } catch (e) {}
+        }));
+        
+        return new Response(JSON.stringify({ files: bundle }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "fetch_project_bundle") {
