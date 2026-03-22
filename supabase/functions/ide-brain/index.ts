@@ -1257,16 +1257,19 @@ serve(async (req) => {
         const hOff = payload.history_offset || 0;
         const lOff = payload.log_offset || 0;
 
-        // Strict scoping: Only fetch records belonging to the specific owner/repo path
+        // Smart Scoping: Org mode is strict, Personal mode allows legacy short-names
+        const shortName = TARGET_REPO.includes('/') ? TARGET_REPO.split('/')[1] : TARGET_REPO;
+        const repoFilter = is_org ? `repo_name.eq.${TARGET_REPO}` : `repo_name.eq.${TARGET_REPO},repo_name.eq.${shortName}`;
+
         const { data: history } = await supabase.from('conduit_history')
             .select('*, conduit_id')
-            .eq('repo_name', TARGET_REPO)
+            .or(repoFilter)
             .order('conduit_id', { ascending: false })
             .range(hOff, hOff + historyLimit - 1);
 
         const { data: logs } = await supabase.from('conduit_logs')
             .select('*')
-            .eq('repo_name', TARGET_REPO)
+            .or(repoFilter)
             .order('created_at', { ascending: false })
             .range(lOff, lOff + logLimit - 1);
 
