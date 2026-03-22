@@ -3596,7 +3596,9 @@
         el.dataset.category = category;
 
         // --- UPDATED SIGNATURE LOGIC ---
-        const historyEntry = response.sha ? dbHistory.find(h => h.sha === response.sha) : null;
+        // Support both direct response SHAs and nested event data SHAs (for rollbacks)
+        const effectiveSha = response.sha || (response.data && response.data.sha);
+        const historyEntry = effectiveSha ? dbHistory.find(h => h.sha === effectiveSha) : null;
         const conduitId = response.conduit_id || (historyEntry ? historyEntry.conduit_id : null);
         
         let signatureHtml = '';
@@ -3607,8 +3609,8 @@
         }
 
         // Store commit sha on the element for tracing
-        if (response.sha) {
-            el.dataset.commitSha = response.sha;
+        if (effectiveSha) {
+            el.dataset.commitSha = effectiveSha;
         }
 
         el.innerHTML = `
