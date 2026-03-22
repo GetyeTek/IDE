@@ -5678,6 +5678,9 @@ async function downloadArtifact(runId) {
                 loadWorkflows(false);
             }
         }
+
+        // Hide FAB on Preview tab to prevent UI obstruction
+        toggleFab(id !== 'tab-preview');
     }
 
     function toggleFullscreen(a) {
