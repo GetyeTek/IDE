@@ -2393,10 +2393,10 @@ serve(async (req) => {
     }
 
     if (action === "list_storage_objects") {
-        const { bucket, path, sort_by, sort_order } = payload;
+        const { bucket, path, sort_by, sort_order, offset } = payload;
         const { data, error } = await supabase.storage.from(bucket).list(path || '', {
             limit: 100, 
-            offset: 0, 
+            offset: offset || 0, 
             sortBy: { 
                 column: sort_by || 'name', 
                 order: sort_order || 'asc' 
