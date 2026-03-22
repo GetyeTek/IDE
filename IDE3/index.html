@@ -6199,6 +6199,9 @@ async function downloadArtifact(runId) {
         toggleFab(true);
         storageCurrentBucket = null;
         storageCurrentPath = [];
+        // Ensure footer is hidden for next open
+        const footer = document.getElementById('storage-footer');
+        if (footer) footer.style.display = 'none';
     }
 
     function toggleStorageSearch(show) {
@@ -6235,7 +6238,10 @@ async function downloadArtifact(runId) {
         document.getElementById('storage-controls').style.display = 'none';
         toggleStorageSearch(false);
         document.getElementById('btn-storage-upload').style.display = 'none';
-        document.getElementById('storage-footer').style.display = 'none';
+        
+        // Hide footer immediately when returning to root
+        const footer = document.getElementById('storage-footer');
+        if (footer) footer.style.display = 'none';
 
         try {
             const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'list_buckets' }) });
