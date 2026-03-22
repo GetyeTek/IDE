@@ -173,17 +173,24 @@ function escapeRegExp(string: string) {
 
 function isRecordInScope(record: any, scopePath: string): boolean {
     if (!scopePath || scopePath === "/" || scopePath === "") return true;
-    if (record.type === 'Checkpoint') return true; // Always show checkpoints
-    // Allow if matches scope OR is an Edge Function operation
-    if (record.ops && Array.isArray(record.ops)) {
-        return record.ops.some((op: any) => 
+    // Checkpoints and Chat sessions usually don't have file paths, show them by default
+    if (record.type === 'Checkpoint' || record.type === 'Chat') return true;
+
+    const ops = record.ops || (record.data && record.data.ops);
+    if (ops && Array.isArray(ops)) {
+        // If there are no operations (System Event), don't filter it out
+        if (ops.length === 0) return true;
+        return ops.some((op: any) => 
             (op.file_path && op.file_path.startsWith(scopePath)) || 
             op.is_resolved_ef ||
             (op.file_path && op.file_path.includes("supabase/functions/"))
         );
     }
-    if (record.data && record.data.results && Array.isArray(record.data.results)) {
-        return record.data.results.some((res: any) => 
+
+    const results = record.results || (record.data && record.data.results);
+    if (results && Array.isArray(results)) {
+        if (results.length === 0) return true;
+        return results.some((res: any) => 
             (res.file && res.file.startsWith(scopePath)) ||
             (res.file && res.file.includes("supabase/functions/"))
         );
@@ -1250,15 +1257,18 @@ serve(async (req) => {
         const hOff = payload.history_offset || 0;
         const lOff = payload.log_offset || 0;
 
+        // Legacy Support: Also look for the short repo name (e.g. 'IDE' vs 'GetyeTek/IDE')
+        const shortName = TARGET_REPO.includes('/') ? TARGET_REPO.split('/')[1] : TARGET_REPO;
+
         const { data: history } = await supabase.from('conduit_history')
             .select('*, conduit_id')
-            .eq('repo_name', TARGET_REPO)
+            .or(`repo_name.eq.${TARGET_REPO},repo_name.eq.${shortName}`)
             .order('conduit_id', { ascending: false })
             .range(hOff, hOff + historyLimit - 1);
 
         const { data: logs } = await supabase.from('conduit_logs')
             .select('*')
-            .eq('repo_name', TARGET_REPO)
+            .or(`repo_name.eq.${TARGET_REPO},repo_name.eq.${shortName}`)
             .order('created_at', { ascending: false })
             .range(lOff, lOff + logLimit - 1);
 
