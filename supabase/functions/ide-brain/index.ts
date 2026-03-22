@@ -8,6 +8,7 @@ if (typeof document === "undefined") {
 
 // --- CONFIGURATION ---
 const GITHUB_USER = "GetyeTek"; 
+const ORG_NAME = "MasterEmpire";
 const DEFAULT_REPO = "IDE"; 
 const MAIN_BRANCH = "main";
 const DEV_BRANCH = "conduit-dev";
@@ -206,9 +207,8 @@ const getHeaders = () => ({
 });
 
 async function githubFetch(repo: string, path: string, options: RequestInit = {}) {
-  // Intelligent Repo Parsing: If 'owner/repo' is passed, use it directly. Otherwise prepend GITHUB_USER.
-  const cleanRepo = repo.includes('/') ? repo : `${GITHUB_USER}/${repo}`;
-  const url = `https://api.github.com/repos/${cleanRepo}${path}`;
+  // If the repo string already contains a slash, it's a full path. Otherwise, we rely on the caller to have resolved the owner.
+  const url = `https://api.github.com/repos/${repo}${path}`;
   
   const res = await fetch(url, { ...options, headers: { ...getHeaders(), ...options.headers } });
   
@@ -1227,12 +1227,19 @@ async function validateWithTreeSitter(code: string, filePath: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    const body = await req.json();
     const { 
       action, operations, file_path, ref_sha, version_name, repo_name, 
       code_block, error_message, messages, context_files, auto_sanity, 
-      workflow_id, branch, inputs, run_id, project_path, chat_id, title, user_prompt, ai_config, ...payload 
-    } = await req.json();
-    const TARGET_REPO = repo_name || DEFAULT_REPO;
+      workflow_id, branch, inputs, run_id, project_path, chat_id, title, user_prompt, ai_config, is_org, ...payload 
+    } = body;
+
+    const OWNER = is_org ? ORG_NAME : GITHUB_USER;
+    // Ensure TARGET_REPO is always 'owner/name'
+    const TARGET_REPO = repo_name 
+        ? (repo_name.includes('/') ? repo_name : `${OWNER}/${repo_name}`) 
+        : `${OWNER}/${DEFAULT_REPO}`;
+
     await ensureBranchExists(TARGET_REPO);
 
     // 1. INIT
@@ -2042,7 +2049,9 @@ serve(async (req) => {
     }
 
     if (action === "fetch_repos") {
-        const url = `https://api.github.com/user/repos?per_page=100&sort=pushed`;
+        const url = is_org 
+            ? `https://api.github.com/orgs/${ORG_NAME}/repos?per_page=100&sort=pushed` 
+            : `https://api.github.com/user/repos?per_page=100&sort=pushed`;
         const res = await fetch(url, { headers: getHeaders() });
         if (!res.ok) throw new Error(`GitHub API Error: ${res.status}`);
         const data = await res.json();
@@ -2054,7 +2063,9 @@ serve(async (req) => {
         const { name, is_private } = payload;
         if (!name) throw new Error("Repository name is required");
 
-        const url = `https://api.github.com/user/repos`;
+        const url = is_org 
+            ? `https://api.github.com/orgs/${ORG_NAME}/repos` 
+            : `https://api.github.com/user/repos`;
         const res = await fetch(url, {
             method: "POST",
             headers: getHeaders(),
