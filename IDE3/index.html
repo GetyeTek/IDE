@@ -1700,10 +1700,13 @@
             <div style="text-align:center; padding:40px; color:#666;">Initialising Storage...</div>
         </div>
         <div id="storage-footer" class="flex-between" style="display:none; padding:10px; border-top:1px solid var(--border); background:#0a0a0a;">
-            <span id="storage-selection-count" style="font-size:11px; color:#666;">0 items selected</span>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                <span id="storage-total-count" style="font-size:10px; color:var(--ai-accent); font-weight:bold;">0 items</span>
+                <span id="storage-selection-count" style="font-size:9px; color:#555;">0 selected</span>
+            </div>
             <div class="flex-gap">
-                <button class="btn-outline" style="padding:4px 10px; font-size:11px; color:var(--danger); border-color:var(--danger);" onclick="deleteSelectedStorage()">Delete Selected</button>
-                <button class="btn-outline" style="padding:4px 10px; font-size:11px;" onclick="toggleAllStorage(true)">Select All</button>
+                <button class="btn-outline" style="padding:4px 10px; font-size:11px; color:var(--danger); border-color:var(--danger);" onclick="deleteSelectedStorage()">Delete</button>
+                <button class="btn-outline" style="padding:4px 10px; font-size:11px;" onclick="toggleAllStorage(true)">All</button>
             </div>
         </div>
     </div>
@@ -6262,7 +6265,7 @@ async function downloadArtifact(runId) {
         fetchStorageObjects();
     }
 
-        async function fetchStorageObjects(isAppend = false) {
+    async function fetchStorageObjects(isAppend = false) {
         if (isPerformingAction) return;
         const container = document.getElementById('storage-content');
         const bread = document.getElementById('storage-breadcrumbs');
@@ -6273,12 +6276,17 @@ async function downloadArtifact(runId) {
             storageHasMore = true;
             storageObjects = [];
             container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Reading Objects...</div>';
+        } else {
+            const loader = document.createElement('div');
+            loader.id = 'storage-scroll-loader';
+            loader.style.cssText = 'padding:15px; text-align:center; font-size:10px; color:var(--ai-accent);';
+            loader.innerText = 'Fetching more items...';
+            container.appendChild(loader);
         }
 
         isPerformingAction = true;
 
-        const countDisplay = storageObjects.length > 0 ? ` (${storageObjects.length}${storageHasMore ? '+' : ''} items)` : '';
-        document.getElementById('storage-title').innerText = storageCurrentBucket + countDisplay;
+        document.getElementById('storage-title').innerText = storageCurrentBucket;
         bread.style.display = 'block';
         bread.innerHTML = `<span onclick="fetchBuckets()" style="cursor:pointer; color:var(--primary);">buckets</span> / ` + 
             storageCurrentPath.map((p, i) => `<span onclick="navigateToStorageDepth(${i})" style="cursor:pointer; color:var(--primary);">${p}</span>`).join(' / ');
@@ -6303,15 +6311,17 @@ async function downloadArtifact(runId) {
             const data = await res.json();
             const fetched = data.objects || [];
             
+            const loaderEl = document.getElementById('storage-scroll-loader');
+            if (loaderEl) loaderEl.remove();
+
             storageObjects = isAppend ? storageObjects.concat(fetched) : fetched;
             storageOffset += 100;
             storageHasMore = fetched.length === 100;
 
             renderStorageList();
             
-            // Attach Scroll Listener for infinite scroll
             container.onscroll = () => {
-                if (container.scrollTop + container.clientHeight >= container.scrollHeight - 50) {
+                if (container.scrollTop + container.clientHeight >= container.scrollHeight - 60) {
                     if (storageHasMore && !isPerformingAction) fetchStorageObjects(true);
                 }
             };
@@ -6378,7 +6388,13 @@ async function downloadArtifact(runId) {
 
     function updateStorageSelectionCount() {
         const count = document.querySelectorAll('.storage-check:checked').length;
-        document.getElementById('storage-selection-count').innerText = `${count} items selected`;
+        document.getElementById('storage-selection-count').innerText = `${count} selected`;
+        
+        // Also update total count display immediately
+        const totalEl = document.getElementById('storage-total-count');
+        if (totalEl) {
+            totalEl.innerText = `${storageObjects.length}${storageHasMore ? '+' : ''} items`;
+        }
     }
 
     function toggleAllStorage(force) {
