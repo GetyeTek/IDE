@@ -693,7 +693,13 @@
                     <input type="text" id="setting-func-url" class="input-field" placeholder="https://...supabase.co/functions/v1/ide-brain">
                 </div>
                 <div class="input-group">
-                    <label class="input-label">GitHub Repo Name</label>
+                    <div class="flex-between" style="margin-bottom: 6px;">
+                        <label class="input-label" style="margin:0">GitHub Repo Name</label>
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
+                            <span style="font-size:10px; color:var(--text-muted); font-weight:bold;">ORG MODE</span>
+                            <input type="checkbox" id="setting-is-org" style="accent-color:var(--ai-accent); transform:scale(0.9);">
+                        </label>
+                    </div>
                     <div style="position: relative; display: flex; align-items: center;">
                         <input type="text" id="setting-repo-name" class="input-field" placeholder="IDE" style="padding-right: 40px;">
                         <button class="icon-btn" 
@@ -1720,6 +1726,7 @@
         funcUrl: localStorage.getItem('conduit_funcUrl') || '',
         // Project context prefers sessionStorage for tab isolation
         repoName: sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE',
+        isOrg: localStorage.getItem('conduit_isOrg') === 'true',
         projectPath: sessionStorage.getItem('conduit_projectPath') || localStorage.getItem('conduit_projectPath') || '',
         autoFix: false,
         autoSanity: false,
@@ -1836,6 +1843,7 @@
         // Load Settings into UI
         document.getElementById('setting-func-url').value = CONFIG.funcUrl;
         document.getElementById('setting-repo-name').value = CONFIG.repoName;
+        document.getElementById('setting-is-org').checked = CONFIG.isOrg;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
         document.getElementById('setting-auto-fix').checked = CONFIG.autoFix;
         document.getElementById('setting-auto-sanity').checked = CONFIG.autoSanity;
@@ -2042,9 +2050,12 @@
     }
 
     function apiBody(obj) {
-        // INJECT AI CONFIG INTO EVERY REQUEST
-        // Default to CONFIG.repoName, but allow 'obj' to override it (crucial for Discovery)
-        return JSON.stringify({ repo_name: CONFIG.repoName, ai_config: window.aiConfig, ...obj });
+        return JSON.stringify({ 
+            repo_name: CONFIG.repoName, 
+            is_org: CONFIG.isOrg,
+            ai_config: window.aiConfig, 
+            ...obj 
+        });
     }
 
     function resolvePath(base, relative) {
@@ -2722,6 +2733,7 @@
         const autoFix = document.getElementById('setting-auto-fix').checked;
         const autoSanity = document.getElementById('setting-auto-sanity').checked;
         const showPreview = document.getElementById('setting-show-preview').checked;
+        const isOrg = document.getElementById('setting-is-org').checked;
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
         const floatingConsole = document.getElementById('setting-floating-console').checked;
@@ -2732,6 +2744,7 @@
         // Global Preferences
         localStorage.setItem('conduit_funcUrl', funcUrl);
         localStorage.setItem('conduit_showPreview', showPreview);
+        localStorage.setItem('conduit_isOrg', isOrg);
         localStorage.setItem('conduit_wasm_validation', wasmValidation);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
         localStorage.setItem('conduit_floating_console', floatingConsole);
@@ -2749,7 +2762,7 @@
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
 
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf };
         
         applyPreviewTabVisibility(); 
         initFloatingHUD();
