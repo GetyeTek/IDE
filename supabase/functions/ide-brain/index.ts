@@ -2304,8 +2304,16 @@ serve(async (req) => {
     if (action === "rollback") {
         if(!ref_sha) throw new Error("Target SHA required");
         await githubFetch(TARGET_REPO, `/git/refs/heads/${DEV_BRANCH}`, { method: "PATCH", body: JSON.stringify({ sha: ref_sha, force: true }) });
-        await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'rollback', data: { message: `Rolled back to ${ref_sha.substring(0,7)}` } });
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Store the SHA in the log data so the frontend can link it to History entries
+        await supabase.from('conduit_logs').insert({ 
+            repo_name: TARGET_REPO, 
+            type: 'rollback', 
+            data: { 
+                message: `Rolled back to ${ref_sha.substring(0,7)}`, 
+                sha: ref_sha 
+            } 
+        });
+        return new Response(JSON.stringify({ success: true, sha: ref_sha }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (action === "update_note") {
         const { error } = await supabase.from('conduit_history').update({ note: payload.note }).eq('id', payload.id);
