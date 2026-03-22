@@ -1757,6 +1757,8 @@
     let storageCurrentBucket = null;
     let storageCurrentPath = [];
     let storageObjects = [];
+    let storageOffset = 0;
+    let storageHasMore = true;
     let storageSearchQuery = '';
     let storageSortOrder = 'asc';
     let chatUseSystemPrompt = false;
@@ -6260,14 +6262,23 @@ async function downloadArtifact(runId) {
         fetchStorageObjects();
     }
 
-    async function fetchStorageObjects() {
+        async function fetchStorageObjects(isAppend = false) {
+        if (isPerformingAction) return;
         const container = document.getElementById('storage-content');
         const bread = document.getElementById('storage-breadcrumbs');
         const sortBy = document.getElementById('storage-sort-by')?.value || 'name';
         
-        container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Reading Objects...</div>';
-        
-        document.getElementById('storage-title').innerText = storageCurrentBucket;
+        if (!isAppend) {
+            storageOffset = 0;
+            storageHasMore = true;
+            storageObjects = [];
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Reading Objects...</div>';
+        }
+
+        isPerformingAction = true;
+
+        const countDisplay = storageObjects.length > 0 ? ` (${storageObjects.length}${storageHasMore ? '+' : ''} items)` : '';
+        document.getElementById('storage-title').innerText = storageCurrentBucket + countDisplay;
         bread.style.display = 'block';
         bread.innerHTML = `<span onclick="fetchBuckets()" style="cursor:pointer; color:var(--primary);">buckets</span> / ` + 
             storageCurrentPath.map((p, i) => `<span onclick="navigateToStorageDepth(${i})" style="cursor:pointer; color:var(--primary);">${p}</span>`).join(' / ');
@@ -6283,15 +6294,33 @@ async function downloadArtifact(runId) {
                 body: apiBody({ 
                     action: 'list_storage_objects', 
                     bucket: storageCurrentBucket, 
-                    path: path,
+                    path: path, 
                     sort_by: sortBy,
-                    sort_order: storageSortOrder
+                    sort_order: storageSortOrder,
+                    offset: storageOffset
                 })
             });
             const data = await res.json();
-            storageObjects = data.objects || [];
+            const fetched = data.objects || [];
+            
+            storageObjects = isAppend ? storageObjects.concat(fetched) : fetched;
+            storageOffset += 100;
+            storageHasMore = fetched.length === 100;
+
             renderStorageList();
-        } catch(e) { container.innerHTML = `<div style="color:var(--danger); padding:20px;">${e.message}</div>`; }
+            
+            // Attach Scroll Listener for infinite scroll
+            container.onscroll = () => {
+                if (container.scrollTop + container.clientHeight >= container.scrollHeight - 50) {
+                    if (storageHasMore && !isPerformingAction) fetchStorageObjects(true);
+                }
+            };
+
+        } catch(e) {
+            if (!isAppend) container.innerHTML = `<div style="color:var(--danger); padding:20px;">${e.message}</div>`;
+        } finally {
+            isPerformingAction = false;
+        }
     }
 
     function filterStorageList(q) {
