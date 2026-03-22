@@ -204,6 +204,7 @@
             display: none; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
         .menu-dropdown.show { display: block; animation: fadeUp 0.1s ease-out; }
+        .file-pinned-marker { color: var(--ai-accent); font-size: 10px; margin-right: 4px; }
         .menu-item {
             padding: 10px; font-size: 12px; color: #eee; cursor: pointer;
             border-bottom: 1px solid #333; display: flex; gap: 8px; align-items: center;
@@ -5178,36 +5179,44 @@ async function downloadArtifact(runId) {
 
     function renderFileList(files) {
         const container = document.getElementById('file-list-container');
-        // Update chat context bar and master checkbox if files change
         updateChatContextIndicator();
         setTimeout(syncSelectAllState, 50);
         container.innerHTML = '';
         if (!files || files.length === 0) return container.innerHTML = '<div style="padding:20px; text-align:center;">No files found.</div>';
+
+        const pinned = JSON.parse(localStorage.getItem('conduit_pinned_files') || '[]');
         
-        files.forEach(file => {
+        // Sort: Pinned first, then by existing list order
+        const sortedFiles = [...files].sort((a, b) => {
+            const aPinned = pinned.includes(a.path);
+            const bPinned = pinned.includes(b.path);
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+            return 0;
+        });
+        
+        sortedFiles.forEach((file, index) => {
             const div = document.createElement('div');
             div.className = 'file-item';
+            const isPinned = pinned.includes(file.path);
             
             let fileName = file.path.split('/').pop();
-            // Intelligence: If it's an Edge Function entry, show the function name instead of index.ts
             if (file.path.includes('supabase/functions/') && fileName === 'index.ts') {
                 const segments = file.path.split('/');
-                // Expected path: supabase/functions/{NAME}/index.ts
-                if (segments.length >= 2) {
-                    const functionName = segments[segments.length - 2];
-                    fileName = `λ ${functionName}`;
-                }
+                if (segments.length >= 2) fileName = `λ ${segments[segments.length - 2]}`;
             }
 
             const fileSize = formatBytes(file.size);
             const updated = timeAgo(file.last_updated);
-
             const isExcluded = file.path.endsWith('index.ts') || file.path.includes('supabase/functions/');
             const checkedAttr = isExcluded ? '' : 'checked';
 
             div.innerHTML = `
                 <div class="v-info" onclick="openFileViewer('${file.path}')" style="cursor:pointer; flex:1; min-width: 0; padding-right: 10px;">
-                    <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 13px;">${fileName}</strong>
+                    <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 13px;">
+                        ${isPinned ? '<span class="file-pinned-marker">📌</span>' : ''}
+                        ${fileName}
+                    </strong>
                     <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
                         <span style="color:var(--text-muted); font-size:10px; font-family:'JetBrains Mono';">${fileSize}</span>
                         <span style="color:#444;">•</span>
@@ -5216,10 +5225,16 @@ async function downloadArtifact(runId) {
                     <small style="opacity:0.5; font-size:9px; display:block; margin-top:2px;">${file.path}</small>
                 </div>
                 <div class="flex-gap" style="align-items:center;">
-                    <button class="menu-btn" onclick="openRenameModal('${file.path}')" title="Rename/Move">✎</button>
-                    <button class="menu-btn" onclick="runDeepScan('${file.path}')" style="color:var(--ai-accent);" title="Deep Syntax Scan">🧬</button>
-                    <button class="menu-btn" onclick="downloadSingleFile('${file.path}', this)" style="color:var(--text-muted);" title="Download">⬇</button>
-                    <button class="menu-btn" onclick="stageDeleteFile('${file.path}')" style="color:var(--danger)">🗑</button>
+                    <div style="position:relative">
+                        <button class="menu-btn" onclick="event.stopPropagation(); toggleFileMenu(${index})">⋮</button>
+                        <div id="file-menu-${index}" class="menu-dropdown">
+                            <div class="menu-item" onclick="togglePin('${file.path}')">${isPinned ? '📍 Unpin' : '📌 Pin to Top'}</div>
+                            <div class="menu-item" onclick="openRenameModal('${file.path}')">✎ Rename</div>
+                            <div class="menu-item" style="color:var(--ai-accent)" onclick="runDeepScan('${file.path}')">🧬 Deep Scan</div>
+                            <div class="menu-item" onclick="downloadSingleFile('${file.path}', this)">⬇ Download</div>
+                            <div class="menu-item danger" onclick="stageDeleteFile('${file.path}')">🗑 Delete</div>
+                        </div>
+                    </div>
                     <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="updateChatContextIndicator(); syncSelectAllState();" style="accent-color:var(--primary)">
                 </div>`;
             container.appendChild(div);
@@ -5659,6 +5674,22 @@ async function downloadArtifact(runId) {
     function toggleMenu(i) {
         document.querySelectorAll('.menu-dropdown').forEach(m => m.classList.remove('show'));
         document.getElementById(`menu-${i}`).classList.add('show');
+    }
+
+    function toggleFileMenu(i) {
+        document.querySelectorAll('.menu-dropdown').forEach(m => m.classList.remove('show'));
+        document.getElementById(`file-menu-${i}`).classList.add('show');
+    }
+
+    function togglePin(path) {
+        let pinned = JSON.parse(localStorage.getItem('conduit_pinned_files') || '[]');
+        if (pinned.includes(path)) {
+            pinned = pinned.filter(p => p !== path);
+        } else {
+            pinned.push(path);
+        }
+        localStorage.setItem('conduit_pinned_files', JSON.stringify(pinned));
+        renderFileList(window.repoFiles); // Re-render with new sorting
     }
 
     function closeAllMenus(e) {
