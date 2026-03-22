@@ -1257,18 +1257,16 @@ serve(async (req) => {
         const hOff = payload.history_offset || 0;
         const lOff = payload.log_offset || 0;
 
-        // Legacy Support: Also look for the short repo name (e.g. 'IDE' vs 'GetyeTek/IDE')
-        const shortName = TARGET_REPO.includes('/') ? TARGET_REPO.split('/')[1] : TARGET_REPO;
-
+        // Strict scoping: Only fetch records belonging to the specific owner/repo path
         const { data: history } = await supabase.from('conduit_history')
             .select('*, conduit_id')
-            .or(`repo_name.eq.${TARGET_REPO},repo_name.eq.${shortName}`)
+            .eq('repo_name', TARGET_REPO)
             .order('conduit_id', { ascending: false })
             .range(hOff, hOff + historyLimit - 1);
 
         const { data: logs } = await supabase.from('conduit_logs')
             .select('*')
-            .or(`repo_name.eq.${TARGET_REPO},repo_name.eq.${shortName}`)
+            .eq('repo_name', TARGET_REPO)
             .order('created_at', { ascending: false })
             .range(lOff, lOff + logLimit - 1);
 
