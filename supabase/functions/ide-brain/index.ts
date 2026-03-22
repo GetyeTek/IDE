@@ -154,10 +154,9 @@ function base64ToText(str: string) {
     try {
         const binString = atob(str.replace(/\s/g, ''));
         const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0)!);
-        const decoded = new TextDecoder().decode(bytes);
-        return decodeURIComponent(decoded);
+        return new TextDecoder().decode(bytes);
     } catch (e) {
-        try { return atob(str); } catch(e2) { return ""; }
+        return "";
     }
 }
 
