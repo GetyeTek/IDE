@@ -75,11 +75,19 @@ async function main() {
     // Trigger Next Workflow
     const { data: remaining } = await supabase.from('re_log').select('id').eq('status', 'pending').limit(1);
     if (remaining.length > 0) {
-        console.log('Triggering next chain run...');
+        console.log(`Triggering next chain run on branch: ${process.env.GITHUB_REF_NAME}...`);
         await axios.post(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/workflows/re_analysis.yml/dispatches`,
-            { ref: 'main' },
-            { headers: { Authorization: `token ${process.env.MY_PAT}`, Accept: 'application/vnd.github.v3+json' } }
-        ).catch(e => console.error('Chain trigger failed:', e.message));
+            { ref: process.env.GITHUB_REF_NAME || 'main' },
+            { 
+                headers: { 
+                    Authorization: `token ${process.env.MY_PAT}`, 
+                    Accept: 'application/vnd.github.v3+json',
+                    'User-Agent': 'NodeJS-Worker'
+                } 
+            }
+        ).catch(e => {
+            console.error('Chain trigger failed:', e.response ? e.response.data : e.message);
+        });
     }
 }
 
