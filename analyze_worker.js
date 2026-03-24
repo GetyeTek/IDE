@@ -7,13 +7,19 @@ const axios = require('axios');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const zipPath = path.join(process.cwd(), 'Classes', 'classes.dex.zip');
 
-async function getLeastUsedKeys(count) {
+async function getLeastUsedKeys() {
     const { data, error } = await supabase
         .from('api_keys')
         .select('*')
         .eq('is_active', true)
+        .eq('service', 'gemini')
         .order('last_used_at', { ascending: true });
     if (error) throw error;
+    
+    if (!data || data.length === 0) {
+        console.error('❌ CRITICAL: No active Gemini API keys found in the database.');
+        process.exit(1);
+    }
     return data;
 }
 
