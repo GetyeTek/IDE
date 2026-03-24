@@ -45,7 +45,7 @@ async function populate() {
         for (let i = 0; i < filePaths.length; i += chunkSize) {
             const chunk = filePaths.slice(i, i + chunkSize);
             const { error } = await supabase
-                .from('RE_log')
+                .from('re_log')
                 .upsert(chunk, { onConflict: 'file_path' });
 
             if (error) {
