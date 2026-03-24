@@ -23,7 +23,9 @@ async function processFile(filePath, zip, apiKeyRecord) {
         if (!entry) return;
         const content = entry.getData().toString('utf8');
 
-        const genAI = new GoogleGenerativeAI(apiKeyRecord.api_key);
+        // Clean the key: remove quotes and whitespace that often come from CSV imports
+        const cleanKey = apiKeyRecord.api_key.trim().replace(/^"|"$/g, '');
+        const genAI = new GoogleGenerativeAI(cleanKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
 
         const prompt = `You are a Senior Reverse Engineer specializing in legacy Android forensics. Your mission is to reconstruct the resource-loading and decryption logic of an old Ethiopian Orthodox Church offline application. The app uses components from 'Faith Comes By Hearing' (FCBH) and likely custom encryption for its internal texts.\n\nTASK:\nProvide a multi-layered technical analysis of the provided Java code. Your depth MUST be proportional to the complexity of the file. If it's a 5-line boilerplate, be brief. If it's a core logic class, be exhaustive.\n\nKEY AREAS OF ANALYSIS:\n1. CRYPTOGRAPHIC TRACES: Identify any use of Cipher, SecretKey, MessageDigest, AES, XOR loops, or custom math-heavy encoding.\n2. RESOURCE FLOW: How does this file interact with AssetManager, getResources(), or raw stream readers? Look for custom decoders or wrappers.\n3. DEPENDENCY MAPPING: Which other classes or packages does this file reference? Identify the 'Great Puzzle' connections.\n4. NAMING & OBFUSCATION: Spot renamed methods or variables that look like they are masking sensitive data handling or key derivation.\n5. INSIGHTS: Explain exactly how this file helps us find the master decryption key or the entry point for extracting the raw database/texts.\n\nOUTPUT STRUCTURE:\n- [Technical Summary]\n- [Detailed Observations & Logic Flow]\n- [Dependencies & External References]\n- [Red Flags & RE Insights]\n\nCRITICAL INSTRUCTION: You MUST provide a numerical importance score (1-10) and a brief justification at the VERY end, wrapped in this tag: <RE_CRITICALITY>[SCORE] - [JUSTIFICATION]</RE_CRITICALITY>.\n\nFile Content:\n${content}`;
@@ -40,7 +42,7 @@ async function processFile(filePath, zip, apiKeyRecord) {
 
         console.log(`✅ Processed: ${filePath}`);
     } catch (err) {
-        console.error(`❌ Failed: ${filePath}`, err.message);
+        console.error(`❌ Failed: ${filePath} | Key ID: ${apiKeyRecord.id} | Error: ${err.message}`);
         // Leave as pending for next run
     }
 }
@@ -70,7 +72,7 @@ async function main() {
         console.log('Triggering next chain run...');
         await axios.post(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/workflows/re_analysis.yml/dispatches`,
             { ref: 'main' },
-            { headers: { Authorization: `token ${process.env.GH_PAT}`, Accept: 'application/vnd.github.v3+json' } }
+            { headers: { Authorization: `token ${process.env.MY_PAT}`, Accept: 'application/vnd.github.v3+json' } }
         ).catch(e => console.error('Chain trigger failed:', e.message));
     }
 }
