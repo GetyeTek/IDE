@@ -26,7 +26,7 @@ async function processFile(filePath, zip, apiKeyRecord) {
         const genAI = new GoogleGenerativeAI(apiKeyRecord.api_key);
         const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
 
-        const prompt = `Analyze this Java file from an old mobile app. The app uses components like 'Faith Comes By Hearing'. \n\nObjective: Identify logic related to resource loading, decryption, or data obfuscation. We need to understand how the app ultimately accesses its internal text/media resources. \n\nFile Content:\n${content}`;
+        const prompt = `Analyze this Java file from an old mobile app. The app uses components like 'Faith Comes By Hearing'. \n\nObjective: Identify logic related to resource loading, decryption, or data obfuscation. We need to understand how the app ultimately accesses its internal text/media resources.\n\nCRITICAL INSTRUCTION: At the end of your response, provide a numerical importance score from 1 to 10 (10 being highly critical) based on how much this file contributes to finding the decryption keys or resource loading logic. Wrap this score in the following tag: <RE_CRITICALITY>X</RE_CRITICALITY> where X is your score. Add a one-sentence justification inside the tag after the score.\n\nFile Content:\n${content}`;
 
         const result = await model.generateContent(prompt);
         const analysis = result.response.text();
