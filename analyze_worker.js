@@ -24,7 +24,7 @@ async function processFile(filePath, zip, apiKeyRecord) {
         const content = entry.getData().toString('utf8');
 
         const genAI = new GoogleGenerativeAI(apiKeyRecord.api_key);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
 
         const prompt = `Analyze this Java file from an old mobile app. The app uses components like 'Faith Comes By Hearing'. \n\nObjective: Identify logic related to resource loading, decryption, or data obfuscation. We need to understand how the app ultimately accesses its internal text/media resources. \n\nFile Content:\n${content}`;
 
