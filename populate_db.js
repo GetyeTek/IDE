@@ -6,14 +6,14 @@ const fs = require('fs');
 async function populate() {
     try {
         // Resolve path relative to the root of the repository
-        const zipPath = path.join(process.cwd(), 'classes', 'classes.dex.zip');
+        const zipPath = path.join(process.cwd(), 'Classes', 'classes.dex.zip');
         
         console.log(`Checking for file at: ${zipPath}`);
 
         if (!fs.existsSync(zipPath)) {
             console.error(`ERROR: File not found at ${zipPath}`);
             // List files in the 'classes' directory to see what's actually there
-            const classesDir = path.join(process.cwd(), 'classes');
+            const classesDir = path.join(process.cwd(), 'Classes');
             if (fs.existsSync(classesDir)) {
                 console.log(`Contents of 'classes' folder:`, fs.readdirSync(classesDir));
             } else {
