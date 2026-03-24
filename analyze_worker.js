@@ -65,12 +65,18 @@ async function main() {
     const workers = 4;
     const tasksPerWorker = 10;
 
-    for (let i = 0; i < workers; i++) {
-        const batch = tasks.slice(i * tasksPerWorker, (i + 1) * tasksPerWorker);
-        const key = keys[i % keys.length]; // LUF rotation
-        
-        await Promise.all(batch.map(task => processFile(task.file_path, zip, key)));
-    }
+    // Process tasks in a way that rotates keys for EVERY single request
+    const taskPromises = tasks.map((task, index) => {
+        // Tiny stagger (500ms * index % workers) to prevent instant bursts
+        return new Promise(resolve => setTimeout(resolve, (index % workers) * 500))
+            .then(() => {
+                // Pick a key based on the global pool, rotating constantly
+                const key = keys[index % keys.length];
+                return processFile(task.file_path, zip, key);
+            });
+    });
+
+    await Promise.all(taskPromises);
 
     // Trigger Next Workflow
     const { data: remaining } = await supabase.from('re_log').select('id').eq('status', 'pending').limit(1);
