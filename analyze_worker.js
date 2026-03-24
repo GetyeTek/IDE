@@ -64,21 +64,25 @@ async function main() {
 
     const keys = await getLeastUsedKeys();
     const zip = new AdmZip(zipPath);
+    
+    // How many we fire at once. Don't go above 10 or Google will hate your IP.
+    const WAVE_SIZE = Math.min(keys.length, 10);
 
-    console.log(`🚀 Starting batch of ${tasks.length} tasks with ${keys.length} keys...`);
+    console.log(`🚀 Fast-tracking ${tasks.length} tasks. Wave size: ${WAVE_SIZE} (based on ${keys.length} keys)`);
 
-    for (let i = 0; i < tasks.length; i++) {
-        const task = tasks[i];
-        const key = keys[i % keys.length]; // Strict round-robin rotation
+    for (let i = 0; i < tasks.length; i += WAVE_SIZE) {
+        const currentWave = tasks.slice(i, i + WAVE_SIZE);
+        console.log(`🌊 Launching wave ${Math.floor(i / WAVE_SIZE) + 1}...`);
 
-        console.log(`[${i + 1}/${tasks.length}] Using key: ...${key.api_key.slice(-4)} for ${task.file_path}`);
-        
-        // Process sequentially to avoid 429s and allow DB updates to propagate
-        await processFile(task.file_path, zip, key);
+        await Promise.all(currentWave.map((task, index) => {
+            const key = keys[index % keys.length];
+            return processFile(task.file_path, zip, key);
+        }));
 
-        // Gap between requests: 2 seconds (Adjust based on your tier's RPM)
-        if (i < tasks.length - 1) {
-            await sleep(2000);
+        // Small breather between waves to let the API and DB catch up
+        if (i + WAVE_SIZE < tasks.length) {
+            console.log('⏳ Wave complete. Resting for 3s...');
+            await sleep(3000);
         }
     }
 
