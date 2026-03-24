@@ -53,6 +53,8 @@ async function processFile(filePath, zip, apiKeyRecord) {
     }
 }
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function main() {
     const { data: tasks } = await supabase.from('re_log').select('file_path').eq('status', 'pending').limit(40);
     if (!tasks || tasks.length === 0) {
@@ -62,21 +64,23 @@ async function main() {
 
     const keys = await getLeastUsedKeys();
     const zip = new AdmZip(zipPath);
-    const workers = 4;
-    const tasksPerWorker = 10;
 
-    // Process tasks in a way that rotates keys for EVERY single request
-    const taskPromises = tasks.map((task, index) => {
-        // Tiny stagger (500ms * index % workers) to prevent instant bursts
-        return new Promise(resolve => setTimeout(resolve, (index % workers) * 500))
-            .then(() => {
-                // Pick a key based on the global pool, rotating constantly
-                const key = keys[index % keys.length];
-                return processFile(task.file_path, zip, key);
-            });
-    });
+    console.log(`🚀 Starting batch of ${tasks.length} tasks with ${keys.length} keys...`);
 
-    await Promise.all(taskPromises);
+    for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+        const key = keys[i % keys.length]; // Strict round-robin rotation
+
+        console.log(`[${i + 1}/${tasks.length}] Using key: ...${key.api_key.slice(-4)} for ${task.file_path}`);
+        
+        // Process sequentially to avoid 429s and allow DB updates to propagate
+        await processFile(task.file_path, zip, key);
+
+        // Gap between requests: 2 seconds (Adjust based on your tier's RPM)
+        if (i < tasks.length - 1) {
+            await sleep(2000);
+        }
+    }
 
     // Trigger Next Workflow
     const { data: remaining } = await supabase.from('re_log').select('id').eq('status', 'pending').limit(1);
