@@ -22,6 +22,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GH_PAT: ${{ secrets.GH_PAT }}
+          MY_PAT: ${{ secrets.MY_PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node analyze_worker.js
