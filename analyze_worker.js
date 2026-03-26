@@ -3,6 +3,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const AdmZip = require('adm-zip');
 const path = require('path');
 const axios = require('axios');
+const fs = require('fs');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 // Zip path base - we'll build this dynamically
