@@ -1,0 +1,38 @@
+name: Native SO Analysis
+on:
+  workflow_dispatch:
+
+jobs:
+  dissect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Radare2 and Ghidra Plugin
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y radare2
+          r2pm init
+          # Note: r2ghidra install can be slow and sometimes fails in CI
+          # We'll stick to standard radare2 analysis if plugin fails
+          r2pm -i r2ghidra || true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install @supabase/supabase-js
+
+      - name: Run Populator
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node populate_so.js
+
+      - name: Run Native Worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node so_worker.js
