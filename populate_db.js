@@ -5,53 +5,51 @@ const fs = require('fs');
 
 async function populate() {
     try {
-        // Resolve path relative to the root of the repository
-        const zipPath = path.join(process.cwd(), 'Classes', 'classes.dex.zip');
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+        const classesDir = path.join(process.cwd(), 'Classes');
         
-        console.log(`Checking for file at: ${zipPath}`);
-
-        if (!fs.existsSync(zipPath)) {
-            console.error(`ERROR: File not found at ${zipPath}`);
-            // List files in the 'classes' directory to see what's actually there
-            const classesDir = path.join(process.cwd(), 'Classes');
-            if (fs.existsSync(classesDir)) {
-                console.log(`Contents of 'classes' folder:`, fs.readdirSync(classesDir));
-            } else {
-                console.log(`'classes' folder does not exist at: ${classesDir}`);
-            }
+        if (!fs.existsSync(classesDir)) {
+            console.error(`ERROR: 'Classes' folder does not exist at: ${classesDir}`);
             process.exit(1);
         }
 
-        const zip = new AdmZip(zipPath);
-        const zipEntries = zip.getEntries();
+        for (let fileIndex = 1; fileIndex <= 8; fileIndex++) {
+            const fileName = `${fileIndex}tele_class.dex.zip`;
+            const zipPath = path.join(classesDir, fileName);
 
-        const filePaths = zipEntries
-            .filter(entry => !entry.isDirectory)
-            .map(entry => ({
-                file_path: entry.entryName,
-                status: 'pending'
-            }));
+            if (!fs.existsSync(zipPath)) {
+                console.log(`Skipping: ${fileName} (File not found)`);
+                continue;
+            }
 
-        if (filePaths.length === 0) {
-            console.log("Zip file is empty or contains no files.");
-            return;
-        }
+            console.log(`Processing ${fileName}...`);
+            const zip = new AdmZip(zipPath);
+            const zipEntries = zip.getEntries();
 
-        console.log(`Found ${filePaths.length} files. Connecting to Supabase...`);
+            const dataToInsert = zipEntries
+                .filter(entry => !entry.isDirectory)
+                .map(entry => ({
+                    file_path: entry.entryName,
+                    source_index: fileIndex
+                }));
 
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+            if (dataToInsert.length === 0) {
+                console.log(`Zip ${fileName} is empty.`);
+                continue;
+            }
 
-        const chunkSize = 500;
-        for (let i = 0; i < filePaths.length; i += chunkSize) {
-            const chunk = filePaths.slice(i, i + chunkSize);
-            const { error } = await supabase
-                .from('re_log')
-                .upsert(chunk, { onConflict: 'file_path' });
+            const chunkSize = 500;
+            for (let i = 0; i < dataToInsert.length; i += chunkSize) {
+                const chunk = dataToInsert.slice(i, i + chunkSize);
+                const { error } = await supabase
+                    .from('tele_logs')
+                    .upsert(chunk, { onConflict: 'file_path, source_index' });
 
-            if (error) {
-                console.error(`Error inserting chunk:`, error.message);
-            } else {
-                console.log(`Inserted ${i + chunk.length} / ${filePaths.length} files...`);
+                if (error) {
+                    console.error(`Error inserting chunk from ${fileName}:`, error.message);
+                } else {
+                    console.log(`[${fileName}] Inserted ${i + chunk.length} / ${dataToInsert.length} entries...`);
+                }
             }
         }
 
