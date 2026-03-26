@@ -29,7 +29,7 @@ async function getLeastUsedKeys() {
 async function processFile(task, apiKeyRecord, currentCount, totalCount) {
     try {
         const { file_path: filePath, source_index } = task;
-        const maskedKey = `***${apiKeyRecord.id.slice(-4)}`;
+        const maskedKey = `***${String(apiKeyRecord.id).slice(-4)}`;
         
         // Get zip from cache or load it
         if (!zipCache.has(source_index)) {
