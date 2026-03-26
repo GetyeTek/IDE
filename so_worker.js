@@ -51,7 +51,7 @@ async function shredSO(task) {
             const parts = line.trim().split(/\s+/);
             return {
                 so_id: task.id,
-                offset: parts[0],
+                func_offset: parts[0],
                 function_name: parts[parts.length - 1],
                 status: 'pending'
             };
@@ -80,8 +80,8 @@ async function decompileFunction(task) {
     console.log(`🧪 Decompiling [${task.so_analysis.file_path}]: ${task.function_name}`);
 
     try {
-        // 's [offset]' = seek, 'pdg' = print decompile ghidra
-        const code = execSync(`r2 -qc "aaa; s ${task.offset}; pdg" "${soPath}"`).toString();
+        // 's [func_offset]' = seek, 'pdg' = print decompile ghidra
+        const code = execSync(`r2 -qc "aaa; s ${task.func_offset}; pdg" "${soPath}"`).toString();
         
         await supabase.from('so_functions').update({
             ghidra_code: code,
