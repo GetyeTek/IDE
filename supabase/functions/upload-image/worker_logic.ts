@@ -148,28 +148,21 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
   const data = await res.json();
   const errorMessage = data.error?.message || "";
 
-  // 1. Handle Invalid Key (400)
-  if (res.status === 400 && errorMessage.toLowerCase().includes("key not valid")) {
-    await deactivateKey(supabase, keyId, requestId || "");
-    console.warn(`[${requestId}] [RETRY] Invalid key detected. Deactivated and rotating.`);
-    return callGeminiApi(supabase, model, prompt, parts, requestId, retryCount + 1);
-  }
+  // Universal Retry Logic for any error (400, 429, 500, etc.)
+  if (!res.ok || errorMessage) {
+    console.warn(`[${requestId}] [ATTEMPT_FAILED] Status: ${res.status} | Error: ${errorMessage}`);
 
-  // 2. Handle Rate Limit (429)
-  if (res.status === 429) {
-    await markKeyCooldown(supabase, keyId, requestId || "");
-    console.warn(`[${requestId}] [RETRY] 429 detected. Rotating key and switching model.`);
+    // Specific Cleanup Actions
+    if (res.status === 400 && errorMessage.toLowerCase().includes("key not valid")) {
+      await deactivateKey(supabase, keyId, requestId || "");
+    } else if (res.status === 429) {
+      await markKeyCooldown(supabase, keyId, requestId || "");
+    }
+
+    console.warn(`[${requestId}] [RETRY] Rotating model/key and retrying (Attempt ${retryCount + 1}/3)...`);
     const nextModel = model === PRIMARY_MODEL ? FALLBACK_MODEL : PRIMARY_MODEL;
     return callGeminiApi(supabase, nextModel, prompt, parts, requestId, retryCount + 1);
   }
-
-  // 2. Handle High Demand Spikes (Immediate Retry on same key)
-  if (errorMessage.toLowerCase().includes("high demand")) {
-    console.warn(`[${requestId}] [RETRY] High demand spike. Retrying immediately without rotation.`);
-    return callGeminiApi(supabase, model, prompt, parts, requestId, retryCount + 1);
-  }
-
-  if (!res.ok) throw new Error(errorMessage || `AI API returned ${res.status}`);
   
   const finalResponse = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join('') || "";
   console.log(`[${requestId}] [AI_RAW_RESPONSE_SUCCESS] Length: ${finalResponse.length}`);
