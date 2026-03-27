@@ -8,7 +8,7 @@ const REQUEST_ID = Deno.env.get('REQUEST_ID') ?? 'WORKER';
 const IMAGE_PATHS_RAW = Deno.env.get('IMAGE_PATHS') ?? '[]';
 
 // --- MODELS (USER SPECIFIED ORDER) ---
-const PRIMARY_MODEL = "gemini-2.5-flash";
+const PRIMARY_MODEL = "gemini-3-flash-preview";
 const FALLBACK_MODEL = "gemini-2.5-flash";
 
 const OCR_PROMPT_TEMPLATE = `
@@ -127,14 +127,17 @@ async function deactivateKey(supabase: any, keyId: number, requestId: string) {
   await supabase.from('api_keys').update({ is_active: false }).eq('id', keyId);
 }
 
-async function callGeminiApi(supabase: any, model: string, prompt: string | null, parts?: any[], requestId?: string, retryCount = 0): Promise<string> {
-  if (retryCount >= 3) throw new Error(`Exceeded maximum retries (3) for ${model}`);
+async function callGeminiApi(supabase: any, _ignoredModel: string, prompt: string | null, parts?: any[], requestId?: string, retryCount = 0): Promise<string> {
+  if (retryCount >= 6) throw new Error(`Exceeded total retries (6) across both models`);
+
+  // Primary for first 3 tries, Fallback for the next 3
+  const currentModel = retryCount < 3 ? PRIMARY_MODEL : FALLBACK_MODEL;
 
   const { id: keyId, key } = await getGeminiKey(supabase, requestId || "");
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${key}`;
   const payloadParts = parts || [{ text: prompt }];
   
-  console.log(`[${requestId}] [AI_REQUEST] Model: ${model} | Retry: ${retryCount}`);
+  console.log(`[${requestId}] [AI_REQUEST] Model: ${currentModel} | Retry: ${retryCount}`);
 
   const res = await fetch(url, {
     method: 'POST',
@@ -159,9 +162,8 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
       await markKeyCooldown(supabase, keyId, requestId || "");
     }
 
-    console.warn(`[${requestId}] [RETRY] Rotating model/key and retrying (Attempt ${retryCount + 1}/3)...`);
-    const nextModel = model === PRIMARY_MODEL ? FALLBACK_MODEL : PRIMARY_MODEL;
-    return callGeminiApi(supabase, nextModel, prompt, parts, requestId, retryCount + 1);
+    console.warn(`[${requestId}] [RETRY] Rotating key/model and retrying (Attempt ${retryCount + 1}/6)...`);
+    return callGeminiApi(supabase, currentModel, prompt, parts, requestId, retryCount + 1);
   }
   
   const finalResponse = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join('') || "";
