@@ -17,7 +17,7 @@ You are provided with multiple images of an exam paper.
 
 YOUR GOAL:
 1. STITCHING: Compare all images to create a master list of unique questions. 
-2. ORDERING: Use the physical layout (top-to-bottom, left-to-right) to determine the logical order. If a question is numbered '1' and another '2', 1 MUST come first.
+2. ORDERING: Use the physical layout (top-to-bottom, left-to-right) to determine the logical order. Follow the exact numbering visible on the paper; if the first question visible is labeled '3', its number MUST be '3'. If '1' and '2' are present, 1 MUST come first.
 3. DEDUPLICATION: If Question 5 appears in three photos, only transcribe the clearest version once.
 4. CLARITY: If text is unreadable, use [unreadable] but attempt to infer from context.
 
