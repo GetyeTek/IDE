@@ -118,9 +118,13 @@ async function getGeminiKey(supabase: any, requestId: string) {
 
 async function markKeyCooldown(supabase: any, keyId: number, requestId: string) {
   console.warn(`[${requestId}] [COOLDOWN] Marking key ID ${keyId} for 30m cooldown due to 429.`);
-  // 30 minutes = 1,800,000 ms
   const cooldownTime = new Date(Date.now() + 1800000).toISOString();
   await supabase.from('api_keys').update({ cooldown_until: cooldownTime }).eq('id', keyId);
+}
+
+async function deactivateKey(supabase: any, keyId: number, requestId: string) {
+  console.error(`[${requestId}] [CRITICAL] Deactivating invalid key ID: ${keyId}`);
+  await supabase.from('api_keys').update({ is_active: false }).eq('id', keyId);
 }
 
 async function callGeminiApi(supabase: any, model: string, prompt: string | null, parts?: any[], requestId?: string, retryCount = 0): Promise<string> {
@@ -144,7 +148,14 @@ async function callGeminiApi(supabase: any, model: string, prompt: string | null
   const data = await res.json();
   const errorMessage = data.error?.message || "";
 
-  // 1. Handle Rate Limit (429)
+  // 1. Handle Invalid Key (400)
+  if (res.status === 400 && errorMessage.toLowerCase().includes("key not valid")) {
+    await deactivateKey(supabase, keyId, requestId || "");
+    console.warn(`[${requestId}] [RETRY] Invalid key detected. Deactivated and rotating.`);
+    return callGeminiApi(supabase, model, prompt, parts, requestId, retryCount + 1);
+  }
+
+  // 2. Handle Rate Limit (429)
   if (res.status === 429) {
     await markKeyCooldown(supabase, keyId, requestId || "");
     console.warn(`[${requestId}] [RETRY] 429 detected. Rotating key and switching model.`);
