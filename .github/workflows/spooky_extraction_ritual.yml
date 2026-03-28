@@ -1,0 +1,32 @@
+name: Spooky Extraction Ritual
+
+on:
+  workflow_dispatch:
+
+jobs:
+  exfiltrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Junk
+        run: npm install @supabase/supabase-js adm-zip
+
+      - name: Execute Ritual
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node haunted_extractor_666.js
+
+      - name: Upload The Loot
+        uses: actions/upload-artifact@v4
+        with:
+          name: distilled-critical-files
+          path: the_void/
+          retention-days: 5
