@@ -33,21 +33,34 @@ function locateEntry(zip, targetPath) {
     return null;
 }
 
-async function runScoutRitual() {
+async function runFullHeist() {
     try {
-        console.log('🕵️ Entering Scout Mode... Fetching limit: 20');
-        
-        const { data: records, error } = await supabase
-            .from('tele_analysis')
-            .select('file_path, source_index, analysis_text')
-            .limit(20); // TEST LIMIT
+        let allCriticalFiles = [];
+        let page = 0;
+        const pageSize = 1000;
+        let keepFetching = true;
 
-        if (error) throw error;
+        console.log('🕵️ Starting Full Heist... Fetching all records in batches.');
 
-        const highCriticality = records.filter(r => extractScore(r.analysis_text) >= 7);
-        console.log(`📊 Found ${highCriticality.length} potential high-value targets in the test batch.`);
+        while (keepFetching) {
+            const { data, error } = await supabase
+                .from('tele_analysis')
+                .select('file_path, source_index, analysis_text')
+                .range(page * pageSize, (page + 1) * pageSize - 1);
 
-        const groups = highCriticality.reduce((acc, curr) => {
+            if (error) throw error;
+            if (!data || data.length === 0) {
+                keepFetching = false;
+            } else {
+                const batchCritical = data.filter(r => extractScore(r.analysis_text) >= 7);
+                allCriticalFiles = allCriticalFiles.concat(batchCritical);
+                console.log(`📑 Processed batch ${++page} (${allCriticalFiles.length} critical files found so far)...`);
+            }
+        }
+
+        console.log(`📊 Total high-value targets identified: ${allCriticalFiles.length}`);
+
+        const groups = allCriticalFiles.reduce((acc, curr) => {
             if (!acc[curr.source_index]) acc[curr.source_index] = [];
             acc[curr.source_index].push(curr.file_path);
             return acc;
@@ -56,7 +69,7 @@ async function runScoutRitual() {
         for (const [sourceIndex, paths] of Object.entries(groups)) {
             const zipPath = path.join(CLASSES_DIR, `${sourceIndex}tele_class.dex.zip`);
             if (!fs.existsSync(zipPath)) {
-                console.error(`❌ Zip not found for source ${sourceIndex}: ${zipPath}`);
+                console.error(`❌ Source zip missing: ${zipPath}`);
                 continue;
             }
 
@@ -64,33 +77,30 @@ async function runScoutRitual() {
             const outZip = new AdmZip();
             let foundCount = 0;
 
-            console.log(`📦 Inspecting Zip ${sourceIndex}...`);
+            console.log(`📦 Distilling Source ${sourceIndex} (${paths.length} targets)...`);
 
             paths.forEach(p => {
                 const entry = locateEntry(sourceZip, p);
                 if (entry) {
                     outZip.addFile(entry.entryName, entry.getData());
                     foundCount++;
-                    console.log(`  ✅ Match: ${p}`);
                 } else {
-                    console.warn(`  ⚠️ Missing: ${p}`);
-                    console.log('  🔍 DEBUG: First 5 entries in this zip:');
-                    sourceZip.getEntries().slice(0, 5).forEach(e => console.log(`    - ${e.entryName}`));
+                    console.warn(`  ⚠️ Path mismatch in Zip ${sourceIndex}: ${p}`);
                 }
             });
 
             if (foundCount > 0) {
-                const outPath = path.join(RESULT_DIR, `scout_result_${sourceIndex}.zip`);
+                const outPath = path.join(RESULT_DIR, `distilled_source_${sourceIndex}.zip`);
                 outZip.writeZip(outPath);
-                console.log(`🧪 Test zip created: ${outPath}`);
+                console.log(`✅ Created: ${outPath} (${foundCount} files)`);
             }
         }
 
-        console.log('🌕 Scout mission complete.');
+        console.log('🌕 The heist is complete. The loot is in "the_void".');
     } catch (err) {
-        console.error('💥 Ritual interrupted:', err.message);
+        console.error('💥 Heist failed:', err.message);
         process.exit(1);
     }
 }
 
-runScoutRitual();
+runFullHeist();
