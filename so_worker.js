@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { execSync } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -13,64 +14,85 @@ async function main() {
         .limit(1)
         .single();
 
-    if (funcTask) {
-        await decompileFunction(funcTask);
-        return;
-    }
-
-    // 2. If no functions pending, find a new .so to shred
-    const { data: soTask } = await supabase
-        .from('so_analysis')
-        .select('*')
-        .eq('status', 'pending')
-        .limit(1)
-        .single();
-
-    if (soTask) {
-        await shredSO(soTask);
+        if (soTask) {
+        await auditSO(soTask);
     } else {
-        console.log('No work left. System clean.');
+        console.log('No binaries to audit. Peace out.');
     }
 }
 
-async function shredSO(task) {
-    const filePath = path.join(process.cwd(), 'So', task.file_path);
-    console.log(`🔪 Shredding: ${task.file_path}`);
+async function auditSO(task) {
+    const zipPath = path.join(process.cwd(), 'So', task.file_path);
+    const extractDir = path.join(process.cwd(), 'tmp_audit');
+    
+    if (!fs.existsSync(extractDir)) fs.mkdirSync(extractDir);
+
+    console.log(`🚀 AUDITOR MODE STARTING: ${task.file_path}`);
 
     try {
-        // Extract strings and hex once
-        const strings = execSync(`rabin2 -z "${filePath}" | head -n 2000`).toString();
-        const hex = execSync(`r2 -qc "px 1024" "${filePath}"`).toString();
-
-        // Get function list: 'afl' (Analyze Functions List)
-        console.log('Analyzing functions (aaa)...');
-        const functionsRaw = execSync(`r2 -qc "aaa; afl" "${filePath}"`).toString();
+        // 1. Unzip on the fly
+        console.log('📦 Unzipping binary...');
+        execSync(`unzip -o "${zipPath}" -d "${extractDir}"`);
         
+        // Find the actual .so file in the extracted mess
+        const files = fs.readdirSync(extractDir);
+        const soFileName = files.find(f => f.endsWith('.so'));
+        if (!soFileName) throw new Error('No .so file found in zip');
+        const binPath = path.join(extractDir, soFileName);
+
+        // 2. Binary Info Gathering
+        const binInfo = execSync(`rabin2 -I "${binPath}"`).toString();
+        const goVersion = execSync(`strings "${binPath}" | grep -m 1 "go1." || echo "Unknown"`).toString().trim();
+        const sections = execSync(`r2 -qc "iS" "${binPath}"`).toString();
+        const exports = execSync(`r2 -qc "iE" "${binPath}" | grep Java_ || echo "None"`).toString();
+
+        // 3. Deep Function Analysis (Recovering Go symbols with 'ann')
+        console.log('🔍 Performing deep Go-symbol recovery...');
+        const functionsRaw = execSync(`r2 -qc "aa; ann; afl" "${binPath}"`).toString();
         const functionLines = functionsRaw.split('\n').filter(line => line.trim());
-        const functionData = functionLines.map(line => {
+
+        const categories = {
+            jni: [],
+            logic: [],
+            runtime: 0
+        };
+
+        functionLines.forEach(line => {
             const parts = line.trim().split(/\s+/);
-            return {
-                so_id: task.id,
-                func_offset: parts[0],
-                function_name: parts[parts.length - 1],
-                status: 'pending'
-            };
-        }).filter(f => f.function_name && f.function_name.startsWith('0x') === false);
+            const name = parts[parts.length - 1];
+            if (!name || name.startsWith('0x')) return;
 
-        console.log(`Found ${functionData.length} functions. Populating queue...`);
+            if (name.startsWith('Java_')) categories.jni.push(name);
+            else if (['runtime.', 'go.', 'type.', 'sync.', 'reflect.'].some(p => name.startsWith(p))) categories.runtime++;
+            else categories.logic.push(name);
+        });
 
-        // Batch insert functions
-        const { error: insErr } = await supabase.from('so_functions').upsert(functionData, { onConflict: 'so_id, function_name' });
-        if (insErr) throw insErr;
+        // 4. THE AUDIT LOG REPORT
+        console.log('\n' + '='.repeat(50));
+        console.log(`AUDIT REPORT FOR: ${soFileName}`);
+        console.log('='.repeat(50));
+        console.log(`GO VERSION: ${goVersion}`);
+        console.log(`PCLNTAB: ${sections.includes('gopclntab') ? '✅ PRESENT (Symbols Recoverable)' : '❌ MISSING (Stripped Binary)')}`);
+        console.log(`TOTAL FUNCTIONS: ${functionLines.length}`);
+        console.log(`RUNTIME BLOAT: ${categories.runtime} functions`);
+        console.log(`USER LOGIC: ${categories.logic.length} functions`);
+        console.log('\n--- JNI EXPORT POINTS ---');
+        console.log(categories.jni.join('\n') || 'None found.');
+        console.log('\n--- TOP USER FUNCTIONS (Sample) ---');
+        console.log(categories.logic.slice(0, 15).join('\n'));
+        console.log('='.repeat(50) + '\n');
 
+        // Update Supabase so we don't repeat this task
         await supabase.from('so_analysis').update({ 
-            status: 'shredded', 
-            strings_output: strings, 
-            hex_dump: hex 
+            status: 'audited', 
+            strings_output: `Audit completed. Found ${categories.logic.length} logic functions.`
         }).eq('id', task.id);
 
+        // Cleanup
+        fs.rmSync(extractDir, { recursive: true, force: true });
+
     } catch (err) {
-        console.error('Shred failed:', err.message);
+        console.error('❌ AUDIT FAILED:', err.message);
         await supabase.from('so_analysis').update({ status: 'failed' }).eq('id', task.id);
     }
 }
