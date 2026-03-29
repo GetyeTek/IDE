@@ -57,12 +57,16 @@ async function auditSO(fileName) {
 
         // 2. Download GoReSym
         console.log('\n🪓 --- DOWNLOADING GORESYM (MANDIANT) ---');
-        const goReSymUrl = "https://github.com/mandiant/GoReSym/releases/download/v3.0.1/GoReSym_3.0.1_linux_x86_64";
+        const goReSymZip = path.join(process.cwd(), 'GoReSym-linux.zip');
         const goReSymPath = path.join(process.cwd(), 'GoReSym');
+        
         if (!fs.existsSync(goReSymPath)) {
-            execSync(`curl -sL -o "${goReSymPath}" "${goReSymUrl}"`);
+            const goReSymUrl = "https://github.com/mandiant/GoReSym/releases/download/v3.3/GoReSym-linux.zip";
+            execSync(`curl -sL -o "${goReSymZip}" "${goReSymUrl}"`);
+            execSync(`unzip -q -o "${goReSymZip}" -d .`);
+            // The zip extracts a binary named GoReSym
             execSync(`chmod +x "${goReSymPath}"`);
-            console.log('✅ GoReSym downloaded and ready.');
+            console.log('✅ GoReSym v3.3 downloaded and extracted.');
         }
 
         // 3. Extract Hidden Symbols
