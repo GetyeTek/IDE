@@ -11,7 +11,7 @@ jobs:
       - name: Install Radare2 and Ghidra Plugin
         run: |
           sudo apt-get update
-          sudo apt-get install -y radare2
+          sudo apt-get install -y radare2 unzip binutils
           r2pm init
           # Note: r2ghidra install can be slow and sometimes fails in CI
           # We'll stick to standard radare2 analysis if plugin fails
