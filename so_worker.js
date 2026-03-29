@@ -70,6 +70,15 @@ async function auditSO(fileName) {
         const goVersion = execSync(`strings "${soPath}" | grep -oP "go1\\.[0-9]+(\\.[0-9]+)?" | head -n 1 || echo "Unknown"`).toString().trim();
         console.log(`Go Version   : ${goVersion}`);
 
+        // 3.5 Direct ELF Export Hunt
+        console.log('\n🔎 --- JNI EXPORT HUNT ---');
+        try {
+            const exports = execSync(`rabin2 -E "${soPath}" | grep "Java_"`).toString().trim();
+            console.log(exports ? exports : 'No Java_ exports found in standard ELF export table.');
+        } catch (e) {
+            console.log('No Java_ exports found in standard ELF export table.');
+        }
+
         // 4. Heavy Function Shredding
         console.log('\n⚙️ Running Radare2 analysis (this might take a minute)...');
         const r2Command = `r2 -qc "aa; afl" "${soPath}"`;
@@ -77,20 +86,26 @@ async function auditSO(fileName) {
         
         const lines = functionsRaw.split('\n').filter(l => l.trim());
         
-        let stats = { jni:[], main:[], runtime: 0, unnamed: 0, total: lines.length };
+        let stats = { jni:[], main:[], runtime: 0, unnamed: 0, total: lines.length, sample:[] };
 
         lines.forEach(line => {
             const parts = line.trim().split(/\s+/);
-            const funcName = parts[parts.length - 1];
+            const rawName = parts[parts.length - 1];
+            
+            // Strip r2 prefixes to see the real Go name
+            const cleanName = rawName.replace(/^(sym\.|exp\.|imp\.|fcn\.)/, '');
 
-            if (funcName.startsWith('Java_')) {
-                stats.jni.push(funcName);
-            } else if (funcName.match(/^(runtime|go\.|type\.|sync\.|syscall\.|internal\.)/)) {
+            if (cleanName.startsWith('Java_')) {
+                stats.jni.push(cleanName);
+            } else if (cleanName.match(/^(runtime|go\.|type\.|sync\.|syscall\.|internal\.)/)) {
                 stats.runtime++;
-            } else if (funcName.startsWith('sym.func.') || funcName.startsWith('fcn.') || funcName.startsWith('0x')) {
+            } else if (cleanName.startsWith('main.') || cleanName.includes('/')) {
+                stats.main.push(cleanName);
+            } else {
                 stats.unnamed++;
-            } else if (funcName.startsWith('main.') || funcName.includes('/')) {
-                stats.main.push(funcName);
+                if (stats.sample.length < 20 && !cleanName.startsWith('0x')) {
+                    stats.sample.push(rawName);
+                }
             }
         });
 
@@ -98,13 +113,17 @@ async function auditSO(fileName) {
         console.log('\n📈 --- FUNCTION AUDIT REPORT ---');
         console.log(`Total Functions Found : ${stats.total}`);
         console.log(`Runtime/Noise (Ignored) : ${stats.runtime}`);
-        console.log(`Unnamed/Stripped        : ${stats.unnamed}`);
+        console.log(`Other/Unknown           : ${stats.unnamed}`);
+        
         console.log(`\n🔥 JNI EXPORTS (${stats.jni.length}):`);
-        stats.jni.length > 0 ? stats.jni.forEach(f => console.log(`  - ${f}`)) : console.log('  None found.');
+        stats.jni.length > 0 ? [...new Set(stats.jni)].forEach(f => console.log(`  - ${f}`)) : console.log('  None found via r2 afl.');
 
         console.log(`\n🧠 USER LOGIC / MAIN (${stats.main.length}):`);
-        stats.main.slice(0, 15).forEach(f => console.log(`  - ${f}`));
+[...new Set(stats.main)].slice(0, 15).forEach(f => console.log(`  - ${f}`));
         if (stats.main.length > 15) console.log(`  ... and ${stats.main.length - 15} more.`);
+
+        console.log(`\n👽 RANDOM UNKNOWN SAMPLE (First 20):`);
+        stats.sample.forEach(f => console.log(`  - ${f}`));
 
         console.log('\n✅ Standalone Audit Complete.');
 
