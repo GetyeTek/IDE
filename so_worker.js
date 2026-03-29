@@ -33,6 +33,18 @@ async function auditSO(task) {
     console.log(`\n📦 Target: ${task.file_path}`);
 
     try {
+        // 0. The Ultimate Sanity Check
+        const soDir = path.join(process.cwd(), 'So');
+        if (!fs.existsSync(soDir)) {
+            console.error(`❌ BRO! The 'So' folder doesn't even exist! ROOT FILES:`, fs.readdirSync(process.cwd()));
+        } else {
+            console.log(`📂 ACTUAL contents of the 'So' folder:`, fs.readdirSync(soDir));
+        }
+
+        if (!fs.existsSync(zipPath)) {
+            throw new Error(`The file [${task.file_path}] is physically MISSING from the runner! Check your .gitignore or capitalization!`);
+        }
+
         // 1. Unzip on the fly
         console.log('🗜️ Unzipping archive...');
         fs.mkdirSync(extractDir, { recursive: true });
