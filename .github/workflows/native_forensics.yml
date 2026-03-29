@@ -30,3 +30,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node so_worker.js
+
+      - name: Upload Reversed Logic Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Huawei_CubeIM_Reversed
+          path: Extracted_Logic/
