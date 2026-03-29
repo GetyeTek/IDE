@@ -58,15 +58,27 @@ async function auditSO(fileName) {
         // 2. Download GoReSym
         console.log('\n🪓 --- DOWNLOADING GORESYM (MANDIANT) ---');
         const goReSymZip = path.join(process.cwd(), 'GoReSym-linux.zip');
-        const goReSymPath = path.join(process.cwd(), 'GoReSym');
+        const goReSymDir = path.join(process.cwd(), 'GoReSym_v3');
+        const goReSymPath = path.join(goReSymDir, 'GoReSym');
         
         if (!fs.existsSync(goReSymPath)) {
+            // Nuke the corrupted 404 HTML file from the previous CI run (dirty workspace)
+            execSync(`rm -rf "${goReSymDir}" "GoReSym" "GoReSym-linux.zip"`);
+            fs.mkdirSync(goReSymDir, { recursive: true });
+            
             const goReSymUrl = "https://github.com/mandiant/GoReSym/releases/download/v3.3/GoReSym-linux.zip";
             execSync(`curl -sL -o "${goReSymZip}" "${goReSymUrl}"`);
-            execSync(`unzip -q -o "${goReSymZip}" -d .`);
-            // The zip extracts a binary named GoReSym
+            execSync(`unzip -q -o "${goReSymZip}" -d "${goReSymDir}"`);
+            
+            // Find whatever the binary is named inside the zip
+            const binOut = execSync(`find "${goReSymDir}" -type f`).toString().trim();
+            const actualBinPath = binOut.split('\n')[0];
+            
+            if (actualBinPath !== goReSymPath) {
+                execSync(`mv "${actualBinPath}" "${goReSymPath}"`);
+            }
             execSync(`chmod +x "${goReSymPath}"`);
-            console.log('✅ GoReSym v3.3 downloaded and extracted.');
+            console.log('✅ GoReSym v3.3 downloaded, extracted, and armed.');
         }
 
         // 3. Extract Hidden Symbols
