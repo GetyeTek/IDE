@@ -227,12 +227,14 @@
         const modelName = "gemini-2.5-flash"; 
         const vidA = document.getElementById('vid-a');
         const vidB = document.getElementById('vid-b');
+        let bStartedAt = 0;
 
         // VIDEO LOGIC: Handover from A to B
         vidA.addEventListener('ended', () => {
             vidA.style.opacity = '0';
             vidB.style.opacity = '1';
             vidB.play();
+            bStartedAt = Date.now(); // Mark when the 5s timer starts
         });
 
         window.onload = () => {
@@ -290,6 +292,13 @@
                     requestBody.system_instruction = { parts: { text: systemPrompt } };
                 }
 
+                // Wait 2 seconds before kicking off Video A
+                setTimeout(() => {
+                    if (vidA.paused && vidB.paused) {
+                        vidA.play().catch(e => console.log("User interaction required for video"));
+                    }
+                }, 2000);
+
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -297,19 +306,28 @@
                 });
 
                 const data = await response.json();
-                removeTypingIndicator(typingId);
 
                 if (data.candidates && data.candidates[0].content) {
                     const aiResponse = data.candidates[0].content.parts[0].text;
-                    appendMessage('model', aiResponse);
                     
-                    // SUCCESS! TRIGGER VIDEO A PLAYBACK
-                    if (vidA.paused && vidB.paused) {
-                        vidA.play().catch(e => console.log("Autoplay blocked, wait for user interaction."));
-                    }
+                    // Helper to gate the response until B has played for 5s
+                    const checkAndDisplay = () => {
+                        const now = Date.now();
+                        const elapsedB = bStartedAt > 0 ? now - bStartedAt : 0;
 
-                    chatHistory.push({ role: "user", parts: [{ text: text }] });
-                    chatHistory.push({ role: "model", parts: [{ text: aiResponse }] });
+                        if (bStartedAt > 0 && elapsedB >= 5000) {
+                            removeTypingIndicator(typingId);
+                            appendMessage('model', aiResponse);
+                            chatHistory.push({ role: "user", parts: [{ text: text }] });
+                            chatHistory.push({ role: "model", parts: [{ text: aiResponse }] });
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        } else {
+                            // Keep checking every 100ms until the 5s requirement is met
+                            setTimeout(checkAndDisplay, 100);
+                        }
+                    };
+
+                    checkAndDisplay();
                 } else {
                     throw new Error(data.error?.message || "Check API key.");
                 }
