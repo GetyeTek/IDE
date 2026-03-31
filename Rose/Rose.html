@@ -50,13 +50,18 @@
         }
 
         #vid-a {
-            z-index: 2;
+            z-index: 3;
             opacity: 1;
         }
 
         #vid-b {
+            z-index: 2;
+            opacity: 1;
+        }
+
+        #vid-c {
             z-index: 1;
-            opacity: 1; /* Keep it fully opaque, just hiding behind A */
+            opacity: 1;
         }
 
         .glass-panel {
@@ -150,9 +155,13 @@
         <video id="vid-a" muted playsinline preload="auto">
             <source src="A.mp4" type="video/mp4">
         </video>
-        <!-- Video B: Hidden until A ends -->
-        <video id="vid-b" muted playsinline loop preload="auto">
+        <!-- Video B: Plays after A ends -->
+        <video id="vid-b" muted playsinline preload="auto">
             <source src="B.mp4" type="video/mp4">
+        </video>
+        <!-- Video C: Plays after B ends -->
+        <video id="vid-c" muted playsinline preload="auto">
+            <source src="C.mp4" type="video/mp4">
         </video>
     </div>
 
@@ -233,22 +242,31 @@
         const modelName = "gemini-2.5-flash"; 
         const vidA = document.getElementById('vid-a');
         const vidB = document.getElementById('vid-b');
+        const vidC = document.getElementById('vid-c');
         let bStartedAt = 0;
 
-        // VIDEO LOGIC: Handover from A to B
+        // VIDEO LOGIC: Handover from A -> B -> C
 
         vidA.addEventListener('ended', () => {
-            // Play B exactly when A finishes to preserve the timeline
             vidB.play();
-            bStartedAt = Date.now(); // The 5s countdown starts when B is requested to play
+            bStartedAt = Date.now(); 
         });
 
-        // The Frame-Hold trick: Wait for B to actually start rendering frames
         vidB.addEventListener('timeupdate', function onBStart() {
-            // Once B's playhead moves past 0, it is actively drawing to the screen
             if (vidB.currentTime > 0) {
-                vidA.style.opacity = '0'; // Seamlessly reveal B hiding underneath
-                vidB.removeEventListener('timeupdate', onBStart); // Clean up the listener
+                vidA.style.opacity = '0'; 
+                vidB.removeEventListener('timeupdate', onBStart);
+            }
+        });
+
+        vidB.addEventListener('ended', () => {
+            vidC.play();
+        });
+
+        vidC.addEventListener('timeupdate', function onCStart() {
+            if (vidC.currentTime > 0) {
+                vidB.style.opacity = '0'; // Reveal C hiding underneath B
+                vidC.removeEventListener('timeupdate', onCStart);
             }
         });
 
