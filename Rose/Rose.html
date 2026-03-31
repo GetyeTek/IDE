@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aura | AI Companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600&display=swap');
+
+        :root {
+            --primary: #8b5cf6;
+            --secondary: #ec4899;
+            --glass: rgba(255, 255, 255, 0.15); /* Thinned out for video visibility */
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #000; /* Dark base for video */
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Video Background Logic */
+        .video-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+            transition: opacity 1s ease-in-out;
+        }
+
+        #vid-b {
+            opacity: 0;
+        }
+
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 30px;
+        }
+
+        .chat-container {
+            height: calc(100vh - 180px);
+            scrollbar-width: none;
+        }
+        .chat-container::-webkit-scrollbar { display: none; }
+
+        .message-user {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.8) 0%, rgba(168, 85, 247, 0.8) 100%);
+            color: white;
+            border-radius: 20px 20px 4px 20px;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2);
+            align-self: flex-end;
+            animation: slideInRight 0.3s ease-out;
+            backdrop-filter: blur(5px);
+        }
+
+        .message-ai {
+            background: rgba(255, 255, 255, 0.8);
+            color: #1f2937;
+            border-radius: 20px 20px 20px 4px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            align-self: flex-start;
+            animation: slideInLeft 0.3s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .sidebar {
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+        }
+
+        .sidebar.closed {
+            transform: translateX(-100%);
+        }
+
+        .input-area {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        #user-input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        #user-input {
+            color: white;
+        }
+
+        .dot-pulse {
+            display: flex;
+            gap: 4px;
+        }
+        .dot {
+            width: 8px; height: 8px; background: #fff; border-radius: 50%;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(0.8); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Video Backgrounds -->
+    <div class="video-wrapper">
+        <!-- Video A: Loads first, sits as wallpaper -->
+        <video id="vid-a" muted playsinline preload="auto">
+            <source src="A.mp4" type="video/mp4">
+        </video>
+        <!-- Video B: Hidden until A ends -->
+        <video id="vid-b" muted playsinline loop preload="auto">
+            <source src="B.mp4" type="video/mp4">
+        </video>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar closed fixed top-0 left-0 h-full w-80 glass-panel m-2 shadow-2xl z-50 p-6 flex flex-col">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-2xl font-semibold text-white">Settings</h2>
+            <button onclick="toggleSidebar()" class="text-white/70 hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <div class="space-y-6 flex-grow">
+            <div>
+                <label class="block text-sm font-medium text-white/80 mb-2">Gemini API Key</label>
+                <input type="password" id="api-key" placeholder="Paste your key here..." 
+                    class="w-full p-3 rounded-xl bg-white/10 border border-white/20 text-white focus:ring-2 focus:ring-purple-400 focus:outline-none transition-all">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-white/80 mb-2">System Instructions</label>
+                <textarea id="system-prompt" rows="6" placeholder="Example: You are a caring, witty AI companion named Aura..." 
+                    class="w-full p-3 rounded-xl bg-white/10 border border-white/20 text-white focus:ring-2 focus:ring-purple-400 focus:outline-none transition-all resize-none text-sm"></textarea>
+            </div>
+            
+            <div class="p-4 bg-purple-500/20 rounded-2xl border border-purple-400/30">
+                <p class="text-xs text-purple-200 font-medium uppercase tracking-wider mb-1">Active Model</p>
+                <p class="text-sm text-white font-semibold">Gemini 2.5 Flash</p>
+            </div>
+        </div>
+
+        <div class="pt-6">
+            <button onclick="saveSettings()" class="w-full bg-purple-600 text-white py-3 rounded-xl font-semibold hover:bg-purple-700 transition-colors shadow-lg">
+                Save & Apply
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="w-full max-w-md h-full flex flex-col p-4 relative z-10">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center py-4 px-2">
+            <button onclick="toggleSidebar()" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 shadow-sm transition-all border border-white/30">
+                <i class="fa-solid fa-sliders text-white"></i>
+            </button>
+            <div class="text-center">
+                <h1 class="text-xl font-bold text-white">Aura</h1>
+                <span class="text-[10px] text-green-400 font-bold tracking-widest uppercase">Online</span>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-400 to-pink-400 border-2 border-white/50 shadow-md"></div>
+        </header>
+
+        <!-- Chat Area -->
+        <div id="chat-container" class="chat-container flex flex-col space-y-4 p-2 overflow-y-auto pb-10 mt-2">
+            <div class="message-ai p-4 max-w-[85%]">
+                Hello there. I'm your companion. Open settings to add your API key so we can start talking.
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="pb-6 pt-2">
+            <div class="input-area shadow-xl p-2 flex items-center gap-2">
+                <input type="text" id="user-input" placeholder="Whisper something..." 
+                    class="flex-grow bg-transparent p-3 focus:outline-none ml-2">
+                <button onclick="sendMessage()" id="send-btn" class="bg-purple-600 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-md hover:scale-105 transition-transform active:scale-95">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let chatHistory = [];
+        const modelName = "gemini-2.5-flash"; 
+        const vidA = document.getElementById('vid-a');
+        const vidB = document.getElementById('vid-b');
+
+        // VIDEO LOGIC: Handover from A to B
+        vidA.addEventListener('ended', () => {
+            vidA.style.opacity = '0';
+            vidB.style.opacity = '1';
+            vidB.play();
+        });
+
+        window.onload = () => {
+            document.getElementById('api-key').value = localStorage.getItem('aura_api_key') || '';
+            document.getElementById('system-prompt').value = localStorage.getItem('aura_system_prompt') || '';
+            
+            // Show the first frame of A.mp4 as wallpaper
+            vidA.currentTime = 0;
+        };
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('closed');
+            overlay.classList.toggle('hidden');
+        }
+
+        function saveSettings() {
+            localStorage.setItem('aura_api_key', document.getElementById('api-key').value);
+            localStorage.setItem('aura_system_prompt', document.getElementById('system-prompt').value);
+            toggleSidebar();
+            alert("Settings applied!");
+        }
+
+        async function sendMessage() {
+            const inputElement = document.getElementById('user-input');
+            const chatContainer = document.getElementById('chat-container');
+            const apiKey = localStorage.getItem('aura_api_key');
+            const systemPrompt = localStorage.getItem('aura_system_prompt');
+            const text = inputElement.value.trim();
+
+            if (!text) return;
+            if (!apiKey) {
+                alert("Add your API Key first!");
+                toggleSidebar();
+                return;
+            }
+
+            appendMessage('user', text);
+            inputElement.value = '';
+            
+            const typingId = appendTypingIndicator();
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                const contents = [...chatHistory];
+                contents.push({ role: "user", parts: [{ text: text }] });
+
+                const requestBody = {
+                    contents: contents,
+                    generationConfig: { temperature: 0.9, maxOutputTokens: 2048 }
+                };
+
+                if (systemPrompt) {
+                    requestBody.system_instruction = { parts: { text: systemPrompt } };
+                }
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+                removeTypingIndicator(typingId);
+
+                if (data.candidates && data.candidates[0].content) {
+                    const aiResponse = data.candidates[0].content.parts[0].text;
+                    appendMessage('model', aiResponse);
+                    
+                    // SUCCESS! TRIGGER VIDEO A PLAYBACK
+                    if (vidA.paused && vidB.paused) {
+                        vidA.play().catch(e => console.log("Autoplay blocked, wait for user interaction."));
+                    }
+
+                    chatHistory.push({ role: "user", parts: [{ text: text }] });
+                    chatHistory.push({ role: "model", parts: [{ text: aiResponse }] });
+                } else {
+                    throw new Error(data.error?.message || "Check API key.");
+                }
+
+            } catch (error) {
+                removeTypingIndicator(typingId);
+                appendMessage('ai', "Error: " + error.message);
+            }
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function appendMessage(role, text) {
+            const container = document.getElementById('chat-container');
+            const div = document.createElement('div');
+            div.className = `p-4 max-w-[85%] ${role === 'user' ? 'message-user' : 'message-ai'}`;
+            div.innerText = text;
+            container.appendChild(div);
+        }
+
+        function appendTypingIndicator() {
+            const id = 'typing-' + Date.now();
+            const container = document.getElementById('chat-container');
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = 'message-ai p-4 w-20 flex justify-center bg-white/20 backdrop-blur-md';
+            div.innerHTML = `<div class="dot-pulse"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+            container.appendChild(div);
+            return id;
+        }
+
+        function removeTypingIndicator(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>
