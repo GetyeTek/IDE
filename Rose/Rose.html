@@ -56,7 +56,7 @@
 
         #vid-b {
             z-index: 1;
-            opacity: 0;
+            opacity: 1; /* Keep it fully opaque, just hiding behind A */
         }
 
         .glass-panel {
@@ -236,22 +236,20 @@
         let bStartedAt = 0;
 
         // VIDEO LOGIC: Handover from A to B
-        let bPreWarmed = false;
-
-        vidA.addEventListener('timeupdate', () => {
-            // Start playing B 0.3s before A ends so it's ready (Pre-warm)
-            if (!bPreWarmed && vidA.currentTime > vidA.duration - 0.3) {
-                vidB.play();
-                bPreWarmed = true;
-            }
-        });
 
         vidA.addEventListener('ended', () => {
-            // Instant swap - no opacity transition to avoid black frames
-            vidA.style.display = 'none';
-            vidB.style.opacity = '1';
-            vidB.style.zIndex = '3'; 
-            bStartedAt = Date.now(); // The 5s countdown starts ONLY when B is visible
+            // Play B exactly when A finishes to preserve the timeline
+            vidB.play();
+            bStartedAt = Date.now(); // The 5s countdown starts when B is requested to play
+        });
+
+        // The Frame-Hold trick: Wait for B to actually start rendering frames
+        vidB.addEventListener('timeupdate', function onBStart() {
+            // Once B's playhead moves past 0, it is actively drawing to the screen
+            if (vidB.currentTime > 0) {
+                vidA.style.opacity = '0'; // Seamlessly reveal B hiding underneath
+                vidB.removeEventListener('timeupdate', onBStart); // Clean up the listener
+            }
         });
 
         window.onload = () => {
