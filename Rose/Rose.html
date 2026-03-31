@@ -49,19 +49,9 @@
             /* Removed transition to allow instant frame-perfect swapping */
         }
 
-        #vid-a {
-            z-index: 3;
+        .seq-vid {
             opacity: 1;
-        }
-
-        #vid-b {
-            z-index: 2;
-            opacity: 1;
-        }
-
-        #vid-c {
-            z-index: 1;
-            opacity: 1;
+            transition: none; /* Keep the instant opacity swap smooth */
         }
 
         .glass-panel {
@@ -149,20 +139,13 @@
 </head>
 <body class="antialiased">
 
-    <!-- Video Backgrounds -->
+    <!-- Video Backgrounds (Infinitely Scalable) -->
     <div class="video-wrapper">
-        <!-- Video A: Loads first, sits as wallpaper -->
-        <video id="vid-a" muted playsinline preload="auto">
-            <source src="A.mp4" type="video/mp4">
-        </video>
-        <!-- Video B: Plays after A ends -->
-        <video id="vid-b" muted playsinline preload="auto">
-            <source src="B.mp4" type="video/mp4">
-        </video>
-        <!-- Video C: Plays after B ends -->
-        <video id="vid-c" muted playsinline loop preload="auto">
-            <source src="C.mp4" type="video/mp4">
-        </video>
+        <video class="seq-vid" muted playsinline preload="auto"><source src="A.mp4" type="video/mp4"></video>
+        <video class="seq-vid" muted playsinline preload="auto"><source src="B.mp4" type="video/mp4"></video>
+        <video class="seq-vid" muted playsinline preload="auto"><source src="C.mp4" type="video/mp4"></video>
+        <!-- Just make sure your final video in the chain has 'loop' -->
+        <video class="seq-vid" muted playsinline loop preload="auto"><source src="D.mp4" type="video/mp4"></video>
     </div>
 
     <!-- Sidebar Overlay -->
@@ -240,42 +223,45 @@
     <script>
         let chatHistory = [];
         const modelName = "gemini-2.5-flash"; 
-        const vidA = document.getElementById('vid-a');
-        const vidB = document.getElementById('vid-b');
-        const vidC = document.getElementById('vid-c');
-        let bStartedAt = 0;
+        let bStartedAt = 0; // Tracks when the second video starts for the delay
 
-        // VIDEO LOGIC: Handover from A -> B -> C
+        function initVideoSequence() {
+            const vids = document.querySelectorAll('.seq-vid');
+            if (vids.length === 0) return;
 
-        vidA.addEventListener('ended', () => {
-            vidB.play();
-            bStartedAt = Date.now(); 
-        });
+            // Dynamically stack z-indexes: first video gets the highest number
+            vids.forEach((vid, i) => {
+                vid.style.zIndex = vids.length - i;
+            });
 
-        vidB.addEventListener('timeupdate', function onBStart() {
-            if (vidB.currentTime > 0) {
-                vidA.style.opacity = '0'; 
-                vidB.removeEventListener('timeupdate', onBStart);
+            // Chain them together dynamically
+            for (let i = 0; i < vids.length - 1; i++) {
+                vids[i].addEventListener('ended', () => {
+                    vids[i + 1].play();
+                    
+                    // Track when the *second* video in the chain starts for the text delay
+                    if (i === 0) bStartedAt = Date.now();
+                });
+
+                // Frame-Hold trick for the next video in line
+                vids[i + 1].addEventListener('timeupdate', function onStart() {
+                    if (vids[i + 1].currentTime > 0) {
+                        vids[i].style.opacity = '0'; // Hide the previous video seamlessly
+                        vids[i + 1].removeEventListener('timeupdate', onStart);
+                    }
+                });
             }
-        });
-
-        vidB.addEventListener('ended', () => {
-            vidC.play();
-        });
-
-        vidC.addEventListener('timeupdate', function onCStart() {
-            if (vidC.currentTime > 0) {
-                vidB.style.opacity = '0'; // Reveal C hiding underneath B
-                vidC.removeEventListener('timeupdate', onCStart);
-            }
-        });
+        }
 
         window.onload = () => {
             document.getElementById('api-key').value = localStorage.getItem('aura_api_key') || '';
             document.getElementById('system-prompt').value = localStorage.getItem('aura_system_prompt') || '';
             
-            // Show the first frame of A.mp4 as wallpaper
-            vidA.currentTime = 0;
+            initVideoSequence();
+            
+            // Show the first frame of the first video as wallpaper
+            const firstVid = document.querySelector('.seq-vid');
+            if (firstVid) firstVid.currentTime = 0;
         };
 
         function toggleSidebar() {
@@ -309,22 +295,24 @@
             const typingId = appendTypingIndicator();
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // Wait 2 seconds before kicking off Video A
+            // Wait 2 seconds before kicking off the video sequence
             setTimeout(() => {
-                if (vidA.paused && vidB.paused && vidC.paused) {
-                    vidA.play().catch(e => console.log("User interaction required for video"));
+                const vids = document.querySelectorAll('.seq-vid');
+                const isAnyPlaying = Array.from(vids).some(v => !v.paused);
+                if (!isAnyPlaying && vids.length > 0) {
+                    vids[0].play().catch(e => console.log("User interaction required for video"));
                 }
             }, 2000);
 
             // MOCK API LOGIC - Saves your Gemini Quota
             setTimeout(() => {
-                const aiResponse = "This is a mocked response! I'm saving your API quota while you test the video transitions. Video C should be looping now.";
+                const aiResponse = "This is a mocked response! I'm saving your API quota while you test the transitions. The final video should be looping now.";
                 
                 const checkAndDisplay = () => {
                     const now = Date.now();
                     const elapsedB = bStartedAt > 0 ? now - bStartedAt : 0;
 
-                    if (bStartedAt > 0 && elapsedB >= 5000) {
+                    if (bStartedAt > 0 && elapsedB >= 9000) { // Bumped delay to 9 seconds
                         removeTypingIndicator(typingId);
                         appendMessage('model', aiResponse);
                         chatHistory.push({ role: "user", parts: [{ text: text }] });
