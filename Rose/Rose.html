@@ -46,10 +46,16 @@
             height: auto;
             transform: translate(-50%, -50%);
             object-fit: cover;
-            transition: opacity 1s ease-in-out;
+            /* Removed transition to allow instant frame-perfect swapping */
+        }
+
+        #vid-a {
+            z-index: 2;
+            opacity: 1;
         }
 
         #vid-b {
+            z-index: 1;
             opacity: 0;
         }
 
@@ -230,11 +236,22 @@
         let bStartedAt = 0;
 
         // VIDEO LOGIC: Handover from A to B
+        let bPreWarmed = false;
+
+        vidA.addEventListener('timeupdate', () => {
+            // Start playing B 0.3s before A ends so it's ready (Pre-warm)
+            if (!bPreWarmed && vidA.currentTime > vidA.duration - 0.3) {
+                vidB.play();
+                bPreWarmed = true;
+            }
+        });
+
         vidA.addEventListener('ended', () => {
-            vidA.style.opacity = '0';
+            // Instant swap - no opacity transition to avoid black frames
+            vidA.style.display = 'none';
             vidB.style.opacity = '1';
-            vidB.play();
-            bStartedAt = Date.now(); // Mark when the 5s timer starts
+            vidB.style.zIndex = '3'; 
+            bStartedAt = Date.now(); // The 5s countdown starts ONLY when B is visible
         });
 
         window.onload = () => {
