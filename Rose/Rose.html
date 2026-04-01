@@ -273,16 +273,18 @@
             if (index === 0) playVid(1); // A done -> B
             else if (index === 1) playVid(2); // B done -> C
             else if (index === 2) {
-                cLoopCount++;
-                if (cLoopCount < 3) playVid(2); // Loop C
-                else {
-                    // If first message, go straight to G after intro
-                    if (isFirstMessage) {
-                        messageSentDuringVid = 2;
-                        playVid(6);
+                // New logic: if message sent during C, loop C unless it was sent in the last 1s
+                if (messageSentDuringVid === 2) {
+                    if (isLateSend) {
+                        playVid(3); // Proceed to D
                     } else {
-                        playVid(3); 
+                        playVid(2); // Loop C forever
                     }
+                } else {
+                    // Standard intro progression if no message active
+                    cLoopCount++;
+                    if (cLoopCount < 3) playVid(2);
+                    else playVid(3);
                 }
             }
             // Idle/Interaction Logic
@@ -354,8 +356,8 @@
                 const elapsedSinceStart = now - firstMessageTime;
                 
                 if (isFirstMessage) {
-                    // First message: Strictly 9 seconds from send, ignoring video state
-                    if (elapsedSinceStart >= 9000 && aiResponseQueue) {
+                    // First message: Strictly 15 seconds from send
+                    if (elapsedSinceStart >= 15000 && aiResponseQueue) {
                         displayAIResponse(aiResponseQueue);
                         aiResponseQueue = null;
                         isFirstMessage = false;
@@ -375,7 +377,7 @@
 
             // Prepare response immediately
             aiResponseQueue = isFirstMessage ? 
-                "Hello! I'm Aura. I've finished my intro sequence and waited exactly 9 seconds to speak to you." : 
+                "Hello! I'm Aura. I've finished my intro sequence and waited exactly 15 seconds to speak to you." : 
                 "This response was triggered while Video " + (messageSentDuringVid === 3 ? 'D' : 'E') + (isLateSend ? ' was almost over.' : ' was playing.');
             
             checkAndDisplay();
