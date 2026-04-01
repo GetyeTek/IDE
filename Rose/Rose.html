@@ -146,8 +146,8 @@
         <video class="seq-vid" muted playsinline preload="auto"><source src="C.mp4" type="video/mp4"></video>
         <video class="seq-vid" muted playsinline preload="auto"><source src="D.mp4" type="video/mp4"></video>
         <video class="seq-vid" muted playsinline preload="auto"><source src="E.mp4" type="video/mp4"></video>
-        <!-- I hope F is the last one because I'm running out of alphabet -->
-        <video class="seq-vid" muted playsinline loop preload="auto"><source src="F.mp4" type="video/mp4"></video>
+        <video class="seq-vid" muted playsinline preload="auto"><source src="F.mp4" type="video/mp4"></video>
+        <video class="seq-vid" muted playsinline preload="auto"><source src="G.mp4" type="video/mp4"></video>
     </div>
 
     <!-- Sidebar Overlay -->
@@ -224,70 +224,104 @@
 
     <script>
         let chatHistory = [];
-        const modelName = "gemini-2.5-flash"; 
-        let bStartedAt = 0; // Tracks when the second video starts for the delay
+        const modelName = "gemini-2.5-flash";
+        
+        // Video indices: 0:A, 1:B, 2:C, 3:D, 4:E, 5:F, 6:G
+        let currentVidIndex = 0;
+        let cLoopCount = 0;
+        let messageSentDuringVid = null; // Stores index of video playing when sent
+        let isLateSend = false;
+        let aiResponseQueue = null;
 
-        function initVideoSequence() {
-            const vids = document.querySelectorAll('.seq-vid');
-            if (vids.length === 0) return;
+        const vids = document.querySelectorAll('.seq-vid');
 
-            // Dynamically stack z-indexes: first video gets the highest number
+        function initVideoManager() {
             vids.forEach((vid, i) => {
                 vid.style.zIndex = vids.length - i;
-            });
-
-            // Chain them together dynamically
-            for (let i = 0; i < vids.length - 1; i++) {
-                vids[i].addEventListener('ended', () => {
-                    vids[i + 1].play();
-                    
-                    // Track when the *second* video in the chain starts for the text delay
-                    if (i === 0) bStartedAt = Date.now();
-                });
-
-                // Frame-Hold trick for the next video in line
-                vids[i + 1].addEventListener('timeupdate', function onStart() {
-                    if (vids[i + 1].currentTime > 0) {
-                        vids[i].style.opacity = '0'; // Hide the previous video seamlessly
-                        vids[i + 1].removeEventListener('timeupdate', onStart);
+                vid.addEventListener('ended', () => handleVideoEnded(i));
+                
+                // Smooth transition logic
+                vid.addEventListener('timeupdate', function() {
+                    if (this.currentTime > 0.1) {
+                        // Hide all videos with higher index than currently playing
+                        for(let prev = 0; prev < i; prev++) {
+                            vids[prev].style.opacity = '0';
+                        }
                     }
                 });
+            });
+        }
+
+        function playVid(index) {
+            vids.forEach(v => { v.pause(); v.style.opacity = '0'; });
+            currentVidIndex = index;
+            vids[index].style.opacity = '1';
+            vids[index].currentTime = 0;
+            vids[index].play();
+
+            // Special logic for Video G (The Response)
+            if (index === 6) {
+                setTimeout(() => {
+                    if (aiResponseQueue) {
+                        displayAIResponse(aiResponseQueue);
+                        aiResponseQueue = null;
+                    }
+                }, 3000);
+            }
+        }
+
+        function handleVideoEnded(index) {
+            // Intro Sequence: A -> B -> C(x3) -> D
+            if (index === 0) playVid(1); // A done -> B
+            else if (index === 1) playVid(2); // B done -> C
+            else if (index === 2) {
+                cLoopCount++;
+                if (cLoopCount < 3) playVid(2); // Loop C
+                else playVid(3); // C done -> D
+            }
+            // Idle/Interaction Logic
+            else if (index === 3) { // D ended
+                if (messageSentDuringVid === 3) {
+                    if (isLateSend) playVid(4); // Play E
+                    else playVid(6); // Play G
+                    messageSentDuringVid = null;
+                } else {
+                    playVid(3); // Loop D indefinitely until message
+                }
+            }
+            else if (index === 4) { // E ended
+                if (messageSentDuringVid === 4) {
+                    if (isLateSend) {
+                        isLateSend = false; // Reset late flag
+                        playVid(4); // Loop E once more
+                    } else {
+                        playVid(6); // Play G
+                        messageSentDuringVid = null;
+                    }
+                } else if (messageSentDuringVid === 3 && isLateSend) {
+                     // We came from D late, now play G
+                     playVid(6);
+                     messageSentDuringVid = null;
+                } else {
+                    playVid(3); // Default back to D
+                }
+            }
+            else if (index === 6) { // G ended
+                playVid(3); // Back to D loop
             }
         }
 
         window.onload = () => {
             document.getElementById('api-key').value = localStorage.getItem('aura_api_key') || '';
             document.getElementById('system-prompt').value = localStorage.getItem('aura_system_prompt') || '';
-            
-            initVideoSequence();
-            
-            // Show the first frame of the first video as wallpaper
-            const firstVid = document.querySelector('.seq-vid');
-            if (firstVid) firstVid.currentTime = 0;
+            initVideoManager();
         };
-
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            sidebar.classList.toggle('closed');
-            overlay.classList.toggle('hidden');
-        }
-
-        function saveSettings() {
-            localStorage.setItem('aura_api_key', document.getElementById('api-key').value);
-            localStorage.setItem('aura_system_prompt', document.getElementById('system-prompt').value);
-            toggleSidebar();
-            alert("Settings applied!");
-        }
 
         async function sendMessage() {
             const inputElement = document.getElementById('user-input');
-            const chatContainer = document.getElementById('chat-container');
             const text = inputElement.value.trim();
-
             if (!text) return;
 
-            // Nuke the awkward welcome message on first send
             const welcomeMsg = document.getElementById('welcome-msg');
             if (welcomeMsg) welcomeMsg.remove();
 
@@ -295,41 +329,43 @@
             inputElement.value = '';
             
             const typingId = appendTypingIndicator();
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Start Sequence if not started
+            if (vids[0].paused && currentVidIndex === 0 && cLoopCount === 0) {
+                playVid(0);
+            }
 
-            // Wait 2 seconds before kicking off the video sequence
+            // Determine Transition Path
+            const currentVid = vids[currentVidIndex];
+            const remaining = currentVid.duration - currentVid.currentTime;
+            
+            messageSentDuringVid = currentVidIndex;
+            isLateSend = remaining <= 1.0;
+
+            // Mock API Response
             setTimeout(() => {
-                const vids = document.querySelectorAll('.seq-vid');
-                const isAnyPlaying = Array.from(vids).some(v => !v.paused);
-                if (!isAnyPlaying && vids.length > 0) {
-                    vids[0].play().catch(e => console.log("User interaction required for video"));
-                }
-            }, 2000);
+                removeTypingIndicator(typingId);
+                aiResponseQueue = "This response was triggered while Video " + 
+                                  (messageSentDuringVid === 3 ? 'D' : 'E') + 
+                                  (isLateSend ? ' was almost over.' : ' was playing.');
+            }, 1000);
+        }
 
-            // MOCK API LOGIC - Saves your Gemini Quota
-            setTimeout(() => {
-                const aiResponse = "This is a mocked response! I'm saving your API quota while you test the transitions. The final video should be looping now.";
-                
-                const checkAndDisplay = () => {
-                    const now = Date.now();
-                    const elapsedB = bStartedAt > 0 ? now - bStartedAt : 0;
+        function displayAIResponse(text) {
+            appendMessage('model', text);
+            const container = document.getElementById('chat-container');
+            container.scrollTop = container.scrollHeight;
+        }
 
-                    if (bStartedAt > 0 && elapsedB >= 9000) { // Bumped delay to 9 seconds
-                        removeTypingIndicator(typingId);
-                        appendMessage('model', aiResponse);
-                        chatHistory.push({ role: "user", parts: [{ text: text }] });
-                        chatHistory.push({ role: "model", parts: [{ text: aiResponse }] });
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    } else {
-                        // Keep checking every 100ms until the 5s requirement is met
-                        setTimeout(checkAndDisplay, 100);
-                    }
-                };
+        function toggleSidebar() { 
+            document.getElementById('sidebar').classList.toggle('closed');
+            document.getElementById('sidebar-overlay').classList.toggle('hidden');
+        }
 
-                checkAndDisplay();
-            }, 1500); // 1.5s Fake network delay
-
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+        function saveSettings() {
+            localStorage.setItem('aura_api_key', document.getElementById('api-key').value);
+            localStorage.setItem('aura_system_prompt', document.getElementById('system-prompt').value);
+            toggleSidebar();
         }
 
         function appendMessage(role, text) {
@@ -338,27 +374,25 @@
             div.className = `p-4 max-w-[85%] ${role === 'user' ? 'message-user' : 'message-ai'}`;
             div.innerText = text;
             container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
         }
 
         function appendTypingIndicator() {
             const id = 'typing-' + Date.now();
             const container = document.getElementById('chat-container');
             const div = document.createElement('div');
-            div.id = id;
-            div.className = 'message-ai p-4 w-20 flex justify-center bg-white/20 backdrop-blur-md';
+            div.id = id; div.className = 'message-ai p-4 w-20 flex justify-center bg-white/20 backdrop-blur-md';
             div.innerHTML = `<div class="dot-pulse"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
             container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
             return id;
         }
 
         function removeTypingIndicator(id) {
-            const el = document.getElementById(id);
-            if (el) el.remove();
+            const el = document.getElementById(id); if (el) el.remove();
         }
 
-        document.getElementById('user-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
+        document.getElementById('user-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
     </script>
 </body>
 </html>
