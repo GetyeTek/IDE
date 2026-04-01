@@ -337,9 +337,11 @@
             activeTypingId = appendTypingIndicator();
             
             // Start Sequence if not started
-            if (vids[0].paused && currentVidIndex === 0 && cLoopCount === 0) {
+            if (isFirstMessage) {
                 firstMessageTime = Date.now();
-                setTimeout(() => playVid(0), 2000);
+                if (vids[0].paused && currentVidIndex === 0 && cLoopCount === 0) {
+                    setTimeout(() => playVid(0), 1000); // Reduced delay slightly
+                }
             }
 
             const currentVid = vids[currentVidIndex];
@@ -349,20 +351,19 @@
             // Logic to handle response timing
             const checkAndDisplay = () => {
                 const now = Date.now();
-                const elapsedSinceStart = firstMessageTime > 0 ? now - firstMessageTime : 99999;
+                const elapsedSinceStart = now - firstMessageTime;
                 
-                // Condition: If first message, must wait 19s. 
-                // AND Video G (6) must have been playing for 3s (handled in playVid)
                 if (isFirstMessage) {
-                    if (elapsedSinceStart >= 9000 && aiResponseQueue && currentVidIndex === 6 && vids[6].currentTime >= 3.0) {
+                    // First message: Strictly 9 seconds from send, ignoring video state
+                    if (elapsedSinceStart >= 9000 && aiResponseQueue) {
                         displayAIResponse(aiResponseQueue);
                         aiResponseQueue = null;
-                        isFirstMessage = false; // Intro over
+                        isFirstMessage = false;
                     } else {
                         setTimeout(checkAndDisplay, 100);
                     }
                 } else {
-                    // Subsequent messages just wait for G logic
+                    // Subsequent messages: Wait for Video G (Index 6) to reach 3s
                     if (aiResponseQueue && currentVidIndex === 6 && vids[6].currentTime >= 3.0) {
                         displayAIResponse(aiResponseQueue);
                         aiResponseQueue = null;
@@ -372,13 +373,12 @@
                 }
             };
 
-            // Prepare the mock response
-            setTimeout(() => {
-                aiResponseQueue = isFirstMessage ? 
-                    "Hello! I'm Aura. I've finished my intro sequence and waited 19 seconds to speak to you." : 
-                    "This response was triggered while Video " + (messageSentDuringVid === 3 ? 'D' : 'E') + (isLateSend ? ' was almost over.' : ' was playing.');
-                checkAndDisplay();
-            }, 1000);
+            // Prepare response immediately
+            aiResponseQueue = isFirstMessage ? 
+                "Hello! I'm Aura. I've finished my intro sequence and waited exactly 9 seconds to speak to you." : 
+                "This response was triggered while Video " + (messageSentDuringVid === 3 ? 'D' : 'E') + (isLateSend ? ' was almost over.' : ' was playing.');
+            
+            checkAndDisplay();
         }
 
         function displayAIResponse(text) {
