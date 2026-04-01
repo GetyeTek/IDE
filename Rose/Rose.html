@@ -233,6 +233,8 @@
         let isLateSend = false;
         let aiResponseQueue = null;
         let activeTypingId = null;
+        let firstMessageTime = 0;
+        let isFirstMessage = true;
 
         const vids = document.querySelectorAll('.seq-vid');
 
@@ -262,12 +264,7 @@
 
             // Special logic for Video G (The Response)
             if (index === 6) {
-                setTimeout(() => {
-                    if (aiResponseQueue) {
-                        displayAIResponse(aiResponseQueue);
-                        aiResponseQueue = null;
-                    }
-                }, 3000);
+                // The checkAndDisplay loop in sendMessage handles the trigger now
             }
         }
 
@@ -278,7 +275,15 @@
             else if (index === 2) {
                 cLoopCount++;
                 if (cLoopCount < 3) playVid(2); // Loop C
-                else playVid(3); // C done -> D
+                else {
+                    // If first message, go straight to G after intro
+                    if (isFirstMessage) {
+                        messageSentDuringVid = 2;
+                        playVid(6);
+                    } else {
+                        playVid(3); 
+                    }
+                }
             }
             // Idle/Interaction Logic
             else if (index === 3) { // D ended
@@ -331,23 +336,48 @@
             
             activeTypingId = appendTypingIndicator();
             
-            // Start Sequence if not started (with 2s delay as requested)
+            // Start Sequence if not started
             if (vids[0].paused && currentVidIndex === 0 && cLoopCount === 0) {
+                firstMessageTime = Date.now();
                 setTimeout(() => playVid(0), 2000);
             }
 
-            // Determine Transition Path
             const currentVid = vids[currentVidIndex];
-            const remaining = currentVid.duration - currentVid.currentTime;
-            
             messageSentDuringVid = currentVidIndex;
-            isLateSend = remaining <= 1.0;
+            isLateSend = (currentVid.duration - currentVid.currentTime) <= 1.0;
 
-            // Mock API Response - Dots stay until displayAIResponse is called later
+            // Logic to handle response timing
+            const checkAndDisplay = () => {
+                const now = Date.now();
+                const elapsedSinceStart = firstMessageTime > 0 ? now - firstMessageTime : 99999;
+                
+                // Condition: If first message, must wait 19s. 
+                // AND Video G (6) must have been playing for 3s (handled in playVid)
+                if (isFirstMessage) {
+                    if (elapsedSinceStart >= 19000 && aiResponseQueue && currentVidIndex === 6 && vids[6].currentTime >= 3.0) {
+                        displayAIResponse(aiResponseQueue);
+                        aiResponseQueue = null;
+                        isFirstMessage = false; // Intro over
+                    } else {
+                        setTimeout(checkAndDisplay, 100);
+                    }
+                } else {
+                    // Subsequent messages just wait for G logic
+                    if (aiResponseQueue && currentVidIndex === 6 && vids[6].currentTime >= 3.0) {
+                        displayAIResponse(aiResponseQueue);
+                        aiResponseQueue = null;
+                    } else {
+                        setTimeout(checkAndDisplay, 100);
+                    }
+                }
+            };
+
+            // Prepare the mock response
             setTimeout(() => {
-                aiResponseQueue = "This response was triggered while Video " + 
-                                  (messageSentDuringVid === 3 ? 'D' : 'E') + 
-                                  (isLateSend ? ' was almost over.' : ' was playing.');
+                aiResponseQueue = isFirstMessage ? 
+                    "Hello! I'm Aura. I've finished my intro sequence and waited 19 seconds to speak to you." : 
+                    "This response was triggered while Video " + (messageSentDuringVid === 3 ? 'D' : 'E') + (isLateSend ? ' was almost over.' : ' was playing.');
+                checkAndDisplay();
             }, 1000);
         }
 
