@@ -232,6 +232,7 @@
         let messageSentDuringVid = null; // Stores index of video playing when sent
         let isLateSend = false;
         let aiResponseQueue = null;
+        let activeTypingId = null;
 
         const vids = document.querySelectorAll('.seq-vid');
 
@@ -328,11 +329,11 @@
             appendMessage('user', text);
             inputElement.value = '';
             
-            const typingId = appendTypingIndicator();
+            activeTypingId = appendTypingIndicator();
             
-            // Start Sequence if not started
+            // Start Sequence if not started (with 2s delay as requested)
             if (vids[0].paused && currentVidIndex === 0 && cLoopCount === 0) {
-                playVid(0);
+                setTimeout(() => playVid(0), 2000);
             }
 
             // Determine Transition Path
@@ -342,9 +343,8 @@
             messageSentDuringVid = currentVidIndex;
             isLateSend = remaining <= 1.0;
 
-            // Mock API Response
+            // Mock API Response - Dots stay until displayAIResponse is called later
             setTimeout(() => {
-                removeTypingIndicator(typingId);
                 aiResponseQueue = "This response was triggered while Video " + 
                                   (messageSentDuringVid === 3 ? 'D' : 'E') + 
                                   (isLateSend ? ' was almost over.' : ' was playing.');
@@ -352,6 +352,10 @@
         }
 
         function displayAIResponse(text) {
+            if (activeTypingId) {
+                removeTypingIndicator(activeTypingId);
+                activeTypingId = null;
+            }
             appendMessage('model', text);
             const container = document.getElementById('chat-container');
             container.scrollTop = container.scrollHeight;
