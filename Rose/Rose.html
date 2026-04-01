@@ -354,7 +354,7 @@
                 // Condition: If first message, must wait 19s. 
                 // AND Video G (6) must have been playing for 3s (handled in playVid)
                 if (isFirstMessage) {
-                    if (elapsedSinceStart >= 19000 && aiResponseQueue && currentVidIndex === 6 && vids[6].currentTime >= 3.0) {
+                    if (elapsedSinceStart >= 9000 && aiResponseQueue && currentVidIndex === 6 && vids[6].currentTime >= 3.0) {
                         displayAIResponse(aiResponseQueue);
                         aiResponseQueue = null;
                         isFirstMessage = false; // Intro over
