@@ -162,7 +162,7 @@
             </button>
         </div>
 
-        <div class="space-y-6 flex-grow">
+        <div class="space-y-6 flex-grow overflow-y-auto pr-2 custom-scrollbar">
             <div>
                 <label class="block text-sm font-medium text-white/80 mb-2">Gemini API Key</label>
                 <input type="password" id="api-key" placeholder="Paste your key here..." 
@@ -171,7 +171,7 @@
 
             <div>
                 <label class="block text-sm font-medium text-white/80 mb-2">System Instructions</label>
-                <textarea id="system-prompt" rows="6" placeholder="Example: You are a caring, witty AI companion named Aura..." 
+                <textarea id="system-prompt" rows="4" placeholder="Example: You are a caring, witty AI companion named Aura..." 
                     class="w-full p-3 rounded-xl bg-white/10 border border-white/20 text-white focus:ring-2 focus:ring-purple-400 focus:outline-none transition-all resize-none text-sm"></textarea>
             </div>
             
@@ -180,14 +180,14 @@
                 <p class="text-sm text-white font-semibold">Gemini 2.5 Flash</p>
             </div>
 
-            <div class="mt-6">
+            <div class="mt-4">
                 <div class="flex justify-between items-center mb-2">
                     <label class="text-sm font-medium text-white/80">Video Sequence</label>
                     <button onclick="addVideoConfig()" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white border border-white/20">
                         <i class="fa-solid fa-plus mr-1"></i>Add
                     </button>
                 </div>
-                <div id="video-config-list" class="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                <div id="video-config-list" class="space-y-2 mb-4">
                     <!-- Config items injected here -->
                 </div>
             </div>
@@ -285,23 +285,29 @@
             }
         }
 
+        function getVidIndexById(id) {
+            return vids.findIndex(v => {
+                const source = v.querySelector('source');
+                const src = source ? source.getAttribute('src') : '';
+                return src.includes(id + '.mp4');
+            });
+        }
+
         function handleVideoEnded(index) {
-            const config = videoConfig.find(c => vids.indexOf(vids.find(v => v.src.includes(c.id + '.mp4'))) === index);
+            const config = videoConfig.find(c => getVidIndexById(c.id) === index);
             
             if (config && config.loop && !aiResponseQueue) {
                 playVid(index);
                 return;
             }
 
-            // Find next video by order
             const nextConfig = [...videoConfig].sort((a, b) => a.order - b.order)
                 .find(c => c.order > (config ? config.order : 0));
 
             if (nextConfig) {
-                const nextIndex = vids.findIndex(v => v.src.includes(nextConfig.id + '.mp4'));
+                const nextIndex = getVidIndexById(nextConfig.id);
                 if (nextIndex !== -1) playVid(nextIndex);
             } else {
-                // Restart sequence or loop last
                 playVid(index);
             }
         }
@@ -315,6 +321,9 @@
         };
 
         async function sendMessage() {
+            // Unlock videos for mobile
+            vids.forEach(v => { v.play().then(() => v.pause()).catch(() => {}); });
+
             const inputElement = document.getElementById('user-input');
             const text = inputElement.value.trim();
             if (!text) return;
@@ -330,10 +339,9 @@
             // Start Sequence if not started
             if (isFirstMessage) {
                 firstMessageTime = Date.now();
-                // Find Video A
-                const indexA = vids.findIndex(v => v.src.includes('A.mp4'));
-                if (indexA !== -1 && vids[indexA].paused) {
-                    setTimeout(() => playVid(indexA), 2000); // 2s delay for A
+                const indexA = getVidIndexById('A');
+                if (indexA !== -1) {
+                    setTimeout(() => playVid(indexA), 2000);
                 }
             }
 
