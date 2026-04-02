@@ -403,6 +403,9 @@
             const savedConfig = localStorage.getItem('aura_video_config');
             if (savedConfig) videoConfig = JSON.parse(savedConfig);
             initVideoManager();
+            
+            // Save your fingers from typing "Hello" for the 100th time
+            document.getElementById('user-input').value = "Hello";
         };
 
         async function sendMessage() {
