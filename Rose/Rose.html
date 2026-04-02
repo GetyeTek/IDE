@@ -299,27 +299,39 @@
         function getVidIndexById(id) {
             return vids.findIndex(v => {
                 const source = v.querySelector('source');
-                const src = source ? source.getAttribute('src') : '';
-                return src.includes(id + '.mp4');
+                if (!source) return false;
+                const src = source.getAttribute('src');
+                // Match 'A.mp4' regardless of path
+                return src === `${id}.mp4` || src.endsWith(`/${id}.mp4`);
             });
         }
 
         function handleVideoEnded(index) {
-            const config = videoConfig.find(c => getVidIndexById(c.id) === index);
+            const currentConf = videoConfig.find(c => getVidIndexById(c.id) === index);
             
-            if (config && config.loop && !aiResponseQueue) {
+            // If we have an AI response waiting, skip looping and try to find Video G (Response)
+            if (aiResponseQueue) {
+                const gIndex = getVidIndexById('G');
+                if (gIndex !== -1 && index !== gIndex) {
+                    playVid(gIndex);
+                    return;
+                }
+            }
+
+            // Standard loop logic
+            if (currentConf && currentConf.loop && !aiResponseQueue) {
                 playVid(index);
                 return;
             }
 
-            const nextConfig = [...videoConfig].sort((a, b) => a.order - b.order)
-                .find(c => c.order > (config ? config.order : 0));
+            // Find next based on order
+            const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
+            const currentIndex = sorted.findIndex(c => c.id === (currentConf ? currentConf.id : ''));
+            const nextConf = sorted[currentIndex + 1] || sorted[0]; // Loop back to start of sequence if at end
 
-            if (nextConfig) {
-                const nextIndex = getVidIndexById(nextConfig.id);
-                if (nextIndex !== -1) playVid(nextIndex);
-            } else {
-                playVid(index);
+            if (nextConf) {
+                const nextIdx = getVidIndexById(nextConf.id);
+                if (nextIdx !== -1) playVid(nextIdx);
             }
         }
 
@@ -406,40 +418,60 @@
         }
 
         function saveSettings() {
+            const btn = event.target.closest('button');
+            const originalText = btn.innerText;
+
             localStorage.setItem('aura_api_key', document.getElementById('api-key').value);
             localStorage.setItem('aura_system_prompt', document.getElementById('system-prompt').value);
             
             const configRows = document.querySelectorAll('.config-row');
-            const newConfig = Array.from(configRows).map(row => ({
+            videoConfig = Array.from(configRows).map(row => ({
                 id: row.dataset.id,
-                order: parseInt(row.querySelector('.order-input').value),
+                order: parseInt(row.querySelector('.order-input').value || 0),
                 loop: row.querySelector('.loop-input').checked
             }));
             
-            videoConfig = newConfig;
-            localStorage.setItem('aura_video_config', JSON.stringify(newConfig));
-            toggleSidebar();
+            localStorage.setItem('aura_video_config', JSON.stringify(videoConfig));
+            
+            // Visual Feedback
+            btn.innerText = "Saved!";
+            btn.classList.replace('bg-purple-600', 'bg-green-600');
+            
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.replace('bg-green-600', 'bg-purple-600');
+                toggleSidebar();
+                renderVideoConfig(); // Refresh UI to match sorted state
+            }, 800);
         }
 
         function renderVideoConfig() {
             const list = document.getElementById('video-config-list');
+            if (!list) return;
             list.innerHTML = '';
-            videoConfig.sort((a,b) => a.order - b.order).forEach(conf => {
+            // Sort a copy for display, but keep original data intact
+            const sorted = [...videoConfig].sort((a,b) => a.order - b.order);
+            sorted.forEach(conf => {
                 const div = document.createElement('div');
                 div.className = 'config-row flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10';
                 div.dataset.id = conf.id;
                 div.innerHTML = `
                     <span class="text-white font-bold w-6 text-center">${conf.id}</span>
                     <input type="number" class="order-input w-12 bg-black/20 border border-white/20 rounded px-1 text-xs text-white" value="${conf.order}">
-                    <label class="flex items-center gap-1 text-[10px] text-white/60">
+                    <label class="flex items-center gap-1 text-[10px] text-white/60 select-none">
                         <input type="checkbox" class="loop-input" ${conf.loop ? 'checked' : ''}> Loop
                     </label>
-                    <button onclick="this.parentElement.remove()" class="ml-auto text-red-400 hover:text-red-300 text-xs">
+                    <button onclick="removeVideoConfig('${conf.id}')" class="ml-auto text-red-400 hover:text-red-300 text-xs p-1">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 `;
                 list.appendChild(div);
             });
+        }
+
+        function removeVideoConfig(id) {
+            videoConfig = videoConfig.filter(c => c.id !== id);
+            renderVideoConfig();
         }
 
         function addVideoConfig() {
