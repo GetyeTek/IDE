@@ -371,29 +371,41 @@
         }
 
         function handleVideoEnded(index) {
+            // Use a stable sorted list
             const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
-            const currentConf = videoConfig.find(c => getVidIndexById(c.id) === index);
+            
+            // Find current config by matching the video source to the ID
+            const currentConf = videoConfig.find(c => {
+                const vIdx = getVidIndexById(c.id);
+                return vIdx === index;
+            });
             
             if (currentConf) {
-                // Decide which loop limit to use based on user interaction
-                const extraLoopsLimit = messageSentDuringVid ? 
-                    (parseInt(currentConf.loopsMsg) || 0) : 
-                    (parseInt(currentConf.loopsIdle) || 0);
+                // Logic Check: Did we interact? 
+                // We use strict boolean check because 0 (Video A) is falsy
+                const isInteracted = (messageSentDuringVid === true);
+                
+                const extraLoopsLimit = isInteracted ? 
+                    parseInt(currentConf.loopsMsg) : 
+                    parseInt(currentConf.loopsIdle);
 
-                // -1 is our secret code for infinite
+                // Handle Looping
                 if (extraLoopsLimit === -1 || currentLoopCount < extraLoopsLimit) {
-                    playVid(index);
+                    playVid(index); 
                     return;
                 }
             }
 
-            // Move to NEXT video in order
+            // Transition to Next Video
             const currentPos = sorted.findIndex(c => c.id === (currentConf ? currentConf.id : ''));
             const nextConf = sorted[currentPos + 1] || sorted[0]; 
 
             if (nextConf) {
                 const nextIdx = getVidIndexById(nextConf.id);
                 if (nextIdx !== -1) playVid(nextIdx);
+            } else {
+                // Fallback to first video if sequence is empty or broken
+                playVid(0);
             }
         }
 
@@ -436,8 +448,8 @@
             }
 
             const currentVid = vids[currentVidIndex];
-            // Remove the incorrect reassignment of messageSentDuringVid
-            const tempVidIndex = currentVidIndex; 
+            // Fixed: We already set messageSentDuringVid = true at the top of the function.
+            // Do not overwrite it with the index number.
             isLateSend = (currentVid.duration - currentVid.currentTime) <= 1.0;
 
             // Logic to handle response timing
