@@ -321,8 +321,11 @@
         };
 
         async function sendMessage() {
-            // Unlock videos for mobile
-            vids.forEach(v => { v.play().then(() => v.pause()).catch(() => {}); });
+            // Unlock videos for mobile only once
+            if (!window.vidsUnlocked) {
+                vids.forEach(v => { v.play().then(() => v.pause()).catch(() => {}); });
+                window.vidsUnlocked = true;
+            }
 
             const inputElement = document.getElementById('user-input');
             const text = inputElement.value.trim();
