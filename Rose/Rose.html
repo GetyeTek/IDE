@@ -278,12 +278,13 @@
                 });
             });
 
-            // Set the correctly ordered first video as the visible background
+            // Set the correctly ordered first video as the visible background (Static until first message)
             if (firstIndex !== -1) {
                 currentVidIndex = firstIndex;
                 vids[firstIndex].style.opacity = '1';
                 vids[firstIndex].style.zIndex = '10';
-                vids[firstIndex].play().catch(() => console.log("Waiting for user interaction to play background..."));
+                vids[firstIndex].currentTime = 0; 
+                vids[firstIndex].pause(); // Force pause on reload
             }
             renderVideoConfig();
         }
