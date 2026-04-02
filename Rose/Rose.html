@@ -240,13 +240,13 @@
         const modelName = "gemini-2.5-flash";
         
         let videoConfig = [
-            { id: 'A', order: 1, loop: false },
-            { id: 'B', order: 2, loop: false },
-            { id: 'C', order: 3, loop: true },
-            { id: 'D', order: 4, loop: true },
-            { id: 'E', order: 5, loop: false },
-            { id: 'F', order: 6, loop: false },
-            { id: 'G', order: 7, loop: false }
+            { id: 'A', order: 1, loopsIdle: 0, loopsMsg: 0 },
+            { id: 'B', order: 2, loopsIdle: 0, loopsMsg: 0 },
+            { id: 'C', order: 3, loopsIdle: -1, loopsMsg: 0 },
+            { id: 'D', order: 4, loopsIdle: -1, loopsMsg: 0 },
+            { id: 'E', order: 5, loopsIdle: 0, loopsMsg: 0 },
+            { id: 'F', order: 6, loopsIdle: 0, loopsMsg: 0 },
+            { id: 'G', order: 7, loopsIdle: 0, loopsMsg: 0 }
         ];
 
         let currentVidIndex = 0;
@@ -335,26 +335,22 @@
             const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
             const currentConf = videoConfig.find(c => getVidIndexById(c.id) === index);
             
-            // 1. Check if we should LOOP the current video based on settings
-            if (currentConf && currentConf.loop) {
-                let shouldLoop = false;
-                const cond = currentConf.condition || 'always';
-                const max = parseInt(currentConf.maxLoops) || 0;
+            if (currentConf) {
+                // Decide which loop limit to use based on user interaction
+                const extraLoopsLimit = messageSentDuringVid ? 
+                    (parseInt(currentConf.loopsMsg) || 0) : 
+                    (parseInt(currentConf.loopsIdle) || 0);
 
-                if (cond === 'always') shouldLoop = true;
-                else if (cond === 'onMessage' && messageSentDuringVid) shouldLoop = true;
-                else if (cond === 'onNoMessage' && !messageSentDuringVid) shouldLoop = true;
-
-                // Only loop if we haven't hit the max count (0 = infinite)
-                if (shouldLoop && (max === 0 || currentLoopCount < max)) {
+                // -1 is our secret code for infinite
+                if (extraLoopsLimit === -1 || currentLoopCount < extraLoopsLimit) {
                     playVid(index);
                     return;
                 }
             }
 
-            // 2. If not looping, move to the NEXT video in the sorted order
+            // Move to NEXT video in order
             const currentPos = sorted.findIndex(c => c.id === (currentConf ? currentConf.id : ''));
-            const nextConf = sorted[currentPos + 1] || sorted[0]; // Loop back to the start of the list
+            const nextConf = sorted[currentPos + 1] || sorted[0]; 
 
             if (nextConf) {
                 const nextIdx = getVidIndexById(nextConf.id);
@@ -462,9 +458,8 @@
             videoConfig = Array.from(configRows).map(row => ({
                 id: row.dataset.id,
                 order: parseInt(row.querySelector('.order-input').value || 0),
-                loop: row.querySelector('.loop-input').checked,
-                condition: row.querySelector('.cond-input')?.value || 'always',
-                maxLoops: parseInt(row.querySelector('.max-input')?.value || 0)
+                loopsIdle: parseInt(row.querySelector('.idle-input').value || 0),
+                loopsMsg: parseInt(row.querySelector('.msg-input').value || 0)
             }));
             
             localStorage.setItem('aura_video_config', JSON.stringify(videoConfig));
@@ -496,36 +491,32 @@
             const sorted = [...videoConfig].sort((a,b) => a.order - b.order);
             sorted.forEach(conf => {
                 const div = document.createElement('div');
-                div.className = 'config-row flex flex-col gap-2 bg-white/5 p-3 rounded-lg border border-white/10';
+                div.className = 'config-row flex flex-col gap-3 bg-white/5 p-3 rounded-lg border border-white/10';
                 div.dataset.id = conf.id;
                 div.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="text-white font-bold w-6">${conf.id}</span>
-                        <input type="number" class="order-input w-10 bg-black/20 border border-white/20 rounded px-1 text-xs text-white" 
-                            value="${conf.order}" onchange="this.closest('.config-row').querySelector('.order-input').value = this.value">
-                        <label class="flex items-center gap-1 text-[10px] text-white/60 cursor-pointer">
-                            <input type="checkbox" class="loop-input" ${conf.loop ? 'checked' : ''} 
-                                onchange="updateLoopStatus('${conf.id}', this.checked)"> Loop
-                        </label>
-                        <button onclick="removeVideoConfig('${conf.id}')" class="ml-auto text-red-400 text-xs p-1"><i class="fa-solid fa-trash"></i></button>
+                    <div class="flex items-center gap-3">
+                        <div class="flex flex-col">
+                            <span class="text-[9px] text-white/40 uppercase">ID</span>
+                            <span class="text-white font-bold">${conf.id}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-[9px] text-white/40 uppercase">Order</label>
+                            <input type="number" class="order-input w-10 bg-black/20 border border-white/20 rounded px-1 text-xs text-white" value="${conf.order}">
+                        </div>
+                        <button onclick="removeVideoConfig('${conf.id}')" class="ml-auto text-red-400 text-xs"><i class="fa-solid fa-trash"></i></button>
                     </div>
-                    ${conf.loop ? `
-                    <div class="grid grid-cols-2 gap-2 mt-1 border-t border-white/5 pt-2">
+                    <div class="grid grid-cols-2 gap-3 border-t border-white/5 pt-2">
                         <div class="flex flex-col gap-1">
-                            <label class="text-[9px] text-white/40 uppercase">Condition</label>
-                            <select class="cond-input bg-black/40 text-white text-[10px] rounded border border-white/10 p-1">
-                                <option value="always" ${conf.condition === 'always' ? 'selected' : ''}>Always</option>
-                                <option value="onMessage" ${conf.condition === 'onMessage' ? 'selected' : ''}>On Message</option>
-                                <option value="onNoMessage" ${conf.condition === 'onNoMessage' ? 'selected' : ''}>On No Message</option>
-                            </select>
+                            <label class="text-[9px] text-white/40 uppercase">Extra Loops (Idle)</label>
+                            <input type="number" class="idle-input bg-black/40 text-white text-xs rounded border border-white/10 p-1" 
+                                value="${conf.loopsIdle || 0}" placeholder="-1 = infinite">
                         </div>
                         <div class="flex flex-col gap-1">
-                            <label class="text-[9px] text-white/40 uppercase">Max Loops</label>
-                            <input type="number" class="max-input bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" 
-                                value="${conf.maxLoops || 0}" placeholder="0 = infinite">
+                            <label class="text-[9px] text-white/40 uppercase">Extra Loops (Msg)</label>
+                            <input type="number" class="msg-input bg-black/40 text-white text-xs rounded border border-white/10 p-1" 
+                                value="${conf.loopsMsg || 0}" placeholder="-1 = infinite">
                         </div>
                     </div>
-                    ` : ''}
                 `;
                 list.appendChild(div);
             });
