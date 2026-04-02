@@ -273,15 +273,25 @@
         }
 
         function playVid(index) {
-            vids.forEach(v => { v.pause(); v.style.opacity = '0'; });
+            if (index === -1) return;
+            
+            const oldIndex = currentVidIndex;
             currentVidIndex = index;
+            
             vids[index].style.opacity = '1';
             vids[index].currentTime = 0;
-            vids[index].play();
-
-            // Special logic for Video G (The Response)
-            if (index === 6) {
-                // The checkAndDisplay loop in sendMessage handles the trigger now
+            
+            const playPromise = vids[index].play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    // Only hide the old video AFTER the new one starts playing to prevent black flicker
+                    if (oldIndex !== index) {
+                        vids[oldIndex].pause();
+                        vids[oldIndex].style.opacity = '0';
+                    }
+                }).catch(error => {
+                    console.log("Playback blocked, waiting for interaction");
+                });
             }
         }
 
@@ -321,12 +331,6 @@
         };
 
         async function sendMessage() {
-            // Unlock videos for mobile only once
-            if (!window.vidsUnlocked) {
-                vids.forEach(v => { v.play().then(() => v.pause()).catch(() => {}); });
-                window.vidsUnlocked = true;
-            }
-
             const inputElement = document.getElementById('user-input');
             const text = inputElement.value.trim();
             if (!text) return;
