@@ -179,6 +179,18 @@
                 <p class="text-xs text-purple-200 font-medium uppercase tracking-wider mb-1">Active Model</p>
                 <p class="text-sm text-white font-semibold">Gemini 2.5 Flash</p>
             </div>
+
+            <div class="mt-6">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-sm font-medium text-white/80">Video Sequence</label>
+                    <button onclick="addVideoConfig()" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white border border-white/20">
+                        <i class="fa-solid fa-plus mr-1"></i>Add
+                    </button>
+                </div>
+                <div id="video-config-list" class="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                    <!-- Config items injected here -->
+                </div>
+            </div>
         </div>
 
         <div class="pt-6">
@@ -226,33 +238,38 @@
         let chatHistory = [];
         const modelName = "gemini-2.5-flash";
         
-        // Video indices: 0:A, 1:B, 2:C, 3:D, 4:E, 5:F, 6:G
+        let videoConfig = [
+            { id: 'A', order: 1, loop: false },
+            { id: 'B', order: 2, loop: false },
+            { id: 'C', order: 3, loop: true },
+            { id: 'D', order: 4, loop: true },
+            { id: 'E', order: 5, loop: false },
+            { id: 'F', order: 6, loop: false },
+            { id: 'G', order: 7, loop: false }
+        ];
+
         let currentVidIndex = 0;
-        let cLoopCount = 0;
-        let messageSentDuringVid = null; // Stores index of video playing when sent
-        let isLateSend = false;
         let aiResponseQueue = null;
         let activeTypingId = null;
         let firstMessageTime = 0;
         let isFirstMessage = true;
 
-        const vids = document.querySelectorAll('.seq-vid');
+        const vids = Array.from(document.querySelectorAll('.seq-vid'));
 
         function initVideoManager() {
             vids.forEach((vid, i) => {
                 vid.style.zIndex = vids.length - i;
                 vid.addEventListener('ended', () => handleVideoEnded(i));
-                
-                // Smooth transition logic
                 vid.addEventListener('timeupdate', function() {
                     if (this.currentTime > 0.1) {
-                        // Hide all videos with higher index than currently playing
-                        for(let prev = 0; prev < i; prev++) {
-                            vids[prev].style.opacity = '0';
-                        }
+                        vids.forEach((v, idx) => {
+                            if(idx !== currentVidIndex) v.style.opacity = '0';
+                        });
+                        vids[currentVidIndex].style.opacity = '1';
                     }
                 });
             });
+            renderVideoConfig();
         }
 
         function playVid(index) {
@@ -269,59 +286,31 @@
         }
 
         function handleVideoEnded(index) {
-            // Intro Sequence: A -> B -> C(x3) -> D
-            if (index === 0) playVid(1); // A done -> B
-            else if (index === 1) playVid(2); // B done -> C
-            else if (index === 2) {
-                // New logic: if message sent during C, loop C unless it was sent in the last 1s
-                if (messageSentDuringVid === 2) {
-                    if (isLateSend) {
-                        playVid(3); // Proceed to D
-                    } else {
-                        playVid(2); // Loop C forever
-                    }
-                } else {
-                    // Standard intro progression if no message active
-                    cLoopCount++;
-                    if (cLoopCount < 3) playVid(2);
-                    else playVid(3);
-                }
+            const config = videoConfig.find(c => vids.indexOf(vids.find(v => v.src.includes(c.id + '.mp4'))) === index);
+            
+            if (config && config.loop && !aiResponseQueue) {
+                playVid(index);
+                return;
             }
-            // Idle/Interaction Logic
-            else if (index === 3) { // D ended
-                if (messageSentDuringVid === 3) {
-                    if (isLateSend) playVid(4); // Play E
-                    else playVid(6); // Play G
-                    messageSentDuringVid = null;
-                } else {
-                    playVid(3); // Loop D indefinitely until message
-                }
-            }
-            else if (index === 4) { // E ended
-                if (messageSentDuringVid === 4) {
-                    if (isLateSend) {
-                        isLateSend = false; // Reset late flag
-                        playVid(4); // Loop E once more
-                    } else {
-                        playVid(6); // Play G
-                        messageSentDuringVid = null;
-                    }
-                } else if (messageSentDuringVid === 3 && isLateSend) {
-                     // We came from D late, now play G
-                     playVid(6);
-                     messageSentDuringVid = null;
-                } else {
-                    playVid(3); // Default back to D
-                }
-            }
-            else if (index === 6) { // G ended
-                playVid(3); // Back to D loop
+
+            // Find next video by order
+            const nextConfig = [...videoConfig].sort((a, b) => a.order - b.order)
+                .find(c => c.order > (config ? config.order : 0));
+
+            if (nextConfig) {
+                const nextIndex = vids.findIndex(v => v.src.includes(nextConfig.id + '.mp4'));
+                if (nextIndex !== -1) playVid(nextIndex);
+            } else {
+                // Restart sequence or loop last
+                playVid(index);
             }
         }
 
         window.onload = () => {
             document.getElementById('api-key').value = localStorage.getItem('aura_api_key') || '';
             document.getElementById('system-prompt').value = localStorage.getItem('aura_system_prompt') || '';
+            const savedConfig = localStorage.getItem('aura_video_config');
+            if (savedConfig) videoConfig = JSON.parse(savedConfig);
             initVideoManager();
         };
 
@@ -341,8 +330,10 @@
             // Start Sequence if not started
             if (isFirstMessage) {
                 firstMessageTime = Date.now();
-                if (vids[0].paused && currentVidIndex === 0 && cLoopCount === 0) {
-                    setTimeout(() => playVid(0), 1000); // Reduced delay slightly
+                // Find Video A
+                const indexA = vids.findIndex(v => v.src.includes('A.mp4'));
+                if (indexA !== -1 && vids[indexA].paused) {
+                    setTimeout(() => playVid(indexA), 2000); // 2s delay for A
                 }
             }
 
@@ -401,7 +392,46 @@
         function saveSettings() {
             localStorage.setItem('aura_api_key', document.getElementById('api-key').value);
             localStorage.setItem('aura_system_prompt', document.getElementById('system-prompt').value);
+            
+            const configRows = document.querySelectorAll('.config-row');
+            const newConfig = Array.from(configRows).map(row => ({
+                id: row.dataset.id,
+                order: parseInt(row.querySelector('.order-input').value),
+                loop: row.querySelector('.loop-input').checked
+            }));
+            
+            videoConfig = newConfig;
+            localStorage.setItem('aura_video_config', JSON.stringify(newConfig));
             toggleSidebar();
+        }
+
+        function renderVideoConfig() {
+            const list = document.getElementById('video-config-list');
+            list.innerHTML = '';
+            videoConfig.sort((a,b) => a.order - b.order).forEach(conf => {
+                const div = document.createElement('div');
+                div.className = 'config-row flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10';
+                div.dataset.id = conf.id;
+                div.innerHTML = `
+                    <span class="text-white font-bold w-6 text-center">${conf.id}</span>
+                    <input type="number" class="order-input w-12 bg-black/20 border border-white/20 rounded px-1 text-xs text-white" value="${conf.order}">
+                    <label class="flex items-center gap-1 text-[10px] text-white/60">
+                        <input type="checkbox" class="loop-input" ${conf.loop ? 'checked' : ''}> Loop
+                    </label>
+                    <button onclick="this.parentElement.remove()" class="ml-auto text-red-400 hover:text-red-300 text-xs">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function addVideoConfig() {
+            const name = prompt("Enter Video Name (e.g. H):");
+            if (!name) return;
+            const nextOrder = videoConfig.length > 0 ? Math.max(...videoConfig.map(c => c.order)) + 1 : 1;
+            videoConfig.push({ id: name.toUpperCase(), order: nextOrder, loop: false });
+            renderVideoConfig();
         }
 
         function appendMessage(role, text) {
