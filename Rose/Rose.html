@@ -135,6 +135,31 @@
             0%, 100% { transform: scale(0.8); opacity: 0.5; }
             50% { transform: scale(1.2); opacity: 1; }
         }
+
+        .toast-msg {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 1000;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            opacity: 0;
+        }
+
+        .toast-msg.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-10px);
+        }
     </style>
 </head>
 <body class="antialiased">
@@ -149,6 +174,9 @@
         <video class="seq-vid" muted playsinline preload="auto"><source src="F.mp4" type="video/mp4"></video>
         <video class="seq-vid" muted playsinline preload="auto"><source src="G.mp4" type="video/mp4"></video>
     </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast-msg"></div>
 
     <!-- Sidebar Overlay -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden" onclick="toggleSidebar()"></div>
@@ -291,10 +319,21 @@
             renderVideoConfig();
         }
 
+        function showToast(id) {
+            const toast = document.getElementById('toast');
+            toast.innerText = `VIDEO ${id} ACTIVE`;
+            toast.classList.add('show');
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
         function playVid(index) {
             if (index === -1) return;
             
             const oldIndex = currentVidIndex;
+            const currentConf = videoConfig.find(c => getVidIndexById(c.id) === index);
+            if (currentConf) showToast(currentConf.id);
+
             if (oldIndex !== index) {
                 currentLoopCount = 0;
                 messageSentDuringVid = false;
