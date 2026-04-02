@@ -50,8 +50,8 @@
         }
 
         .seq-vid {
-            opacity: 1;
-            transition: none; /* Keep the instant opacity swap smooth */
+            opacity: 0;
+            transition: opacity 0.3s ease; /* Smooth fade for the initial load */
         }
 
         .glass-panel {
@@ -258,8 +258,15 @@
         const vids = Array.from(document.querySelectorAll('.seq-vid'));
 
         function initVideoManager() {
+            const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
+            const firstId = sorted.length > 0 ? sorted[0].id : 'A';
+            const firstIndex = getVidIndexById(firstId);
+
             vids.forEach((vid, i) => {
-                vid.style.zIndex = vids.length - i;
+                // Reset all to hidden
+                vid.style.opacity = '0';
+                vid.style.zIndex = '1';
+                
                 vid.addEventListener('ended', () => handleVideoEnded(i));
                 vid.addEventListener('timeupdate', function() {
                     if (this.currentTime > 0.1) {
@@ -270,6 +277,14 @@
                     }
                 });
             });
+
+            // Set the correctly ordered first video as the visible background
+            if (firstIndex !== -1) {
+                currentVidIndex = firstIndex;
+                vids[firstIndex].style.opacity = '1';
+                vids[firstIndex].style.zIndex = '10';
+                vids[firstIndex].play().catch(() => console.log("Waiting for user interaction to play background..."));
+            }
             renderVideoConfig();
         }
 
@@ -279,6 +294,7 @@
             const oldIndex = currentVidIndex;
             currentVidIndex = index;
             
+            vids[index].style.zIndex = '10';
             vids[index].style.opacity = '1';
             vids[index].currentTime = 0;
             
