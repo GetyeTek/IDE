@@ -335,14 +335,7 @@
             const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
             const currentConf = videoConfig.find(c => getVidIndexById(c.id) === index);
             
-            if (aiResponseQueue) {
-                const gIndex = getVidIndexById('G');
-                if (gIndex !== -1 && index !== gIndex) {
-                    playVid(gIndex);
-                    return;
-                }
-            }
-
+            // 1. Check if we should LOOP the current video based on settings
             if (currentConf && currentConf.loop) {
                 let shouldLoop = false;
                 const cond = currentConf.condition || 'always';
@@ -352,15 +345,16 @@
                 else if (cond === 'onMessage' && messageSentDuringVid) shouldLoop = true;
                 else if (cond === 'onNoMessage' && !messageSentDuringVid) shouldLoop = true;
 
-                // Check loop count limit (0 = infinite)
+                // Only loop if we haven't hit the max count (0 = infinite)
                 if (shouldLoop && (max === 0 || currentLoopCount < max)) {
                     playVid(index);
                     return;
                 }
             }
 
+            // 2. If not looping, move to the NEXT video in the sorted order
             const currentPos = sorted.findIndex(c => c.id === (currentConf ? currentConf.id : ''));
-            const nextConf = sorted[currentPos + 1] || sorted[0]; 
+            const nextConf = sorted[currentPos + 1] || sorted[0]; // Loop back to the start of the list
 
             if (nextConf) {
                 const nextIdx = getVidIndexById(nextConf.id);
