@@ -398,7 +398,8 @@
             }
 
             const currentVid = vids[currentVidIndex];
-            messageSentDuringVid = currentVidIndex;
+            // Remove the incorrect reassignment of messageSentDuringVid
+            const tempVidIndex = currentVidIndex; 
             isLateSend = (currentVid.duration - currentVid.currentTime) <= 1.0;
 
             // Logic to handle response timing
@@ -480,6 +481,14 @@
             }, 800);
         }
 
+        function updateLoopStatus(id, isChecked) {
+            const conf = videoConfig.find(c => c.id === id);
+            if (conf) {
+                conf.loop = isChecked;
+                renderVideoConfig();
+            }
+        }
+
         function renderVideoConfig() {
             const list = document.getElementById('video-config-list');
             if (!list) return;
@@ -492,9 +501,11 @@
                 div.innerHTML = `
                     <div class="flex items-center gap-2">
                         <span class="text-white font-bold w-6">${conf.id}</span>
-                        <input type="number" class="order-input w-10 bg-black/20 border border-white/20 rounded px-1 text-xs text-white" value="${conf.order}">
-                        <label class="flex items-center gap-1 text-[10px] text-white/60">
-                            <input type="checkbox" class="loop-input" ${conf.loop ? 'checked' : ''} onchange="renderVideoConfig()"> Loop
+                        <input type="number" class="order-input w-10 bg-black/20 border border-white/20 rounded px-1 text-xs text-white" 
+                            value="${conf.order}" onchange="this.closest('.config-row').querySelector('.order-input').value = this.value">
+                        <label class="flex items-center gap-1 text-[10px] text-white/60 cursor-pointer">
+                            <input type="checkbox" class="loop-input" ${conf.loop ? 'checked' : ''} 
+                                onchange="updateLoopStatus('${conf.id}', this.checked)"> Loop
                         </label>
                         <button onclick="removeVideoConfig('${conf.id}')" class="ml-auto text-red-400 text-xs p-1"><i class="fa-solid fa-trash"></i></button>
                     </div>
