@@ -307,9 +307,10 @@
         }
 
         function handleVideoEnded(index) {
+            const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
             const currentConf = videoConfig.find(c => getVidIndexById(c.id) === index);
             
-            // If we have an AI response waiting, skip looping and try to find Video G (Response)
+            // If we have an AI response waiting, jump to Video G (Response) regardless of order
             if (aiResponseQueue) {
                 const gIndex = getVidIndexById('G');
                 if (gIndex !== -1 && index !== gIndex) {
@@ -318,16 +319,15 @@
                 }
             }
 
-            // Standard loop logic
+            // If current video is set to loop, stay here unless AI is ready
             if (currentConf && currentConf.loop && !aiResponseQueue) {
                 playVid(index);
                 return;
             }
 
-            // Find next based on order
-            const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
-            const currentIndex = sorted.findIndex(c => c.id === (currentConf ? currentConf.id : ''));
-            const nextConf = sorted[currentIndex + 1] || sorted[0]; // Loop back to start of sequence if at end
+            // Find next based on the sorted 'order' property
+            const currentPos = sorted.findIndex(c => c.id === (currentConf ? currentConf.id : ''));
+            const nextConf = sorted[currentPos + 1] || sorted[0]; 
 
             if (nextConf) {
                 const nextIdx = getVidIndexById(nextConf.id);
@@ -356,12 +356,15 @@
             
             activeTypingId = appendTypingIndicator();
             
-            // Start Sequence if not started
+            // Start Sequence based on the LOWEST order defined in settings
             if (isFirstMessage) {
                 firstMessageTime = Date.now();
-                const indexA = getVidIndexById('A');
-                if (indexA !== -1) {
-                    setTimeout(() => playVid(indexA), 2000);
+                const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
+                if (sorted.length > 0) {
+                    const firstVidIdx = getVidIndexById(sorted[0].id);
+                    if (firstVidIdx !== -1) {
+                        setTimeout(() => playVid(firstVidIdx), 2000);
+                    }
                 }
             }
 
@@ -384,8 +387,9 @@
                         setTimeout(checkAndDisplay, 100);
                     }
                 } else {
-                    // Subsequent messages: Wait for Video G (Index 6) to reach 3s
-                    if (aiResponseQueue && currentVidIndex === 6 && vids[6].currentTime >= 3.0) {
+                    // Subsequent messages: Wait for Video G to reach 3s (finding G dynamically)
+                    const gIndex = getVidIndexById('G');
+                    if (aiResponseQueue && currentVidIndex === gIndex && vids[gIndex].currentTime >= 3.0) {
                         displayAIResponse(aiResponseQueue);
                         aiResponseQueue = null;
                     } else {
