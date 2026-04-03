@@ -371,41 +371,37 @@
         }
 
         function handleVideoEnded(index) {
-            // Use a stable sorted list
             const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
-            
-            // Find current config by matching the video source to the ID
-            const currentConf = videoConfig.find(c => {
-                const vIdx = getVidIndexById(c.id);
-                return vIdx === index;
-            });
+            const currentConf = videoConfig.find(c => getVidIndexById(c.id) === index);
             
             if (currentConf) {
-                // Logic Check: Did we interact? 
-                // We use strict boolean check because 0 (Video A) is falsy
                 const isInteracted = (messageSentDuringVid === true);
-                
-                const extraLoopsLimit = isInteracted ? 
-                    parseInt(currentConf.loopsMsg) : 
-                    parseInt(currentConf.loopsIdle);
+                const extraLoopsLimit = isInteracted ? parseInt(currentConf.loopsMsg) : parseInt(currentConf.loopsIdle);
 
-                // Handle Looping
+                // 1. Handle Looping First
                 if (extraLoopsLimit === -1 || currentLoopCount < extraLoopsLimit) {
                     playVid(index); 
                     return;
                 }
+
+                // 2. Handle Jump Gates (Overrides the default order)
+                const jumpTargetId = isInteracted ? currentConf.jumpMsg : currentConf.jumpIdle;
+                if (jumpTargetId && jumpTargetId.trim() !== "") {
+                    const jumpIdx = getVidIndexById(jumpTargetId.toUpperCase());
+                    if (jumpIdx !== -1) {
+                        playVid(jumpIdx);
+                        return;
+                    }
+                }
             }
 
-            // Transition to Next Video
+            // 3. Fallback: Transition to NEXT video in order
             const currentPos = sorted.findIndex(c => c.id === (currentConf ? currentConf.id : ''));
             const nextConf = sorted[currentPos + 1] || sorted[0]; 
 
             if (nextConf) {
                 const nextIdx = getVidIndexById(nextConf.id);
                 if (nextIdx !== -1) playVid(nextIdx);
-            } else {
-                // Fallback to first video if sequence is empty or broken
-                playVid(0);
             }
         }
 
@@ -513,7 +509,9 @@
                 id: row.dataset.id,
                 order: parseInt(row.querySelector('.order-input').value || 0),
                 loopsIdle: parseInt(row.querySelector('.idle-input').value || 0),
-                loopsMsg: parseInt(row.querySelector('.msg-input').value || 0)
+                loopsMsg: parseInt(row.querySelector('.msg-input').value || 0),
+                jumpIdle: row.querySelector('.jump-idle-input').value.toUpperCase() || "",
+                jumpMsg: row.querySelector('.jump-msg-input').value.toUpperCase() || ""
             }));
             
             localStorage.setItem('aura_video_config', JSON.stringify(videoConfig));
@@ -559,16 +557,23 @@
                         </div>
                         <button onclick="removeVideoConfig('${conf.id}')" class="ml-auto text-red-400 text-xs"><i class="fa-solid fa-trash"></i></button>
                     </div>
-                    <div class="grid grid-cols-2 gap-3 border-t border-white/5 pt-2">
-                        <div class="flex flex-col gap-1">
-                            <label class="text-[9px] text-white/40 uppercase">Extra Loops (Idle)</label>
-                            <input type="number" class="idle-input bg-black/40 text-white text-xs rounded border border-white/10 p-1" 
-                                value="${conf.loopsIdle || 0}" placeholder="-1 = infinite">
-                        </div>
-                        <div class="flex flex-col gap-1">
-                            <label class="text-[9px] text-white/40 uppercase">Extra Loops (Msg)</label>
-                            <input type="number" class="msg-input bg-black/40 text-white text-xs rounded border border-white/10 p-1" 
-                                value="${conf.loopsMsg || 0}" placeholder="-1 = infinite">
+                    
+                    <div class="space-y-3 border-t border-white/10 pt-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[8px] text-purple-300 uppercase font-bold">Idle Logic</label>
+                                <div class="flex gap-1">
+                                    <input type="number" class="idle-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" value="${conf.loopsIdle || 0}" title="Extra Loops" placeholder="Lp">
+                                    <input type="text" class="jump-idle-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1 uppercase" value="${conf.jumpIdle || ''}" title="Jump Target" placeholder="Jump">
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[8px] text-pink-300 uppercase font-bold">Message Logic</label>
+                                <div class="flex gap-1">
+                                    <input type="number" class="msg-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" value="${conf.loopsMsg || 0}" title="Extra Loops" placeholder="Lp">
+                                    <input type="text" class="jump-msg-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1 uppercase" value="${conf.jumpMsg || ''}" title="Jump Target" placeholder="Jump">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
