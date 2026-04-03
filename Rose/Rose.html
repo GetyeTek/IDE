@@ -336,6 +336,7 @@
 
             if (oldIndex !== index) {
                 currentLoopCount = 0;
+                // Flag is reset only when we successfully transition to a NEW video
                 messageSentDuringVid = false;
             } else {
                 currentLoopCount++;
@@ -349,14 +350,11 @@
             const playPromise = vids[index].play();
             if (playPromise !== undefined) {
                 playPromise.then(() => {
-                    // Only hide the old video AFTER the new one starts playing to prevent black flicker
-                    if (oldIndex !== index) {
+                    if (oldIndex !== index && vids[oldIndex]) {
                         vids[oldIndex].pause();
                         vids[oldIndex].style.opacity = '0';
                     }
-                }).catch(error => {
-                    console.log("Playback blocked, waiting for interaction");
-                });
+                }).catch(e => console.warn("Autoplay prevented"));
             }
         }
 
@@ -370,34 +368,34 @@
             });
         }
 
-        function handleVideoEnded(index) {
-            const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
+                function handleVideoEnded(index) {
             const currentConf = videoConfig.find(c => getVidIndexById(c.id) === index);
-            
-            if (currentConf) {
-                const isInteracted = (messageSentDuringVid === true);
-                const extraLoopsLimit = isInteracted ? parseInt(currentConf.loopsMsg) : parseInt(currentConf.loopsIdle);
+            if (!currentConf) return;
 
-                // 1. Handle Looping First
-                if (extraLoopsLimit === -1 || currentLoopCount < extraLoopsLimit) {
-                    playVid(index); 
+            const isInteracted = (messageSentDuringVid === true);
+            const loopsRaw = isInteracted ? currentConf.loopsMsg : currentConf.loopsIdle;
+            const extraLoopsLimit = (loopsRaw === -1) ? -1 : parseInt(loopsRaw || 0);
+
+            // 1. Looping Priority
+            if (extraLoopsLimit === -1 || currentLoopCount < extraLoopsLimit) {
+                playVid(index);
+                return;
+            }
+
+            // 2. Jump Gate Priority
+            const jumpTargetId = (isInteracted ? currentConf.jumpMsg : currentConf.jumpIdle) || "";
+            if (jumpTargetId.trim() !== "") {
+                const jumpIdx = getVidIndexById(jumpTargetId.trim().toUpperCase());
+                if (jumpIdx !== -1) {
+                    playVid(jumpIdx);
                     return;
-                }
-
-                // 2. Handle Jump Gates (Overrides the default order)
-                const jumpTargetId = isInteracted ? currentConf.jumpMsg : currentConf.jumpIdle;
-                if (jumpTargetId && jumpTargetId.trim() !== "") {
-                    const jumpIdx = getVidIndexById(jumpTargetId.toUpperCase());
-                    if (jumpIdx !== -1) {
-                        playVid(jumpIdx);
-                        return;
-                    }
                 }
             }
 
-            // 3. Fallback: Transition to NEXT video in order
-            const currentPos = sorted.findIndex(c => c.id === (currentConf ? currentConf.id : ''));
-            const nextConf = sorted[currentPos + 1] || sorted[0]; 
+            // 3. Linear Sequence Fallback
+            const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
+            const currentPos = sorted.findIndex(c => c.id === currentConf.id);
+            const nextConf = sorted[currentPos + 1] || sorted[0];
 
             if (nextConf) {
                 const nextIdx = getVidIndexById(nextConf.id);
