@@ -211,10 +211,15 @@
 
             <div class="mt-4">
                 <div class="flex justify-between items-center mb-2">
-                    <label class="text-sm font-medium text-white/80">Video Sequence</label>
-                    <button onclick="addVideoConfig()" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white border border-white/20">
-                        <i class="fa-solid fa-plus mr-1"></i>Add
-                    </button>
+                    <label class="text-sm font-medium text-white/80">Sequence Control</label>
+                    <div class="flex gap-2">
+                        <button onclick="openJsonModal()" class="text-xs bg-purple-500/20 hover:bg-purple-500/40 px-2 py-1 rounded text-purple-200 border border-purple-400/30">
+                            <i class="fa-solid fa-code mr-1"></i>JSON
+                        </button>
+                        <button onclick="addVideoConfig()" class="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white border border-white/20">
+                            <i class="fa-solid fa-plus mr-1"></i>Add
+                        </button>
+                    </div>
                 </div>
                 <div id="video-config-list" class="space-y-2 mb-4">
                     <!-- Config items injected here -->
@@ -262,6 +267,26 @@
             </div>
         </div>
     </main>
+
+    <!-- JSON Config Modal -->
+    <div id="json-modal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-md" onclick="closeJsonModal()"></div>
+        <div class="glass-panel w-full max-w-2xl p-6 relative flex flex-col gap-4 shadow-2xl border-white/30">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white tracking-tight">Advanced Sequence Config</h3>
+                <button onclick="closeJsonModal()" class="text-white/50 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-white/60 -mt-2">Paste your sequence JSON here. Errors will be caught before applying.</p>
+            <textarea id="json-input" class="w-full h-80 bg-black/40 border border-white/10 rounded-xl p-4 text-xs font-mono text-purple-300 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none" spellcheck="false"></textarea>
+            <div class="flex justify-between gap-3">
+                <button onclick="formatJson()" class="px-4 py-2 bg-white/10 text-white rounded-lg text-sm hover:bg-white/20 transition-all">Format JSON</button>
+                <div class="flex gap-2">
+                    <button onclick="closeJsonModal()" class="px-4 py-2 text-white/70 hover:text-white transition-all text-sm">Cancel</button>
+                    <button onclick="applyJsonConfig()" class="px-6 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-500 shadow-lg shadow-purple-900/20 transition-all">Apply & Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         let chatHistory = [];
@@ -531,6 +556,45 @@
             if (conf) {
                 conf.loop = isChecked;
                 renderVideoConfig();
+            }
+        }
+
+        function openJsonModal() {
+            const modal = document.getElementById('json-modal');
+            const textarea = document.getElementById('json-input');
+            textarea.value = JSON.stringify(videoConfig, null, 2);
+            modal.classList.remove('hidden');
+        }
+
+        function closeJsonModal() {
+            document.getElementById('json-modal').classList.add('hidden');
+        }
+
+        function formatJson() {
+            const textarea = document.getElementById('json-input');
+            try {
+                const parsed = JSON.parse(textarea.value);
+                textarea.value = JSON.stringify(parsed, null, 2);
+            } catch (e) {
+                alert("Malformed JSON, can't format this mess: " + e.message);
+            }
+        }
+
+        function applyJsonConfig() {
+            const textarea = document.getElementById('json-input');
+            try {
+                const parsed = JSON.parse(textarea.value);
+                if (!Array.isArray(parsed)) throw new Error("Root must be an array");
+                
+                videoConfig = parsed;
+                localStorage.setItem('aura_video_config', JSON.stringify(videoConfig));
+                
+                renderVideoConfig();
+                initVideoManager();
+                closeJsonModal();
+                showToast("CONFIG APPLIED");
+            } catch (e) {
+                alert("JSON Error: " + e.message);
             }
         }
 
