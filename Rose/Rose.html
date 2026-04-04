@@ -309,6 +309,7 @@
         let isFirstMessage = true;
         let messageSentDuringVid = false;
         let currentLoopCount = 0;
+        let videoPlayCounts = {}; // Track how many times each video has completed
 
         const vids = Array.from(document.querySelectorAll('.seq-vid'));
 
@@ -407,10 +408,23 @@
                 return;
             }
 
-            // 2. Jump Gate Priority
-            const jumpTargetId = (isInteracted ? currentConf.jumpMsg : currentConf.jumpIdle) || "";
-            if (jumpTargetId.trim() !== "") {
-                const jumpIdx = getVidIndexById(jumpTargetId.trim().toUpperCase());
+            // 2. Jump Gate Priority (Supports String or Array)
+            const rawJump = isInteracted ? currentConf.jumpMsg : currentConf.jumpIdle;
+            let targetId = "";
+
+            if (Array.isArray(rawJump) && rawJump.length > 0) {
+                // Get count for THIS specific video ID
+                const visitCount = videoPlayCounts[currentConf.id] || 0;
+                // Clamp to the last element if we exceed array length
+                targetId = rawJump[Math.min(visitCount, rawJump.length - 1)];
+                // Increment visit count for next time we hit this video
+                videoPlayCounts[currentConf.id] = visitCount + 1;
+            } else if (typeof rawJump === 'string' && rawJump.trim() !== "") {
+                targetId = rawJump.trim();
+            }
+
+            if (targetId) {
+                const jumpIdx = getVidIndexById(targetId.toUpperCase());
                 if (jumpIdx !== -1) {
                     playVid(jumpIdx);
                     return;
