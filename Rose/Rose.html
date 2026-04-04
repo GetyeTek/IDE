@@ -408,23 +408,28 @@
                 return;
             }
 
-            // 2. Jump Gate Priority (Supports String or Array)
+            // 2. Jump Gate Priority (Supports String, Array, and Signals)
             const rawJump = isInteracted ? currentConf.jumpMsg : currentConf.jumpIdle;
-            let targetId = "";
+            let targetInstruction = "";
 
             if (Array.isArray(rawJump) && rawJump.length > 0) {
-                // Get count for THIS specific video ID
                 const visitCount = videoPlayCounts[currentConf.id] || 0;
-                // Clamp to the last element if we exceed array length
-                targetId = rawJump[Math.min(visitCount, rawJump.length - 1)];
-                // Increment visit count for next time we hit this video
+                targetInstruction = rawJump[Math.min(visitCount, rawJump.length - 1)];
                 videoPlayCounts[currentConf.id] = visitCount + 1;
             } else if (typeof rawJump === 'string' && rawJump.trim() !== "") {
-                targetId = rawJump.trim();
+                targetInstruction = rawJump.trim();
             }
 
-            if (targetId) {
-                const jumpIdx = getVidIndexById(targetId.toUpperCase());
+            if (targetInstruction) {
+                // Split ID from Signal (e.g., "C:reset" -> ["C", "reset"])
+                const [targetId, signal] = targetInstruction.split(':');
+                const cleanId = targetId.trim().toUpperCase();
+
+                if (signal && signal.toLowerCase() === 'reset') {
+                    videoPlayCounts[cleanId] = 0; 
+                }
+
+                const jumpIdx = getVidIndexById(cleanId);
                 if (jumpIdx !== -1) {
                     playVid(jumpIdx);
                     return;
