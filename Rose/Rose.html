@@ -474,7 +474,8 @@
             activeTypingId = appendTypingIndicator();
             
             // Start Sequence based on the LOWEST order defined in settings
-            if (isFirstMessage) {
+            // Ensure the intro sequence teleport ONLY runs exactly once per session
+            if (firstMessageTime === 0) {
                 firstMessageTime = Date.now();
                 const sorted = [...videoConfig].sort((a, b) => a.order - b.order);
                 if (sorted.length > 0) {
@@ -486,9 +487,8 @@
             }
 
             const currentVid = vids[currentVidIndex];
-            // Fixed: We already set messageSentDuringVid = true at the top of the function.
-            // Do not overwrite it with the index number.
-            isLateSend = (currentVid.duration - currentVid.currentTime) <= 1.0;
+            // Fixed: Declare isLateSend correctly to prevent global scope leakage
+            const isLateSend = (currentVid.duration - currentVid.currentTime) <= 1.0;
 
             // Logic to handle response timing
             const checkAndDisplay = () => {
@@ -644,14 +644,14 @@
                             <div class="flex flex-col gap-1">
                                 <label class="text-[8px] text-purple-300 uppercase font-bold">Idle Logic</label>
                                 <div class="flex gap-1">
-                                    <input type="number" class="idle-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" value="${conf.loopsIdle || 0}" title="Extra Loops" placeholder="Lp">
+                                    <input type="number" class="idle-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" value="${conf.loopsIdle !== undefined ? conf.loopsIdle : 0}" title="Extra Loops" placeholder="Lp">
                                     <input type="text" class="jump-idle-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1 uppercase" value="${conf.jumpIdle || ''}" title="Jump Target" placeholder="Jump">
                                 </div>
                             </div>
                             <div class="flex flex-col gap-1">
                                 <label class="text-[8px] text-pink-300 uppercase font-bold">Message Logic</label>
                                 <div class="flex gap-1">
-                                    <input type="number" class="msg-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" value="${conf.loopsMsg || 0}" title="Extra Loops" placeholder="Lp">
+                                    <input type="number" class="msg-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" value="${conf.loopsMsg !== undefined ? conf.loopsMsg : 0}" title="Extra Loops" placeholder="Lp">
                                     <input type="text" class="jump-msg-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1 uppercase" value="${conf.jumpMsg || ''}" title="Jump Target" placeholder="Jump">
                                 </div>
                             </div>
