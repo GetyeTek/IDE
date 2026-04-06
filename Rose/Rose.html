@@ -580,6 +580,23 @@
             });
             
             localStorage.setItem('aura_video_config', JSON.stringify(videoConfig));
+
+            // Hard Reset Session State
+            chatHistory = [];
+            videoPlayCounts = {};
+            currentLoopCount = 0;
+            isFirstMessage = true;
+            firstMessageTime = 0;
+            messageSentDuringVid = false;
+            aiResponseQueue = null;
+            if (activeTypingId) removeTypingIndicator(activeTypingId);
+            
+            // Clear Chat UI
+            const container = document.getElementById('chat-container');
+            container.innerHTML = `<div id="welcome-msg" class="message-ai p-4 max-w-[85%]">Settings applied. Session restarted.</div>`;
+            
+            // Reset Video Manager
+            initVideoManager();
             
             // Visual Feedback
             btn.innerText = "Saved!";
