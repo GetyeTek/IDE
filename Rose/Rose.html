@@ -469,7 +469,9 @@
             if (welcomeMsg) welcomeMsg.remove();
 
             appendMessage('user', text);
-            inputElement.value = '';
+            if (text.toLowerCase() !== 'hello') {
+                inputElement.value = '';
+            }
             
             activeTypingId = appendTypingIndicator();
             
