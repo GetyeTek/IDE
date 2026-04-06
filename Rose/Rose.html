@@ -399,6 +399,7 @@
             if (!currentConf) return;
 
             const isInteracted = (messageSentDuringVid === true);
+            const trackKey = isInteracted ? '_msg' : '_idle';
             const loopsRaw = isInteracted ? currentConf.loopsMsg : currentConf.loopsIdle;
             const extraLoopsLimit = (loopsRaw === -1) ? -1 : parseInt(loopsRaw || 0);
 
@@ -413,9 +414,10 @@
             let targetInstruction = "";
 
             if (Array.isArray(rawJump) && rawJump.length > 0) {
-                const visitCount = videoPlayCounts[currentConf.id] || 0;
+                const visitKey = currentConf.id + trackKey;
+                const visitCount = videoPlayCounts[visitKey] || 0;
                 targetInstruction = rawJump[Math.min(visitCount, rawJump.length - 1)];
-                videoPlayCounts[currentConf.id] = visitCount + 1;
+                videoPlayCounts[visitKey] = visitCount + 1;
             } else if (typeof rawJump === 'string' && rawJump.trim() !== "") {
                 targetInstruction = rawJump.trim();
             }
@@ -426,22 +428,20 @@
                 const signal = parts[1] ? parts[1].toLowerCase() : null;
 
                 if (signal === 'reset') {
-                    // Wipes memory of the video you are GOING TO
-                    videoPlayCounts[cleanId] = 0; 
+                    // Wipes memory of the specific track you are on for the target video
+                    videoPlayCounts[cleanId + trackKey] = 0; 
                 } else if (signal === 'reset-this' || signal === 'self') {
-                    // Wipes memory of the video you are LEAVING (starts its array over next time)
-                    videoPlayCounts[currentConf.id] = 0;
+                    // Wipes memory of the specific track for the source video
+                    videoPlayCounts[currentConf.id + trackKey] = 0;
                 } else if (signal === 'delete') {
-                    // Scorched earth on the DESTINATION video
                     const targetConf = videoConfig.find(c => c.id === cleanId);
                     if (targetConf) {
                         if (isInteracted) targetConf.jumpMsg = ""; else targetConf.jumpIdle = "";
-                        videoPlayCounts[cleanId] = 0;
+                        videoPlayCounts[cleanId + trackKey] = 0;
                     }
                 } else if (signal === 'delete-this' || signal === 'self-delete') {
-                    // Scorched earth on the SOURCE video (the path is gone forever)
                     if (isInteracted) currentConf.jumpMsg = ""; else currentConf.jumpIdle = "";
-                    videoPlayCounts[currentConf.id] = 0;
+                    videoPlayCounts[currentConf.id + trackKey] = 0;
                 }
 
                 const jumpIdx = getVidIndexById(cleanId);
