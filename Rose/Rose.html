@@ -421,12 +421,16 @@
             }
 
             if (targetInstruction) {
-                // Split ID from Signal (e.g., "C:reset" -> ["C", "reset"])
-                const [targetId, signal] = targetInstruction.split(':');
-                const cleanId = targetId.trim().toUpperCase();
+                const parts = targetInstruction.split(':');
+                const cleanId = parts[0].trim().toUpperCase();
+                const signal = parts[1] ? parts[1].toLowerCase() : null;
 
-                if (signal && signal.toLowerCase() === 'reset') {
+                if (signal === 'reset') {
+                    // Wipes memory of the video you are GOING TO
                     videoPlayCounts[cleanId] = 0; 
+                } else if (signal === 'reset-this' || signal === 'self') {
+                    // Wipes memory of the video you are LEAVING (starts its array over next time)
+                    videoPlayCounts[currentConf.id] = 0;
                 }
 
                 const jumpIdx = getVidIndexById(cleanId);
