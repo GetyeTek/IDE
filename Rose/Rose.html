@@ -431,6 +431,17 @@
                 } else if (signal === 'reset-this' || signal === 'self') {
                     // Wipes memory of the video you are LEAVING (starts its array over next time)
                     videoPlayCounts[currentConf.id] = 0;
+                } else if (signal === 'delete') {
+                    // Scorched earth on the DESTINATION video
+                    const targetConf = videoConfig.find(c => c.id === cleanId);
+                    if (targetConf) {
+                        if (isInteracted) targetConf.jumpMsg = ""; else targetConf.jumpIdle = "";
+                        videoPlayCounts[cleanId] = 0;
+                    }
+                } else if (signal === 'delete-this' || signal === 'self-delete') {
+                    // Scorched earth on the SOURCE video (the path is gone forever)
+                    if (isInteracted) currentConf.jumpMsg = ""; else currentConf.jumpIdle = "";
+                    videoPlayCounts[currentConf.id] = 0;
                 }
 
                 const jumpIdx = getVidIndexById(cleanId);
