@@ -549,14 +549,20 @@
             localStorage.setItem('aura_system_prompt', document.getElementById('system-prompt').value);
             
             const configRows = document.querySelectorAll('.config-row');
-            videoConfig = Array.from(configRows).map(row => ({
-                id: row.dataset.id,
-                order: parseInt(row.querySelector('.order-input').value || 0),
-                loopsIdle: parseInt(row.querySelector('.idle-input').value || 0),
-                loopsMsg: parseInt(row.querySelector('.msg-input').value || 0),
-                jumpIdle: row.querySelector('.jump-idle-input').value.toUpperCase() || "",
-                jumpMsg: row.querySelector('.jump-msg-input').value.toUpperCase() || ""
-            }));
+            videoConfig = Array.from(configRows).map(row => {
+                const parseJump = (val) => {
+                    const parts = val.trim().toUpperCase().split(/\s+/).filter(p => p.length > 0);
+                    return parts.length > 1 ? parts : (parts[0] || "");
+                };
+                return {
+                    id: row.dataset.id,
+                    order: parseInt(row.querySelector('.order-input').value || 0),
+                    loopsIdle: parseInt(row.querySelector('.idle-input').value || 0),
+                    loopsMsg: parseInt(row.querySelector('.msg-input').value || 0),
+                    jumpIdle: parseJump(row.querySelector('.jump-idle-input').value),
+                    jumpMsg: parseJump(row.querySelector('.jump-msg-input').value)
+                };
+            });
             
             localStorage.setItem('aura_video_config', JSON.stringify(videoConfig));
             
@@ -647,14 +653,14 @@
                                 <label class="text-[8px] text-purple-300 uppercase font-bold">Idle Logic</label>
                                 <div class="flex gap-1">
                                     <input type="number" class="idle-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" value="${conf.loopsIdle !== undefined ? conf.loopsIdle : 0}" title="Extra Loops" placeholder="Lp">
-                                    <input type="text" class="jump-idle-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1 uppercase" value="${conf.jumpIdle || ''}" title="Jump Target" placeholder="Jump">
+                                    <input type="text" class="jump-idle-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1 uppercase" value="${Array.isArray(conf.jumpIdle) ? conf.jumpIdle.join(' ') : (conf.jumpIdle || '')}" title="Jump Target" placeholder="Jump">
                                 </div>
                             </div>
                             <div class="flex flex-col gap-1">
                                 <label class="text-[8px] text-pink-300 uppercase font-bold">Message Logic</label>
                                 <div class="flex gap-1">
                                     <input type="number" class="msg-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1" value="${conf.loopsMsg !== undefined ? conf.loopsMsg : 0}" title="Extra Loops" placeholder="Lp">
-                                    <input type="text" class="jump-msg-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1 uppercase" value="${conf.jumpMsg || ''}" title="Jump Target" placeholder="Jump">
+                                    <input type="text" class="jump-msg-input w-full bg-black/40 text-white text-[10px] rounded border border-white/10 p-1 uppercase" value="${Array.isArray(conf.jumpMsg) ? conf.jumpMsg.join(' ') : (conf.jumpMsg || '')}" title="Jump Target" placeholder="Jump">
                                 </div>
                             </div>
                         </div>
