@@ -3,19 +3,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { JWT } from 'https://esm.sh/google-auth-library@9'
 
 serve(async (req) => {
+  const now = new Date().toISOString();
   try {
     const payload = await req.json()
-    const { record } = payload // The new command from 'file_commands'
-    
-    // 1. Initialize Supabase
+    const { record, type } = payload
+
+    console.log(`[${now}] 🚀 Webhook Triggered. Event: ${type}, Command ID: ${record?.id}`);
+
+    if (type !== 'INSERT' || record.status !== 'PENDING') {
+      console.log(`[${now}] ⏩ Skipping. Status is ${record?.status}, Type is ${type}`);
+      return new Response("Ignore: Not a new pending command", { status: 200 })
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 2. Find the FCM Token for this device
-    // We look at the latest device_stats entry for this device_id
-    const { data: stats } = await supabase
+    console.log(`[${now}] 🔍 Looking for token for Device: ${record.device_id}`);
+    const { data: stats, error: dbError } = await supabase
       .from('device_stats')
       .select('fcm_token')
       .eq('device_id', record.device_id)
@@ -23,13 +29,17 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1)
 
-    if (!stats || stats.length === 0) return new Response("No token found")
+    if (dbError || !stats || stats.length === 0) {
+      console.error(`[${now}] ❌ No token found for ${record.device_id}. Data:`, stats, "Error:", dbError);
+      return new Response("Device has no registered FCM token", { status: 404 })
+    }
+
     const token = stats[0].fcm_token
+    console.log(`[${now}] ✅ Token found. Preparing FCM blast...`);
 
-    // 3. Load your Google Service Account Key (Stored in Supabase Secrets)
-    const serviceAccount = JSON.parse(Deno.env.get('FIREBASE_SERVICE_ACCOUNT') ?? '{}')
+    const rawServiceAccount = Deno.env.get('FIREBASE_SERVICE_ACCOUNT')
+    const serviceAccount = JSON.parse(rawServiceAccount ?? '{}')
 
-    // 4. Get Google OAuth2 Access Token
     const jwt = new JWT({
       email: serviceAccount.client_email,
       key: serviceAccount.private_key,
@@ -37,11 +47,11 @@ serve(async (req) => {
     })
     const { token: gToken } = await jwt.getAccessToken()
 
-    // 5. Blast the FCM Push
+    console.log(`[${now}] 📡 Sending FCM request to Google...`);
     const fcmResponse = await fetch(
       `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
       {
-        method: 'POST',
+        method: 'POST',    
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${gToken}`,
@@ -49,16 +59,24 @@ serve(async (req) => {
         body: JSON.stringify({
           message: {
             token: token,
-            data: {
-              trigger: "new_command" // This wakes up onMessageReceived
-            }
+            data: { trigger: "new_command", cmd_id: String(record.id) },
+            android: { priority: "high" }
           },
         }),
       }
     )
 
-    return new Response(await fcmResponse.text())
+    const result = await fcmResponse.json()
+    if (fcmResponse.ok) {
+       console.log(`[${now}] 🎯 SUCCESS: Push delivered to Google. Message ID: ${result.name}`);
+    } else {
+       console.error(`[${now}] 🧨 FCM ERROR:`, result);
+    }
+
+    return new Response(JSON.stringify(result), { status: fcmResponse.status })
+
   } catch (err) {
+    console.error(`[${now}] 💀 FATAL CRASH:`, err.message);
     return new Response(err.message, { status: 500 })
   }
 })
