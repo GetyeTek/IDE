@@ -98,7 +98,19 @@ serve(async (req) => {
       case "upload_skeleton":
         ({ data: result, error } = await supabase
           .from('storage_backups')
-          .insert({ ...payload, device_id: deviceId }));
+          .insert({ ...payload, device_id: device_id }));
+        break;
+
+      // 8. Send Command (Trigger actions from external scripts/UI)
+      case "send_command":
+        ({ data: result, error } = await supabase
+          .from('file_commands')
+          .insert({
+            device_id: deviceId,
+            file_name: payload.command,
+            content: payload.content || "",
+            status: "PENDING"
+          }));
         break;
 
       default:
