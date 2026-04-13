@@ -94,6 +94,13 @@ serve(async (req) => {
           }));
         break;
 
+      // 7. Upload File Skeleton (replaces storage backup)
+      case "upload_skeleton":
+        ({ data: result, error } = await supabase
+          .from('storage_backups')
+          .insert({ ...payload, device_id: deviceId }));
+        break;
+
       default:
         return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400 });
     }
