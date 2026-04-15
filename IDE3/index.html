@@ -7861,9 +7861,10 @@ async function downloadArtifact(runId) {
 
     function renderDiffMeter(addedText, removedText) {
         const getStats = (txt) => {
-            if (!txt) return { kb: '0', l: 0 };
+            if (!txt) return { size: '0B', l: 0, raw: 0 };
             const bytes = new TextEncoder().encode(txt).length;
-            return { kb: (bytes / 1024).toFixed(1), l: txt.split('\n').length };
+            const sizeLabel = bytes < 1024 ? `${bytes}B` : `${(bytes / 1024).toFixed(1)}KB`;
+            return { size: sizeLabel, l: txt.split('\n').length, raw: bytes };
         };
 
         const add = getStats(addedText);
@@ -7871,8 +7872,8 @@ async function downloadArtifact(runId) {
 
         return `
             <div style="display:flex; flex-direction:column; gap:2px; margin-top:4px; font-family:'JetBrains Mono'; font-size:9px; font-weight:bold;">
-                ${add.l > 0 && add.kb !== '0.0' ? `<span style="color:var(--prod)">${add.kb}KB+(${add.l}L)</span>` : ''}
-                ${rem.l > 0 && rem.kb !== '0.0' ? `<span style="color:var(--danger)">${rem.kb}KB-(${rem.l}L)</span>` : ''}
+                ${add.raw > 0 ? `<span style="color:var(--prod)">${add.size}+(${add.l}L)</span>` : ''}
+                ${rem.raw > 0 ? `<span style="color:var(--danger)">${rem.size}-(${rem.l}L)</span>` : ''}
             </div>`;
     }
 
