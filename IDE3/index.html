@@ -3565,14 +3565,20 @@
                             else if(op.score >= 80) scoreColor = 'var(--dev)';
                             else if(op.score > 0) scoreColor = 'var(--danger)';
 
+                            const added = op.replace_with || op.content || "";
+                            const removed = op.find_block || "";
+                            
                             opHtml += `
                             <div class="op-row ${isFail ? 'row-fail' : ''}" onclick="toggleOpMenu('${opId}')">
                                 <div class="op-title">
-                                    <span>${escapeHtml(op.type.replace(/_/g, ' ').toUpperCase())}</span>
-                                    <span class="score-badge" style="border:1px solid ${scoreColor}; color:${scoreColor}">${escapeHtml(badgeText)}</span>
+                                    <div style="display:flex; flex-direction:column;">
+                                        <span>${escapeHtml(op.type.replace(/_/g, ' ').toUpperCase())}</span>
+                                        ${renderDiffMeter(added, removed)}
+                                    </div>
+                                    <span class="score-badge" style="border:1px solid ${scoreColor}; color:${scoreColor}; align-self: flex-start;">${escapeHtml(badgeText)}</span>
                                 </div>
                                 <div class="op-details">${escapeHtml(op.message)}</div>
-                            </div>
+                            </div>`
                             <div id="${opId}-opts" class="op-options">
                                 <button class="op-opt-btn" onclick="openOpModal('${opId}')">Details</button>
                                 <button class="op-opt-btn" onclick="openDiffViewer('${opId}')">Diff</button>
@@ -7315,7 +7321,15 @@ async function downloadArtifact(runId) {
         const title = document.getElementById('op-modal-title');
         const body = document.getElementById('op-modal-body');
         
-        title.innerText = `${op.type || op.action} in ${data.file}`;
+        const added = op.replace_with || op.content || "";
+        const removed = op.find_block || "";
+        title.innerHTML = `
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span>${op.type || op.action} in ${data.file.split('/').pop()}</span>
+                <div style="display:flex; gap:8px; border-left:1px solid var(--border); padding-left:12px;">
+                    ${renderDiffMeter(added, removed).replace(/flex-direction:column/g, 'flex-direction:row; gap:8px')}
+                </div>
+            </div>`;
         
         const esc = (s) => typeof s === 'string' ? s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : JSON.stringify(s, null, 2);
         
@@ -7843,6 +7857,23 @@ async function downloadArtifact(runId) {
         navigator.clipboard.writeText(text).then(() => {
             showGlobalToast('Copied ' + (isApp ? 'App ' : 'IDE ') + activeTab + ' logs');
         });
+    }
+
+    function renderDiffMeter(addedText, removedText) {
+        const getStats = (txt) => {
+            if (!txt) return { kb: '0', l: 0 };
+            const bytes = new TextEncoder().encode(txt).length;
+            return { kb: (bytes / 1024).toFixed(1), l: txt.split('\n').length };
+        };
+
+        const add = getStats(addedText);
+        const rem = getStats(removedText);
+
+        return `
+            <div style="display:flex; flex-direction:column; gap:2px; margin-top:4px; font-family:'JetBrains Mono'; font-size:9px; font-weight:bold;">
+                ${add.l > 0 && add.kb !== '0.0' ? `<span style="color:var(--prod)">${add.kb}KB+(${add.l}L)</span>` : ''}
+                ${rem.l > 0 && rem.kb !== '0.0' ? `<span style="color:var(--danger)">${rem.kb}KB-(${rem.l}L)</span>` : ''}
+            </div>`;
     }
 
     function renderJsonHighlight(obj) {
