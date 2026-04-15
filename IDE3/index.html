@@ -5187,6 +5187,7 @@ async function downloadArtifact(runId) {
         viewer.classList.add('active');
         document.getElementById('ace-search-bar').style.display = 'none';
         document.getElementById('ace-search-toggle').style.display = 'none';
+        document.getElementById('viewer-edit-btn').style.display = 'none'; // Hide useless edit button
         document.getElementById('viewer-filename').innerText = `Log: ${jobName}`;
         document.getElementById('ace-container').style.display = 'none';
         
@@ -5206,7 +5207,8 @@ async function downloadArtifact(runId) {
                 })
             });
             const data = await res.json();
-            renderStructuredLogs(data.logs || "");
+            window.CURRENT_RAW_LOG = data.logs || ""; // Store raw text for copy operation
+            renderStructuredLogs(window.CURRENT_RAW_LOG);
         } catch (e) {
             logDiv.innerText = "Error: " + e.message;
         }
@@ -5400,7 +5402,8 @@ async function downloadArtifact(runId) {
             content = aceEditorInstance.getValue();
             pathHeader = `FILE: ${currentViewerPath}\n`;
         } else {
-            content = document.getElementById('log-custom-container').innerText;
+            // Priority: Use raw buffer if available, fallback to DOM for legacy support
+            content = window.CURRENT_RAW_LOG || document.getElementById('log-custom-container').innerText;
         }
 
         if (!content) return showGlobalToast("No content to copy", true);
@@ -5479,6 +5482,8 @@ async function downloadArtifact(runId) {
         document.getElementById('ace-container').style.display = 'block';
         document.getElementById('log-custom-container').style.display = 'none';
         document.getElementById('ace-search-toggle').style.display = 'flex';
+        document.getElementById('viewer-edit-btn').style.display = 'flex'; // Restore edit button
+        window.CURRENT_RAW_LOG = null; // Clear buffer
     }
 
     // --- NAVIGATION HELPER ---
