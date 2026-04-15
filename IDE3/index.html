@@ -1081,8 +1081,11 @@
                     <textarea id="ef-code" class="json-editor" style="flex:1; margin-bottom:0; font-family:'JetBrains Mono'; resize:none;" placeholder="Paste function code here..."></textarea>
                 </div>
                 <div class="flex-between ef-controls" style="background:var(--card-bg); padding:12px; border-radius:12px; border:1px solid var(--border);">
-                    <div id="ef-status-msg" style="font-size:11px; color:var(--text-muted);">Select or create a function.</div>
-                    <button class="btn btn-primary" style="width:auto; background:var(--ai-accent); padding:10px 20px;" onclick="deployEdgeFunction()">🚀 Deploy</button>
+                    <div id="ef-status-msg" style="font-size:11px; color:var(--text-muted); flex:1; margin-right:10px;">Select or create a function.</div>
+                    <div class="flex-gap">
+                        <button class="btn btn-outline" style="width:auto; border-color:var(--dev); color:var(--dev); padding:10px 15px; font-size:12px;" onclick="bulkSyncEdgeFunction()">🧬 Merge</button>
+                        <button class="btn btn-primary" style="width:auto; background:var(--ai-accent); padding:10px 20px;" onclick="deployEdgeFunction()">🚀 Deploy</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -4280,6 +4283,48 @@
     }
     function clearEFCode() {
         document.getElementById('ef-code').value = '';
+    }
+
+    async function bulkSyncEdgeFunction() {
+        const name = document.getElementById('ef-name').value.trim();
+        const code = document.getElementById('ef-code').value.trim();
+        const status = document.getElementById('ef-status-msg');
+
+        if (!name || !code || code === "Loading...") return showGlobalToast("Function name and code required", true);
+
+        const msg = `🧬 BULK MERGE\n\nThis will OVERWRITE '${name}' in EVERY repository where it exists with this current code.\n\nAre you absolutely sure?`;
+        if (!confirm(msg)) return;
+
+        status.innerText = "🔍 Scanning fleet...";
+        status.style.color = "var(--dev)";
+        
+        const termId = addTerminalCard(null, { loading: true });
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'bulk_sync_ef', 
+                    function_name: name, 
+                    content: code 
+                })
+            });
+            const data = await res.json();
+            
+            updateTerminalCard(termId, data, null, true);
+
+            if (data.success) {
+                status.innerText = `✅ Merged to ${data.sync_count} repos`;
+                status.style.color = "var(--prod)";
+                showGlobalToast(`Successfully synced to ${data.sync_count} repositories`);
+            } else {
+                throw new Error(data.error || "Bulk sync failed");
+            }
+        } catch (e) {
+            status.innerText = "❌ Merge Failed";
+            status.style.color = "var(--danger)";
+            updateTerminalCard(termId, { error: e.message });
+        }
     }
 
     // --- WORKFLOWS & CI/CD ---
