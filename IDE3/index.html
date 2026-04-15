@@ -686,7 +686,12 @@
 
         <!-- SETTINGS TAB -->
         <div id="tab-settings" class="tab-content">
-            <div class="header">Settings</div>
+            <div class="header">
+                Settings
+                <button class="menu-btn" onclick="openRepoSettings()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+                </button>
+            </div>
             <div class="card">
                 <div class="input-group">
                     <label class="input-label">Supabase Edge Function URL</label>
@@ -1166,6 +1171,27 @@
         </div>
         <div id="ef-logs-footer" style="padding:10px; border-top:1px solid var(--border); display:none;">
             <button class="btn btn-outline" style="padding:8px; font-size:11px;" onclick="fetchEFLogs(true)">Load Older Logs</button>
+        </div>
+    </div>
+
+    <!-- REPO SETTINGS OVERLAY -->
+    <div id="repo-settings-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span class="viewer-title">Repository Settings</span>
+            <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeRepoSettings()">Close</button>
+        </div>
+        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            <div class="ai-section-title">Advanced Actions</div>
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div class="history-item" onclick="initRepoMigration()">
+                    <div style="flex:1">
+                        <div class="history-title">🚀 Repository Migration</div>
+                        <div class="history-date">Clone current repo to an Organization (Destructive)</div>
+                    </div>
+                    <span style="color:#666;">›</span>
+                </div>
+                <!-- Placeholder for future settings -->
+            </div>
         </div>
     </div>
 
@@ -6170,6 +6196,47 @@ async function downloadArtifact(runId) {
         document.getElementById('setting-repo-name').value = name;
         closeRepoSelector();
         showGlobalToast(`Repo set to: ${name}`);
+    }
+
+    function openRepoSettings() {
+        document.getElementById('repo-settings-overlay').classList.add('active');
+        toggleFab(false);
+    }
+
+    function closeRepoSettings() {
+        document.getElementById('repo-settings-overlay').classList.remove('active');
+        toggleFab(true);
+    }
+
+    async function initRepoMigration() {
+        const targetOrg = prompt("Enter the target Organization / Username for migration:", "MasterEmpire");
+        if (!targetOrg) return;
+
+        const confirmMsg = `⚠️ WARNING: DESTRICTIVE ACTION\n\nThis will migrate "${CONFIG.repoName}" to "${targetOrg}/${CONFIG.repoName}".\n\nIf the repo exists, ALL FILES in the target will be DELETED and replaced with current files.\n\nType 'CONFIRM' to proceed:`;
+        if (prompt(confirmMsg) !== 'CONFIRM') return;
+
+        showGlobalToast("🚀 Starting Migration...");
+        const termId = addTerminalCard(null, { loading: true });
+        switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
+        closeRepoSettings();
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'migrate_repo', 
+                    target_owner: targetOrg,
+                    source_repo: CONFIG.repoName
+                })
+            });
+            const data = await res.json();
+            updateTerminalCard(termId, data, null, true);
+            if (data.success) {
+                showGlobalToast("✅ Migration Complete!");
+            }
+        } catch(e) {
+            updateTerminalCard(termId, { error: e.message });
+        }
     }
 
     function openBucketManager() {
