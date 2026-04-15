@@ -3568,7 +3568,7 @@
                             const added = op.replace_with || op.content || "";
                             const removed = op.find_block || "";
                             
-                            opHtml += `
+                                                        opHtml += `
                             <div class="op-row ${isFail ? 'row-fail' : ''}" onclick="toggleOpMenu('${opId}')">
                                 <div class="op-title">
                                     <div style="display:flex; flex-direction:column;">
@@ -3578,7 +3578,7 @@
                                     <span class="score-badge" style="border:1px solid ${scoreColor}; color:${scoreColor}; align-self: flex-start;">${escapeHtml(badgeText)}</span>
                                 </div>
                                 <div class="op-details">${escapeHtml(op.message)}</div>
-                            </div>`
+                            </div>
                             <div id="${opId}-opts" class="op-options">
                                 <button class="op-opt-btn" onclick="openOpModal('${opId}')">Details</button>
                                 <button class="op-opt-btn" onclick="openDiffViewer('${opId}')">Diff</button>
