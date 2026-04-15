@@ -7718,7 +7718,6 @@ async function downloadArtifact(runId) {
                     : `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
 
                 editor.value = currentVal + separator + newQuery;
-                editor.focus();
                 editor.scrollTop = editor.scrollHeight;
                 saveSqlState();
             };
