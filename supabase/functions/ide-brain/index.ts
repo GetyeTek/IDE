@@ -2070,6 +2070,53 @@ serve(async (req) => {
         return new Response(JSON.stringify({ repos }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "migrate_repo") {
+        const { target_owner, source_repo } = payload;
+        const targetRepoPath = `${target_owner}/${source_repo}`;
+
+        // 1. Fetch ALL source files
+        const sourceTree = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
+        const sourceBlobs = sourceTree.tree.filter((f: any) => f.type === "blob");
+
+        // 2. Check if target repo exists, create if not
+        try {
+            await githubFetch(targetRepoPath, "");
+        } catch (e) {
+            console.log("Target repo missing, creating...");
+            await fetch(`https://api.github.com/orgs/${target_owner}/repos`, {
+                method: "POST",
+                headers: getHeaders(),
+                body: JSON.stringify({ name: source_repo, private: true, auto_init: true })
+            });
+            await new Promise(r => setTimeout(r, 2000)); // Wait for init
+        }
+
+        await ensureBranchExists(targetRepoPath);
+
+        // 3. Fetch target tree to wipe it
+        const targetTree = await githubFetch(targetRepoPath, `/git/trees/${DEV_BRANCH}?recursive=1`);
+        const targetBlobs = targetTree.tree.filter((f: any) => f.type === "blob");
+
+        const migrationOps: any[] = [
+            { action: "comment", text: `[Migration] Full sync from ${TARGET_REPO}` }
+        ];
+
+        // Destructive Wipe: Delete everything in target
+        targetBlobs.forEach((f: any) => {
+            migrationOps.push({ action: "delete_file", file_path: f.path });
+        });
+
+        // Full Sync: Create everything from source
+        for (const f of sourceBlobs) {
+            const { content } = await getFileRaw(TARGET_REPO, f.path, DEV_BRANCH);
+            migrationOps.push({ action: "create_file", file_path: f.path, content: base64ToText(content) });
+        }
+
+        // 4. Process on the TARGET repo
+        const result = await processOperations(targetRepoPath, migrationOps, "", false);
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "create_repo") {
         const { name, is_private } = payload;
         if (!name) throw new Error("Repository name is required");
