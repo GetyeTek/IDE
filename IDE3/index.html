@@ -1141,8 +1141,11 @@
         </div>
     </div>
 
-    <!-- DELETE HISTORY FAB -->
-    <button id="delete-history-fab" class="btn btn-danger" onclick="deleteSelectedHistory()" style="position:fixed; bottom:100px; right:20px; width:auto; padding:12px 16px; border-radius:16px; z-index:150; display:none; box-shadow:0 5px 20px rgba(0,0,0,0.4);">Delete Selected</button>
+    <!-- HISTORY ACTIONS FAB GROUP -->
+    <div id="history-actions-fab" class="flex-gap" style="position:fixed; bottom:100px; right:20px; z-index:150; display:none;">
+        <button class="btn btn-outline" onclick="copySelectedHistoryJSON()" style="width:auto; padding:12px 16px; border-radius:16px; background:var(--card-bg); border-color:var(--ai-accent); color:var(--ai-accent); box-shadow:0 5px 20px rgba(0,0,0,0.4);">📋 Copy JSON</button>
+        <button class="btn btn-danger" onclick="deleteSelectedHistory()" style="width:auto; padding:12px 16px; border-radius:16px; box-shadow:0 5px 20px rgba(0,0,0,0.4);">🗑️ Delete Selected</button>
+    </div>
 
     <!-- MODEL SELECTOR OVERLAY -->
     <div id="model-selector-overlay" class="viewer-overlay">
@@ -7291,7 +7294,30 @@ async function downloadArtifact(runId) {
     }
 
     function toggleDeleteFab() {
-        document.getElementById('delete-history-fab').style.display = document.querySelectorAll('.history-check:checked').length ? 'flex' : 'none';
+        document.getElementById('history-actions-fab').style.display = document.querySelectorAll('.history-check:checked').length ? 'flex' : 'none';
+    }
+
+    async function copySelectedHistoryJSON() {
+        const checked = Array.from(document.querySelectorAll('.history-check:checked')).map(cb => cb.value);
+        if (!checked.length) return;
+        
+        const allOps = [];
+        checked.forEach(id => {
+            const entry = dbHistory.find(h => String(h.id) === String(id));
+            if (entry && entry.ops && Array.isArray(entry.ops)) {
+                allOps.push(...entry.ops);
+            }
+        });
+
+        if (allOps.length === 0) return showGlobalToast("No operations found in selection", true);
+
+        try {
+            // Standardize: Remove any duplicates and combine into a clean JSON string
+            await navigator.clipboard.writeText(JSON.stringify(allOps, null, 2));
+            showGlobalToast("📋 Combined JSON copied to clipboard!");
+        } catch (e) {
+            showGlobalToast("Copy failed", true);
+        }
     }
 
     // --- NEW FEATURE LOGIC ---
