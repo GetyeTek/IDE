@@ -1093,7 +1093,8 @@
 
     <!-- SYNTAX REPORT MODAL -->
     <div id="syntax-report-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:300; align-items:center; justify-content:center;">
-        <div class="card" style="width:90%; max-width:600px; background:#151517; box-shadow:0 10px 40px rgba(0,0,0,0.6); display:flex; flex-direction:column; max-height:80vh;">
+        <div class="card" style="position:relative; width:90%; max-width:600px; background:#151517; box-shadow:0 10px 40px rgba(0,0,0,0.6); display:flex; flex-direction:column; max-height:80vh;">
+            <button class="menu-btn" style="position:absolute; right:15px; top:15px; font-size:20px; color:#666;" onclick="closeSyntaxReport()">×</button>
             <div class="header" style="font-size:14px; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px; color:var(--danger);">
                 🛑 Build Blocked: Syntax Error
             </div>
@@ -1116,8 +1117,9 @@
             </div>
 
             <div class="flex-gap" style="margin-top:20px; padding-top:15px; border-top:1px solid #333;">
-                <button id="btn-auto-fix-wasm" class="btn btn-primary" style="display:none;" onclick="applyDeterministicFix()">✨ Apply Auto-Fix</button>
-                <button class="btn btn-outline" onclick="closeSyntaxReport()">Close & Fix Manually</button>
+                <button id="btn-auto-fix-wasm" class="btn btn-primary" style="display:none; flex:1;" onclick="applyDeterministicFix()">✨ Auto-Fix</button>
+                <button class="btn btn-outline" style="flex:1;" onclick="copyErrorReport()">📋 Copy Report</button>
+                <button class="btn btn-danger" style="flex:1;" onclick="buildAnyway()">🚀 Build Anyway</button>
             </div>
         </div>
     </div>
@@ -4394,7 +4396,10 @@
                 toast.innerHTML = `⚠️ Syntax Error Detected`;
                 setTimeout(() => toast.remove(), 3000);
                 
-                // STOP! Show detailed report instead of prompting for AI fix.
+                // Store parameters for 'Build Anyway' fallback
+                currentSyntaxContext.workflowFile = workflowFile;
+                currentSyntaxContext.branch = branch;
+
                 openSyntaxReport(data.file_path, data.errors[0]);
                 return;
             }
@@ -4503,6 +4508,47 @@
 
     function closeSyntaxReport() {
         document.getElementById('syntax-report-modal').style.display = 'none';
+    }
+
+    async function copyErrorReport() {
+        const ctx = currentSyntaxContext;
+        if (!ctx.error) return;
+        
+        const report = `SYNTAX ERROR REPORT\nFile: ${ctx.file}\nError: ${ctx.error.message}\nLine: ${ctx.error.line}, Col: ${ctx.error.column || '?'}\n\nCONTEXT:\n${document.getElementById('sr-code').innerText}`;
+        
+        await navigator.clipboard.writeText(report);
+        showGlobalToast("Report copied to clipboard!");
+    }
+
+    async function buildAnyway() {
+        const ctx = currentSyntaxContext;
+        if (!ctx.workflowFile) return;
+
+        if (!confirm("⚠️ FORCE BUILD\n\nSyntax errors were detected. Forcing a build may result in a compilation failure in CI/CD.\n\nContinue?")) return;
+
+        closeSyntaxReport();
+        const toast = document.createElement('div');
+        toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:#3b82f6; color:white; padding:10px 20px; border-radius:30px; z-index:9999; font-size:13px;";
+        toast.innerHTML = `🚀 Forcing Build: ${ctx.workflowFile}...`;
+        document.body.appendChild(toast);
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'trigger_build', 
+                    workflow_id: ctx.workflowFile, 
+                    branch: ctx.branch, 
+                    validate_pre_build: false 
+                })
+            });
+            const data = await res.json();
+            if(data.success) {
+                showGlobalToast("🚀 Dispatched (Validation Bypassed)");
+                setTimeout(() => { loadWorkflows(); fetchState(false, true); }, 1000);
+            } else throw new Error(data.error);
+        } catch(e) { alert("Force Trigger Failed: " + e.message); }
+        finally { toast.remove(); }
     }
 
     function copySyntaxContext() {
