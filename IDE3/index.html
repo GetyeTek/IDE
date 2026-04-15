@@ -5796,7 +5796,9 @@ async function downloadArtifact(runId) {
     }
 
     async function handleRestore(index) {
-        if (confirm(`Reset to ${dbHistory[index].sha.substring(0,7)}?`)) {
+        const entry = dbHistory[index];
+        const msg = `⚠️ RESTORE STATE\n\nReset repository to:\n"${entry.title}"\n(${entry.sha.substring(0,7)})\n\nContinue?`;
+        if (confirm(msg)) {
             await fetch(CONFIG.funcUrl, {
                 method: 'POST',
                 headers: {
@@ -5821,9 +5823,11 @@ async function downloadArtifact(runId) {
         const target = dbHistory[index];
         const previous = dbHistory[index + 1];
 
-        let msg = `Delete this record?`;
+        let msg = `🗑️ DELETE HISTORY`;
         if (previous && previous.sha) {
-            msg += `\n\n⚠️ This will also ROLLBACK your code on GitHub to the previous state: "${previous.title}" (${previous.sha.substring(0,7)})`;
+            msg = `🗑️ DELETE & ROLLBACK\n\nDeleting this will revert GitHub to the previous state:\n"${previous.title}"\n(${previous.sha.substring(0,7)})`;
+        } else {
+            msg = `Delete this history record? (No rollback target found)`;
         }
 
         if (confirm(msg)) {
@@ -7333,7 +7337,11 @@ async function downloadArtifact(runId) {
     }
 
     async function undoLog(domId, shaBefore) {
-        if (!confirm("Undo this patch? The repository will be restored to its state before this operation.")) return;
+        const target = dbHistory.find(h => h.sha === shaBefore);
+        const targetDesc = target ? `"${target.title}"` : shaBefore.substring(0,7);
+        
+        const msg = `⏪ UNDO PATCH\n\nThis will remove the current patch and return the repository to:\n${targetDesc}\n\nProceed?`;
+        if (!confirm(msg)) return;
         
         showGlobalToast("⏪ Rolling back...");
         try {
