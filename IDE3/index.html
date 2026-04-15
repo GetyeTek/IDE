@@ -7696,15 +7696,27 @@ async function downloadArtifact(runId) {
             btn.className = 'table-pill px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-slate-400 active:scale-95';
             btn.innerText = row.table_name;
             btn.onclick = () => {
-                const isActive = btn.classList.contains('active');
                 const editor = document.getElementById('sqlEditor');
                 const currentVal = editor.value.trim();
                 const separator = currentVal ? '\n\n' : '';
-                document.querySelectorAll('.table-pill').forEach(p => p.classList.remove('active'));
+
+                // Determine toggle state: default to 'sample' so first click becomes 'info'
+                const lastMode = btn.getAttribute('data-last-mode') || 'sample';
+                const nextMode = lastMode === 'info' ? 'sample' : 'info';
+
+                // Clear other pills visual state and their stored modes to reset cycle when switching tables
+                document.querySelectorAll('.table-pill').forEach(p => {
+                    p.classList.remove('active');
+                    if (p !== btn) p.removeAttribute('data-last-mode');
+                });
+
                 btn.classList.add('active');
-                let newQuery = !isActive 
+                btn.setAttribute('data-last-mode', nextMode);
+
+                let newQuery = nextMode === 'info' 
                     ? `-- Table Structure for ${row.table_name}\nSELECT table_name, column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;` 
                     : `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
+
                 editor.value = currentVal + separator + newQuery;
                 editor.focus();
                 editor.scrollTop = editor.scrollHeight;
