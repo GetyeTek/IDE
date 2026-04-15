@@ -1717,7 +1717,7 @@
         funcUrl: localStorage.getItem('conduit_funcUrl') || '',
         // Project context prefers sessionStorage for tab isolation
         repoName: sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE',
-        isOrg: localStorage.getItem('conduit_isOrg') === 'true',
+        isOrg: (localStorage.getItem('conduit_isOrg') === 'true'),
         projectPath: sessionStorage.getItem('conduit_projectPath') || localStorage.getItem('conduit_projectPath') || '',
         autoFix: false,
         autoSanity: false,
@@ -2736,7 +2736,7 @@
         // Global Preferences
         localStorage.setItem('conduit_funcUrl', funcUrl);
         localStorage.setItem('conduit_showPreview', showPreview);
-        localStorage.setItem('conduit_isOrg', isOrg);
+        localStorage.setItem('conduit_isOrg', isOrg ? 'true' : 'false');
         localStorage.setItem('conduit_wasm_validation', wasmValidation);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
         localStorage.setItem('conduit_floating_console', floatingConsole);
