@@ -2118,6 +2118,46 @@ serve(async (req) => {
         return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "bulk_sync_ef") {
+        const { function_name, content } = payload;
+        const filePath = `supabase/functions/${function_name}/index.ts`;
+
+        // 1. Fetch ALL repositories
+        const repoUrl = is_org 
+            ? `https://api.github.com/orgs/${ORG_NAME}/repos?per_page=100&sort=pushed` 
+            : `https://api.github.com/user/repos?per_page=100&sort=pushed`;
+        
+        const reposRes = await fetch(repoUrl, { headers: getHeaders() });
+        const allRepos = await reposRes.json();
+
+        const syncResults = [];
+        let syncCount = 0;
+
+        // 2. Process in small batches to avoid timeouts
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < allRepos.length; i += BATCH_SIZE) {
+            const batch = allRepos.slice(i, i + BATCH_SIZE);
+            await Promise.all(batch.map(async (repo: any) => {
+                try {
+                    // Check if function exists in this repo
+                    const check = await fetch(`https://api.github.com/repos/${repo.full_name}/contents/${filePath}?ref=${DEV_BRANCH}`, { headers: getHeaders() });
+                    
+                    if (check.ok) {
+                        const fileData = await check.json();
+                        await updateFile(repo.full_name, filePath, content, fileData.sha, DEV_BRANCH, `Conduit: Bulk Merge Sync [${function_name}]`);
+                        syncResults.push({ repo: repo.name, status: "updated" });
+                        syncCount++;
+                    }
+                } catch (e) {} // Silently skip repos where it doesn't exist or branch is missing
+            }));
+        }
+
+        const logData = { success: true, sync_count: syncCount, results: [{ file: function_name, status: "bulk_merged", operations: syncResults.map(r => ({ type: "sync", message: `Updated ${r.repo}`, success: true, score: 100 })) }] };
+        await supabase.from('conduit_logs').insert({ repo_name: "FLEET_WIDE", type: 'bulk_sync', data: logData });
+
+        return new Response(JSON.stringify(logData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "create_repo") {
         const { name, is_private } = payload;
         if (!name) throw new Error("Repository name is required");
