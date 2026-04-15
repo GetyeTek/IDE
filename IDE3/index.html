@@ -5509,6 +5509,7 @@ async function downloadArtifact(runId) {
                         <button class="menu-btn" onclick="event.stopPropagation(); toggleMenu(${index})">⋮</button>
                         <div id="menu-${index}" class="menu-dropdown">
                             <div class="menu-item" onclick="loadVersion(${index})">Load Patch</div>
+                            <div class="menu-item" style="color:var(--ai-accent)" onclick="buildHistoryEntry(${index})">🛠 Build this</div>
                             <div class="menu-item" onclick="traceHistoryToLog('${h.sha}')">View Patch</div>
                             <div class="menu-item" onclick="traceHistoryToRun('${h.sha}')">View Build</div>
                             <div class="menu-item" onclick="bundleAndPreview(${index})">Preview</div>
@@ -5887,6 +5888,39 @@ async function downloadArtifact(runId) {
             a.href = URL.createObjectURL(blob);
             a.download = `briefing_${CONFIG.repoName}_${new Date().toISOString().slice(0,10)}.md`;
             a.click();
+        }
+    }
+
+    async function buildHistoryEntry(index) {
+        const entry = dbHistory[index];
+        if (!entry.sha) return showGlobalToast("This entry has no SHA", true);
+
+        const workflowFile = prompt("Enter Workflow Filename:", "build.yml");
+        if (!workflowFile) return;
+
+        showGlobalToast(`🚀 Triggering build for #${entry.conduit_id}...`);
+
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ 
+                    action: 'trigger_build', 
+                    workflow_id: workflowFile, 
+                    branch: entry.sha, // Pass SHA as the ref
+                    validate_pre_build: false // Skip syntax guard for historical builds
+                })
+            });
+            const data = await res.json();
+            
+            if(data.success) {
+                showGlobalToast("✅ Build Dispatched!");
+                switchTab('tab-cicd', document.querySelectorAll('.nav-item')[4]);
+                loadWorkflows();
+            } else {
+                throw new Error(data.error || "Trigger failed");
+            }
+        } catch(e) {
+            alert("Build Error: " + e.message);
         }
     }
 
