@@ -1696,6 +1696,7 @@ serve(async (req) => {
 
     if (action === "trigger_build") {
         const targetBranch = branch || DEV_BRANCH;
+        const isSha = /^[0-9a-f]{40}$/i.test(targetBranch);
         
         // --- PRE-BUILD SYNTAX GUARD (OPTIMIZED BATCHING) ---
         if (payload.validate_pre_build) {
@@ -1741,8 +1742,8 @@ serve(async (req) => {
 
         try {
             if (workflow_id) {
-                // AUTO-PROVISION or UPDATE deploy.yml
-                if (workflow_id === 'deploy.yml') {
+                // AUTO-PROVISION or UPDATE deploy.yml (Skip if building a SHA)
+                if (workflow_id === 'deploy.yml' && !isSha) {
                     let sha = "";
                     let exists = false;
                     let content = "";
