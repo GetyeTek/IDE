@@ -4795,17 +4795,47 @@ async function downloadArtifact(runId) {
 
     async function viewJobSummary(id, name, e) {
         if(e) e.stopPropagation();
-        const toast = document.createElement('div'); toast.innerText = "📄 Fetching Summary..."; toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:10px 20px; border-radius:30px; z-index:9999;"; document.body.appendChild(toast);
-        try {
-            const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'analyze_log', job_id: id }) });
-            const data = await res.json();
-            toast.remove();
-            if(data.analysis) {
-                document.getElementById('op-modal-title').innerText = `Failure Analysis: ${name}`;
-                document.getElementById('op-modal-body').innerHTML = `<div style="padding:15px; color:#ddd; font-size:13px; line-height:1.6; display:flex; flex-direction:column; height:100%;"><div style="background:#222; padding:15px; border-radius:8px; margin-bottom:15px; white-space:pre-wrap; font-family:'JetBrains Mono', monospace; font-size:12px; overflow-y:auto; flex:1; border:1px solid #333;">${data.analysis}</div><button class="btn btn-primary" onclick="navigator.clipboard.writeText(this.previousElementSibling.innerText).then(()=>showGlobalToast('Summary copied!'))">📋 Copy</button></div>`;
-                document.getElementById('op-modal').style.display = 'flex';
+        const toast = document.createElement('div');
+        toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:10px 20px; border-radius:30px; z-index:9999; font-size:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5);";
+        document.body.appendChild(toast);
+
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            toast.innerText = `📄 Analyzing (Attempt ${attempts}/${maxAttempts})...`;
+            
+            try {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: apiBody({ action: 'analyze_log', job_id: id }) 
+                });
+                
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                
+                if (data.analysis) {
+                    toast.remove();
+                    document.getElementById('op-modal-title').innerText = `Failure Analysis: ${name}`;
+                    document.getElementById('op-modal-body').innerHTML = `<div style="padding:15px; color:#ddd; font-size:13px; line-height:1.6; display:flex; flex-direction:column; height:100%;"><div style="background:#222; padding:15px; border-radius:8px; margin-bottom:15px; white-space:pre-wrap; font-family:'JetBrains Mono', monospace; font-size:12px; overflow-y:auto; flex:1; border:1px solid #333;">${data.analysis}</div><button class="btn btn-primary" onclick="navigator.clipboard.writeText(this.previousElementSibling.innerText).then(()=>showGlobalToast('Summary copied!'))">📋 Copy</button></div>`;
+                    document.getElementById('op-modal').style.display = 'flex';
+                    return; // Success, exit function
+                }
+                throw new Error("Empty analysis");
+            } catch (err) {
+                console.warn(`[Detective] Attempt ${attempts} failed:`, err);
+                if (attempts >= maxAttempts) {
+                    toast.style.background = "var(--danger)";
+                    toast.innerText = "❌ Analysis Failed after 3 retries.";
+                    setTimeout(() => toast.remove(), 3000);
+                } else {
+                    // Wait 1.5 seconds before retrying
+                    await new Promise(r => setTimeout(r, 1500));
+                }
             }
-        } catch(err) { toast.innerText = "Error"; setTimeout(() => toast.remove(), 2000); }
+        }
     }
 
     async function chatWithJobLog(id, name) {
