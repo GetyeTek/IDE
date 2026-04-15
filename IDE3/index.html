@@ -5805,6 +5805,8 @@ async function downloadArtifact(runId) {
                 })
             });
             showGlobalToast("Repository state restored");
+            historyOffset = 0;
+            logOffset = 0;
             fetchState(true);
             fetchFileList();
             // Auto-rebuild preview to match restored state
@@ -5840,6 +5842,8 @@ async function downloadArtifact(runId) {
                 body: apiBody({ action: 'delete_history', id: target.id })
             });
 
+            historyOffset = 0;
+            logOffset = 0;
             fetchState(true);
             fetchFileList();
             if (previous) setTimeout(() => bundleAndPreview(index + 1), 1000);
@@ -7279,6 +7283,8 @@ async function downloadArtifact(runId) {
             })
         ));
 
+        historyOffset = 0;
+        logOffset = 0;
         fetchState(true);
         fetchFileList();
         if (rollbackTarget) setTimeout(() => bundleAndPreview(null), 1000);
