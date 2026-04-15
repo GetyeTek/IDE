@@ -7427,10 +7427,12 @@ async function downloadArtifact(runId) {
     }
 
     async function undoLog(domId, shaBefore) {
+        // Look up the human-readable title of the commit we are rolling back to
         const target = dbHistory.find(h => h.sha === shaBefore);
-        const targetDesc = target ? `"${target.title}"` : shaBefore.substring(0,7);
+        const targetTitle = target ? `"${target.title}"` : `SHA: ${shaBefore.substring(0, 7)}`;
         
-        const msg = `⏪ UNDO PATCH\n\nThis will remove the current patch and return the repository to:\n${targetDesc}\n\nProceed?`;
+        const msg = `⏪ UNDO PATCH\n\nThis will discard the current changes and restore the repository to the state it was in BEFORE this patch.\n\nTargeting: ${targetTitle}\n\nAre you sure you want to proceed?`;
+        
         if (!confirm(msg)) return;
         
         showGlobalToast("⏪ Rolling back...");
