@@ -86,7 +86,17 @@
         .tab-content.active { display: block; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .header { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .header { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
+        .header .flex-gap {
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
+            flex: 1;
+            justify-content: flex-end;
+            padding-bottom: 4px; /* Space for momentum bounce */
+        }
+        .header .flex-gap::-webkit-scrollbar { display: none; }
         
         .card {
             background: var(--card-bg); border: 1px solid var(--border);
@@ -781,7 +791,7 @@
         <!-- CI/CD TAB -->
         <div id="tab-cicd" class="tab-content">
             <div class="header">
-                Workflows
+                <span style="flex-shrink: 0;">Workflows</span>
                 <div class="flex-gap">
                     <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
                     <button class="icon-btn" onclick="triggerBuild()">▶ Trigger</button>
