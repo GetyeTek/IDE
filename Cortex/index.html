@@ -295,16 +295,21 @@
                     case 'SET_INTERVAL': content = document.getElementById('val-work').value; break;
                     case 'PULL_FILE': content = document.getElementById('val-pull').value; break;
                     case 'RUN_INTENT':
-                        content = JSON.stringify({
-                            action: document.getElementById('int-act').value,
-                            data: document.getElementById('int-data').value,
-                            target: document.getElementById('int-tgt').value
-                        }); break;
+                        const intObj = {};
+                        const act = document.getElementById('int-act').value;
+                        const dat = document.getElementById('int-data').value;
+                        const tgt = document.getElementById('int-tgt').value;
+                        if (act) intObj.action = act;
+                        if (dat) intObj.data = dat;
+                        if (tgt) intObj.target = tgt;
+                        content = JSON.stringify(intObj); break;
                     case 'GET_TREE':
-                        content = JSON.stringify({
-                            pkg: document.getElementById('tree-pkg').value || null,
-                            duration_mins: parseInt(document.getElementById('tree-dur').value) || 1
-                        }); break;
+                        const treeObj = {};
+                        const pkg = document.getElementById('tree-pkg').value;
+                        const dur = document.getElementById('tree-dur').value;
+                        if (pkg) treeObj.pkg = pkg;
+                        if (dur) treeObj.duration_mins = parseInt(dur);
+                        content = JSON.stringify(treeObj); break;
                     case 'TOGGLE_FEATURE':
                         content = `${document.getElementById('tog-feat').value}:${document.getElementById('tog-state').value}:${document.getElementById('tog-dur').value}`; break;
                     case 'CODERED':
