@@ -8299,13 +8299,13 @@ async function downloadArtifact(runId) {
         const raw = el.value;
         if (!raw.includes('AIza')) return;
 
-        // Extract all instances starting with AIza followed by alphanumeric characters
-        const matches = raw.match(/AIza[a-zA-Z0-9_-]+/g);
+        // IMPROVED REGEX: Look for AIza... but stop before the next AIza or whitespace
+        // Using a length constraint (30-50 chars) to prevent greedy merging
+        const matches = raw.match(/AIza[a-zA-Z0-9_-]{30,50}/g);
         if (matches) {
             const uniqueKeys = [...new Set(matches)];
             const structured = uniqueKeys.join('\n');
             
-            // Only update if the content has actually changed to avoid cursor jumping
             if (el.value !== structured) {
                 el.value = structured;
                 showGlobalToast(`✨ Detected ${uniqueKeys.length} keys`);
@@ -8314,10 +8314,13 @@ async function downloadArtifact(runId) {
     }
 
     function executeKeyImport() {
-        const structured = document.getElementById('key-import-area').value.trim();
-        if (!structured) return;
+        const rawText = document.getElementById('key-import-area').value;
+        if (!rawText) return;
 
-        const keys = structured.split('\n').map(k => k.trim()).filter(k => k.startsWith('AIza'));
+        // Final safety extraction pass to prevent merged keys in SQL
+        const keys = (rawText.match(/AIza[a-zA-Z0-9_-]{30,50}/g) || [])
+            .map(k => k.trim())
+            .filter(k => k.length > 30);
 
         if (keys.length === 0) return showGlobalToast("No valid keys to import", true);
 
