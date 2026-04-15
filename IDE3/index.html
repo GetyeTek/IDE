@@ -714,22 +714,7 @@
                     <input type="text" id="setting-project-path" class="input-field" placeholder="e.g. apps/my-project/" onblur="this.value = this.value.replace(/\/+$/, '') + (this.value ? '/' : '')">
                 </div>
                 
-                <div class="card" style="border:1px solid #333; margin-top:20px;">
-                    <div class="header" style="font-size:14px; margin-bottom:10px; color:var(--dev);">Automation Suite</div>
-                    <div style="display:flex; flex-direction:column; gap:12px;">
-                        <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
-                            <span style="font-size:13px;">🤖 Auto-Fix Build Failures</span>
-                            <input type="checkbox" id="setting-auto-fix" style="accent-color:var(--dev); transform:scale(1.2);">
-                        </label>
-                        <p style="font-size:10px; color:#666; margin:0;">If a CI/CD workflow fails, AI will analyze logs and immediately commit a fix.</p>
-                        
-                        <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
-                            <span style="font-size:13px;">🛡️ AI Sanity Check</span>
-                            <input type="checkbox" id="setting-auto-sanity" style="accent-color:var(--dev); transform:scale(1.2);">
-                        </label>
-                        <p style="font-size:10px; color:#666; margin:0;">After AI heals a file, it will double-check for syntax errors before committing.</p>
-                    </div>
-                </div>
+
                 
                 <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
                     <span style="font-size:13px;">👁️ Show Preview Tab</span>
@@ -1853,8 +1838,7 @@
         document.getElementById('setting-repo-name').value = CONFIG.repoName;
         document.getElementById('setting-is-org').checked = CONFIG.isOrg;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
-        document.getElementById('setting-auto-fix').checked = CONFIG.autoFix;
-        document.getElementById('setting-auto-sanity').checked = CONFIG.autoSanity;
+
         document.getElementById('setting-show-preview').checked = CONFIG.showPreview;
         document.getElementById('setting-wasm-validation').checked = CONFIG.wasmValidation;
         document.getElementById('setting-ef-mode').value = CONFIG.efDeploymentMode;
@@ -2738,8 +2722,8 @@
         let projectPath = document.getElementById('setting-project-path').value.trim();
         if(projectPath && !projectPath.endsWith('/')) projectPath += '/';
         
-        const autoFix = document.getElementById('setting-auto-fix').checked;
-        const autoSanity = document.getElementById('setting-auto-sanity').checked;
+        const autoFix = false;
+        const autoSanity = false;
         const showPreview = document.getElementById('setting-show-preview').checked;
         const isOrg = document.getElementById('setting-is-org').checked;
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
