@@ -7,63 +7,127 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS
+  // Handle CORS for browser-based debugging/calls
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    const deviceId = formData.get('deviceId') as string
-    const category = formData.get('category') as string || 'GENERAL'
-
-    if (!file || !deviceId) {
-      return new Response(JSON.stringify({ error: 'Missing file or deviceId' }), { 
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
-    }
-
-    // Initialize Supabase with Service Role Key (Server-side power)
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Sanitize filename and create path: device_id/category/timestamp_name
-    const timestamp = Date.now()
-    const filePath = `${deviceId}/${category}/${timestamp}_${file.name}`
+    // Detect GZIP (The Android app uses GZIP for large uploads)
+    const isGzip = req.headers.get('content-encoding') === 'gzip'
+    let body;
 
-    // 1. Upload to Storage
-    const { data: storageData, error: storageError } = await supabase.storage
-      .from('cortex-vault')
-      .upload(filePath, file.stream(), {
-        contentType: file.type,
-        upsert: false
-      })
+    if (isGzip) {
+      // Decompress stream
+      const decompressedStream = req.body?.pipeThrough(new DecompressionStream("gzip"));
+      const text = await new Response(decompressedStream).text();
+      body = JSON.parse(text);
+    } else {
+      body = await req.json();
+    }
 
-    if (storageError) throw storageError
+    const { action, deviceId, payload } = body;
 
-    // 2. Register in Database
-    const { error: dbError } = await supabase
-      .from('file_registry')
-      .insert({
-        device_id: deviceId,
-        file_name: file.name,
-        file_path: filePath,
-        category: category,
-        file_size: file.size
-      })
+    if (!action || !deviceId) {
+      return new Response(JSON.stringify({ error: "Missing action or deviceId" }), { status: 400 });
+    }
 
-    if (dbError) throw dbError
+    let result;
+    let error;
 
-    return new Response(JSON.stringify({ message: 'Upload successful', path: filePath }), {
+    switch (action) {
+      // 1. Upload Device Stats (replaces CloudManager & HealthWorker)
+      case "upload_stats":
+        ({ data: result, error } = await supabase
+          .from('device_stats')
+          .insert({ ...payload, device_id: deviceId }));
+        break;
+
+      // 2. Fetch Pending Commands (replaces CommandProcessor GET)
+      case "get_commands":
+        ({ data: result, error } = await supabase
+          .from('file_commands')
+          .select('*')
+          .eq('device_id', deviceId)
+          .eq('status', 'PENDING'));
+        break;
+
+      // 3. Update Command Status (replaces CommandProcessor PATCH)
+      case "update_command":
+        ({ data: result, error } = await supabase
+          .from('file_commands')
+          .update({ 
+            status: payload.status, 
+            error_log: payload.errorMsg, 
+            result_data: payload.resultData, 
+            result_file_path: payload.resultFilePath,
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', payload.id)
+          .eq('device_id', deviceId));
+        break;
+
+      // 4. Fetch Config (replaces ConfigSyncWorker)
+      case "get_config":
+        ({ data: result, error } = await supabase
+          .from('device_config')
+          .select('config_json')
+          .eq('device_id', deviceId)
+          .maybeSingle());
+        break;
+
+      // 5. Fetch Rules (replaces RuleSyncWorker)
+      case "get_rules":
+        ({ data: result, error } = await supabase
+          .from('monitoring_rules')
+          .select('*'));
+        break;
+
+      // 6. Beacon/Ping (replaces CloudManager.sendPing)
+      case "ping":
+        ({ data: result, error } = await supabase
+          .from('device_stats')
+          .insert({ 
+            ...payload,
+            device_id: deviceId, 
+            trigger: payload.trigger || "BEACON", 
+            summary_stats: payload.summary_stats || { status: "ONLINE" } 
+          }));
+        break;
+
+      // 7. Upload File Skeleton
+      case "upload_skeleton":
+        ({ data: result, error } = await supabase
+          .from('storage_backups')
+          .insert({ ...payload, device_id: deviceId }));
+        break;
+
+      // 8. Register Uploaded File (PULL_FILE, OFFLINE_STREAM)
+      case "register_file":
+        ({ data: result, error } = await supabase
+          .from('file_registry')
+          .insert({ ...payload, device_id: deviceId }));
+        break;
+
+      default:
+        return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400 });
+    }
+
+    if (error) throw error;
+
+    return new Response(JSON.stringify({ success: true, data: result }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (err) {
+    console.error("Gateway Error:", err.message);
+    return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })
