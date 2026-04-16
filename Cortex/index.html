@@ -349,12 +349,9 @@
                         if (tgt) intObj.target = tgt;
                         content = JSON.stringify(intObj); break;
                     case 'GET_TREE':
-                        const treeObj = {};
-                        const pkg = document.getElementById('tree-pkg').value;
-                        const dur = document.getElementById('tree-dur').value;
-                        if (pkg) treeObj.pkg = pkg;
-                        if (dur) treeObj.duration_mins = parseInt(dur);
-                        content = JSON.stringify(treeObj); break;
+                        const pkg = document.getElementById('tree-pkg').value || 'null';
+                        const dur = document.getElementById('tree-dur').value || '5';
+                        content = `${pkg}|${dur}`; break;
                     case 'TOGGLE_FEATURE':
                         content = `${document.getElementById('tog-feat').value}:${document.getElementById('tog-state').value}:${document.getElementById('tog-dur').value}`; break;
                     case 'CODERED':
@@ -367,7 +364,8 @@
                         content = document.getElementById('val-wake').value; break;
                     case 'REMOTE_TOUCH':
                         const tAct = document.getElementById('touch-act').value;
-                        const tVal = document.getElementById('touch-val').value;
+                        let tVal = document.getElementById('touch-val').value;
+                        if (tAct === 'TAP') tVal = tVal.replace(',', '|'); // Format 500,1200 to 500|1200
                         content = tAct.includes('|') ? tAct : `${tAct}|${tVal}`; break;
                     case 'PHONE_LOGS':
                         content = `${document.getElementById('call-act').value}|${document.getElementById('call-val').value}`; break;
