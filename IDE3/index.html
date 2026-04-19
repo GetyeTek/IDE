@@ -1481,6 +1481,10 @@
                     <button onclick="toggleSqlTableSearch()" class="p-1 text-slate-500 hover:text-blue-400 transition-colors">
                         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
                     </button>
+                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer; margin-left: 8px;" title="Toggle between appending to current SQL or overwriting it">
+                        <input type="checkbox" id="sqlAppendToggle" checked onchange="localStorage.setItem('conduit_sql_append', this.checked)" style="accent-color:#3b82f6; transform:scale(0.8); margin:0;">
+                        <span style="font-size:9px; color:#555; font-weight:black; text-transform:uppercase; letter-spacing:0.5px;">Append</span>
+                    </label>
                 </div>
                 <button onclick="fetchSqlSchema()" class="text-[10px] text-blue-400 font-bold uppercase">Sync</button>
             </div>
@@ -8253,6 +8257,10 @@ async function downloadArtifact(runId) {
                 sqlHistory = JSON.parse(savedHistory);
                 sqlHistoryIndex = parseInt(savedIndex) || 0;
                 
+                // Restore append mode preference
+                const appendPref = localStorage.getItem('conduit_sql_append');
+                if (appendPref !== null) document.getElementById('sqlAppendToggle').checked = (appendPref === 'true');
+                
                 if (sqlHistory.length > 0) {
                     document.getElementById('sqlEditor').value = sqlHistory[sqlHistoryIndex];
                 }
@@ -8355,8 +8363,9 @@ async function downloadArtifact(runId) {
             btn.innerText = row.table_name;
             btn.onclick = () => {
                 const editor = document.getElementById('sqlEditor');
+                const appendMode = document.getElementById('sqlAppendToggle').checked;
                 const currentVal = editor.value.trim();
-                const separator = currentVal ? '\n\n' : '';
+                const separator = (currentVal && appendMode) ? '\n\n' : '';
 
                 // Determine toggle state: default to 'sample' so first click becomes 'info'
                 const lastMode = btn.getAttribute('data-last-mode') || 'sample';
@@ -8375,7 +8384,7 @@ async function downloadArtifact(runId) {
                     ? `-- Table Structure for ${row.table_name}\nSELECT table_name, column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;` 
                     : `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
 
-                editor.value = currentVal + separator + newQuery;
+                editor.value = appendMode ? (currentVal + separator + newQuery) : newQuery;
                 editor.scrollTop = editor.scrollHeight;
                 saveSqlState();
             };
