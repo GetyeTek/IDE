@@ -7928,6 +7928,12 @@ async function downloadArtifact(runId) {
         const checkedCount = document.querySelectorAll('.cicd-check:checked').length;
         const fab = document.getElementById('cicd-actions-fab');
         if (fab) fab.style.display = checkedCount > 0 ? 'flex' : 'none';
+
+        if (checkedCount === 0 && window.cicdSelectionMode) {
+            window.cicdSelectionMode = false;
+            document.querySelectorAll('.cicd-check').forEach(cb => cb.classList.add('hidden'));
+            document.querySelectorAll('.cicd-status-icon').forEach(ic => ic.classList.remove('hidden'));
+        }
     }
 
     async function deleteSelectedWorkflows() {
