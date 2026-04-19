@@ -727,13 +727,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="input-group">
-                    <label class="input-label">Project Type</label>
-                    <select id="setting-project-type" class="input-field" style="appearance: auto;" onchange="togglePreviewSettingsVisibility(this.value)">
-                        <option value="web">🌐 Web App (Preview Enabled)</option>
-                        <option value="native">📱 Native App (Preview Disabled)</option>
-                    </select>
-                </div>
+
                 <div class="input-group">
                     <label class="input-label">Project Root Path (Optional)</label>
                     <input type="text" id="setting-project-path" class="input-field" placeholder="e.g. apps/my-project/" onblur="this.value = this.value.replace(/\/+$/, '') + (this.value ? '/' : '')">
@@ -768,6 +762,13 @@
                 </div>
 
                 <div class="input-group" style="border-top: 1px solid var(--border); padding-top: 10px;">
+                    <label class="input-label">Project Type</label>
+                    <select id="setting-project-type" class="input-field" style="appearance: auto;" onchange="togglePreviewSettingsVisibility(this.value)">
+                        <option value="web">🌐 Web App (Preview Enabled)</option>
+                        <option value="native">📱 Native App (Preview Disabled)</option>
+                    </select>
+                </div>
+                <div class="input-group">
                     <label class="input-label">EF Deployment Mode</label>
                     <select id="setting-ef-mode" class="input-field" style="appearance: auto;">
                         <option value="default">Default (Auto-resolve index.ts to supabase/functions/)</option>
