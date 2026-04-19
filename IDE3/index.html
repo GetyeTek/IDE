@@ -86,7 +86,8 @@
         .tab-content.active { display: block; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .header { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
+        .header { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; flex-wrap: wrap; }
+        .header span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .header .flex-gap {
             overflow-x: auto;
             scrollbar-width: none;
@@ -1216,6 +1217,29 @@
                 </div>
                 <!-- Placeholder for future settings -->
             </div>
+        </div>
+    </div>
+
+    <!-- TRIGGER BUILD MODAL -->
+    <div id="trigger-build-overlay" class="viewer-overlay">
+        <div class="viewer-header">
+            <span class="viewer-title">Trigger Workflow</span>
+            <div class="flex-gap">
+                <button class="btn btn-prod" style="width:auto; padding:6px 20px;" onclick="executeTriggerBuild()">▶ Dispatch</button>
+                <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeTriggerModal()">Cancel</button>
+            </div>
+        </div>
+        <div style="padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 16px;">
+            <div class="input-group">
+                <label class="input-label">Workflow Filename</label>
+                <input type="text" id="tb-workflow" class="input-field" placeholder="e.g. build.yml" list="workflow-suggestions">
+                <datalist id="workflow-suggestions"></datalist>
+            </div>
+            <div class="input-group">
+                <label class="input-label">Target Branch / Ref</label>
+                <input type="text" id="tb-branch" class="input-field" placeholder="conduit-dev">
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted);">This will trigger a repository dispatch event on GitHub. Make sure your workflow file exists in the target branch.</p>
         </div>
     </div>
 
@@ -4431,11 +4455,37 @@
         btn.innerText = 'Load More Runs';
     }
 
-    async function triggerBuild() {
-        const workflowFile = prompt("Enter Workflow Filename:", "build.yml");
-        if (!workflowFile) return;
-        const branch = prompt("Branch to run on:", "conduit-dev");
-        if (!branch) return;
+    function triggerBuild() {
+        const overlay = document.getElementById('trigger-build-overlay');
+        overlay.classList.add('active');
+        toggleFab(false);
+
+        // Load suggestions
+        const suggestions = JSON.parse(localStorage.getItem('conduit_workflow_history') || '["build.yml", "deploy.yml"]');
+        const dl = document.getElementById('workflow-suggestions');
+        dl.innerHTML = suggestions.map(s => `<option value="${s}">`).join('');
+
+        document.getElementById('tb-workflow').value = suggestions[0] || 'build.yml';
+        document.getElementById('tb-branch').value = 'conduit-dev';
+        document.getElementById('tb-workflow').focus();
+    }
+
+    function closeTriggerModal() {
+        document.getElementById('trigger-build-overlay').classList.remove('active');
+        toggleFab(true);
+    }
+
+    async function executeTriggerBuild() {
+        const workflowFile = document.getElementById('tb-workflow').value.trim();
+        const branch = document.getElementById('tb-branch').value.trim();
+        if (!workflowFile || !branch) return showGlobalToast("Workflow and Branch are required", true);
+
+        // Save to suggestions
+        let suggestions = JSON.parse(localStorage.getItem('conduit_workflow_history') || '[]');
+        suggestions = [workflowFile, ...suggestions.filter(s => s !== workflowFile)].slice(0, 10);
+        localStorage.setItem('conduit_workflow_history', JSON.stringify(suggestions));
+
+        closeTriggerModal();
 
         const toast = document.createElement('div');
         toast.style.cssText = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:10px 20px; border-radius:30px; z-index:9999; font-size:13px; box-shadow:0 4px 15px rgba(0,0,0,0.5); display:flex; align-items:center; gap:10px;";
