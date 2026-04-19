@@ -803,10 +803,10 @@
         <!-- CI/CD TAB -->
         <div id="tab-cicd" class="tab-content">
             <div class="header">
-                <span style="flex-shrink: 0;">Workflows</span>
-                <div class="flex-gap">
-                    <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
-                    <button class="icon-btn" onclick="triggerBuild()">▶ Trigger</button>
+                <span>Workflows</span>
+                <div class="flex-gap" style="display: flex !important; gap: 8px; overflow-x: auto;">
+                    <button class="icon-btn" style="color:var(--dev);" onclick="openFavorites()">★ Saved</button>
+                    <button class="icon-btn" style="color:var(--prod); border-color:var(--prod);" onclick="triggerBuild()">▶ Trigger</button>
                     <button class="icon-btn" onclick="loadWorkflows(true); lastCicdRefresh=0; loadWorkflows(false)">Refresh</button>
                     <button class="icon-btn" onclick="openFilterOverlay('cicd')">🔍 Filter</button>
                 </div>
@@ -7926,6 +7926,9 @@ async function downloadArtifact(runId) {
 
     function toggleCicdFab() {
         const checkedCount = document.querySelectorAll('.cicd-check:checked').length;
+        const fab = document.getElementById('cicd-actions-fab');
+        if (fab) fab.style.display = checkedCount > 0 ? 'flex' : 'none';
+    }
 
     async function deleteSelectedWorkflows() {
         const checked = Array.from(document.querySelectorAll('.cicd-check:checked'));
