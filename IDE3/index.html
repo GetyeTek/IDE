@@ -2164,6 +2164,7 @@
     async function initCreateRepo() {
         const name = prompt("Enter New Repository Name:");
         if (!name) return;
+        const isOrgRepo = confirm("Create inside Organization? (Cancel for Personal/User)");
         const isPrivate = confirm("Make repository Private? (Cancel for Public)");
         
         toggleFabMenu();
@@ -2172,7 +2173,7 @@
         try {
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'create_repo', name, is_private: isPrivate })
+                body: apiBody({ action: 'create_repo', name, is_private: isPrivate, is_org: isOrgRepo })
             });
             const data = await res.json();
             
@@ -2180,6 +2181,7 @@
                 showGlobalToast("✅ Repository Created!");
                 // Auto-update local settings to point to new repo
                 document.getElementById('setting-repo-name').value = data.repo_name;
+                document.getElementById('setting-is-org').checked = isOrgRepo;
                 saveSettings();
                 setTimeout(() => {
                     switchTab('tab-context', document.querySelectorAll('.nav-item')[0]);
@@ -6548,8 +6550,8 @@ async function downloadArtifact(runId) {
         const targetOrg = prompt("Enter the target Organization / Username for migration:", "MasterEmpire");
         if (!targetOrg) return;
 
-        const confirmMsg = `⚠️ WARNING: DESTRICTIVE ACTION\n\nThis will migrate "${CONFIG.repoName}" to "${targetOrg}/${CONFIG.repoName}".\n\nIf the repo exists, ALL FILES in the target will be DELETED and replaced with current files.\n\nType 'CONFIRM' to proceed:`;
-        if (prompt(confirmMsg) !== 'CONFIRM') return;
+        const confirmMsg = `⚠️ WARNING: DESTRUCTIVE ACTION\n\nThis will migrate "${CONFIG.repoName}" to "${targetOrg}/${CONFIG.repoName}".\n\nIf the repo exists, ALL FILES in the target will be DELETED and replaced with current files.\n\nProceed with migration?`;
+        if (!confirm(confirmMsg)) return;
 
         showGlobalToast("🚀 Starting Migration...");
         const termId = addTerminalCard(null, { loading: true });
