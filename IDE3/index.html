@@ -926,7 +926,7 @@
             <div class="flex-gap">
                 <button id="viewer-save-btn" class="btn btn-prod" style="display:none; width:auto; padding:6px 12px; font-size:12px;" onclick="saveFileEdits()">Save Changes</button>
                 <button id="viewer-edit-btn" class="icon-btn" onclick="toggleEditMode()" title="Edit File">✎ Edit</button>
-                <button class="icon-btn" onclick="copyViewerContent(this)" title="Copy Content">📋</button>
+                <button class="icon-btn" id="viewer-action-btn" onclick="copyViewerContent(this)" title="Copy Content">📋</button>
                 <button class="icon-btn" id="ace-search-toggle" onclick="toggleAceSearch()">🔍</button>
                 <button class="btn-outline" style="width: auto; padding: 6px 14px;" onclick="closeFileViewer()">Close</button>
             </div>
@@ -4882,7 +4882,7 @@ async function downloadArtifact(runId) {
                             <button class="icon-btn" style="color:#eab308; border-color:#333;" onclick="triggerManualAutoFix(${runId})" title="Auto-Fix Build">⚡ Fix</button>
                             <button class="icon-btn" style="color:var(--ai-accent); border-color:#333;" onclick="chatWithJobLog(${job.id}, '${job.name}')" title="Chat with Log"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg></button>
                             ${isFail ? `<button class="icon-btn" style="color:${statusColor}; border-color:#333;" onclick="viewJobSummary(${job.id}, '${job.name}', event)" title="View Summary"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></button>` : ''}
-                            <button class="icon-btn" style="color:#aaa; border-color:#333;" onclick="downloadJobLogs(${job.id}, '${job.name}')">⬇</button>
+                            <button class="icon-btn" style="color:#aaa; border-color:#333;" onclick="copyJobLogs(${job.id}, '${job.name}', this)" title="Copy Logs">📋</button>
                             <button class="icon-btn" style="color:${statusColor}; border-color:#333;" onclick="viewJobLogs(${job.id}, '${job.name}')">View Logs</button>
                         </div>
                     </div>`;
@@ -5289,7 +5289,34 @@ async function downloadArtifact(runId) {
         } catch(e) { alert("Import failed: " + e.message); }
     }
 
+    async function copyJobLogs(jobId, jobName, btn) {
+        const original = btn.innerHTML;
+        btn.innerHTML = '⏳';
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: apiBody({ action: 'fetch_job_logs', job_id: jobId })
+            });
+            const data = await res.json();
+            if (data.logs) {
+                await navigator.clipboard.writeText(data.logs);
+                showGlobalToast("Logs copied to clipboard!");
+                btn.innerHTML = '✔';
+                setTimeout(() => btn.innerHTML = original, 2000);
+            } else throw new Error("Logs empty");
+        } catch (e) {
+            showGlobalToast("Copy failed: " + e.message, true);
+            btn.innerHTML = original;
+        }
+    }
+
     async function downloadJobLogs(jobId, jobName) {
+        const actionBtn = document.getElementById('viewer-action-btn');
+        actionBtn.innerHTML = '⬇';
+        actionBtn.title = 'Download Logs';
+        actionBtn.onclick = () => downloadJobLogs(jobId, jobName);
+
         try {
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST',
@@ -5609,6 +5636,15 @@ async function downloadArtifact(runId) {
     function closeFileViewer() {
         document.getElementById('code-viewer').classList.remove('active');
         toggleFab(true);
+
+        // Reset action button to Copy mode
+        const actionBtn = document.getElementById('viewer-action-btn');
+        if (actionBtn) {
+            actionBtn.innerHTML = '📋';
+            actionBtn.title = 'Copy Content';
+            actionBtn.onclick = function() { copyViewerContent(this); };
+        }
+
         document.getElementById('ace-search-bar').style.display = 'none';
         document.getElementById('viewer-filename').style.display = 'block';
         document.getElementById('ace-container').style.display = 'block';
