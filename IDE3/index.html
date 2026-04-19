@@ -86,20 +86,16 @@
         .tab-content.active { display: block; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .header { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; flex-wrap: nowrap; width: 100%; }
-        .header span:first-child { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .header { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; flex-wrap: wrap; }
+        .header span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .header .flex-gap {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            flex: 1 1 auto;
             overflow-x: auto;
             scrollbar-width: none;
             -ms-overflow-style: none;
             -webkit-overflow-scrolling: touch;
-            gap: 8px;
-            min-width: 0;
-            padding-bottom: 4px;
+            flex: 1;
+            justify-content: flex-end;
+            padding-bottom: 4px; /* Space for momentum bounce */
         }
         .header .flex-gap::-webkit-scrollbar { display: none; }
         
@@ -808,7 +804,7 @@
         <div id="tab-cicd" class="tab-content">
             <div class="header">
                 <span>Workflows</span>
-                <div class="flex-gap" style="overflow-x: auto;">
+                <div class="flex-gap" style="display: flex !important; gap: 8px; overflow-x: auto;">
                     <button class="icon-btn" style="color:var(--dev);" onclick="openFavorites()">★ Saved</button>
                     <button class="icon-btn" style="color:var(--prod); border-color:var(--prod);" onclick="triggerBuild()">▶ Trigger</button>
                     <button class="icon-btn" onclick="loadWorkflows(true); lastCicdRefresh=0; loadWorkflows(false)">Refresh</button>
@@ -7930,13 +7926,8 @@ async function downloadArtifact(runId) {
 
     function toggleCicdFab() {
         const checkedCount = document.querySelectorAll('.cicd-check:checked').length;
-    function toggleCicdFab() {
-        const checkedCount = document.querySelectorAll('.cicd-check:checked').length;
         const fab = document.getElementById('cicd-actions-fab');
         if (fab) fab.style.display = checkedCount > 0 ? 'flex' : 'none';
-    }
-
-    async function deleteSelectedWorkflows() {
 
         if (checkedCount === 0 && window.cicdSelectionMode) {
             window.cicdSelectionMode = false;
