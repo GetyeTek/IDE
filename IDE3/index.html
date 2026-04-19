@@ -662,8 +662,7 @@
         <div id="tab-preview" class="tab-content">
             <button class="fs-back-btn" onclick="toggleFullscreen(false)">Back</button>
             <div class="header" style="flex-shrink:0; margin-bottom:10px;">
-                Preview
-                <div class="flex-gap">
+                <div class="flex-gap" style="flex: 1; justify-content: flex-start; overflow-x: auto; scrollbar-width: none;">
                     <button class="icon-btn" onclick="refreshPreview()" title="Refresh Current View">↻ Refresh</button>
                     <button class="icon-btn" onclick="openInspector()" style="color:var(--ai-accent); border-color:var(--ai-accent);">📟 Inspector</button>
                     <button class="icon-btn" onclick="openPopOut()">↗ Pop-out</button>
@@ -807,8 +806,7 @@
         <!-- CI/CD TAB -->
         <div id="tab-cicd" class="tab-content">
             <div class="header">
-                <span>Workflows</span>
-                <div class="flex-gap" style="overflow-x: auto;">
+                <div class="flex-gap" style="overflow-x: auto; flex: 1; justify-content: flex-start;">
                     <button class="icon-btn" style="color:var(--dev);" onclick="openFavorites()">★ Saved</button>
                     <button class="icon-btn" style="color:var(--prod); border-color:var(--prod);" onclick="triggerBuild()">▶ Trigger</button>
                     <button class="icon-btn" onclick="loadWorkflows(true); lastCicdRefresh=0; loadWorkflows(false)">Refresh</button>
