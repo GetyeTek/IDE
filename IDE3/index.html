@@ -585,6 +585,7 @@
                 Context
                 <div class="flex-gap">
                     <button id="btn-context-copy" class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px; color:var(--ai-accent); border-color:var(--ai-accent);" onclick="copySelectedFiles()" title="Copy selected files to clipboard">📋 Copy</button>
+                    <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px; color:var(--prod); border-color:var(--prod);" onclick="openSendModal()" title="Send selected files to another repo">📤 Send</button>
                     <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px;" onclick="fetchFileList()">Refresh</button>
                 </div>
             </div>
@@ -1247,8 +1248,12 @@
     <div id="repo-selector-overlay" class="viewer-overlay">
         <div class="viewer-header">
             <div style="flex:1; display:flex; align-items:center; gap:10px;">
-                <span class="viewer-title">Select Repository</span>
-                <input type="text" id="repo-search" class="input-field" placeholder="Filter repos..." style="max-width:250px; height:32px; font-size:12px;" onkeyup="filterRepoList(this.value)">
+                <span class="viewer-title" id="repo-selector-title">Select Repository</span>
+                <div class="flex-gap" id="repo-type-toggle" style="display:none;">
+                    <button class="filter-pill active" id="repo-btn-user" onclick="setRepoSelectorType(false)">User</button>
+                    <button class="filter-pill" id="repo-btn-org" onclick="setRepoSelectorType(true)">Org</button>
+                </div>
+                <input type="text" id="repo-search" class="input-field" placeholder="Filter repos..." style="max-width:200px; height:32px; font-size:12px;" onkeyup="filterRepoList(this.value)">
             </div>
             <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeRepoSelector()">Close</button>
         </div>
@@ -6485,6 +6490,31 @@ async function downloadArtifact(runId) {
     }
 
     let currentRepoList = [];
+    let repoSelectorMode = 'settings';
+    let repoSelectorIsOrg = false;
+
+    function openSendModal() {
+        const checked = document.querySelectorAll('#file-list-container .file-check:checked');
+        if (checked.length === 0) return showGlobalToast("Select files to send first", true);
+        
+        repoSelectorMode = 'send';
+        document.getElementById('repo-selector-title').innerText = "Send to Repository";
+        document.getElementById('repo-type-toggle').style.display = 'flex';
+        repoSelectorIsOrg = CONFIG.isOrg; // Default to current mode
+        updateRepoToggleUI();
+        fetchRepoList();
+    }
+
+    function setRepoSelectorType(isOrg) {
+        repoSelectorIsOrg = isOrg;
+        updateRepoToggleUI();
+        fetchRepoList();
+    }
+
+    function updateRepoToggleUI() {
+        document.getElementById('repo-btn-user').classList.toggle('active', !repoSelectorIsOrg);
+        document.getElementById('repo-btn-org').classList.toggle('active', repoSelectorIsOrg);
+    }
 
     async function fetchRepoList() {
         showGlobalToast("Fetching repositories...");
@@ -6492,7 +6522,10 @@ async function downloadArtifact(runId) {
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: apiBody({ action: 'fetch_repos' })
+                body: apiBody({ 
+                    action: 'fetch_repos', 
+                    is_org: (repoSelectorMode === 'send' ? repoSelectorIsOrg : CONFIG.isOrg) 
+                })
             });
             const data = await res.json();
             if (data.repos) {
@@ -6519,7 +6552,9 @@ async function downloadArtifact(runId) {
                 </div>
                 <div class="model-actions">
                     <button class="btn btn-primary" style="width:auto; padding:4px 12px; font-size:11px;" 
-                        onclick="selectRepo('${r.name}')">Select</button>
+                        onclick="repoSelectorMode === 'send' ? executeSendFiles('${r.name}', repoSelectorIsOrg) : selectRepo('${r.name}')">
+                        ${repoSelectorMode === 'send' ? '🚀 Send' : 'Select'}
+                    </button>
                 </div>
             </div>
         `).join('');
@@ -6534,6 +6569,55 @@ async function downloadArtifact(runId) {
         document.getElementById('setting-repo-name').value = name;
         closeRepoSelector();
         showGlobalToast(`Repo set to: ${name}`);
+    }
+
+    async function executeSendFiles(targetRepo, targetIsOrg) {
+        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
+        if (!confirm(`🚀 Send ${checked.length} files to ${targetRepo}? Existing files will be overwritten.`)) return;
+
+        closeRepoSelector();
+        showGlobalToast("📦 Gathering files...");
+
+        try {
+            const operations = [{ action: 'comment', text: `[Inbound] Transfer from ${CONFIG.repoName}` }];
+            
+            for (const path of checked) {
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: apiBody({ action: 'preview_file', file_path: path })
+                });
+                const data = await res.json();
+                if (data.content) {
+                    operations.push({
+                        action: 'create_file',
+                        file_path: path,
+                        content: b64DecodeUnicode(data.content)
+                    });
+                }
+            }
+
+            showGlobalToast(`📡 Uploading to ${targetRepo}...`);
+            
+            const sendRes = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'patch',
+                    repo_name: targetRepo,
+                    is_org: targetIsOrg,
+                    operations: operations,
+                    ai_config: window.aiConfig
+                })
+            });
+            const sendData = await sendRes.json();
+
+            if (sendData.success) {
+                showGlobalToast("✅ Transfer Complete!", false);
+            } else {
+                throw new Error(sendData.error || "Upload failed");
+            }
+        } catch (e) {
+            alert("Send Error: " + e.message);
+        }
     }
 
     function openRepoSettings() {
@@ -6950,6 +7034,10 @@ async function downloadArtifact(runId) {
 
     function closeRepoSelector() {
         document.getElementById('repo-selector-overlay').classList.remove('active');
+        // Reset state for next use
+        document.getElementById('repo-selector-title').innerText = "Select Repository";
+        document.getElementById('repo-type-toggle').style.display = 'none';
+        repoSelectorMode = 'settings';
     }
 
     async function commitStagedChanges() {
