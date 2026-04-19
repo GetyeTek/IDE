@@ -2825,6 +2825,7 @@
     // --- API & DATA ---
     async function fetchState(force = false, updateTerminal = true, isAppend = false) {
         if(force && !isAppend) {
+            document.getElementById('history-actions-fab').style.display = 'none';
             document.getElementById('history-container').innerHTML = '<div style="padding:10px; text-align:center;">Syncing...</div>';
             if (updateTerminal) document.getElementById('terminal-list').innerHTML = '<div style="padding:10px; text-align:center; color:#666">Syncing logs...</div>';
         }
@@ -4623,6 +4624,10 @@
 
     async function loadWorkflows(silent = false, isAppend = false) {
         const container = document.getElementById('workflow-list');
+        if (!isAppend && !silent) {
+            window.cicdSelectionMode = false;
+            document.getElementById('cicd-actions-fab').style.display = 'none';
+        }
         if (!isAppend) workflowPage = 1;
 
         if (!silent && !isAppend && container.children.length === 0) {
@@ -7542,7 +7547,13 @@ async function downloadArtifact(runId) {
     }
 
     function toggleDeleteFab() {
-        document.getElementById('history-actions-fab').style.display = document.querySelectorAll('.history-check:checked').length ? 'flex' : 'none';
+        const checkedCount = document.querySelectorAll('.history-check:checked').length;
+        const fab = document.getElementById('history-actions-fab');
+        if (checkedCount > 0) {
+            fab.style.display = 'flex';
+        } else {
+            fab.style.display = 'none';
+        }
     }
 
     async function copySelectedHistoryJSON() {
@@ -7744,16 +7755,6 @@ async function downloadArtifact(runId) {
 
     function toggleCicdFab() {
         const checkedCount = document.querySelectorAll('.cicd-check:checked').length;
-        const fab = document.getElementById('cicd-actions-fab');
-        if (checkedCount > 0) {
-            fab.style.display = 'flex';
-        } else {
-            fab.style.display = 'none';
-            window.cicdSelectionMode = false;
-            document.querySelectorAll('.cicd-check').forEach(cb => cb.classList.add('hidden'));
-            document.querySelectorAll('.cicd-status-icon').forEach(ic => ic.classList.remove('hidden'));
-        }
-    }
 
     async function deleteSelectedWorkflows() {
         const checked = Array.from(document.querySelectorAll('.cicd-check:checked'));
