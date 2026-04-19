@@ -1162,6 +1162,12 @@
         <button class="btn btn-danger" onclick="deleteSelectedHistory()" style="width:auto; padding:12px 16px; border-radius:16px; box-shadow:0 5px 20px rgba(0,0,0,0.4);">🗑️ Delete Selected</button>
     </div>
 
+    <!-- CI/CD ACTIONS FAB GROUP -->
+    <div id="cicd-actions-fab" class="flex-gap" style="position:fixed; bottom:100px; right:20px; z-index:150; display:none;">
+        <button class="btn btn-outline" onclick="copySelectedWorkflowLogs()" style="width:auto; padding:12px 16px; border-radius:16px; background:var(--card-bg); border-color:var(--ai-accent); color:var(--ai-accent); box-shadow:0 5px 20px rgba(0,0,0,0.4);">📋 Copy Logs</button>
+        <button class="btn btn-danger" onclick="deleteSelectedWorkflows()" style="width:auto; padding:12px 16px; border-radius:16px; box-shadow:0 5px 20px rgba(0,0,0,0.4);">🗑️ Delete Selected</button>
+    </div>
+
     <!-- MODEL SELECTOR OVERLAY -->
     <div id="model-selector-overlay" class="viewer-overlay">
         <div class="viewer-header">
@@ -4720,12 +4726,14 @@
 
                 div.innerHTML = `
                     <div style="padding:16px; display:flex; align-items:flex-start; gap:14px; cursor:pointer; background:${isExpanded ? '#1a1a1c' : '#111'}; transition: background 0.2s;" 
-                         onclick="toggleWorkflowJobs(${run.id}, this)"
+                         onclick="if(window.cicdSelectionMode) toggleCicdCheck(${run.id}); else toggleWorkflowJobs(${run.id}, this)" 
+                         data-run-id="${run.id}"
                          onmouseover="this.style.background='#161618'"
                          onmouseout="if(document.getElementById('wf-jobs-${run.id}').style.display === 'none') this.style.background='#111'; else this.style.background='#1a1a1c';">
                         
                         <div style="display:flex; flex-direction:column; align-items:center; gap:5px;">
-                            <div style="color:${color}; font-size:18px; padding-top:2px;">${icon}</div>
+                            <input type="checkbox" class="cicd-check hidden" value="${run.id}" onchange="toggleCicdFab()" onclick="event.stopPropagation()" style="accent-color:var(--ai-accent); margin-top:5px;">
+                            <div class="cicd-status-icon" style="color:${color}; font-size:18px; padding-top:2px;">${icon}</div>
                             <button class="menu-btn favorite-btn" onclick="event.stopPropagation(); toggleFavorite('${run.head_commit.id}', 'Build', {title: '${run.name} #${run.run_number}', run_id: '${run.id}'})" style="padding:0; color:#555; font-size:14px;">★</button>
                         </div>
                         
@@ -4765,8 +4773,8 @@
                                         onclick="event.stopPropagation(); traceRunToLog('${run.head_commit.id}')" title="Find in Terminal">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 17l6-6-6-6m8 12h8"></path></svg>
                                 </button>
-                                <button class="icon-btn" style="color:var(--danger); border-color:#333; padding: 4px 10px;" 
-                                        onclick="event.stopPropagation(); deleteWorkflowRun(${run.id})" title="Delete Run">
+                                <button class="icon-btn cicd-delete-btn" style="color:var(--danger); border-color:#333; padding: 4px 10px;" 
+                                        onclick="event.stopPropagation(); enterCicdSelectionMode(${run.id})" title="Delete Run">
                                     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             </div>
@@ -7714,6 +7722,92 @@ async function downloadArtifact(runId) {
             el.style.opacity = '0';
             setTimeout(() => el.remove(), 300);
         }
+    }
+
+    function enterCicdSelectionMode(initialId) {
+        window.cicdSelectionMode = true;
+        document.querySelectorAll('.cicd-check').forEach(cb => cb.classList.remove('hidden'));
+        document.querySelectorAll('.cicd-status-icon').forEach(ic => ic.classList.add('hidden'));
+        
+        if (initialId) {
+            const cb = document.querySelector(`.cicd-check[value="${initialId}"]`);
+            if (cb) cb.checked = true;
+        }
+        toggleCicdFab();
+    }
+
+    function toggleCicdCheck(runId) {
+        const cb = document.querySelector(`.cicd-check[value="${runId}"]`);
+        if (cb) cb.checked = !cb.checked;
+        toggleCicdFab();
+    }
+
+    function toggleCicdFab() {
+        const checkedCount = document.querySelectorAll('.cicd-check:checked').length;
+        const fab = document.getElementById('cicd-actions-fab');
+        if (checkedCount > 0) {
+            fab.style.display = 'flex';
+        } else {
+            fab.style.display = 'none';
+            window.cicdSelectionMode = false;
+            document.querySelectorAll('.cicd-check').forEach(cb => cb.classList.add('hidden'));
+            document.querySelectorAll('.cicd-status-icon').forEach(ic => ic.classList.remove('hidden'));
+        }
+    }
+
+    async function deleteSelectedWorkflows() {
+        const checked = Array.from(document.querySelectorAll('.cicd-check:checked'));
+        if (!checked.length) return;
+        if (!confirm(`Permanently delete ${checked.length} workflow runs?`)) return;
+
+        showGlobalToast("Batch deleting runs...");
+        try {
+            await Promise.all(checked.map(cb => 
+                fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'delete_workflow_run', run_id: cb.value })
+                })
+            ));
+            showGlobalToast("Purge complete");
+            loadWorkflows();
+        } catch(e) { showGlobalToast("Batch delete failed", true); }
+    }
+
+    async function copySelectedWorkflowLogs() {
+        const checked = Array.from(document.querySelectorAll('.cicd-check:checked'));
+        if (!checked.length) return;
+        
+        showGlobalToast("📥 Aggregating logs from multiple runs...");
+        let aggregatedLogs = "";
+
+        try {
+            for (const cb of checked) {
+                const runId = cb.value;
+                const runEl = document.querySelector(`div[data-run-id="${runId}"]`);
+                const runTitle = runEl?.querySelector('span[style*="font-size:14px"]')?.innerText || runId;
+
+                // Get jobs for this run
+                const resJobs = await fetch(CONFIG.funcUrl, { 
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, 
+                    body: apiBody({ action: 'fetch_workflow_jobs', run_id: runId }) 
+                });
+                const dataJobs = await resJobs.json();
+
+                aggregatedLogs += `\n${'='.repeat(50)}\nRUN: ${runTitle} (ID: ${runId})\n${'='.repeat(50)}\n`;
+
+                for (const job of (dataJobs.jobs || [])) {
+                    const resLogs = await fetch(CONFIG.funcUrl, { 
+                        method: 'POST', headers: {'Content-Type': 'application/json'}, 
+                        body: apiBody({ action: 'fetch_job_logs', job_id: job.id }) 
+                    });
+                    const dataLogs = await resLogs.json();
+                    aggregatedLogs += `\n--- JOB: ${job.name} ---\n${dataLogs.logs || "[No logs found]"}\n`;
+                }
+            }
+
+            await navigator.clipboard.writeText(aggregatedLogs);
+            showGlobalToast("📋 All logs combined and copied!");
+        } catch(e) { showGlobalToast("Failed to aggregate logs", true); }
     }
 
     async function cancelWorkflowRun(runId) {
