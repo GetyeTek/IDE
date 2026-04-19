@@ -686,6 +686,7 @@
             <div class="header">
                 History 
                 <div class="flex-gap">
+                    <button class="icon-btn" onclick="createCheckpoint()" title="Create Checkpoint">🚩 Checkpoint</button>
                     <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
                     <button class="icon-btn" onclick="resetHistoryAndSync()">Sync</button>
                     <button class="icon-btn" onclick="openFilterOverlay('history')">🔍 Filter</button>
@@ -784,9 +785,6 @@
                     </button>
                     <button class="btn btn-outline" onclick="openAIManager()">
                         🧠 Manage AI Routing
-                    </button>
-                    <button class="btn btn-outline" onclick="createCheckpoint()">
-                        🚩 Create History Checkpoint
                     </button>
                     <button class="btn btn-outline" onclick="openSQLExecutor()">
                         🗄️ SQL Executor
