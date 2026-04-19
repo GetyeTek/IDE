@@ -727,13 +727,20 @@
                     </div>
                 </div>
                 <div class="input-group">
+                    <label class="input-label">Project Type</label>
+                    <select id="setting-project-type" class="input-field" style="appearance: auto;" onchange="togglePreviewSettingsVisibility(this.value)">
+                        <option value="web">🌐 Web App (Preview Enabled)</option>
+                        <option value="native">📱 Native App (Preview Disabled)</option>
+                    </select>
+                </div>
+                <div class="input-group">
                     <label class="input-label">Project Root Path (Optional)</label>
                     <input type="text" id="setting-project-path" class="input-field" placeholder="e.g. apps/my-project/" onblur="this.value = this.value.replace(/\/+$/, '') + (this.value ? '/' : '')">
                 </div>
                 
 
                 
-                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
+                <label id="preview-toggle-wrap" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
                     <span style="font-size:13px;">👁️ Show Preview Tab</span>
                     <input type="checkbox" id="setting-show-preview" style="accent-color:var(--primary); transform:scale(1.2);">
                 </label>
@@ -1802,6 +1809,7 @@
         autoSanity: false,
         showPreview: localStorage.getItem('conduit_showPreview') !== 'false',
         efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
+        projectType: sessionStorage.getItem('conduit_projectType') || localStorage.getItem('conduit_projectType') || 'web',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
         consoleHalf: localStorage.getItem('conduit_console_half') === 'true'
@@ -1917,6 +1925,8 @@
         document.getElementById('setting-repo-name').value = CONFIG.repoName;
         document.getElementById('setting-is-org').checked = CONFIG.isOrg;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
+        document.getElementById('setting-project-type').value = CONFIG.projectType;
+        togglePreviewSettingsVisibility(CONFIG.projectType);
 
         document.getElementById('setting-show-preview').checked = CONFIG.showPreview;
         document.getElementById('setting-wasm-validation').checked = CONFIG.wasmValidation;
@@ -2144,10 +2154,16 @@
     // Acorn is deprecated. Syntax checking is now handled by backend WASM.
     function checkSyntaxErrors() { return null; }
     // --- SETTINGS ---
+    function togglePreviewSettingsVisibility(type) {
+        const wrap = document.getElementById('preview-toggle-wrap');
+        if (wrap) wrap.style.display = (type === 'native') ? 'none' : 'flex';
+    }
+
     function applyPreviewTabVisibility() {
         const navButton = document.getElementById('nav-preview-btn');
+        const shouldShow = CONFIG.projectType === 'web' && CONFIG.showPreview;
         if (navButton) {
-            navButton.style.display = CONFIG.showPreview ? 'flex' : 'none';
+            navButton.style.display = shouldShow ? 'flex' : 'none';
         }
 
         // Edge case: if the preview tab is active while being hidden, switch to the context tab.
@@ -2809,6 +2825,7 @@
         const isOrg = document.getElementById('setting-is-org').checked;
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
+        const projectType = document.getElementById('setting-project-type').value;
         const floatingConsole = document.getElementById('setting-floating-console').checked;
         const consoleHalf = document.getElementById('setting-console-half').checked;
 
@@ -2819,6 +2836,7 @@
         localStorage.setItem('conduit_showPreview', showPreview);
         localStorage.setItem('conduit_wasm_validation', wasmValidation);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
+        localStorage.setItem('conduit_projectType', projectType);
         localStorage.setItem('conduit_floating_console', floatingConsole);
         localStorage.setItem('conduit_console_half', consoleHalf);
 
@@ -2826,6 +2844,7 @@
         sessionStorage.setItem('conduit_repoName', repoName);
         sessionStorage.setItem('conduit_projectPath', projectPath);
         sessionStorage.setItem('conduit_isOrg', isOrg ? 'true' : 'false');
+        sessionStorage.setItem('conduit_projectType', projectType);
 
         // Also update localStorage as a fallback for new tabs
         localStorage.setItem('conduit_repoName', repoName);
@@ -2835,7 +2854,7 @@
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
 
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf, projectType };
         
         applyPreviewTabVisibility(); 
         initFloatingHUD();
@@ -3779,6 +3798,7 @@
     }
 
     async function bundleAndPreview(index) {
+        if (CONFIG.projectType === 'native') return;
         if(!CONFIG.funcUrl) {
             console.error('Bundler Error: No function URL configured');
             return;
