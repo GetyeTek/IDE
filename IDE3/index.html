@@ -740,7 +740,11 @@
                 
 
                 
-                <label id="preview-toggle-wrap" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
+                    <span style="font-size:13px;">📑 Omit File Headers on Copy</span>
+                    <input type="checkbox" id="setting-omit-headers" style="accent-color:var(--primary); transform:scale(1.2);">
+                </label>
+                <label id="preview-toggle-wrap" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px;">
                     <span style="font-size:13px;">👁️ Show Preview Tab</span>
                     <input type="checkbox" id="setting-show-preview" style="accent-color:var(--primary); transform:scale(1.2);">
                 </label>
@@ -1810,6 +1814,7 @@
         showPreview: localStorage.getItem('conduit_showPreview') !== 'false',
         efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
         projectType: sessionStorage.getItem('conduit_projectType') || localStorage.getItem('conduit_projectType') || 'web',
+        omitHeaders: localStorage.getItem('conduit_omitHeaders') === 'true',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
         consoleHalf: localStorage.getItem('conduit_console_half') === 'true'
@@ -1926,6 +1931,7 @@
         document.getElementById('setting-is-org').checked = CONFIG.isOrg;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
         document.getElementById('setting-project-type').value = CONFIG.projectType;
+        document.getElementById('setting-omit-headers').checked = CONFIG.omitHeaders;
         togglePreviewSettingsVisibility(CONFIG.projectType);
 
         document.getElementById('setting-show-preview').checked = CONFIG.showPreview;
@@ -2826,6 +2832,7 @@
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
         const projectType = document.getElementById('setting-project-type').value;
+        const omitHeaders = document.getElementById('setting-omit-headers').checked;
         const floatingConsole = document.getElementById('setting-floating-console').checked;
         const consoleHalf = document.getElementById('setting-console-half').checked;
 
@@ -2837,6 +2844,7 @@
         localStorage.setItem('conduit_wasm_validation', wasmValidation);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
         localStorage.setItem('conduit_projectType', projectType);
+        localStorage.setItem('conduit_omitHeaders', omitHeaders);
         localStorage.setItem('conduit_floating_console', floatingConsole);
         localStorage.setItem('conduit_console_half', consoleHalf);
 
@@ -2854,7 +2862,7 @@
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
 
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf, projectType };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf, projectType, omitHeaders };
         
         applyPreviewTabVisibility(); 
         initFloatingHUD();
@@ -5649,7 +5657,7 @@ async function downloadArtifact(runId) {
         // Check context: Editor or Log View?
         if (document.getElementById('ace-container').style.display !== 'none' && aceEditorInstance) {
             content = aceEditorInstance.getValue();
-            pathHeader = `FILE: ${currentViewerPath}\n`;
+            pathHeader = CONFIG.omitHeaders ? "" : `FILE: ${currentViewerPath}\n`;
         } else {
             // Priority: Use raw buffer if available, fallback to DOM for legacy support
             content = window.CURRENT_RAW_LOG || document.getElementById('log-custom-container').innerText;
@@ -7285,7 +7293,7 @@ async function downloadArtifact(runId) {
                 fetchedFiles.push(...batchResults.filter(f => f !== null));
             }
 
-            const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
+            const text = fetchedFiles.map(f => CONFIG.omitHeaders ? f.content : `FILE: ${f.path}\n${f.content}`).join('\n\n');
             await navigator.clipboard.writeText(text);
             
             btn.innerHTML = "✔ Copied!";
@@ -7357,7 +7365,7 @@ async function downloadArtifact(runId) {
                 link.download = `${finalBaseName}.zip`;
                 link.click();
             } else {
-                const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
+                const text = fetchedFiles.map(f => CONFIG.omitHeaders ? f.content : `FILE: ${f.path}\n${f.content}`).join('\n\n');
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
                 link.download = `${finalBaseName}.txt`;
