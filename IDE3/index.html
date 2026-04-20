@@ -1828,7 +1828,7 @@
         autoSanity: false,
         showPreview: localStorage.getItem('conduit_showPreview') !== 'false',
         efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
-        projectType: sessionStorage.getItem('conduit_projectType') || localStorage.getItem('conduit_projectType') || 'web',
+        projectType: (JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}')[sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE']?.projectType) || 'web',
         omitHeaders: localStorage.getItem('conduit_omitHeaders') === 'true',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
@@ -2868,6 +2868,15 @@
         sessionStorage.setItem('conduit_projectPath', projectPath);
         sessionStorage.setItem('conduit_isOrg', isOrg ? 'true' : 'false');
         sessionStorage.setItem('conduit_projectType', projectType);
+
+        // Update Repo-Specific Config Map
+        const repoConfigs = JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}');
+        repoConfigs[repoName] = { 
+            projectType, 
+            isOrg, 
+            projectPath 
+        };
+        localStorage.setItem('conduit_repo_configs', JSON.stringify(repoConfigs));
 
         // Also update localStorage as a fallback for new tabs
         localStorage.setItem('conduit_repoName', repoName);
@@ -6650,6 +6659,21 @@ async function downloadArtifact(runId) {
 
     function selectRepo(name) {
         document.getElementById('setting-repo-name').value = name;
+        
+        // Load known config for this repo if it exists
+        const repoConfigs = JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}');
+        if (repoConfigs[name]) {
+            const cfg = repoConfigs[name];
+            if (cfg.projectType) {
+                document.getElementById('setting-project-type').value = cfg.projectType;
+                togglePreviewSettingsVisibility(cfg.projectType);
+            }
+            if (cfg.projectPath !== undefined) {
+                document.getElementById('setting-project-path').value = cfg.projectPath;
+            }
+            showGlobalToast(`Config loaded for: ${name}`);
+        }
+
         closeRepoSelector();
         showGlobalToast(`Repo set to: ${name}`);
     }
