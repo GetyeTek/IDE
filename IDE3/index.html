@@ -1252,7 +1252,17 @@
                 <label class="input-label">Target Branch / Ref</label>
                 <input type="text" id="tb-branch" class="input-field" placeholder="conduit-dev">
             </div>
-            <p style="font-size: 11px; color: var(--text-muted);">This will trigger a repository dispatch event on GitHub. Make sure your workflow file exists in the target branch.</p>
+            <div id="tb-speedster-extras" style="display:none; border-top: 1px dashed var(--border); padding-top: 15px; margin-top: 5px; flex-direction: column; gap: 16px;">
+                <div class="input-group" style="margin-bottom:0">
+                    <label class="input-label">App Label (Speedster)</label>
+                    <input type="text" id="tb-app-label" class="input-field" placeholder="e.g. Calculator Pro">
+                </div>
+                <div class="input-group" style="margin-bottom:0">
+                    <label class="input-label">DEX Filename (Speedster)</label>
+                    <input type="text" id="tb-file-name" class="input-field" placeholder="e.g. calculator.dex">
+                </div>
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted);">This will trigger a repository dispatch event on GitHub. Inputs are remembered per workflow.</p>
         </div>
     </div>
 
@@ -4500,14 +4510,40 @@
         overlay.classList.add('active');
         toggleFab(false);
 
-        // Load suggestions
-        const suggestions = JSON.parse(localStorage.getItem('conduit_workflow_history') || '["build.yml", "deploy.yml"]');
+        const workflowInput = document.getElementById('tb-workflow');
+        
+        // Load historical workflow list
+        const suggestions = JSON.parse(localStorage.getItem('conduit_workflow_history') || '["build.yml", "deploy.yml", "speedster.yml"]');
         const dl = document.getElementById('workflow-suggestions');
         dl.innerHTML = suggestions.map(s => `<option value="${s}">`).join('');
 
-        document.getElementById('tb-workflow').value = suggestions[0] || 'build.yml';
+        workflowInput.value = suggestions[0] || 'build.yml';
         document.getElementById('tb-branch').value = 'conduit-dev';
-        document.getElementById('tb-workflow').focus();
+        
+        // Sync extra fields on initial load
+        syncWorkflowInputs(workflowInput.value);
+
+        // Watch for changes to switch context
+        workflowInput.oninput = (e) => syncWorkflowInputs(e.target.value);
+
+        workflowInput.focus();
+    }
+
+    function syncWorkflowInputs(filename) {
+        const extras = document.getElementById('tb-speedster-extras');
+        const appLabelInput = document.getElementById('tb-app-label');
+        const fileNameInput = document.getElementById('tb-file-name');
+
+        // Show extra fields only if it looks like a speedster workflow
+        const isSpeedster = filename.toLowerCase().includes('speedster');
+        extras.style.display = isSpeedster ? 'flex' : 'none';
+
+        // Load persisted inputs for this specific workflow
+        const configMap = JSON.parse(localStorage.getItem('conduit_workflow_configs') || '{}');
+        const saved = configMap[filename] || {};
+        
+        appLabelInput.value = saved.app_label || (isSpeedster ? 'Calculator Pro' : '');
+        fileNameInput.value = saved.file_name || (isSpeedster ? 'calculator.dex' : '');
     }
 
     function closeTriggerModal() {
@@ -4518,12 +4554,25 @@
     async function executeTriggerBuild() {
         const workflowFile = document.getElementById('tb-workflow').value.trim();
         const branch = document.getElementById('tb-branch').value.trim();
+        const appLabel = document.getElementById('tb-app-label').value.trim();
+        const fileName = document.getElementById('tb-file-name').value.trim();
+
         if (!workflowFile || !branch) return showGlobalToast("Workflow and Branch are required", true);
 
-        // Save to suggestions
+        // Save workflow to recent list
         let suggestions = JSON.parse(localStorage.getItem('conduit_workflow_history') || '[]');
         suggestions = [workflowFile, ...suggestions.filter(s => s !== workflowFile)].slice(0, 10);
         localStorage.setItem('conduit_workflow_history', JSON.stringify(suggestions));
+
+        // Persist specific inputs for this workflow
+        const configMap = JSON.parse(localStorage.getItem('conduit_workflow_configs') || '{}');
+        configMap[workflowFile] = { app_label: appLabel, file_name: fileName };
+        localStorage.setItem('conduit_workflow_configs', JSON.stringify(configMap));
+
+        // Build inputs payload
+        const dynamicInputs = {};
+        if (appLabel) dynamicInputs.app_label = appLabel;
+        if (fileName) dynamicInputs.file_name = fileName;
 
         closeTriggerModal();
 
@@ -4539,6 +4588,7 @@
                     action: 'trigger_build', 
                     workflow_id: workflowFile, 
                     branch: branch,
+                    inputs: dynamicInputs,
                     validate_pre_build: true // Enable Syntax Guard
                 })
             });
