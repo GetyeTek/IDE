@@ -4667,8 +4667,8 @@
             
             codeEl.innerText = snippet;
             
-            // Store for fix application
-            currentSyntaxContext = { file: path, error: error, code: fullCode, ops: null };
+            // Store for fix application - Use assign to preserve workflow/branch info
+            Object.assign(currentSyntaxContext, { file: path, error: error, code: fullCode, ops: null });
 
             // Check for Deterministic Fix Availability
             checkDeterministicFix(path, error, fullCode);
