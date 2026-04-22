@@ -7340,8 +7340,15 @@ async function downloadArtifact(runId) {
     }
 
     async function copySelectedFiles() {
-        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
-        if (checked.length === 0) return showGlobalToast("No files selected", true);
+        const binaryExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'mp4', 'mov', 'webm', 'zip', 'pdf', 'woff', 'woff2', 'ttf', 'otf', 'exe', 'apk'];
+        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked'))
+            .map(c => c.value)
+            .filter(path => {
+                const ext = path.split('.').pop().toLowerCase();
+                return !binaryExtensions.includes(ext);
+            });
+
+        if (checked.length === 0) return showGlobalToast("No textual files selected", true);
         
         if (isPerformingAction) return;
         isPerformingAction = true;
