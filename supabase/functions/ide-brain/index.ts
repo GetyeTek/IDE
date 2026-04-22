@@ -1699,46 +1699,50 @@ serve(async (req) => {
         const isSha = /^[0-9a-f]{40}$/i.test(targetBranch);
         
         // --- PRE-BUILD SYNTAX GUARD (OPTIMIZED BATCHING) ---
-        if (payload.validate_pre_build) {
-            console.log("Running Optimized Pre-Build Syntax Scan...");
-            const tree = await githubFetch(TARGET_REPO, `/git/trees/${targetBranch}?recursive=1`);
-            // Filter for source code files within the project scope
-            const codeFiles = tree.tree.filter((f: any) => 
-                f.type === "blob" && 
-                f.path.startsWith(project_path || "") && 
-                f.path.match(/\.(js|ts|tsx|jsx|py|go|rs|java|kt|c|cpp|json|bash|sh)$/)
-            );
+            if (payload.validate_pre_build) {
+      console.log("Running Delta-Aware Syntax Scan...");
+      let filesToScan = [];
 
-            const BATCH_SIZE = 5; 
-            for (let i = 0; i < codeFiles.length; i += BATCH_SIZE) {
-                const batch = codeFiles.slice(i, i + BATCH_SIZE);
-                const batchResults = await Promise.all(batch.map(async (f: any) => {
-                    const { content } = await getFileRaw(TARGET_REPO, f.path, targetBranch);
-                    if (!content) return { path: f.path, valid: true };
-                    const text = base64ToText(content);
-                    const res = await validateWithTreeSitter(text, f.path);
-                    return { path: f.path, ...res };
-                }));
+      try {
+        // Try to fetch only modified files in the last commit
+        const comparison = await githubFetch(TARGET_REPO, `/commits/${targetBranch}`);
+        filesToScan = (comparison.files || [])
+          .filter((f: any) => f.status !== "removed" && f.filename.match(/\.(js|ts|tsx|jsx|py|go|rs|java|kt|c|cpp|json|bash|sh)$/))
+          .map((f: any) => ({ path: f.filename }));
+        console.log(`[SyntaxGuard] Delta mode: Found ${filesToScan.length} changed code files.`);
+      } catch (e) {
+        console.log("[SyntaxGuard] Commit lookup failed, falling back to full tree scan.");
+        const tree = await githubFetch(TARGET_REPO, `/git/trees/${targetBranch}?recursive=1`);
+        filesToScan = tree.tree.filter((f: any) => 
+          f.type === "blob" && 
+          f.path.startsWith(project_path || "") && 
+          f.path.match(/\.(js|ts|tsx|jsx|py|go|rs|java|kt|c|cpp|json|bash|sh)$/)
+        );
+      }
 
-                for (const res of batchResults) {
-                    if (!res.valid) {
-                        const errorMsg = `File: ${res.path}\nErrors: ${res.errors?.slice(0, 3).join(", ")}`;
-                        await supabase.from('conduit_logs').insert({ 
-                            repo_name: TARGET_REPO, type: 'dispatch_aborted', 
-                            data: { reason: "syntax_error", details: errorMsg } 
-                        });
-                        // Return structured data for Client-Side Auto-Fix
-                        return new Response(JSON.stringify({ 
-                            success: false, 
-                            validation_error: true, 
-                            file_path: res.path,
-                            errors: res.errors,
-                            error: errorMsg 
-                        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-                    }
-                }
-            }
+      const BATCH_SIZE = 10; 
+      for (let i = 0; i < filesToScan.length; i += BATCH_SIZE) {
+        const batch = filesToScan.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(batch.map(async (f: any) => {
+          const { content } = await getFileRaw(TARGET_REPO, f.path, targetBranch);
+          if (!content) return { path: f.path, valid: true };
+          const text = base64ToText(content);
+          const res = await validateWithTreeSitter(text, f.path);
+          return { path: f.path, ...res };
+        }));
+
+        for (const res of batchResults) {
+          if (!res.valid) {
+            const errorMsg = `File: ${res.path}\nErrors: ${res.errors?.slice(0, 3).join(", ")}`;
+            await supabase.from('conduit_logs').insert({ 
+              repo_name: TARGET_REPO, type: 'dispatch_aborted', 
+              data: { reason: "syntax_error", details: errorMsg } 
+            });
+            return new Response(JSON.stringify({ success: false, validation_error: true, file_path: res.path, errors: res.errors, error: errorMsg }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
         }
+      }
+    }
 
         try {
             if (workflow_id) {
