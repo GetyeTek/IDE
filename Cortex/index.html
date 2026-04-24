@@ -584,7 +584,7 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
             const { data, error } = await sb.storage.from('cortex-vault').list(currentVaultPath, {
                 limit: 100,
                 offset: 0,
-                sortBy: { column: 'name', order: 'asc' }
+                sortBy: { column: 'created_at', order: 'desc' }
             });
 
             if (error) {
