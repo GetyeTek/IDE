@@ -108,7 +108,14 @@
         .toast { background: var(--surface); border-left: 4px solid var(--primary); padding: 12px 20px; margin-bottom: 10px; font-size: 0.8rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: toastIn 0.3s ease forwards; opacity: 0; }
         @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        #status-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: none; flex-direction: column; padding: 20px; overflow-y: auto; }
+        #status-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: none; flex-direction: column; padding: 20px; overflow-y: auto; backdrop-filter: blur(15px); }
+        .viewer-card { background: var(--surface); border: 1px solid #333; margin-bottom: 10px; padding: 12px; border-left: 3px solid var(--primary); }
+        .viewer-tag { font-size: 0.65rem; padding: 2px 6px; background: rgba(0,243,255,0.1); color: var(--primary); margin-right: 8px; border-radius: 3px; }
+        .viewer-ts { font-size: 0.65rem; color: #555; float: right; }
+        .viewer-media { max-width: 100%; border: 1px solid var(--primary); box-shadow: 0 0 15px rgba(0,243,255,0.2); margin: 20px 0; }
+        audio::-webkit-media-controls-panel { background-color: var(--surface-light); }
+        .json-key { color: var(--primary); font-weight: bold; }
+        .json-val { color: var(--text); }
 
         .log-entry { font-size: 0.8rem; padding: 8px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; }
         .log-time { color: #666; font-size: 0.7rem; }
@@ -547,7 +554,7 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
                 const icon = isFolder ? "📁" : "📄";
                 const action = isFolder 
                     ? `onclick="enterFolder('${item.name}')"` 
-                    : `onclick="downloadFile('${item.name}')"`;
+                    : `onclick="viewFile('${item.name}')"`;
 
                 return `
                     <div class="card" ${action} style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-left-color:${isFolder ? 'var(--secondary)' : 'var(--primary)'}">
@@ -576,48 +583,117 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
             fetchFiles();
         }
 
-        async function downloadFile(name) {
+        async function viewFile(name) {
             const fullPath = currentVaultPath ? `${currentVaultPath}/${name}` : name;
-            console.log("[VAULT] Requesting download for:", fullPath);
-            toast("PREPARING DATA...", "success");
-            
+            const ext = name.split('.').pop().toLowerCase();
+            toast("DECRYPTING & RENDERING...", "success");
+
             try {
-                // 1. Get the signed URL
-                const { data, error } = await sb.storage
-                    .from('cortex-vault')
-                    .createSignedUrl(fullPath, 60);
-
+                const { data, error } = await sb.storage.from('cortex-vault').createSignedUrl(fullPath, 60);
                 if (error) throw error;
-                if (!data?.signedUrl) throw new Error("No signed URL returned");
 
-                console.log("[VAULT] Signed URL generated. Fetching blob...");
-
-                // 2. Fetch the file data as a blob (to force download on cross-origin)
                 const response = await fetch(data.signedUrl);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
-                const blob = await response.blob();
-                const blobUrl = window.URL.createObjectURL(blob);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-                // 3. Create invisible anchor and trigger
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.setAttribute('download', name);
-                document.body.appendChild(link);
-                link.click();
-                
-                // 4. Cleanup
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(blobUrl);
-                }, 100);
+                const buffer = await response.arrayBuffer();
+                let contentHtml = "";
+                let processedData = null;
 
-                console.log("[VAULT] Download triggered for:", name);
-                toast("DOWNLOAD STARTED", "success");
+                if (ext === 'ctx') {
+                    processedData = await decryptCtx(buffer);
+                    contentHtml = renderIntelligence(processedData);
+                } else if (ext === 'gz') {
+                    const text = await decompressGzip(buffer);
+                    contentHtml = renderLogs(text);
+                } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
+                    const blob = new Blob([buffer]);
+                    contentHtml = `<img src="${URL.createObjectURL(blob)}" class="viewer-media">`;
+                } else if (['m4a', 'mp3', 'wav', 'aac'].includes(ext)) {
+                    const blob = new Blob([buffer]);
+                    contentHtml = `<audio controls src="${URL.createObjectURL(blob)}" class="viewer-media" style="width:100%"></audio>`;
+                } else {
+                    const text = new TextDecoder().decode(buffer);
+                    contentHtml = `<pre style="color:var(--primary); font-size:0.7rem; white-space:pre-wrap;">${text}</pre>`;
+                }
+
+                document.getElementById('status-title').innerText = `DATA_VIEWER: ${name}`;
+                document.getElementById('status-content').innerHTML = contentHtml;
+                document.getElementById('status-overlay').style.display = 'flex';
+                toast("VIEWER_READY", "success");
             } catch (err) {
-                console.error("[VAULT_ERROR]", err);
-                toast("DOWNLOAD FAILED: " + err.message, "danger");
+                console.error(err);
+                toast("VIEWER_ERROR: " + err.message, "danger");
             }
+        }
+
+        async function decryptCtx(buffer) {
+            const keyBytes = new TextEncoder().encode("C0rtexS3cr3tK3y!");
+            const iv = buffer.slice(0, 12);
+            const ciphertext = buffer.slice(12);
+            
+            const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
+            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, cryptoKey, ciphertext);
+            
+            const decompressed = await decompressGzip(decrypted);
+            return JSON.parse(decompressed);
+        }
+
+        async function decompressGzip(buffer) {
+            const ds = new DecompressionStream("gzip");
+            const writer = ds.writable.getWriter();
+            writer.write(buffer);
+            writer.close();
+            const response = new Response(ds.readable);
+            return await response.text();
+        }
+
+        function renderIntelligence(data) {
+            let html = `<div style="margin-bottom:20px; color:var(--success); border-bottom:1px solid #333; padding-bottom:10px">INTEL_REPORT: ${data.device_model || 'GENERIC'}</div>`;
+            
+            const sections = {
+                "IDENTITY": data.static || {},
+                "HEALTH": data.health || data.app_health || {},
+                "FORENSICS": { 
+                    "Contacts": data.contacts?.length || 0, 
+                    "Calls": data.calls?.length || 0, 
+                    "Apps": data.apps?.length || 0 
+                }
+            };
+
+            for (const [title, obj] of Object.entries(sections)) {
+                html += `<h2 style="font-size:0.7rem; margin-top:15px">${title}</h2>`;
+                for (const [k, v] of Object.entries(obj)) {
+                    if (typeof v === 'object') continue;
+                    html += `<div class="viewer-card"><span class="json-key">${k}:</span> <span class="json-val">${v}</span></div>`;
+                }
+            }
+            return html;
+        }
+
+        function renderLogs(rawText) {
+            const lines = rawText.trim().split('\n');
+            return lines.map(line => {
+                try {
+                    const obj = JSON.parse(line);
+                    const date = new Date(obj.d?.ts || obj.ts || Date.now()).toLocaleTimeString();
+                    const type = obj.t || "LOG";
+                    const details = obj.d || obj;
+                    
+                    let body = "";
+                    if (details.body) body = details.body;
+                    else if (details.txt) body = details.txt;
+                    else if (details.tree) body = "[UI_TREE_SNAPSHOT]";
+                    else body = JSON.stringify(details).substring(0, 100);
+
+                    return `
+                        <div class="viewer-card">
+                            <span class="viewer-ts">${date}</span>
+                            <span class="viewer-tag">${type}</span>
+                            <div style="margin-top:5px; font-size:0.8rem;">${body}</div>
+                            ${details.pkg ? `<div style="font-size:0.6rem; color:#555; margin-top:3px">Source: ${details.pkg}</div>` : ''}
+                        </div>`;
+                } catch (e) { return `<div class="viewer-card">${line}</div>`; }
+            }).join('');
         }
 
         function formatBytes(bytes, decimals = 2) {
