@@ -136,10 +136,13 @@
 <body>
 
     <div id="toast-container"></div>
-    <div id="status-overlay" onclick="this.style.display='none'">
-        <h2 id="status-title">COMMAND AUDIT</h2>
-        <div id="status-content" style="flex:1"></div>
-        <button class="btn" style="margin-top:20px">CLOSE AUDIT</button>
+    <div id="status-overlay">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 id="status-title" style="margin:0">COMMAND AUDIT</h2>
+            <div onclick="document.getElementById('status-overlay').style.display='none'" style="font-size:2rem; color:var(--primary); cursor:pointer; padding:0 10px;">×</div>
+        </div>
+        <div id="status-content" style="flex:1" onclick="event.stopPropagation()"></div>
+        <button class="btn" style="margin-top:20px" onclick="document.getElementById('status-overlay').style.display='none'">CLOSE VIEW</button>
     </div>
 
     <div id="loader">
