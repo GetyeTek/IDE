@@ -631,19 +631,27 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
                 const response = await fetch(data.signedUrl);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-                const buffer = await response.arrayBuffer();
-                const contentType = response.headers.get('content-type');
-                activeBlob = new Blob([buffer], { type: contentType });
-                activeFileName = name;
+                let buffer = await response.arrayBuffer();
+                let workingName = name;
+                
+                if (workingName.toLowerCase().endsWith('.gz')) {
+                    buffer = await decompressGzip(buffer);
+                    workingName = workingName.slice(0, -3);
+                }
+
+                const effectiveExt = workingName.split('.').pop().toLowerCase();
+                activeBlob = new Blob([buffer]);
+                activeFileName = workingName;
                 
                 let contentHtml = "";
-                if (ext === 'ctx') {
+                if (effectiveExt === 'ctx') {
                     const processedData = await decryptCtx(buffer);
                     contentHtml = renderIntelligence(processedData);
-                } else if (ext === 'gz') {
-                    const text = await decompressGzip(buffer);
+                } else if (effectiveExt === 'jsonl' || effectiveExt === 'txt' || (effectiveExt === 'gz' && name.includes('log'))) {
+                    // If it was a log file (or remains a log after one layer of decompression)
+                    const text = new TextDecoder().decode(buffer);
                     contentHtml = renderLogs(text);
-                } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
+                } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(effectiveExt)) {
                     const url = URL.createObjectURL(activeBlob);
                     contentHtml = `<img src="${url}" class="viewer-media" style="display:block; margin:auto;">`;
                 } else if (['m4a', 'mp3', 'wav', 'aac'].includes(ext)) {
@@ -684,8 +692,8 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
             const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
             const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, cryptoKey, ciphertext);
             
-            const decompressed = await decompressGzip(decrypted);
-            return JSON.parse(decompressed);
+            const decompressedBuffer = await decompressGzip(decrypted);
+            return JSON.parse(new TextDecoder().decode(decompressedBuffer));
         }
 
         async function decompressGzip(buffer) {
@@ -694,7 +702,7 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
             writer.write(buffer);
             writer.close();
             const response = new Response(ds.readable);
-            return await response.text();
+            return await response.arrayBuffer();
         }
 
         function renderIntelligence(data) {
