@@ -576,11 +576,27 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
             fetchFiles();
         }
 
-        function downloadFile(name) {
-            const fullPath = currentVaultPath + "/" + name;
-            // Use the public URL for the selected file
-            const { data } = sb.storage.from('cortex-vault').getPublicUrl(fullPath);
-            if (data?.publicUrl) window.open(data.publicUrl, '_blank');
+        async function downloadFile(name) {
+            // Sanitize path: Ensure no leading/double slashes
+            const fullPath = currentVaultPath ? `${currentVaultPath}/${name}` : name;
+            
+            toast("GENERATING SECURE LINK...", "success");
+            
+            // Create a Signed URL valid for 60 seconds
+            const { data, error } = await sb.storage
+                .from('cortex-vault')
+                .createSignedUrl(fullPath, 60);
+
+            if (error) {
+                console.error("SignedURL Error:", error);
+                return toast("VAULT ERROR: " + error.message, "danger");
+            }
+
+            if (data?.signedUrl) {
+                window.open(data.signedUrl, '_blank');
+            } else {
+                toast("FILE NOT ACCESSIBLE", "danger");
+            }
         }
 
         function formatBytes(bytes, decimals = 2) {
