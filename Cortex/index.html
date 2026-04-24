@@ -597,24 +597,35 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
                 return;
             }
 
+            const localNotes = JSON.parse(localStorage.getItem('cortex_notes') || '{}');
+
             list.innerHTML = data.map(item => {
-                // In Supabase storage list, items without metadata are folders
                 const isFolder = !item.metadata;
                 const icon = isFolder ? "📁" : "📄";
+                const path = currentVaultPath ? `${currentVaultPath}/${item.name}` : item.name;
+                const folderNote = isFolder ? localNotes[path] : null;
+                
                 const action = isFolder 
                     ? `onclick="enterFolder('${item.name}')"` 
                     : `onclick="viewFile('${item.name}')"`;
 
                 return `
                     <div class="card" ${action} style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-left-color:${isFolder ? 'var(--secondary)' : 'var(--primary)'}">
-                        <div style="display:flex; align-items:center; gap:12px;">
+                        <div style="display:flex; align-items:center; gap:12px; flex:1;">
                             <span style="font-size:1.2rem;">${icon}</span>
-                            <div>
-                                <div style="color: ${isFolder ? 'var(--text)' : 'var(--primary)'}; font-size:0.85rem;">${item.name}</div>
-                                <div style="font-size:0.6rem; color:#555;">${isFolder ? 'DIRECTORY' : formatBytes(item.metadata.size)}</div>
+                            <div style="overflow:hidden;">
+                                <div style="color: ${isFolder ? 'var(--text)' : 'var(--primary)'}; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.name}</div>
+                                ${folderNote ? `<div style="color:var(--success); font-size:0.65rem; text-transform:uppercase; margin-top:2px;">LABEL: ${folderNote}</div>` : ''}
+                                <div style="font-size:0.6rem; color:#555;">
+                                    ${isFolder ? 'DIRECTORY' : formatBytes(item.metadata.size)}
+                                    ${item.metadata && item.metadata.lastModified ? ' • MOD: ' + new Date(item.metadata.lastModified).toLocaleDateString() : ''}
+                                </div>
                             </div>
                         </div>
-                        <div style="color:#444; font-size:0.8rem;">›</div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            ${isFolder ? `<button onclick="saveFolderNote('${item.name}', event)" style="background:none; border:none; color:var(--primary); opacity:0.3; cursor:pointer; font-size:1rem;">🏷️</button>` : ''}
+                            <div style="color:#444; font-size:0.8rem;">›</div>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -630,6 +641,21 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
             parts.pop();
             currentVaultPath = parts.join('/');
             fetchFiles();
+        }
+
+        function saveFolderNote(name, event) {
+            event.stopPropagation();
+            const path = currentVaultPath ? `${currentVaultPath}/${name}` : name;
+            const notes = JSON.parse(localStorage.getItem('cortex_notes') || '{}');
+            const existing = notes[path] || '';
+            const newNote = prompt(`ANNOTATE FOLDER [${name}]:`, existing);
+            
+            if (newNote !== null) {
+                if (newNote.trim() === '') delete notes[path];
+                else notes[path] = newNote.trim();
+                localStorage.setItem('cortex_notes', JSON.stringify(notes));
+                fetchFiles();
+            }
         }
 
         async function viewFile(name) {
