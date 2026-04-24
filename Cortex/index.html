@@ -293,8 +293,12 @@
         </div>
 
         <div id="view-files" class="section">
-            <h2>Data Vault</h2>
-            <div id="file-list"><div style="text-align:center; padding:40px; color:#444;">Initializing Storage...</div></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2>Data Vault</h2>
+                <button class="btn" id="vault-back-btn" onclick="vaultBack()" style="display:none; font-size:0.6rem;">← BACK</button>
+            </div>
+            <div id="vault-path-display" style="font-size: 0.6rem; color: var(--primary); margin-bottom: 10px; opacity: 0.5; overflow: hidden; text-overflow: ellipsis;">ROOT://</div>
+            <div id="file-list"></div>
         </div>
     </main>
 
@@ -310,12 +314,13 @@
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let selectedDeviceIds = new Set();
         let allDevices = [];
+        let currentVaultPath = "";
 
         window.onload = async () => {
             setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 1000);
             await fetchLatest();
             setInterval(fetchLatest, 5000);
-            setInterval(fetchFiles, 10000);
+            fetchFiles(); // Initial load
         };
 
         function switchTab(tab) {
@@ -513,18 +518,78 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
         }
 
         async function fetchFiles() {
-            const { data } = await sb.from('file_registry').select('*').order('created_at', { ascending: false }).limit(20);
             const list = document.getElementById('file-list');
-            if (!data || data.length === 0) return;
-            list.innerHTML = data.map(f => `
-                <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <div style="color: var(--primary); font-size:0.9rem;">${f.file_name}</div>
-                        <div style="font-size:0.7rem; color:#666;">${f.category} • ${(f.file_size/1024).toFixed(1)}KB</div>
+            const backBtn = document.getElementById('vault-back-btn');
+            const pathDisplay = document.getElementById('vault-path-display');
+            
+            pathDisplay.innerText = "ROOT://" + currentVaultPath;
+            backBtn.style.display = currentVaultPath === "" ? "none" : "block";
+
+            const { data, error } = await sb.storage.from('cortex-vault').list(currentVaultPath, {
+                limit: 100,
+                offset: 0,
+                sortBy: { column: 'name', order: 'asc' }
+            });
+
+            if (error) {
+                list.innerHTML = `<div style="color:var(--danger); padding:20px;">STORAGE_ERROR: ${error.message}</div>`;
+                return;
+            }
+
+            if (!data || data.length === 0) {
+                list.innerHTML = `<div style="text-align:center; padding:40px; color:#444;">DIRECTORY_EMPTY</div>`;
+                return;
+            }
+
+            list.innerHTML = data.map(item => {
+                // In Supabase storage list, items without metadata are folders
+                const isFolder = !item.metadata;
+                const icon = isFolder ? "📁" : "📄";
+                const action = isFolder 
+                    ? `onclick="enterFolder('${item.name}')"` 
+                    : `onclick="downloadFile('${item.name}')"`;
+
+                return `
+                    <div class="card" ${action} style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-left-color:${isFolder ? 'var(--secondary)' : 'var(--primary)'}">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <span style="font-size:1.2rem;">${icon}</span>
+                            <div>
+                                <div style="color: ${isFolder ? 'var(--text)' : 'var(--primary)'}; font-size:0.85rem;">${item.name}</div>
+                                <div style="font-size:0.6rem; color:#555;">${isFolder ? 'DIRECTORY' : formatBytes(item.metadata.size)}</div>
+                            </div>
+                        </div>
+                        <div style="color:#444; font-size:0.8rem;">›</div>
                     </div>
-                    <button class="btn" onclick="window.open('${SUPABASE_URL}/storage/v1/object/authenticated/cortex-vault/${f.file_path}')">View</button>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+        }
+
+        function enterFolder(name) {
+            currentVaultPath += (currentVaultPath === "" ? "" : "/") + name;
+            fetchFiles();
+        }
+
+        function vaultBack() {
+            const parts = currentVaultPath.split('/');
+            parts.pop();
+            currentVaultPath = parts.join('/');
+            fetchFiles();
+        }
+
+        function downloadFile(name) {
+            const fullPath = currentVaultPath + "/" + name;
+            // Use the public URL for the selected file
+            const { data } = sb.storage.from('cortex-vault').getPublicUrl(fullPath);
+            if (data?.publicUrl) window.open(data.publicUrl, '_blank');
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
     </script>
 </body>
