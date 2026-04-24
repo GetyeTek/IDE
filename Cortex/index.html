@@ -187,7 +187,11 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Connectivity & Identity</label>
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('PING')">?</button>
                         <button class="btn" style="flex:1" onclick="sendCmd('PING')">Ping Probe</button>
+                    </div>
+                    <div class="input-wrap" style="margin-top:5px">
+                        <button class="btn-status" onclick="auditCmd('GET_TOKEN')">?</button>
                         <button class="btn" style="flex:1" onclick="sendCmd('GET_TOKEN')">Fetch Token</button>
                     </div>
                 </div>
