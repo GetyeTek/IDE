@@ -131,7 +131,10 @@
 
     <main>
         <div id="view-dash" class="section active">
-            <h2>Active Device Cluster</h2>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                <h2>Active Device Cluster</h2>
+                <button class="btn" onclick="fetchLatest()" style="font-size: 0.6rem; padding: 4px 8px;">REFRESH SCAN</button>
+            </div>
             <div class="card" id="device-list-container" style="padding:0; max-height: 300px; overflow-y: auto;">
                 <div style="padding:20px; text-align:center; color:#444;">Scanning for signals...</div>
             </div>
