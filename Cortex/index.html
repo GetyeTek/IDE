@@ -651,25 +651,58 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
         }
 
         function renderIntelligence(data) {
-            let html = `<div style="margin-bottom:20px; color:var(--success); border-bottom:1px solid #333; padding-bottom:10px">INTEL_REPORT: ${data.device_model || 'GENERIC'}</div>`;
+            let html = `<div style="margin-bottom:20px; color:var(--success); border-bottom:1px solid #333; padding-bottom:10px; font-size:1.2rem;">INTEL_REPORT: ${data.device_model || 'GENERIC'}</div>`;
             
-            const sections = {
-                "IDENTITY": data.static || {},
-                "HEALTH": data.health || data.app_health || {},
-                "FORENSICS": { 
-                    "Contacts": data.contacts?.length || 0, 
-                    "Calls": data.calls?.length || 0, 
-                    "Apps": data.apps?.length || 0 
-                }
-            };
-
-            for (const [title, obj] of Object.entries(sections)) {
+            // 1. Basic Vitals
+            const vitals = { "IDENTITY": data.static || {}, "HEALTH": data.health || data.app_health || {} };
+            for (const [title, obj] of Object.entries(vitals)) {
                 html += `<h2 style="font-size:0.7rem; margin-top:15px">${title}</h2>`;
                 for (const [k, v] of Object.entries(obj)) {
                     if (typeof v === 'object') continue;
                     html += `<div class="viewer-card"><span class="json-key">${k}:</span> <span class="json-val">${v}</span></div>`;
                 }
             }
+
+            // 2. Deep Dive Sections
+            const trays = [
+                { 
+                    title: "CALL_HISTORY", 
+                    data: data.calls, 
+                    render: (c) => `
+                        <div style="padding:8px; border-bottom:1px solid #222; display:flex; justify-content:space-between; font-size:0.8rem;">
+                            <span>${c.type === 1 ? '📥' : (c.type === 2 ? '📤' : '❌')} ${c.num}</span>
+                            <span style="color:#555">${c.dur}s | ${new Date(c.ts).toLocaleDateString()}</span>
+                        </div>`
+                },
+                { 
+                    title: "CONTACT_DATABASE", 
+                    data: data.contacts, 
+                    render: (c) => `
+                        <div style="padding:8px; border-bottom:1px solid #222; font-size:0.8rem;">
+                            <div style="color:var(--primary)">${c.name}</div>
+                            <div style="color:#666; font-size:0.7rem">${c.num}</div>
+                        </div>`
+                },
+                { 
+                    title: "INSTALLED_APPS", 
+                    data: data.apps, 
+                    render: (a) => `
+                        <div style="padding:8px; border-bottom:1px solid #222; font-size:0.7rem;">
+                            <span style="color:${a.type === 'SYSTEM' ? '#555' : 'var(--success)'}">[${a.type}]</span> ${a.name}
+                            <div style="color:#444">${a.pkg} (v${a.ver})</div>
+                        </div>`
+                }
+            ];
+
+            trays.forEach(tray => {
+                if (tray.data && tray.data.length > 0) {
+                    html += `<h2 style="font-size:0.7rem; margin-top:25px; color:var(--primary)">${tray.title} (${tray.data.length})</h2>`;
+                    html += `<div style="max-height:300px; overflow-y:auto; background:rgba(0,0,0,0.2); border:1px solid #222;">`;
+                    html += tray.data.map(tray.render).join('');
+                    html += `</div>`;
+                }
+            });
+
             return html;
         }
 
