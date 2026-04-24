@@ -577,12 +577,9 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
         }
 
         async function downloadFile(name) {
-            // Sanitize path: Ensure no leading/double slashes
             const fullPath = currentVaultPath ? `${currentVaultPath}/${name}` : name;
+            toast("PREPARING DOWNLOAD...", "success");
             
-            toast("GENERATING SECURE LINK...", "success");
-            
-            // Create a Signed URL valid for 60 seconds
             const { data, error } = await sb.storage
                 .from('cortex-vault')
                 .createSignedUrl(fullPath, 60);
@@ -593,7 +590,13 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
             }
 
             if (data?.signedUrl) {
-                window.open(data.signedUrl, '_blank');
+                const link = document.createElement('a');
+                link.href = data.signedUrl;
+                link.setAttribute('download', name);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast("DOWNLOAD INITIATED", "success");
             } else {
                 toast("FILE NOT ACCESSIBLE", "danger");
             }
