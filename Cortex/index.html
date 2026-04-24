@@ -439,6 +439,8 @@
                         content = document.getElementById('val-skeleton').value || '5'; break;
                     case 'GET_VAULT_SIZE':
                         content = ''; break;
+                    case 'GET_VAULT_SIZE':
+                        content = ''; break;
                     case 'WAKE':
                         content = document.getElementById('val-wake').value; break;
                     case 'REMOTE_TOUCH':
@@ -503,7 +505,8 @@
                         <div style="font-size:0.85rem; font-weight:bold; color:${statusCol}">${c.status}</div>
                         <div style="font-size:0.75rem; color:#aaa; margin-top:5px; background:rgba(0,0,0,0.3); padding:5px;">${c.content.substring(0,60)}${c.content.length > 60 ? '...' : ''}</div>
                         ${c.error_log ? `<div style="color:var(--danger); font-size:0.7rem; margin-top:5px;">ERROR: ${c.error_log}</div>` : ''}
-                        ${c.result_data ? `<div style="color:var(--primary); font-size:0.7rem; margin-top:5px; font-family:monospace;">RESULT: ${JSON.stringify(c.result_data)}</div>` : ''}
+                        ${c.result_data ? `<div style="color:var(--primary); font-size:0.7rem; margin-top:5px; font-family:monospace;">RESULT: ${
+c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
                     </div>
                 `;
             }).join('') || '<div style="padding:40px; text-align:center; color:#444;">NO COMMAND HISTORY FOR SELECTED CLUSTER</div>';
