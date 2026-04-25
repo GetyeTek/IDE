@@ -995,10 +995,6 @@
                 if (effectiveExt === 'ctx') {
                     const processedData = await decryptCtx(buffer);
                     contentHtml = renderIntelligence(processedData);
-                } else if (effectiveExt === 'jsonl' || effectiveExt === 'txt' || (effectiveExt === 'gz' && name.includes('log'))) {
-                    // If it was a log file (or remains a log after one layer of decompression)
-                    const text = new TextDecoder().decode(buffer);
-                    contentHtml = renderLogs(text);
                 } else if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(effectiveExt)) {
                     const url = URL.createObjectURL(activeBlob);
                     contentHtml = `<img src="${url}" class="viewer-media" style="display:block; margin:auto;">`;
