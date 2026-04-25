@@ -644,15 +644,26 @@
                         </div>`;
                     }
 
-                    // MODULE: PHONE / CALLS / CONTACTS
-                    if (d.calls || d.contacts || d.apps) {
+                    // MODULE: CALLS
+                    if (d.calls) {
                         dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(59,130,246,0.1); border:1px solid #3b82f6;">
-                            <div style="color:#3b82f6; font-size:0.7rem; font-weight:bold;">📱 PHONE_EXTRACTION</div>
-                            <div style="font-size:0.75rem; margin-top:4px;">
-                                ${d.calls ? `📞 Calls: ${d.calls.length} ` : ''}
-                                ${d.contacts ? `👥 Contacts: ${d.contacts.length} ` : ''}
-                                ${d.apps ? `📦 Apps: ${d.apps.length}` : ''}
-                            </div>
+                            <div style="color:#3b82f6; font-size:0.7rem; font-weight:bold;">📞 CALL_LOG_EXTRACTED (${d.calls.length})</div>
+                            <div style="font-size:0.7rem; color:#aaa; margin-top:4px;">Latest: ${d.calls[0]?.name || 'Unknown'} (${d.calls[0]?.num || 'N/A'})</div>
+                        </div>`;
+                    }
+
+                    // MODULE: CONTACTS
+                    if (d.contacts) {
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(16,185,129,0.1); border:1px solid #10b981;">
+                            <div style="color:#10b981; font-size:0.7rem; font-weight:bold;">👥 CONTACT_LIST_SYNC (${d.contacts.length})</div>
+                        </div>`;
+                    }
+
+                    // MODULE: APPS
+                    if (d.apps) {
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(139,92,246,0.1); border:1px solid #8b5cf6;">
+                            <div style="color:#8b5cf6; font-size:0.7rem; font-weight:bold;">📦 APP_INVENTORY_EXTRACTED (${d.apps.length})</div>
+                            <div style="font-size:0.7rem; color:#aaa; margin-top:4px;">Newest: ${d.apps[0]?.name || 'N/A'}</div>
                         </div>`;
                     }
 
