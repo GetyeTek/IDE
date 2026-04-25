@@ -299,11 +299,16 @@
                 <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('PULL_FILE')">?</button><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Remote Deployment (Push)</label>
-                    <input type="text" id="push-url" placeholder="Source URL (http://...)">
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" id="push-url" placeholder="Source URL (http://...)" style="flex:1">
+                        <label class="btn" style="padding:8px; font-size:0.7rem; display:flex; align-items:center;">
+                            📁 <input type="file" id="push-local-file" style="display:none" onchange="document.getElementById('push-url').value = 'LOCAL: ' + this.files[0].name">
+                        </label>
+                    </div>
                     <div class="input-wrap">
                         <button class="btn-status" onclick="auditCmd('PUSH_FILE')">?</button>
-                        <input type="text" id="push-path" placeholder="/sdcard/Target/path.ext" style="flex:1">
-                        <button class="btn" onclick="sendCmd('PUSH_FILE')">Deploy</button>
+                        <input type="text" id="push-path" placeholder="/sdcard/Download/filename.ext" style="flex:1">
+                        <button class="btn" id="push-deploy-btn" onclick="handlePushDeployment()">Deploy</button>
                     </div>
                 </div>
                 <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
@@ -523,6 +528,57 @@
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
 
+        async function handlePushDeployment() {
+            const fileInput = document.getElementById('push-local-file');
+            const urlInput = document.getElementById('push-url');
+            const pathInput = document.getElementById('push-path');
+            const btn = document.getElementById('push-deploy-btn');
+
+            if (selectedDeviceIds.size === 0) return toast("NO TARGETS SELECTED", "danger");
+            if (!pathInput.value) return toast("TARGET PATH REQUIRED", "danger");
+
+            let finalUrl = urlInput.value;
+
+            // If a local file is selected
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                btn.innerText = "STAGING...";
+                btn.disabled = true;
+                
+                try {
+                    const stagePath = `_DEPLOYMENTS_/${Date.now()}_${file.name}`;
+                    const { data: uploadData, error: uploadError } = await sb.storage
+                        .from('cortex-vault')
+                        .upload(stagePath, file);
+                    
+                    if (uploadError) throw uploadError;
+
+                    const { data: signData, error: signError } = await sb.storage
+                        .from('cortex-vault')
+                        .createSignedUrl(stagePath, 86400); // 24 hour link
+                    
+                    if (signError) throw signError;
+                    finalUrl = signData.signedUrl;
+                    toast("FILE STAGED IN VAULT", "success");
+                } catch (e) {
+                    toast("STAGING FAILED: " + e.message, "danger");
+                    btn.innerText = "DEPLOY";
+                    btn.disabled = false;
+                    return;
+                }
+            }
+
+            if (!finalUrl || finalUrl.startsWith('LOCAL: ')) return toast("SOURCE URL OR FILE REQUIRED", "danger");
+
+            await sendCmd('PUSH_FILE', `${finalUrl} | ${pathInput.value}`);
+            
+            // Reset UI
+            btn.innerText = "DEPLOY";
+            btn.disabled = false;
+            fileInput.value = "";
+            urlInput.value = "";
+        }
+
         async function sendCmd(type, forcedVal = null) {
             if (selectedDeviceIds.size === 0) return alert("NO TARGETS SELECTED");
             
@@ -537,6 +593,7 @@
                     case 'GET_TOKEN': content = ''; break;
                     case 'GET_SCREENSHOT': content = document.getElementById('scr-quality').value || '70'; break;
                     case 'PUSH_FILE': 
+                        // This is now handled by handlePushDeployment, but we keep the fallback
                         content = `${document.getElementById('push-url').value} | ${document.getElementById('push-path').value}`; break;
                     case 'PULL_FILE': content = document.getElementById('val-pull').value; break;
                     case 'RUN_INTENT':
