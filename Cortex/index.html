@@ -922,20 +922,47 @@
             fetchFiles();
         }
 
+        async function getFriendlyBlob(fullPath, originalName) {
+            const { data, error } = await sb.storage.from('cortex-vault').createSignedUrl(fullPath, 60);
+            if (error) throw error;
+
+            const resp = await fetch(data.signedUrl);
+            let buffer = await resp.arrayBuffer();
+            let fileName = originalName;
+
+            // 1. Decompress if GZIP
+            if (fileName.toLowerCase().endsWith('.gz')) {
+                buffer = await decompressGzip(buffer);
+                fileName = fileName.slice(0, -3);
+            }
+
+            // 2. Decrypt if CTX
+            if (fileName.toLowerCase().endsWith('.ctx')) {
+                buffer = await decryptCtx(buffer);
+                fileName = fileName.slice(0, -4) + ".json";
+            }
+
+            return { blob: new Blob([buffer]), name: fileName };
+        }
+
         async function handleVaultDownload(name, isFolder, event) {
             event.stopPropagation();
             const fullPath = currentVaultPath ? `${currentVaultPath}/${name}` : name;
             
             if (!isFolder) {
-                toast("PREPARING FILE...", "success");
-                const { data, error } = await sb.storage.from('cortex-vault').createSignedUrl(fullPath, 60);
-                if (error) return toast("DOWNLOAD ERROR", "danger");
-                const a = document.createElement('a');
-                a.href = data.signedUrl;
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+                toast("DECRYPTING & DOWNLOADING...", "success");
+                try {
+                    const result = await getFriendlyBlob(fullPath, name);
+                    const url = window.URL.createObjectURL(result.blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = result.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } catch (e) {
+                    toast("DECRYPTION FAILED", "danger");
+                }
             } else {
                 toast("COMPILING ZIP (RECURSIVE)...", "success");
                 try {
@@ -967,11 +994,12 @@
                     const newFolder = zipFolder.folder(item.name);
                     await crawlAndZip(itemPath, newFolder);
                 } else { // It's a file
-                    const { data: signed, error: sErr } = await sb.storage.from('cortex-vault').createSignedUrl(itemPath, 300);
-                    if (sErr) continue;
-                    const resp = await fetch(signed.signedUrl);
-                    const blob = await resp.blob();
-                    zipFolder.file(item.name, blob);
+                    try {
+                        const processed = await getFriendlyBlob(itemPath, item.name);
+                        zipFolder.file(processed.name, processed.blob);
+                    } catch (e) {
+                        console.error("Skipping corrupted forensic file: ", item.name);
+                    }
                 }
             }
         }
