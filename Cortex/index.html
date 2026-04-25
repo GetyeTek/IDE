@@ -472,21 +472,35 @@
             renderDeviceList();
         }
 
+        function formatLastSeen(dateStr) {
+            const now = new Date();
+            const past = new Date(dateStr);
+            const diffMs = now - past;
+            const diffSec = Math.floor(diffMs / 1000);
+            const diffMin = Math.floor(diffSec / 60);
+            const diffHr = Math.floor(diffMin / 60);
+
+            if (diffSec < 90) return "ONLINE";
+            if (diffMin < 60) return `${diffMin}m ago`;
+            if (diffHr < 24) return `${diffHr}h ago`;
+            return past.toLocaleDateString();
+        }
+
         function renderDeviceList() {
             const container = document.getElementById('device-list-container');
             document.getElementById('multi-select-bar').style.display = 'flex';
             
             container.innerHTML = allDevices.map(dev => {
                 const isSelected = selectedDeviceIds.has(dev.device_id);
-                const diff = Math.floor((new Date() - new Date(dev.created_at)) / 1000);
-                const statusText = diff > 60 ? Math.floor(diff/60) + 'm' : diff + 's';
-                const isOnline = diff < 90;
+                const diffSec = Math.floor((new Date() - new Date(dev.created_at)) / 1000);
+                const isOnline = diffSec < 90;
+                const friendlyStatus = formatLastSeen(dev.created_at);
                 
                 return `
                     <div class="device-row ${isSelected ? 'selected' : ''}" onclick="toggleDevice('${dev.device_id}')">
                         <div class="checkbox"></div>
                         <div class="device-info">
-                            <div style="color:#fff; font-size:0.9rem;">${dev.device_model || 'Unknown'} <span style="color:${isOnline ? 'var(--success)' : '#444'}; font-size:0.6rem;">● ${statusText}</span></div>
+                            <div style="color:#fff; font-size:0.9rem;">${dev.device_model || 'Unknown'} <span style="color:${isOnline ? 'var(--success)' : '#444'}; font-size:0.6rem; font-weight:bold; letter-spacing:0.5px;">● ${friendlyStatus}</span></div>
                             <div style="color:#666; font-size:0.7rem;">${dev.device_id.substring(0,12)}...</div>
                         </div>
                         <div style="color:var(--primary); font-size:0.8rem;">${dev.battery_level || 0}%</div>
