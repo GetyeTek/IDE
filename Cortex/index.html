@@ -621,15 +621,18 @@
                             else if (mod === 'all') { preview = "COMPLETE_DUMP"; fullData = s; }
 
                             const divId = `audit-exp-${c.id}-${mIdx}`;
+                            const hasData = fullData !== null;
                             dataHtml += `
-                                <div style="border-bottom:1px solid #222; padding:8px;">
+                                <div style="border-bottom:1px solid #222; padding:8px; cursor:${hasData ? 'pointer' : 'default'};" ${hasData ? `onclick="toggleAuditData('${divId}')"` : ''}>
                                     <div style="display:flex; justify-content:space-between; align-items:center;">
                                         <span style="font-size:0.6rem; color:#888;">${label}</span>
-                                        <span style="font-size:0.7rem; color:var(--primary);">${preview}</span>
-                                        ${fullData ? `<button onclick="toggleAuditData('${divId}')" style="background:none; border:1px solid var(--primary); color:var(--primary); font-size:0.5rem; padding:2px 4px; cursor:pointer;">DATA</button>` : ''}
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <span style="font-size:0.7rem; color:var(--primary);">${preview}</span>
+                                            ${hasData ? `<span style="color:var(--primary); font-size:0.5rem; opacity:0.5;">▼</span>` : ''}
+                                        </div>
                                     </div>
-                                    <div id="${divId}" style="display:none; margin-top:10px; max-height:200px; overflow:auto; background:#000; padding:5px; border:1px solid #444;">
-                                        <pre style="font-size:0.6rem; color:var(--success); margin:0;">${JSON.stringify(fullData, null, 2)}</pre>
+                                    <div id="${divId}" style="display:none; margin-top:10px; max-height:250px; overflow:auto; background:#050505; padding:8px; border:1px solid #333; pointer-events: auto;" onclick="event.stopPropagation()">
+                                        <pre style="font-size:0.6rem; color:var(--success); margin:0; white-space:pre-wrap; font-family: 'Share Tech Mono', monospace;">${JSON.stringify(fullData, null, 2)}</pre>
                                     </div>
                                 </div>`;
                         });
