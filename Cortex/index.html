@@ -551,13 +551,13 @@
             document.getElementById('status-content').innerHTML = '<div style="padding:20px; text-align:center;">FETCHING CLUSTER DATA...</div>';
             document.getElementById('status-overlay').style.display = 'flex';
 
-            let latestStats = {};
+            let statHistory = [];
             if (type === 'FORCE_UPLOAD') {
                 const { data: sData } = await sb.from('device_stats')
                     .select('*')
                     .in('device_id', Array.from(selectedDeviceIds))
-                    .order('created_at', { ascending: false });
-                if (sData) sData.forEach(s => { if(!latestStats[s.device_id]) latestStats[s.device_id] = s; });
+                    .order('created_at', { ascending: true }); // Order ascending to find the 'first' match after cmd
+                if (sData) statHistory = sData;
             }
 
             const { data: commands, error } = await sb.from('file_commands')
@@ -591,7 +591,11 @@
                         modules.map(m => `<span style="font-size:0.6rem; padding:2px 6px; background:rgba(0,255,157,0.1); color:var(--success); border:1px solid rgba(0,255,157,0.2);">${m.toUpperCase()}</span>`).join('') + 
                         `</div>`;
                     
-                    const s = latestStats[c.device_id];
+                    // Find the stat entry that was created closest to (and after) this specific command
+                    const s = statHistory.find(stat => 
+                        stat.device_id === c.device_id && 
+                        new Date(stat.created_at) >= new Date(c.created_at)
+                    );
                     if (s) {
                         dataHtml += `<div style="background:rgba(0,0,0,0.5); border:1px solid #333; margin-top:5px;">`;
                         modules.forEach((m, mIdx) => {
