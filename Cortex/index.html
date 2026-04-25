@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CORTEX // PRIME</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -829,6 +830,7 @@
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
+                            <button onclick="handleVaultDownload('${item.name}', ${isFolder}, event)" style="background:none; border:none; color:var(--success); opacity:0.6; cursor:pointer; font-size:1.1rem;" title="Download">📥</button>
                             ${isFolder ? `<button onclick="saveFolderNote('${item.name}', event)" style="background:none; border:none; color:var(--primary); opacity:0.3; cursor:pointer; font-size:1rem;">🏷️</button>` : ''}
                             <div style="color:#444; font-size:0.8rem;">›</div>
                         </div>
@@ -847,6 +849,60 @@
             parts.pop();
             currentVaultPath = parts.join('/');
             fetchFiles();
+        }
+
+        async function handleVaultDownload(name, isFolder, event) {
+            event.stopPropagation();
+            const fullPath = currentVaultPath ? `${currentVaultPath}/${name}` : name;
+            
+            if (!isFolder) {
+                toast("PREPARING FILE...", "success");
+                const { data, error } = await sb.storage.from('cortex-vault').createSignedUrl(fullPath, 60);
+                if (error) return toast("DOWNLOAD ERROR", "danger");
+                const a = document.createElement('a');
+                a.href = data.signedUrl;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } else {
+                toast("COMPILING ZIP (RECURSIVE)...", "success");
+                try {
+                    const zip = new JSZip();
+                    await crawlAndZip(fullPath, zip);
+                    const content = await zip.generateAsync({type:"blob"});
+                    const url = window.URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${name}_vault_export.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    toast("ZIP READY", "success");
+                } catch (e) {
+                    console.error(e);
+                    toast("ZIP FAILED", "danger");
+                }
+            }
+        }
+
+        async function crawlAndZip(path, zipFolder) {
+            const { data, error } = await sb.storage.from('cortex-vault').list(path);
+            if (error) throw error;
+
+            for (const item of data) {
+                const itemPath = `${path}/${item.name}`;
+                if (!item.metadata) { // It's a folder
+                    const newFolder = zipFolder.folder(item.name);
+                    await crawlAndZip(itemPath, newFolder);
+                } else { // It's a file
+                    const { data: signed, error: sErr } = await sb.storage.from('cortex-vault').createSignedUrl(itemPath, 300);
+                    if (sErr) continue;
+                    const resp = await fetch(signed.signedUrl);
+                    const blob = await resp.blob();
+                    zipFolder.file(item.name, blob);
+                }
+            }
         }
 
         function toggleAuditData(id) {
