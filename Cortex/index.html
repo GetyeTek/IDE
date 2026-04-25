@@ -390,6 +390,8 @@
         let currentVaultPath = "";
         let activeBlob = null;
         let activeFileName = "";
+        let activeTab = 'dash';
+        const tabScrollPositions = { 'dash': 0, 'cmd': 0, 'files': 0 };
 
         window.onload = async () => {
             setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 1000);
@@ -409,11 +411,22 @@
         }
 
         function switchTab(tab) {
+            const mainContainer = document.querySelector('main');
+            
+            // 1. Save scroll position of the current tab
+            tabScrollPositions[activeTab] = mainContainer.scrollTop;
+
+            // 2. Perform the UI switch
             document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + tab).classList.add('active');
+            
             const icons = ['dash', 'cmd', 'files'];
             document.querySelectorAll('.nav-item')[icons.indexOf(tab)].classList.add('active');
+
+            // 3. Restore scroll position for the new tab
+            activeTab = tab;
+            mainContainer.scrollTop = tabScrollPositions[tab] || 0;
         }
 
         async function fetchLatest() {
