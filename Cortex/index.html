@@ -87,18 +87,20 @@
         .cmd-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
         .cmd-label { color: var(--primary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
         
-        .input-wrap { display: flex; gap: 5px; }
+        .input-wrap { display: flex; gap: 5px; flex-wrap: wrap; }
         input, textarea {
             flex: 1; background: #000; border: 1px solid var(--surface-light);
-            color: var(--primary); padding: 8px 12px; font-family: inherit; font-size: 0.85rem;
+            color: var(--primary); padding: 8px 10px; font-family: inherit; font-size: 0.85rem;
+            min-width: 0; /* Prevents flex items from breaking container */
         }
         textarea { min-height: 60px; resize: vertical; }
 
         .btn {
             background: var(--surface-light); border: 1px solid var(--primary);
-            color: var(--primary); padding: 8px 15px; font-family: inherit;
+            color: var(--primary); padding: 8px 12px; font-family: inherit;
             font-size: 0.8rem; cursor: pointer; text-transform: uppercase;
             transition: all 0.2s; clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
+            white-space: nowrap;
         }
         .btn:active { transform: scale(0.95); background: var(--primary); color: #000; }
         .btn.danger { border-color: var(--danger); color: var(--danger); }
@@ -217,7 +219,7 @@
                     <label class="cmd-label">Notification Wipe</label>
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('WIPE_NOTIFICATIONS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('WIPE_NOTIFICATIONS')">?</button>
-                        <select id="wipe-mode" style="width:70px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                        <select id="wipe-mode" style="width:70px; background:#000; color:var(--primary); border:1px solid var(--surface-light); min-width:0;">
                             <option value="ALL">ALL</option>
                             <option value="PKG">PKG</option>
                             <option value="TEXT">TEXT</option>
