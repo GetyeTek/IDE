@@ -309,17 +309,25 @@
                     </div>
                 </div>
                 <div class="cmd-row">
-                    <label class="cmd-label">Ghost Interaction (Remote Touch)</label>
+                    <label class="cmd-label">Interaction Architect (Ghost Chain)</label>
+                    <div class="card" style="padding:10px; border-style:dashed; margin-bottom:5px;">
+                        <div id="touch-chain-list" style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px;"></div>
+                        <div style="display:flex; gap:5px;">
+                            <select id="next-step-type" style="flex:1; background:#000; color:var(--primary); border:1px solid #333;">
+                                <option value="NODE">TAP NODE (ID/Text)</option>
+                                <option value="TAP">TAP COORD (X,Y)</option>
+                                <option value="NAV">NAV ACTION</option>
+                                <option value="WAIT">WAIT (ms)</option>
+                                <option value="SWIPE">SWIPE (X1,Y1,X2,Y2)</option>
+                            </select>
+                            <button class="btn" onclick="addTouchStep()" style="padding:5px 10px; font-size:0.7rem;">+ STEP</button>
+                        </div>
+                    </div>
+                    <textarea id="touch-json-raw" placeholder="[ { &quot;type&quot;: &quot;NAV&quot;, &quot;val&quot;: &quot;BACK&quot; } ]" style="font-size:0.6rem; min-height:40px; margin-bottom:5px;"></textarea>
                     <div class="input-wrap">
                         <button class="btn-status" onclick="auditCmd('REMOTE_TOUCH')">?</button>
-                        <select id="touch-act" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
-                            <option value="NAV|BACK">Nav: Back</option>
-                            <option value="NAV|HOME">Nav: Home</option>
-                            <option value="NAV|RECENTS">Nav: Recents</option>
-                            <option value="TAP">Custom Tap (X,Y)</option>
-                        </select>
-                        <input type="text" id="touch-val" placeholder="Params (if tap)" style="width:100px">
-                        <button class="btn" onclick="sendCmd('REMOTE_TOUCH')">Send</button>
+                        <button class="btn danger" onclick="clearTouchChain()" style="font-size:0.7rem;">RESET</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('REMOTE_TOUCH')">BROADCAST CHAIN</button>
                     </div>
                 </div>
             </div>
@@ -452,6 +460,36 @@
         let activeBlob = null;
         let activeFileName = "";
         let activeTab = 'dash';
+        let touchChain = [];
+
+        function addTouchStep() {
+            const type = document.getElementById('next-step-type').value;
+            let val = "";
+            if (type === 'NAV') val = "BACK";
+            else if (type === 'WAIT') val = "1000";
+            
+            const stepVal = prompt(`Enter value for ${type}:`, val);
+            if (stepVal === null) return;
+
+            touchChain.push({ type, val: stepVal, delay: 200 });
+            renderTouchChain();
+        }
+
+        function renderTouchChain() {
+            const container = document.getElementById('touch-chain-list');
+            container.innerHTML = touchChain.map((s, i) => `
+                <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(0,243,255,0.05); padding:5px 8px; border-left:2px solid var(--primary); font-size:0.65rem;">
+                    <span><b style="color:var(--primary)">${i+1}. ${s.type}</b>: ${s.val}</span>
+                    <span onclick="touchChain.splice(${i},1);renderTouchChain();" style="color:var(--danger); cursor:pointer">×</span>
+                </div>
+            `).join('');
+            document.getElementById('touch-json-raw').value = JSON.stringify(touchChain);
+        }
+
+        function clearTouchChain() {
+            touchChain = [];
+            renderTouchChain();
+        }
         const tabScrollPositions = { 'dash': 0, 'cmd': 0, 'files': 0 };
 
         window.onload = async () => {
@@ -698,11 +736,8 @@
                     case 'WAKE':
                         content = document.getElementById('val-wake').value; break;
                     case 'REMOTE_TOUCH':
-                        const tAct = document.getElementById('touch-act').value;
-                        let tVal = document.getElementById('touch-val').value;
-                        // Hardening: Convert '500, 1200' or '500 1200' to '500|1200' reliably
-                        if (tAct === 'TAP') tVal = tVal.trim().replace(/[\s,]+/g, '|');
-                        content = tAct.includes('|') ? tAct : `${tAct}|${tVal}`; break;
+                        const raw = document.getElementById('touch-json-raw').value;
+                        content = raw || "[]"; break;
                     case 'PHONE_LOGS':
                         content = `${document.getElementById('call-act').value}|${document.getElementById('call-val').value}`; break;
                     case 'VOLUME':
