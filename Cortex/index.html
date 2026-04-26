@@ -779,6 +779,18 @@
                     </div>`;
                 }
 
+                if (c.file_name === 'GET_ACCOUNTS' && c.result_data && c.result_data.accounts) {
+                    dataHtml = `<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;">
+                        <div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">IDENTITY_REGISTRY (${c.result_data.accounts.length} ENTRIES)</div>
+                        ${c.result_data.accounts.map(acc => `
+                            <div style="margin-bottom:8px; border-left:2px solid var(--primary); padding-left:8px;">
+                                <div style="color:#fff; font-size:0.8rem; word-break:break-all;">${acc.name}</div>
+                                <div style="color:#666; font-size:0.6rem; text-transform:uppercase;">${acc.type}</div>
+                            </div>
+                        `).join('')}
+                    </div>`;
+                }
+
                 if (type === 'FORCE_UPLOAD') {
                     const modules = c.content.split(',').map(m => m.trim());
                     dataHtml = `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px;">` + 
