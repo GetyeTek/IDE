@@ -860,8 +860,16 @@
 
                 if (c.file_name === 'GET_SENSORS' && c.result_data) {
                     const d = c.result_data;
+                    const captureTime = d.captured_at ? new Date(d.captured_at).toLocaleString() : 'N/A';
+                    const isDelayed = d.captured_at && (new Date(c.updated_at) - d.captured_at > 60000);
+                    
                     dataHtml = `<div style="margin-top:10px; padding:15px; background:rgba(0,255,157,0.05); border:1px solid var(--success);">
-                        <div style="color:var(--success); font-size:0.75rem; font-weight:bold; margin-bottom:12px; border-bottom:1px solid #222;">PHYSICAL_ENVIRONMENT_MAP</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #222; padding-bottom:5px;">
+                            <span style="color:var(--success); font-size:0.75rem; font-weight:bold;">PHYSICAL_ENVIRONMENT_MAP</span>
+                            <span style="font-size:0.6rem; color:${isDelayed ? 'var(--danger)' : '#666'}">${isDelayed ? '⚠️ DELAYED_SYNC' : 'LIVE_SYNC'}</span>
+                        </div>
+                        
+                        <div style="font-size:0.6rem; color:#888; margin-bottom:10px;">CAPTURED: ${captureTime}</div>`
                         
                         <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                             <span style="color:#666; font-size:0.7rem;">PROXIMITY:</span>
