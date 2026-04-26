@@ -38,17 +38,18 @@
         }
 
         header {
-            background: rgba(5, 5, 5, 0.95);
+            background: rgba(5, 5, 5, 0.98);
             backdrop-filter: blur(15px);
             padding: 15px;
             border-bottom: 1px solid var(--primary);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            z-index: 1000;
+            z-index: 1100;
             box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
             position: sticky;
             top: 0;
+            flex-shrink: 0;
         }
 
         .logo { font-size: 1.2rem; color: var(--primary); text-shadow: 0 0 5px var(--primary); letter-spacing: 2px; }
@@ -73,6 +74,18 @@
         }
 
         .card { background: var(--surface); border: 1px solid var(--surface-light); border-left: 2px solid var(--primary); padding: 15px; margin-bottom: 15px; position: relative; }
+        
+        .sticky-controls {
+            position: sticky;
+            top: -20px;
+            z-index: 100;
+            background: var(--bg);
+            padding: 10px 0;
+            margin-top: -20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--grid);
+            backdrop-filter: blur(10px);
+        }
         .device-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #222; cursor: pointer; transition: 0.2s; }
         .device-row:hover { background: rgba(0, 243, 255, 0.05); }
         .device-row.selected { border-left: 4px solid var(--primary); background: rgba(0, 243, 255, 0.1); }
@@ -182,8 +195,8 @@
 
     <main>
         <div id="view-dash" class="section active">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
-                <h2 data-search="cluster, active, targets, signal">Active Device Cluster</h2>
+            <div class="sticky-controls" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 data-search="cluster, active, targets, signal" style="margin:0">Active Device Cluster</h2>
                 <button class="btn" onclick="fetchLatest()" style="font-size: 0.6rem; padding: 4px 8px;">REFRESH SCAN</button>
             </div>
             <div class="card" id="device-list-container" style="padding:0; max-height: 300px; overflow-y: auto;">
@@ -487,11 +500,13 @@
         </div>
 
         <div id="view-files" class="section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h2 data-search="vault, storage, files, backups, data, decrypt">Data Vault</h2>
-                <button class="btn" id="vault-back-btn" onclick="vaultBack()" style="display:none; font-size:0.6rem;">← BACK</button>
+            <div class="sticky-controls">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <h2 data-search="vault, storage, files, backups, data, decrypt" style="margin:0">Data Vault</h2>
+                    <button class="btn" id="vault-back-btn" onclick="vaultBack()" style="display:none; font-size:0.6rem;">← BACK</button>
+                </div>
+                <div id="vault-path-display" style="font-size: 0.6rem; color: var(--primary); opacity: 0.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ROOT://</div>
             </div>
-            <div id="vault-path-display" style="font-size: 0.6rem; color: var(--primary); margin-bottom: 10px; opacity: 0.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ROOT://</div>
             <div id="file-list"></div>
         </div>
     </main>
