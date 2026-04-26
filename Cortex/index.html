@@ -455,7 +455,7 @@
                 <h2 data-search="vault, storage, files, backups, data, decrypt">Data Vault</h2>
                 <button class="btn" id="vault-back-btn" onclick="vaultBack()" style="display:none; font-size:0.6rem;">← BACK</button>
             </div>
-            <div id="vault-path-display" style="font-size: 0.6rem; color: var(--primary); margin-bottom: 10px; opacity: 0.5; overflow: hidden; text-overflow: ellipsis;">ROOT://</div>
+            <div id="vault-path-display" style="font-size: 0.6rem; color: var(--primary); margin-bottom: 10px; opacity: 0.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ROOT://</div>
             <div id="file-list"></div>
         </div>
     </main>
@@ -1086,19 +1086,19 @@
                     : `onclick="viewFile('${item.name}')"`;
 
                 return `
-                    <div class="card" ${action} style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-left-color:${isFolder ? 'var(--secondary)' : 'var(--primary)'}">
-                        <div style="display:flex; align-items:center; gap:12px; flex:1;">
-                            <span style="font-size:1.2rem;">${icon}</span>
-                            <div style="overflow:hidden;">
+                    <div class="card" ${action} style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-left-color:${isFolder ? 'var(--secondary)' : 'var(--primary)'}; min-width: 0;">
+                        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width: 0;">
+                            <span style="font-size:1.2rem; flex-shrink: 0;">${icon}</span>
+                            <div style="overflow:hidden; flex: 1; min-width: 0;">
                                 <div style="color: ${isFolder ? 'var(--text)' : 'var(--primary)'}; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.name}</div>
-                                ${folderNote ? `<div style="color:var(--success); font-size:0.65rem; text-transform:uppercase; margin-top:2px;">LABEL: ${folderNote}</div>` : ''}
-                                <div style="font-size:0.6rem; color:#555;">
+                                ${folderNote ? `<div style="color:var(--success); font-size:0.65rem; text-transform:uppercase; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">LABEL: ${folderNote}</div>` : ''}
+                                <div style="font-size:0.6rem; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     ${isFolder ? 'DIRECTORY' : formatBytes(item.metadata.size)}
                                     ${item.metadata && item.metadata.lastModified ? ' • MOD: ' + new Date(item.metadata.lastModified).toLocaleDateString() : ''}
                                 </div>
                             </div>
                         </div>
-                        <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:10px; flex-shrink: 0; margin-left: 10px;">
                             <button onclick="handleVaultDownload('${item.name}', ${isFolder}, event)" style="background:none; border:none; color:var(--success); opacity:0.6; cursor:pointer; font-size:1.1rem;" title="Download">📥</button>
                             ${isFolder ? `<button onclick="saveFolderNote('${item.name}', event)" style="background:none; border:none; color:var(--primary); opacity:0.3; cursor:pointer; font-size:1rem;">🏷️</button>` : ''}
                             <div style="color:#444; font-size:0.8rem;">›</div>
