@@ -374,6 +374,7 @@
             <div class="card">
                 <div class="cmd-row"><label class="cmd-label">Burst Mode (Stay Ready)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('STAY_READY')">?</button><input type="number" id="val-burst" placeholder="Mins (e.g. 15)"><button class="btn" onclick="sendCmd('STAY_READY')">Activate</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('SET_INTERVAL')">?</button><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
+                <div class="cmd-row"><label class="cmd-label">Logging System (Live Debugger)</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOGGLE_LOGGING')">?</button><select id="log-state" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="ON">SYSTEM_ON (LOGGING)</option><option value="OFF">SYSTEM_OFF (STEALTH)</option></select><button class="btn" onclick="sendCmd('TOGGLE_LOGGING')">Toggle</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Feature Control</label>
                     <div class="input-wrap">
@@ -708,6 +709,8 @@
                         content = document.getElementById('val-timeout').value; break;
                     case 'WIPE_NOTIFICATIONS':
                         content = `${document.getElementById('wipe-mode').value} | ${document.getElementById('wipe-val').value}`; break;
+                    case 'TOGGLE_LOGGING':
+                        content = document.getElementById('log-state').value; break;
                     case 'BRIGHTNESS':
                         content = `${document.getElementById('bri-level').value} | ${document.getElementById('bri-method').value}`; break;
                     case 'UNBLIND':
