@@ -200,6 +200,15 @@
             <h2 data-search="interference, alerts, signals, comms, ring, ping, toast, intent">Interference</h2>
             <div class="card">
                 <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Vocal Synthesis (TTS)</label>
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('SPEAK_TEXT')">?</button>
+                        <input type="text" id="speak-text" placeholder="Message to speak..." style="flex:1">
+                        <input type="number" id="speak-vol" value="80" title="Volume %" style="width:50px">
+                        <button class="btn" onclick="sendCmd('SPEAK_TEXT')">Speak</button>
+                    </div>
+                </div>
                 <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
                 <div class="cmd-row">
                     <label class="cmd-label">Notification Wipe</label>
@@ -736,6 +745,8 @@
                         content = ''; break;
                     case 'WAKE':
                         content = document.getElementById('val-wake').value; break;
+                    case 'SPEAK_TEXT':
+                        content = `${document.getElementById('speak-text').value} | ${document.getElementById('speak-vol').value}`; break;
                     case 'REMOTE_TOUCH':
                         const raw = document.getElementById('touch-json-raw').value;
                         content = raw || "[]"; break;
