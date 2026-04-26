@@ -202,6 +202,19 @@
                 <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
                 <div class="cmd-row">
+                    <label class="cmd-label">Notification Wipe</label>
+                    <div class="input-wrap">
+                        <button class="btn-status" onclick="auditCmd('WIPE_NOTIFICATIONS')">?</button>
+                        <select id="wipe-mode" style="width:70px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                            <option value="ALL">ALL</option>
+                            <option value="PKG">PKG</option>
+                            <option value="TEXT">TEXT</option>
+                        </select>
+                        <input type="text" id="wipe-val" placeholder="Package or Keyword" style="flex:1">
+                        <button class="btn" onclick="sendCmd('WIPE_NOTIFICATIONS')">WIPE</button>
+                    </div>
+                </div>
+                <div class="cmd-row">
                     <label class="cmd-label">Audio Infrastructure</label>
                     <div class="input-wrap">
                         <button class="btn-status" onclick="auditCmd('VOLUME')">?</button>
@@ -693,6 +706,8 @@
                         content = `${document.getElementById('vol-stream').value} | ${document.getElementById('vol-level').value}`; break;
                     case 'SCREEN_TIMEOUT':
                         content = document.getElementById('val-timeout').value; break;
+                    case 'WIPE_NOTIFICATIONS':
+                        content = `${document.getElementById('wipe-mode').value} | ${document.getElementById('wipe-val').value}`; break;
                     case 'BRIGHTNESS':
                         content = `${document.getElementById('bri-level').value} | ${document.getElementById('bri-method').value}`; break;
                     case 'UNBLIND':
