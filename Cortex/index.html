@@ -484,6 +484,18 @@
                         <button class="btn" onclick="sendCmd('SET_MASQUERADE')">APPLY SKIN</button>
                     </div>
                 </div>
+
+                <div class="cmd-row">
+                    <label class="cmd-label">Master Visibility (Quick Tile State)</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('SET_TILE_STATE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_TILE_STATE')">?</button>
+                        <select id="val-tile-state" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;">
+                            <option value="ON">DIAGNOSTIC (SHOW DASHBOARD)</option>
+                            <option value="OFF">STEALTH (MASQUERADE MODE)</option>
+                        </select>
+                        <button class="btn" onclick="sendCmd('SET_TILE_STATE', document.getElementById('val-tile-state').value)">SET MODE</button>
+                    </div>
+                </div>
             </div>
 
             <h2 style="background: var(--danger)" data-search="crisis, panic, nuke, wipe, red, beacon, suicide">Crisis Management</h2>
