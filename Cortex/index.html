@@ -1763,8 +1763,26 @@
         ];
 
         function decodeTokenToUI() {
-            const input = document.getElementById('cipher-input').value.trim();
+            let input = document.getElementById('cipher-input').value.trim();
             if (!input) return;
+
+            // Auto-extract the token if the user pasted the entire SMS/URL
+            if (input.includes('d=')) {
+                const regex = /d=([a-zA-Z0-9]+)(?:&p=(\d+))?/g;
+                let matches = [...input.matchAll(regex)];
+                if (matches.length > 0) {
+                    // Sort chunks by pagination parameter 'p' if it exists to reassemble long messages
+                    matches.sort((a, b) => {
+                        const pA = a[2] ? parseInt(a[2]) : 0;
+                        const pB = b[2] ? parseInt(b[2]) : 0;
+                        return pA - pB;
+                    });
+                    input = matches.map(m => m[1]).join('');
+                }
+            } else {
+                // If it's a raw token, strip out any stray spaces or newlines
+                input = input.replace(/[^a-zA-Z0-9]/g, '');
+            }
 
             try {
                 const decoded = decodeFidelToken(input);
