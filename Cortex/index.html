@@ -1762,16 +1762,18 @@
             0x1338, 0x1340
         ];
 
-        function decodeTokenToUI() {
-            let input = document.getElementById('cipher-input').value.trim();
-            if (!input) return;
+                function decodeTokenToUI() {
+            let rawInput = document.getElementById('cipher-input').value;
+            if (!rawInput.trim()) return;
 
-            // Auto-extract the token if the user pasted the entire SMS/URL
+            // Clean up SMS artifacts: Remove all line breaks, whitespaces, and invisible chars.
+            // Also fix HTML encoded ampersands just in case.
+            let input = rawInput.replace(/[\s\u200B-\u200D\uFEFF]/g, '').replace(/&amp;/g, '&');
+
             if (input.includes('d=')) {
                 const regex = /d=([a-zA-Z0-9]+)(?:&p=(\d+))?/g;
                 let matches = [...input.matchAll(regex)];
                 if (matches.length > 0) {
-                    // Sort chunks by pagination parameter 'p' if it exists to reassemble long messages
                     matches.sort((a, b) => {
                         const pA = a[2] ? parseInt(a[2]) : 0;
                         const pB = b[2] ? parseInt(b[2]) : 0;
@@ -1780,7 +1782,6 @@
                     input = matches.map(m => m[1]).join('');
                 }
             } else {
-                // If it's a raw token, strip out any stray spaces or newlines
                 input = input.replace(/[^a-zA-Z0-9]/g, '');
             }
 
@@ -1819,8 +1820,11 @@
                         decodedText += String.fromCharCode(index - 239 + 32);
                     } else if (index === 334) {
                         decodedText += "\n";
+                    } else if (index === 238) {
+                        // 238 handles unsupported chars (emoji, non-breaking spaces).
+                        // Render as a space so words don't awkwardly fuse together.
+                        decodedText += " ";
                     }
-                    // 238 is padding/unknown, ignored
                 });
             }
             return decodedText.trim();
