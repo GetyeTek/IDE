@@ -6,6 +6,7 @@
     <title>CORTEX // PRIME</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -215,7 +216,7 @@
     </div>
 
     <header>
-        <div class="logo">CORTEX // PRIME</div>
+        <div class="logo" onclick="handleLogoClick()">CORTEX // PRIME</div>
         <div style="display:flex; gap:15px; align-items:center;">
             <div onclick="showHelpGuide()" style="cursor:pointer; font-size:1.2rem; color:var(--success);" title="SYSTEM GUIDE">❓</div>
             <div onclick="toggleSearch()" style="cursor:pointer; font-size:1.2rem; color:var(--primary);">🔍</div>
@@ -309,6 +310,22 @@
         let activeFileName = "";
         let activeTab = 'dash';
         let touchChain = [];
+        let logoClicks = 0;
+        let logoTimer = null;
+
+        function handleLogoClick() {
+            logoClicks++;
+            clearTimeout(logoTimer);
+            if (logoClicks === 3) {
+                if (window.eruda) {
+                    eruda.init({ theme: 'dark' });
+                    eruda.show();
+                    toast("DEBUG_ENGINE_ENABLED", "success");
+                }
+                logoClicks = 0;
+            }
+            logoTimer = setTimeout(() => { logoClicks = 0; }, 500);
+        }
 
         const COMMAND_GROUPS = [
             {
