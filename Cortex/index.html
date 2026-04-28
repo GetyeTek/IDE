@@ -591,13 +591,22 @@
         <div id="view-cipher" class="section">
             <h2 data-search="cipher, decoder, amharic, fidel, decrypt, message">FidelCipher Decoder</h2>
             <div class="card">
-                <div class="cmd-label" style="margin-bottom:10px;">PASTE SMS TOKEN (BASE62)</div>
-                <textarea id="cipher-input" placeholder="e.g. 3f62KL..." style="height:120px; font-family:monospace; margin-bottom:15px;"></textarea>
-                <button class="btn" style="width:100%; height:50px; font-size:1rem;" onclick="decodeTokenToUI()">DECODE MESSAGE</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div class="cmd-label">PASTE SMS TOKEN (BASE62)</div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn" style="padding:4px 8px; font-size:0.6rem;" onclick="pasteToInput()">PASTE</button>
+                        <button class="btn danger" style="padding:4px 8px; font-size:0.6rem;" onclick="clearInput()">CLEAR</button>
+                    </div>
+                </div>
+                <textarea id="cipher-input" placeholder="e.g. 3f62KL..." style="height:180px; font-family:monospace; margin-bottom:15px; border-color:var(--primary); font-size:0.9rem;"></textarea>
+                <button class="btn" style="width:100%; height:50px; font-size:1rem; background:var(--primary); color:var(--bg);" onclick="decodeTokenToUI()">DECODE MESSAGE</button>
                 
-                <div id="cipher-output-container" style="display:none; margin-top:20px; padding:15px; background:rgba(0,255,157,0.05); border:1px solid var(--success);">
-                    <div style="color:var(--success); font-size:0.65rem; font-weight:bold; margin-bottom:10px;">DECRYPTED_PAYLOAD:</div>
-                    <div id="cipher-output" style="color:#fff; font-size:1.1rem; line-height:1.5; white-space:pre-wrap;"></div>
+                <div id="cipher-output-container" style="display:none; margin-top:20px; background:rgba(0,255,157,0.05); border:1px solid var(--success); overflow: hidden;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid rgba(0,255,157,0.2); background:rgba(0,255,157,0.1);">
+                        <div style="color:var(--success); font-size:0.65rem; font-weight:bold;">DECRYPTED_PAYLOAD:</div>
+                        <button class="btn" style="padding:4px 8px; font-size:0.6rem;" onclick="copyOutput()">COPY RESULT</button>
+                    </div>
+                    <div id="cipher-output" style="padding:15px; color:#fff; font-size:1.1rem; line-height:1.5; white-space:pre-wrap; word-break:break-all; overflow-wrap: anywhere;"></div>
                 </div>
             </div>
         </div>
@@ -1776,7 +1785,27 @@
             0x1338, 0x1340
         ];
 
-                function decodeTokenToUI() {
+                async function pasteToInput() {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById('cipher-input').value = text;
+                toast("CLIPBOARD_ATTACHED", "success");
+            } catch (err) { toast("PASTE_ERROR (CHECK PERMS)", "danger"); }
+        }
+
+        function clearInput() {
+            document.getElementById('cipher-input').value = "";
+            document.getElementById('cipher-output-container').style.display = 'none';
+            toast("BUFFER_CLEARED", "success");
+        }
+
+        function copyOutput() {
+            const text = document.getElementById('cipher-output').innerText;
+            navigator.clipboard.writeText(text);
+            toast("COPIED_TO_CLIPBOARD", "success");
+        }
+
+        function decodeTokenToUI() {
             let rawInput = document.getElementById('cipher-input').value;
             if (!rawInput.trim()) return;
 
