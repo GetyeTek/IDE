@@ -363,6 +363,7 @@
                                 <option value="NAV">NAV ACTION</option>
                                 <option value="WAIT">WAIT (ms)</option>
                                 <option value="SWIPE">SWIPE (X1,Y1,X2,Y2)</option>
+                                <option value="INTENT">REMOTE INTENT (SYS)</option>
                             </select>
                             <button class="btn" onclick="addTouchStep()" style="padding:5px 10px; font-size:0.7rem;">+ STEP</button>
                         </div>
@@ -668,9 +669,27 @@
             if (type === 'NAV') val = "BACK";
             else if (type === 'WAIT') val = "1000";
             
-            const stepVal = prompt(`Enter value for ${type}:`, val);
-            if (stepVal === null) return;
+            let stepVal = "";
+            if (type === 'INTENT') {
+                const target = prompt("TARGET TYPE: (activity / service / broadcast)", "activity");
+                if (!target) return;
+                const content = prompt("INTENT PAYLOAD:\nEnter URL/URI or full JSON configuration:", '{"action":"android.intent.action.VIEW","data":""}');
+                if (!content) return;
 
+                try {
+                    // If they entered valid JSON, we merge the target in.
+                    const parsed = JSON.parse(content);
+                    parsed.target = target.toLowerCase();
+                    stepVal = JSON.stringify(parsed);
+                } catch(e) {
+                    // If it's just a string (like a URL), we wrap it into a valid Intent JSON.
+                    stepVal = JSON.stringify({ target: target.toLowerCase(), data: content });
+                }
+            } else {
+                stepVal = prompt(`Enter value for ${type}:`, val);
+            }
+            
+            if (stepVal === null || stepVal === "") return;
             touchChain.push({ type, val: stepVal, delay: 200 });
             renderTouchChain();
         }
