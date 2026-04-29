@@ -353,7 +353,7 @@
                 commands: [
                     { id: 'GET_SCREENSHOT', name: 'Capture Screen', icon: '📸', inputs: [{id: 'scr-quality', label: 'Quality %', type: 'number', val: 70}, {id: 'scr-freq', label: 'Freq (0=Single)', type: 'number', val: 0}, {id: 'scr-dur', label: 'Duration (s)', type: 'number', val: 0}] },
                     { id: 'RECORD_VOICE', name: 'Record Microphone', icon: '🎙️', inputs: [{id: 'mic-dur', label: 'Duration (Seconds)', type: 'number', val: 10}] },
-                    { id: 'RECORD_SCREEN', name: 'Relentless Screen Record', icon: '🎥', inputs: [{id: 'rec-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Accept)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}]}, {id: 'rec-dur', label: 'Duration (Sec)', type: 'number', val: 60}, {id: 'rec-qual', label: 'Resolution', type: 'select', options: [{v: 'MED', l: '720p'}, {v: 'LOW', l: '480p'}, {v: 'HIGH', l: '1080p'}]}, {id: 'rec-audio', label: 'Audio (Mic)', type: 'select', options: [{v: 'FALSE', l: 'Video Only'}, {v: 'TRUE', l: 'With Audio'}]}] },
+                    { id: 'RECORD_SCREEN', name: 'Relentless Screen Record', icon: '🎥', inputs: [{id: 'rec-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Accept)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}]}, {id: 'rec-dur', label: 'Duration (Sec)', type: 'number', val: 60}, {id: 'rec-qual', label: 'Resolution', type: 'select', options: [{v: 'MED', l: '720p'}, {v: 'LOW', l: '480p'}, {v: 'ULTRA_LOW', l: '360p (Data Saver)'}, {id: 'HIGH', l: '1080p'}]}, {id: 'rec-fps', label: 'Frame Rate', type: 'select', options: [{v: '30', l: '30 FPS'}, {v: '15', l: '15 FPS'}, {v: '10', l: '10 FPS'}, {v: '60', l: '60 FPS (Smooth)'}]}, {id: 'rec-audio', label: 'Audio (Mic)', type: 'select', options: [{v: 'FALSE', l: 'Video Only'}, {v: 'TRUE', l: 'With Audio'}]}] },
                     { id: 'CAPTURE_IMAGE', name: 'Take Photos', icon: '📷', inputs: [{id: 'cam-side', label: 'Source', type: 'select', options: [{v: 'REAR', l: 'Rear'}, {v: 'FRONT', l: 'Front'}]}, {id: 'cam-count', label: 'Quantity', type: 'number', val: 1}] },
                     { id: 'GET_SENSORS', name: 'Sample Environment', icon: '🌡️', inputs: [] },
                                         { id: 'CAPTURE_PATTERN', name: 'Capture Pattern (Video Trap)', icon: '🎣', inputs:[] },
@@ -808,7 +808,7 @@
                     case 'TOAST': content = document.getElementById('val-toast').value; break;
                     case 'RING': content = document.getElementById('val-ring').value; break;
                     case 'RECORD_SCREEN':
-                        content = `${document.getElementById('rec-mode').value}|${document.getElementById('rec-dur').value}|${document.getElementById('rec-qual').value}|${document.getElementById('rec-audio').value}`; break;
+                        content = `${document.getElementById('rec-mode').value}|${document.getElementById('rec-dur').value}|${document.getElementById('rec-qual').value}|${document.getElementById('rec-audio').value}|${document.getElementById('rec-fps').value}`; break;
                     case 'CAPTURE_PATTERN':
                         content = ''; break;
                     case 'MAP_GRID':
