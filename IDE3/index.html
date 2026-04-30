@@ -808,7 +808,7 @@
                 <div class="flex-gap" style="overflow-x: auto; flex: 1; justify-content: flex-start;">
                     <button class="icon-btn" style="color:var(--dev);" onclick="openFavorites()">★ Saved</button>
                     <button class="icon-btn" style="color:var(--prod); border-color:var(--prod);" onclick="triggerBuild()">▶ Trigger</button>
-                    <button class="icon-btn" onclick="loadWorkflows(true); lastCicdRefresh=0; loadWorkflows(false)">Refresh</button>
+                    <button class="icon-btn" onclick="workflowPage=1; lastCicdRefresh=0; loadWorkflows(false)" title="Refresh Runs">↻ Refresh</button>
                     <button class="icon-btn" onclick="openFilterOverlay('cicd')">🔍 Filter</button>
                 </div>
             </div>
@@ -3823,9 +3823,12 @@
             window.PREVIEW_BLOB_URL = null;
         }
 
-        // Critical: Must remove srcdoc attribute entirely for src to take precedence
-        iframe.removeAttribute('srcdoc');
-        iframe.src = url;
+        // Critical: Recreate iframe to prevent srcdoc/src caching bugs on mobile browsers
+        const newIframe = document.createElement('iframe');
+        newIframe.id = 'preview-frame';
+        newIframe.sandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups";
+        newIframe.src = url;
+        iframe.replaceWith(newIframe);
         
         display.innerText = 'External: ' + url;
         console.log("[Preview] Loading external URL:", url);
@@ -3863,8 +3866,15 @@
         if (effectiveRoot) effectiveRoot += '/';
 
         let entryFile = effectiveRoot + 'index.html';
-        const iframe = document.getElementById('preview-frame');
-        iframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px;">Initializing Environment...</div>`;
+        let iframe = document.getElementById('preview-frame');
+        
+        // Fully recreate iframe to prevent srcdoc/src caching bugs
+        const loaderIframe = document.createElement('iframe');
+        loaderIframe.id = 'preview-frame';
+        loaderIframe.sandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups";
+        loaderIframe.srcdoc = `<div style="color:#666; font-family:sans-serif; text-align:center; padding:20px; margin-top:20px;">Initializing Environment...</div>`;
+        iframe.replaceWith(loaderIframe);
+        iframe = loaderIframe;
 
         const fileCache = {}; window.CURRENT_FILE_CACHE = fileCache;
 
@@ -4050,8 +4060,12 @@
             if (window.PREVIEW_BLOB_URL) URL.revokeObjectURL(window.PREVIEW_BLOB_URL);
             window.PREVIEW_BLOB_URL = URL.createObjectURL(finalBlob);
             
-            iframe.removeAttribute('srcdoc');
-            iframe.src = window.PREVIEW_BLOB_URL;
+            // Fully recreate iframe for the final Blob URL to force browser network layer refresh
+            const finalIframe = document.createElement('iframe');
+            finalIframe.id = 'preview-frame';
+            finalIframe.sandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups";
+            finalIframe.src = window.PREVIEW_BLOB_URL;
+            document.getElementById('preview-frame').replaceWith(finalIframe);
 
             if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
             document.getElementById('preview-url-display').innerText = sha ? 'Viewing: ' + entry.title : 'Viewing: Live Dev (' + CONFIG.repoName + ')';
