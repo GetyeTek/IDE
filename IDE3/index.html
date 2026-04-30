@@ -1821,17 +1821,24 @@
 
 <script>
   // --- CONFIG & STATE ---
+    const getRepoSpecificConfig = (repoName) => {
+        const map = JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}');
+        return map[repoName] || {};
+    };
+
+    const initialRepoName = sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE';
+    const initialRepoConfig = getRepoSpecificConfig(initialRepoName);
+
     let CONFIG = { 
         funcUrl: localStorage.getItem('conduit_funcUrl') || '',
-        // Project context prefers sessionStorage for tab isolation
-        repoName: sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE',
-        isOrg: (sessionStorage.getItem('conduit_isOrg') === 'true' || localStorage.getItem('conduit_isOrg') === 'true'),
-        projectPath: sessionStorage.getItem('conduit_projectPath') || localStorage.getItem('conduit_projectPath') || '',
+        repoName: initialRepoName,
+        isOrg: initialRepoConfig.isOrg ?? (sessionStorage.getItem('conduit_isOrg') === 'true' || localStorage.getItem('conduit_isOrg') === 'true'),
+        projectPath: initialRepoConfig.projectPath ?? (sessionStorage.getItem('conduit_projectPath') || localStorage.getItem('conduit_projectPath') || ''),
         autoFix: false,
         autoSanity: false,
         showPreview: localStorage.getItem('conduit_showPreview') !== 'false',
         efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
-        projectType: (JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}')[sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE']?.projectType) || 'web',
+        projectType: initialRepoConfig.projectType || 'web',
         omitHeaders: localStorage.getItem('conduit_omitHeaders') === 'true',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
@@ -2880,6 +2887,10 @@
             projectPath 
         };
         localStorage.setItem('conduit_repo_configs', JSON.stringify(repoConfigs));
+
+        // Update active CONFIG and UI
+        CONFIG.projectType = projectType;
+        applyPreviewTabVisibility();
 
         // Also update localStorage as a fallback for new tabs
         localStorage.setItem('conduit_repoName', repoName);
@@ -6685,22 +6696,27 @@ async function downloadArtifact(runId) {
     function selectRepo(name) {
         document.getElementById('setting-repo-name').value = name;
         
-        // Load known config for this repo if it exists
         const repoConfigs = JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}');
-        if (repoConfigs[name]) {
-            const cfg = repoConfigs[name];
-            if (cfg.projectType) {
-                document.getElementById('setting-project-type').value = cfg.projectType;
-                togglePreviewSettingsVisibility(cfg.projectType);
-            }
-            if (cfg.projectPath !== undefined) {
-                document.getElementById('setting-project-path').value = cfg.projectPath;
-            }
-            showGlobalToast(`Config loaded for: ${name}`);
+        const cfg = repoConfigs[name] || {};
+
+        // Sync current state to the selected repo's known config
+        if (cfg.projectType) {
+            CONFIG.projectType = cfg.projectType;
+            document.getElementById('setting-project-type').value = cfg.projectType;
+            togglePreviewSettingsVisibility(cfg.projectType);
+            applyPreviewTabVisibility();
+        }
+        if (cfg.projectPath !== undefined) {
+            CONFIG.projectPath = cfg.projectPath;
+            document.getElementById('setting-project-path').value = cfg.projectPath;
+        }
+        if (cfg.isOrg !== undefined) {
+            CONFIG.isOrg = cfg.isOrg;
+            document.getElementById('setting-is-org').checked = cfg.isOrg;
         }
 
         closeRepoSelector();
-        showGlobalToast(`Repo set to: ${name}`);
+        showGlobalToast(`Switched to: ${name}${cfg.projectType ? ' (' + cfg.projectType + ')' : ''}`);
     }
 
     async function executeSendFiles(targetRepo, targetIsOrg) {
