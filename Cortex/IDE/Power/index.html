@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cortex Precision Mapper v2.2</title>
+    <style>
+        :root {
+            --bg-black: rgba(0, 0, 0, 0.4);
+            --text-white: #ffffff;
+            --pill-bg: rgba(255, 255, 255, 0.12);
+            --nav-bg: #000000;
+
+            /* Icon Calibration - Now using Absolute Positioning to prevent Drift */
+            --icon-1-s: 72px; --icon-1-x: 0px; --icon-1-y: 0px; --icon-1-tx: 0px; --icon-1-ty: 0px; --icon-1-ct: 100%; --icon-1-sh: 0px;
+            --icon-2-s: 72px; --icon-2-x: 0px; --icon-2-y: 0px; --icon-2-tx: 0px; --icon-2-ty: 0px; --icon-2-ct: 100%; --icon-2-sh: 0px;
+            --icon-3-s: 72px; --icon-3-x: 0px; --icon-3-y: 0px; --icon-3-tx: 0px; --icon-3-ty: 0px; --icon-3-ct: 100%; --icon-3-sh: 0px;
+            --icon-4-s: 72px; --icon-4-x: 0px; --icon-4-y: 0px; --icon-4-tx: 0px; --icon-4-ty: 0px; --icon-4-ct: 100%; --icon-4-sh: 0px;
+
+            --nav-size: 18px;
+            --nav-spacing: 45px;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+            touch-action: manipulation; 
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: transparent; color: var(--text-white);
+            font-family: "Segoe UI", "Roboto", sans-serif;
+            font-weight: 300; overflow: hidden;
+        }
+
+        .wallpaper-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+        }
+
+        .ui-container {
+            position: relative; z-index: 10; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        /* FIXED GRID - Prevents drifting */
+        .icon-grid {
+            display: grid; 
+            grid-template-columns: 160px 160px; /* Rigid column width */
+            grid-template-rows: 160px 160px;    /* Rigid row height */
+            gap: 20px 20px;
+            width: fit-content;
+            margin-bottom: 60px;
+        }
+
+        /* Each item is a container that holds elements absolutely */
+        .icon-item { 
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .icon-svg { 
+            position: absolute;
+            transition: none; 
+            z-index: 2;
+        }
+
+        .label { 
+            position: absolute;
+            font-size: 15px; 
+            letter-spacing: 0.2px; 
+            line-height: 1.25; 
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 1;
+            top: 110px; /* Base offset */
+        }
+
+        /* Mapping logic for each icon to be pinned */
+        #svg-1 { width: var(--icon-1-s); height: var(--icon-1-s); transform: translate(var(--icon-1-x), var(--icon-1-y)); }
+        #txt-1 { transform: translate(var(--icon-1-tx), var(--icon-1-ty)); filter: contrast(var(--icon-1-ct)) blur(var(--icon-1-sh)); text-shadow: 0 0 var(--icon-1-sh) white; }
+
+        #svg-2 { width: var(--icon-2-s); height: var(--icon-2-s); transform: translate(var(--icon-2-x), var(--icon-2-y)); }
+        #txt-2 { transform: translate(var(--icon-2-tx), var(--icon-2-ty)); filter: contrast(var(--icon-2-ct)) blur(var(--icon-2-sh)); text-shadow: 0 0 var(--icon-2-sh) white; }
+
+        #svg-3 { width: var(--icon-3-s); height: var(--icon-3-s); transform: translate(var(--icon-3-x), var(--icon-3-y)); }
+        #txt-3 { transform: translate(var(--icon-3-tx), var(--icon-3-ty)); filter: contrast(var(--icon-3-ct)) blur(var(--icon-3-sh)); text-shadow: 0 0 var(--icon-3-sh) white; }
+
+        #svg-4 { width: var(--icon-4-s); height: var(--icon-4-s); transform: translate(var(--icon-4-x), var(--icon-4-y)); }
+        #txt-4 { transform: translate(var(--icon-4-tx), var(--icon-4-ty)); filter: contrast(var(--icon-4-ct)) blur(var(--icon-4-sh)); text-shadow: 0 0 var(--icon-4-sh) white; }
+
+        .side-key-btn {
+            position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
+            background: var(--pill-bg); padding: 10px 38px; border-radius: 25px;
+            font-size: 14.5px; border: 0.5px solid rgba(255,255,255,0.08);
+            cursor: pointer;
+        }
+
+        .nav-bar {
+            position: fixed; bottom: 0; width: 100%; height: 48px;
+            background: var(--nav-bg); display: flex;
+            justify-content: space-between; align-items: center;
+            padding: 0 var(--nav-spacing);
+        }
+        .nav-icon { fill: none; stroke: #ffffff; stroke-width: 1.5; width: var(--nav-size); height: var(--nav-size); opacity: 0.9; }
+
+        /* DRAGGABLE TOOL PANEL */
+        #mapper-tools {
+            position: fixed; top: 20px; left: 20px; width: 280px;
+            background: rgba(10, 10, 10, 0.98); border: 1px solid #00f3ff;
+            z-index: 1000; border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+            display: flex; flex-direction: column;
+            user-select: none;
+        }
+
+        #tool-header {
+            padding: 14px; background: #00f3ff; color: #000;
+            border-radius: 10px 10px 0 0; cursor: move;
+            font-weight: bold; font-size: 11px; text-transform: uppercase;
+            display: flex; justify-content: space-between; align-items: center;
+            touch-action: none;
+        }
+
+        #tool-content { padding: 15px; max-height: 80vh; overflow-y: auto; font-family: monospace; font-size: 11px; }
+
+        .tool-group { margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .tool-title { color: #00f3ff; font-weight: bold; margin-bottom: 10px; display: block; }
+        
+        .ctrl-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
+        input[type="range"] { flex: 1; accent-color: #00f3ff; height: 20px; }
+        input[type="number"] { width: 50px; background: #222; color: #00f3ff; border: 1px solid #444; font-size: 10px; padding: 2px; }
+
+        .selector-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 15px; }
+        .sel-btn { background: #1a1a1a; border: 1px solid #444; color: #888; padding: 8px 0; text-align: center; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        .sel-btn.active { background: rgba(0,243,255,0.2); border-color: #00f3ff; color: #00f3ff; }
+
+        .copy-btn { width: 100%; padding: 12px; background: #00f3ff; color: black; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; border-radius: 6px; }
+        
+        #fab-show {
+            position: fixed; bottom: 65px; left: 20px; width: 50px; height: 50px;
+            background: #00f3ff; border-radius: 50%; display: none;
+            align-items: center; justify-content: center; font-size: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 1100; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="fab-show" onclick="toggleTools(true)">🛠️</div>
+
+    <div id="mapper-tools">
+        <div id="tool-header">
+            <span>Cortex Mapper v2.2</span>
+            <span style="opacity: 0.6; font-size: 8px;">Nail Mode active</span>
+        </div>
+        
+        <div id="tool-content">
+            <span class="tool-title">Target Element</span>
+            <div class="selector-grid">
+                <div class="sel-btn active" onclick="selectIcon('1')">1</div>
+                <div class="sel-btn" onclick="selectIcon('2')">2</div>
+                <div class="sel-btn" onclick="selectIcon('3')">3</div>
+                <div class="sel-btn" onclick="selectIcon('4')">4</div>
+            </div>
+            
+            <span class="tool-title">Icon Transform</span>
+            <div class="tool-group">
+                <div class="ctrl-row"><span>Size</span><input type="range" id="icon-s-sl" min="40" max="150"><input type="number" id="icon-s-num"></div>
+                <div class="ctrl-row"><span>Move X</span><input type="range" id="icon-x-sl" min="-100" max="100"><input type="number" id="icon-x-num"></div>
+                <div class="ctrl-row"><span>Move Y</span><input type="range" id="icon-y-sl" min="-100" max="100"><input type="number" id="icon-y-num"></div>
+            </div>
+
+            <span class="tool-title">Text Precise Mapping</span>
+            <div class="tool-group">
+                <div class="ctrl-row"><span>X Shift</span><input type="range" id="text-x-sl" min="-100" max="100"><input type="number" id="text-x-num"></div>
+                <div class="ctrl-row"><span>Y Shift</span><input type="range" id="text-y-sl" min="-100" max="100"><input type="number" id="text-y-num"></div>
+            </div>
+
+            <span class="tool-title">Text Fuzziness</span>
+            <div class="tool-group">
+                <div class="ctrl-row"><span>Contrast</span><input type="range" id="icon-ct-sl" min="0" max="200" value="100"><input type="number" id="icon-ct-num"></div>
+                <div class="ctrl-row"><span>Shadow/Blur</span><input type="range" id="icon-sh-sl" min="0" max="20" step="0.5" value="0"><input type="number" id="icon-sh-num"></div>
+            </div>
+
+            <span class="tool-title">Navigation System</span>
+            <div class="tool-group">
+                <div class="ctrl-row"><span>Icon S</span><input type="range" id="nav-s-sl" min="10" max="50"><input type="number" id="nav-s-num"></div>
+                <div class="ctrl-row"><span>Spread</span><input type="range" id="nav-p-sl" min="0" max="120"><input type="number" id="nav-p-num"></div>
+            </div>
+
+            <button class="copy-btn" onclick="copyConfig()">COPY CSS CONFIG</button>
+            <button class="copy-btn" style="background:#444; color:white; margin-top:8px;" onclick="toggleTools(false)">HIDE MAPPERS</button>
+        </div>
+    </div>
+
+    <div class="wallpaper-overlay"></div>
+
+    <div class="ui-container">
+        <div class="icon-grid">
+            <div class="icon-item">
+                <svg id="svg-1" class="icon-svg" viewBox="0 0 1024 1024">
+                    <defs><clipPath id="sq"><path d="M 512,0 C 114,0 0,114 0,512 0,910 114,1024 512,1024 910,1024 1024,910 1024,512 1024,114 910,0 512,0 Z" /></clipPath></defs>
+                    <rect width="1024" height="1024" fill="#3D3D3D" clip-path="url(#sq)" />
+                    <g fill="none" stroke="white" stroke-width="84" stroke-linecap="round"><line x1="512" y1="245" x2="512" y2="445" /><path d="M 648,312 A 255,255 0 1 1 376,312" /></g>
+                </svg>
+                <div id="txt-1" class="label">Power off</div>
+            </div>
+
+            <div class="icon-item">
+                <svg id="svg-2" class="icon-svg" viewBox="0 0 1024 1024">
+                    <rect width="1024" height="1024" fill="#0BB062" clip-path="url(#sq)" />
+                    <g fill="none" stroke="white" stroke-width="72" stroke-linecap="butt" stroke-linejoin="round">
+                        <line x1="512" y1="240" x2="512" y2="440" stroke-linecap="square" />
+                        <path d="M 585,275 A 240,240 0 1 1 350,715" />
+                        <path d="M 440,275 A 240,240 0 0 0 375,315" /><path d="M 325,365 A 240,240 0 0 0 285,435" /><path d="M 270,495 A 240,240 0 0 0 272,565" />
+                        <path d="M 365,630 L 260,725 L 365,820" stroke-linecap="square" />
+                    </g>
+                    <polygon points="260,689 260,761 320,725" fill="white" />
+                </svg>
+                <div id="txt-2" class="label">Restart</div>
+            </div>
+
+            <div class="icon-item">
+                <svg id="svg-3" class="icon-svg" viewBox="0 0 1024 1024">
+                    <rect width="1024" height="1024" fill="#DE3526" clip-path="url(#sq)" />
+                    <path d="M 246,737 L 778,737 L 778,688 L 714,688 L 666,310 C 658,280 640,270 610,270 L 414,270 C 384,270 366,280 358,310 L 310,688 L 246,688 Z" fill="white" />
+                    <rect x="488" y="365" width="48" height="185" rx="4" fill="#DE3526" />
+                    <circle cx="512" cy="622" r="32" fill="#DE3526" />
+                </svg>
+                <div id="txt-3" class="label">Emergency mode</div>
+            </div>
+
+            <div class="icon-item">
+                <svg id="svg-4" class="icon-svg" viewBox="0 0 1024 1024">
+                    <rect width="1024" height="1024" fill="#00A59A" clip-path="url(#sq)" />
+                    <path d="M 365,450 V 370 A 147,147 0 0 1 659,370 V 450" fill="none" stroke="white" stroke-width="78" stroke-linecap="round" />
+                    <rect x="282" y="445" width="460" height="325" rx="45" fill="white" />
+                    <g fill="#00A59A"><circle cx="512" cy="570" r="44" /><path d="M 484,600 H 540 L 540,685 C 540,705 528,715 512,715 C 496,715 484,705 484,685 Z" /></g>
+                </svg>
+                <div id="txt-4" class="label">Lockdown mode</div>
+            </div>
+        </div>
+
+        <div class="side-key-btn" onclick="if(window.Cortex) Cortex.close()">Side key settings</div>
+    </div>
+
+    <div class="nav-bar">
+        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M7,6V18M12,6V18M17,6V18" /></svg>
+        <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" /></svg>
+        <svg id="nav-back" class="nav-icon" viewBox="0 0 24 24" style="stroke-width: 2.5;"><path d="M15,17.5 L9.5,12 L15,6.5" /></svg>
+    </div>
+
+    <script>
+        const state = {
+            selectedIcon: "1",
+            icons: {
+                "1": { s: 72, x: 0, y: 0, tx: 0, ty: 0, ct: 100, sh: 0 },
+                "2": { s: 72, x: 0, y: 0, tx: 0, ty: 0, ct: 100, sh: 0 },
+                "3": { s: 72, x: 0, y: 0, tx: 0, ty: 0, ct: 100, sh: 0 },
+                "4": { s: 72, x: 0, y: 0, tx: 0, ty: 0, ct: 100, sh: 0 }
+            },
+            navSize: 18,
+            navSpacing: 45
+        };
+
+        const ctrls = {
+            sSl: document.getElementById('icon-s-sl'), sNum: document.getElementById('icon-s-num'),
+            xSl: document.getElementById('icon-x-sl'), xNum: document.getElementById('icon-x-num'),
+            ySl: document.getElementById('icon-y-sl'), yNum: document.getElementById('icon-y-num'),
+            tySl: document.getElementById('text-y-sl'), tyNum: document.getElementById('text-y-num'),
+            txSl: document.getElementById('text-x-sl'), txNum: document.getElementById('text-x-num'),
+            ctSl: document.getElementById('icon-ct-sl'), ctNum: document.getElementById('icon-ct-num'),
+            shSl: document.getElementById('icon-sh-sl'), shNum: document.getElementById('icon-sh-num'),
+            nSSl: document.getElementById('nav-s-sl'), nSNum: document.getElementById('nav-s-num'),
+            nPSl: document.getElementById('nav-p-sl'), nPNum: document.getElementById('nav-p-num')
+        };
+
+        function selectIcon(id) {
+            state.selectedIcon = id;
+            document.querySelectorAll('.sel-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.sel-btn')[parseInt(id)-1].classList.add('active');
+            updateUI(true);
+        }
+
+        function toggleTools(show) {
+            document.getElementById('mapper-tools').style.display = show ? 'flex' : 'none';
+            document.getElementById('fab-show').style.display = show ? 'none' : 'flex';
+        }
+
+        function updateUI(fromSelect = false) {
+            const id = state.selectedIcon;
+            const d = state.icons[id];
+
+            if (fromSelect) {
+                ctrls.sSl.value = d.s; ctrls.sNum.value = d.s;
+                ctrls.xSl.value = d.x; ctrls.xNum.value = d.x;
+                ctrls.ySl.value = d.y; ctrls.yNum.value = d.y;
+                ctrls.tySl.value = d.ty; ctrls.tyNum.value = d.ty;
+                ctrls.txSl.value = d.tx; ctrls.txNum.value = d.tx;
+                ctrls.ctSl.value = d.ct; ctrls.ctNum.value = d.ct;
+                ctrls.shSl.value = d.sh; ctrls.shNum.value = d.sh;
+                ctrls.nSSl.value = state.navSize; ctrls.nSNum.value = state.navSize;
+                ctrls.nPSl.value = state.navSpacing; ctrls.nPNum.value = state.navSpacing;
+            }
+
+            const r = document.documentElement;
+            Object.keys(state.icons).forEach(k => {
+                const icon = state.icons[k];
+                r.style.setProperty(`--icon-${k}-s`, `${icon.s}px`);
+                r.style.setProperty(`--icon-${k}-x`, `${icon.x}px`);
+                r.style.setProperty(`--icon-${k}-y`, `${icon.y}px`);
+                r.style.setProperty(`--icon-${k}-tx`, `${icon.tx}px`);
+                r.style.setProperty(`--icon-${k}-ty`, `${icon.ty}px`);
+                r.style.setProperty(`--icon-${k}-ct`, `${icon.ct}%`);
+                r.style.setProperty(`--icon-${k}-sh`, `${icon.sh}px`);
+            });
+            r.style.setProperty('--nav-size', `${state.navSize}px`);
+            r.style.setProperty('--nav-spacing', `${state.navSpacing}px`);
+        }
+
+        const bind = (sl, num, key, isGlobal = false) => {
+            const fn = (e) => {
+                const v = parseFloat(e.target.value);
+                if (isGlobal) state[key] = v;
+                else state.icons[state.selectedIcon][key] = v;
+                updateUI();
+            };
+            sl.oninput = fn; num.oninput = fn;
+        };
+
+        bind(ctrls.sSl, ctrls.sNum, 's');
+        bind(ctrls.xSl, ctrls.xNum, 'x');
+        bind(ctrls.ySl, ctrls.yNum, 'y');
+        bind(ctrls.tySl, ctrls.tyNum, 'ty');
+        bind(ctrls.txSl, ctrls.txNum, 'tx');
+        bind(ctrls.ctSl, ctrls.ctNum, 'ct');
+        bind(ctrls.shSl, ctrls.shNum, 'sh');
+        bind(ctrls.nSSl, ctrls.nSNum, 'navSize', true);
+        bind(ctrls.nPSl, ctrls.nPNum, 'navSpacing', true);
+
+        // Robust Panel Drag
+        const panel = document.getElementById('mapper-tools');
+        const header = document.getElementById('tool-header');
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+
+        header.addEventListener('pointerdown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = panel.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+            header.setPointerCapture(e.pointerId);
+        });
+
+        header.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            panel.style.left = (initialLeft + dx) + 'px';
+            panel.style.top = (initialTop + dy) + 'px';
+        });
+
+        header.addEventListener('pointerup', (e) => {
+            isDragging = false;
+            header.releasePointerCapture(e.pointerId);
+        });
+
+        function copyConfig() {
+    let css = "/* Cortex Precision Mapping Output */\n:root {\n";
+    
+    Object.keys(state.icons).forEach(k => {
+        const i = state.icons[k];
+        // Added 'ct' and 'sh' which were missing
+        css += `    --icon-${k}-s: ${i.s}px;\n`;
+        css += `    --icon-${k}-x: ${i.x}px;\n`;
+        css += `    --icon-${k}-y: ${i.y}px;\n`;
+        css += `    --icon-${k}-tx: ${i.tx}px;\n`;
+        css += `    --icon-${k}-ty: ${i.ty}px;\n`;
+        css += `    --icon-${k}-ct: ${i.ct}%;\n`;
+        css += `    --icon-${k}-sh: ${i.sh}px;\n`;
+    });
+    
+    css += `    --nav-size: ${state.navSize}px;\n`;
+    css += `    --nav-spacing: ${state.navSpacing}px;\n`;
+    css += "}";
+
+    // 1. Try the Cortex App Bridge
+    if (window.Cortex && window.Cortex.copyToClipboard) {
+        window.Cortex.copyToClipboard(css);
+        alert("Config copied to system via Cortex Bridge");
+    } 
+    // 2. Try standard Web Clipboard API (for browser testing)
+    else if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(css).then(() => {
+            alert("Config copied to clipboard (Browser API)");
+        });
+    } 
+    // 3. Final Fallback
+    else {
+        console.log("MAPPING CONFIG:\n", css);
+        alert("Check console for config (Clipboard API blocked)");
+    }
+}
+
+        updateUI(true);
+    </script>
+</body>
+</html>
