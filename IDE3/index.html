@@ -2971,6 +2971,9 @@
                     document.getElementById('load-more-logs-btn').style.display = 'none';
                 }
             }
+            
+            // NEW: Automatically sync CI/CD runs whenever the IDE state is updated
+            if (force) loadWorkflows(true);
         } catch (e) {
             console.error(e);
             document.getElementById('history-container').innerHTML = `<div style="padding:20px; text-align:center; color:var(--danger);">Failed to sync history: ${e.message}</div>`;
@@ -2981,6 +2984,7 @@
     function resetHistoryAndSync() {
         historyOffset = 0;
         logOffset = 0;
+        workflowPage = 1; // Reset CI/CD pagination
         fetchState(true);
     }
 
@@ -3467,7 +3471,10 @@
 
             if(data.success) {
                 if(actionType === 'patch') setTimeout(() => bundleAndPreview(null), 1500);
-                setTimeout(() => { fetchState(false, false); fetchFileList(); }, 1000);
+                setTimeout(() => { 
+                    fetchState(true, true); // Use force sync to update history and CI/CD
+                    fetchFileList(); 
+                }, 1000);
             }
         } catch (e) {
             updateTerminalCard(termId, { error: e.message });
