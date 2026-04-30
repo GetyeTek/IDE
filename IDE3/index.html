@@ -687,12 +687,11 @@
         <!-- HISTORY TAB -->
         <div id="tab-history" class="tab-content">
             <div class="header">
-                History 
-                <div class="flex-gap">
-                    <button class="icon-btn" onclick="createCheckpoint()" title="Create Checkpoint">🚩 Checkpoint</button>
-                    <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()">★ Saved</button>
-                    <button class="icon-btn" onclick="resetHistoryAndSync()">Sync</button>
-                    <button class="icon-btn" onclick="openFilterOverlay('history')">🔍 Filter</button>
+                <div class="flex-gap" style="width: 100%; justify-content: flex-start;">
+                    <button class="icon-btn" style="color:var(--primary); border-color:var(--primary-dim);" onclick="createCheckpoint()" title="Create Checkpoint">🚩 Checkpoint</button>
+                    <button class="icon-btn" style="color:var(--dev); border:none; background:transparent;" onclick="openFavorites()" title="Saved Items">★</button>
+                    <button class="icon-btn" onclick="resetHistoryAndSync()" title="Sync History">↻</button>
+                    <button class="icon-btn" onclick="openFilterOverlay('history')" title="Filter History">🔍</button>
                 </div>
             </div>
              <div class="card" id="history-container" style="padding-bottom:0;"><div style="padding:10px; text-align:center;">Loading...</div></div>
