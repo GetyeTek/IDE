@@ -2115,32 +2115,50 @@
      * it attempts to double-escape backslashes that aren't valid JSON control chars.
      */
     function smartJSONParse(jsonString) {
-        try {
-            return JSON.parse(jsonString);
-        } catch (e) {
-            console.warn("Standard JSON parse failed, attempting Robust Auto-Fix...");
-            let fixed = jsonString
-                // 1. Fix backslashes that aren't part of a valid escape sequence
-                .replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
-                // 2. Fix literal newlines inside strings (replace with \n)
-                .replace(/(\n)/g, (match, p1, offset) => {
-                    // Only replace if we are likely inside a quoted string
-                    const before = jsonString.slice(0, offset);
-                    const quoteCount = (before.match(/"/g) || []).length;
-                    return (quoteCount % 2 === 1) ? "\\n" : "\n";
-                });
+        let input = jsonString.trim();
+        
+        // 1. Markdown/Code-block stripping
+        input = input.replace(/^```json\s*/, '').replace(/```$/, '').trim();
 
-            try {
-                const cleanObj = JSON.parse(fixed);
-                document.getElementById('json-input').value = fixed;
-                if (typeof saveState === 'function') saveState();
-                showGlobalToast("✨ Robust Auto-Correction Applied");
-                return cleanObj;
-            } catch (e2) {
-                console.error("Robust fix failed:", e2);
-                throw e; // Throw original error for better debugging
-            }
+        const attemptParse = (str) => {
+            try { return JSON.parse(str); } catch(e) { return null; }
+        };
+
+        // Try native first
+        let result = attemptParse(input);
+        if (result) return result;
+
+        console.warn("Malformed JSON detected. Initiating Structural Healing...");
+
+        // 2. Structural Reconstruction
+        let fixed = input;
+        
+        // Fix missing leading/trailing brackets
+        if (fixed.startsWith('{') && fixed.endsWith('}')) fixed = '[' + fixed + ']';
+        else if (fixed.startsWith('{') && !fixed.startsWith('[')) fixed = '[' + fixed;
+        else if (fixed.endsWith('}') && !fixed.endsWith(']')) fixed = fixed + ']';
+        else if (fixed.startsWith('"action"')) fixed = '[{' + fixed + '}]';
+
+        // 3. Delimiter & Syntax Healing
+        fixed = fixed
+            .replace(/}\s*{/g, '},{')             // Fix missing commas between objects
+            .replace(/,\s*]/g, ']')                // Fix trailing commas
+            .replace(/\\(?!["\\/bfnrtu])/g, "\\\\") // Double-escape illegal backslashes
+            .replace(/(\n)/g, (match, p1, offset) => { // Handle literal newlines in strings
+                const before = fixed.slice(0, offset);
+                const quoteCount = (before.match(/"/g) || []).length;
+                return (quoteCount % 2 === 1) ? "\\n" : "\n";
+            });
+
+        result = attemptParse(fixed);
+        if (result) {
+            document.getElementById('json-input').value = JSON.stringify(result, null, 2);
+            saveState();
+            showGlobalToast("✨ Payload Structures Healed");
+            return result;
         }
+
+        throw new Error("JSON too corrupted for auto-fix. Check brackets/commas manually.");
     }
 
     function b64DecodeUnicode(str) {
@@ -7898,8 +7916,19 @@ async function downloadArtifact(runId) {
 
     async function pasteToEditor() {
         try {
-            const text = await navigator.clipboard.readText();
-            document.getElementById('json-input').value = text;
+            let text = await navigator.clipboard.readText();
+            if (!text) return;
+
+            // Apply immediate healing on paste for UX
+            try {
+                // Use the new smart parser logic but just for formatting
+                const healed = smartJSONParse(text);
+                document.getElementById('json-input').value = JSON.stringify(healed, null, 2);
+            } catch(e) {
+                // If healer fails, paste raw so user can see the mess
+                document.getElementById('json-input').value = text;
+            }
+            
             saveState();
         } catch (e) {
             alert("Failed to read clipboard: " + e.message);
