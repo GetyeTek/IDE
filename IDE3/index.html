@@ -2943,7 +2943,6 @@
         if(force && !isAppend) {
             document.getElementById('history-actions-fab').style.display = 'none';
             document.getElementById('history-container').innerHTML = '<div style="padding:10px; text-align:center;">Syncing...</div>';
-            if (updateTerminal) document.getElementById('terminal-list').innerHTML = '<div style="padding:10px; text-align:center; color:#666">Syncing logs...</div>';
         }
         try {
             const res = await fetch(CONFIG.funcUrl, { 
@@ -3639,6 +3638,10 @@
         // Ensure we capture the SHA if present
         if (response && response.commit_sha) {
             el.dataset.commitSha = response.commit_sha;
+        }
+        // If database ID returned, update DOM ID to prevent fetchState duplicates
+        if (response && response.log_id) {
+            el.id = 'term-saved-' + response.log_id;
         }
 
         if(response.error) {
