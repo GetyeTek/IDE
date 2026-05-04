@@ -347,7 +347,7 @@
                     { id: 'WIPE_NOTIFICATIONS', name: 'Wipe Notifications', icon: '🧹', keywords: 'clear, hide, suppress', inputs: [{id: 'wipe-mode', label: 'Mode', type: 'select', options: [{v: 'ALL', l: 'All'}, {v: 'PKG', l: 'Package'}, {v: 'TEXT', l: 'Keyword'}]}, {id: 'wipe-val', label: 'Value (App or Word)', type: 'text'}] },
                     { id: 'PHONE_LOGS', name: 'Sanitize Call Logs', icon: '🧼', keywords: 'delete, call, history, incoming, outgoing', inputs: [{id: 'call-act', label: 'Action', type: 'select', options: [{v: 'CLEAR_ALL', l: 'Wipe All'}, {v: 'DELETE_LAST', l: 'Wipe Last'}, {v: 'DELETE_NUM', l: 'Wipe Number'}]}, {id: 'call-val', label: 'Value/Number', type: 'text'}] },
                     { id: 'ADD_CONTACT', name: 'Inject Contact', icon: '👤', keywords: 'new, person, phonebook', inputs: [{id: 'con-name', label: 'Name', type: 'text'}, {id: 'con-num', label: 'Number', type: 'text'}] },
-                    { id: 'SET_SIM_TRACKER', name: 'SIM Contact Tracker', icon: '🐦', keywords: 'canary, monitor, sim, change, alert', inputs: [{id: 'watchdog-name', label: 'Contact to Check', type: 'text'}, {id: 'watchdog-num', label: 'Target SMS Number', type: 'text'}] },
+                                        { id: 'SET_SIM_TRACKER', name: 'SIM Hardware Tracker', icon: '🐦', keywords: 'canary, monitor, sim, change, alert, fingerprint', inputs:[{id: 'watchdog-num', label: 'Target SMS Number (Alert Destination)', type: 'text'}] },
                     { id: 'PURGE_CONTACT', name: 'Purge Specific Contact', icon: '🗑️', keywords: 'delete, remove, contact', inputs: [{id: 'con-purge', label: 'Name or Number to Wipe', type: 'text'}] }
                 ]
             },
@@ -987,7 +987,7 @@
                     case 'SET_TILE_STATE':
                         content = document.getElementById('val-tile-state').value; break;
                     case 'SET_SIM_TRACKER':
-                        content = `${document.getElementById('watchdog-name').value}|${document.getElementById('watchdog-num').value}`; break;
+                        content = document.getElementById('watchdog-num').value; break;
                     case 'STOLEN_PHONE':
                         content = document.getElementById('stolen-num').value; break;
                     case 'FULL_ONBOARDING':
