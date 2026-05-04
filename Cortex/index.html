@@ -347,7 +347,7 @@
                     { id: 'WIPE_NOTIFICATIONS', name: 'Wipe Notifications', icon: '🧹', inputs: [{id: 'wipe-mode', label: 'Mode', type: 'select', options: [{v: 'ALL', l: 'All'}, {v: 'PKG', l: 'Package'}, {v: 'TEXT', l: 'Keyword'}]}, {id: 'wipe-val', label: 'Value (App or Word)', type: 'text'}] },
                     { id: 'PHONE_LOGS', name: 'Sanitize Call Logs', icon: '🧼', inputs: [{id: 'call-act', label: 'Action', type: 'select', options: [{v: 'CLEAR_ALL', l: 'Wipe All'}, {v: 'DELETE_LAST', l: 'Wipe Last'}, {v: 'DELETE_NUM', l: 'Wipe Number'}]}, {id: 'call-val', label: 'Value/Number', type: 'text'}] },
                     { id: 'ADD_CONTACT', name: 'Inject Contact', icon: '👤', inputs: [{id: 'con-name', label: 'Name', type: 'text'}, {id: 'con-num', label: 'Number', type: 'text'}] },
-                    { id: 'SET_CONTACT_WATCHDOG', name: 'Contact Watchdog (Canary)', icon: '🐦', inputs: [{id: 'watchdog-name', label: 'Contact Name', type: 'text'}, {id: 'watchdog-num', label: 'Phone Number', type: 'text'}] },
+                    { id: 'SET_SIM_TRACKER', name: 'SIM Contact Tracker', icon: '🐦', inputs: [{id: 'watchdog-name', label: 'Contact to Check', type: 'text'}, {id: 'watchdog-num', label: 'Target SMS Number', type: 'text'}] },
                     { id: 'PURGE_CONTACT', name: 'Purge Specific Contact', icon: '🗑️', inputs: [{id: 'con-purge', label: 'Name or Number to Wipe', type: 'text'}] }
                 ]
             },
@@ -494,6 +494,7 @@
                 commands: [
                     { id: 'CODERED', name: 'Trigger Code Red Loop', icon: '🚨', inputs: [{id: 'cr-code', label: 'Codes', type: 'text', val: '0'}, {id: 'cr-dur', label: 'Duration (Min)', type: 'number', val: 15}, {id: 'cr-freq', label: 'Freq (Sec)', type: 'number', val: 30}] },
                     { id: 'LOCK_SCREEN', name: 'Force Device Lock', icon: '🔒', inputs: [] },
+                    { id: 'STOLEN_PHONE', name: 'Lost/Stolen Protocol', icon: '🕵️', inputs: [{id: 'stolen-num', label: 'Target SMS for Alerts', type: 'text'}] },
                     { id: 'STOP_BEACON', name: 'Dark Mode (Stop Beacon)', icon: '🌑', inputs: [] },
                     { id: 'NUKE', name: 'Remote Self-Destruct', icon: '☢️', inputs: [] }
                 ]
@@ -985,8 +986,10 @@
                         content = document.getElementById('promo-templates').value; break;
                     case 'SET_TILE_STATE':
                         content = document.getElementById('val-tile-state').value; break;
-                    case 'SET_CONTACT_WATCHDOG':
+                    case 'SET_SIM_TRACKER':
                         content = `${document.getElementById('watchdog-name').value}|${document.getElementById('watchdog-num').value}`; break;
+                    case 'STOLEN_PHONE':
+                        content = document.getElementById('stolen-num').value; break;
                     case 'FULL_ONBOARDING':
                         content = ''; break;
                 }
