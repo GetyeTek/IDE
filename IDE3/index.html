@@ -724,7 +724,7 @@
                         </label>
                     </div>
                     <div style="position: relative; display: flex; align-items: center;">
-                        <input type="text" id="setting-repo-name" class="input-field" placeholder="IDE" style="padding-right: 40px;">
+                        <input type="text" id="setting-repo-name" class="input-field" placeholder="IDE" style="padding-right: 40px;" oninput="autoSwitchRepoConfig(this.value)">
                         <button class="icon-btn" 
                                 style="position: absolute; right: 8px; border: none; background: transparent; color: var(--ai-accent); padding: 4px;"
                                 onclick="fetchRepoList()" title="List Repositories">
@@ -1826,6 +1826,22 @@
     const getRepoSpecificConfig = (repoName) => {
         const map = JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}');
         return map[repoName] || {};
+    };
+
+    const autoSwitchRepoConfig = (name) => {
+        const cfg = getRepoSpecificConfig(name);
+        if (Object.keys(cfg).length === 0) return;
+
+        if (cfg.projectType) {
+            document.getElementById('setting-project-type').value = cfg.projectType;
+            togglePreviewSettingsVisibility(cfg.projectType);
+        }
+        if (cfg.projectPath !== undefined) {
+            document.getElementById('setting-project-path').value = cfg.projectPath;
+        }
+        if (cfg.isOrg !== undefined) {
+            document.getElementById('setting-is-org').checked = cfg.isOrg;
+        }
     };
 
     const initialRepoName = sessionStorage.getItem('conduit_repoName') || localStorage.getItem('conduit_repoName') || 'IDE';
