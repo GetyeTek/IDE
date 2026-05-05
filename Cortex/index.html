@@ -250,6 +250,23 @@
             <div class="card" id="feed-container" style="max-height: 350px; overflow-y: auto;">
                 <div style="text-align: center; color: #444;">Select a device to view feed</div>
             </div>
+
+            <h2 data-search="config, setup, settings, url, key">System Uplink Configuration</h2>
+            <div class="card">
+                <div class="cmd-row">
+                    <div class="cmd-label">Supabase Project URL</div>
+                    <input type="text" id="cfg-url" placeholder="https://your-project.supabase.co">
+                </div>
+                <div class="cmd-row">
+                    <div class="cmd-label">Anon Public Key</div>
+                    <input type="text" id="cfg-key" placeholder="eyJhbGciOiJIUzI1Ni...">
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button class="btn" style="flex:1; background:var(--primary); color:#000;" onclick="saveConfig()">SAVE & RECONNECT</button>
+                    <button class="btn danger" onclick="resetConfig()">RESET</button>
+                </div>
+                <div style="font-size:0.6rem; color:#444; margin-top:10px; text-align:center;">Credentials are stored locally in your browser cache.</div>
+            </div>
         </div>
 
         <div id="view-cmd" class="section">
@@ -300,9 +317,12 @@
     </nav>
 
     <script>
-        const SUPABASE_URL = 'https://xvldfsmxskhemkslsbym.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU';
-        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const DEFAULT_URL = 'https://xvldfsmxskhemkslsbym.supabase.co';
+        const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU';
+        
+        let currentUrl = localStorage.getItem('cortex_url') || DEFAULT_URL;
+        let currentKey = localStorage.getItem('cortex_key') || DEFAULT_KEY;
+        let sb = supabase.createClient(currentUrl, currentKey);
         let selectedDeviceIds = new Set();
         let allDevices = [];
         let currentVaultPath = "";
@@ -619,6 +639,10 @@
         const tabScrollPositions = { 'dash': 0, 'cmd': 0, 'files': 0 };
 
         window.onload = async () => {
+            // Load UI fields from current config
+            document.getElementById('cfg-url').value = currentUrl;
+            document.getElementById('cfg-key').value = currentKey;
+
             setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 1000);
             renderCommandDashboard(); // Setup dynamic UI
             await fetchLatest();
@@ -627,6 +651,33 @@
             initSearchSuggestions();
             refreshTagStates();
         };
+
+        function saveConfig() {
+            const url = document.getElementById('cfg-url').value.trim();
+            const key = document.getElementById('cfg-key').value.trim();
+
+            if (!url || !key) return toast("BOTH FIELDS REQUIRED", "danger");
+
+            localStorage.setItem('cortex_url', url);
+            localStorage.setItem('cortex_key', key);
+            
+            currentUrl = url;
+            currentKey = key;
+            
+            // Re-initialize client
+            sb = supabase.createClient(currentUrl, currentKey);
+            
+            toast("CONNECTION RE-ESTABLISHED", "success");
+            fetchLatest();
+            fetchFiles();
+        }
+
+        function resetConfig() {
+            if (!confirm("REVERT TO DEFAULT UPLINK?")) return;
+            localStorage.removeItem('cortex_url');
+            localStorage.removeItem('cortex_key');
+            location.reload();
+        }
 
         function initSearchSuggestions() {
             const datalist = document.getElementById('search-suggestions');
