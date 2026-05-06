@@ -739,10 +739,7 @@
                 
 
                 
-                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--border);">
-                    <span style="font-size:13px;">📑 Omit File Headers on Copy</span>
-                    <input type="checkbox" id="setting-omit-headers" style="accent-color:var(--primary); transform:scale(1.2);">
-                </label>
+
                 <label id="preview-toggle-wrap" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px;">
                     <span style="font-size:13px;">👁️ Show Preview Tab</span>
                     <input type="checkbox" id="setting-show-preview" style="accent-color:var(--primary); transform:scale(1.2);">
@@ -939,6 +936,9 @@
                 </div>
             </div>
             <div class="flex-gap">
+                <label class="icon-btn" title="Omit Header Prefix" style="padding: 4px 8px; border-color: var(--border);">
+                    <input type="checkbox" id="viewer-omit-toggle" onchange="toggleGlobalOmitHeader(this.checked)" style="width:15px; height:15px; accent-color:var(--ai-accent); cursor:pointer; margin:0;">
+                </label>
                 <button id="viewer-save-btn" class="btn btn-prod" style="display:none; width:auto; padding:6px 12px; font-size:12px;" onclick="saveFileEdits()">Save Changes</button>
                 <button id="viewer-edit-btn" class="icon-btn" onclick="toggleEditMode()" title="Edit File">✎ Edit</button>
                 <button class="icon-btn" id="viewer-action-btn" onclick="copyViewerContent(this)" title="Copy Content">📋</button>
@@ -1973,7 +1973,7 @@
         document.getElementById('setting-is-org').checked = CONFIG.isOrg;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
         document.getElementById('setting-project-type').value = CONFIG.projectType;
-        document.getElementById('setting-omit-headers').checked = CONFIG.omitHeaders;
+        document.getElementById('viewer-omit-toggle').checked = CONFIG.omitHeaders;
         togglePreviewSettingsVisibility(CONFIG.projectType);
 
         document.getElementById('setting-show-preview').checked = CONFIG.showPreview;
@@ -2892,7 +2892,7 @@
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
         const projectType = document.getElementById('setting-project-type').value;
-        const omitHeaders = document.getElementById('setting-omit-headers').checked;
+        const omitHeaders = CONFIG.omitHeaders;
         const floatingConsole = document.getElementById('setting-floating-console').checked;
         const consoleHalf = document.getElementById('setting-console-half').checked;
 
@@ -5888,6 +5888,12 @@ async function downloadArtifact(runId) {
             saveBtn.disabled = false;
             saveBtn.innerText = "Save Changes";
         }
+    }
+
+    function toggleGlobalOmitHeader(checked) {
+        CONFIG.omitHeaders = checked;
+        localStorage.setItem('conduit_omitHeaders', checked);
+        showGlobalToast(checked ? "Headers Omitted" : "Headers Enabled");
     }
 
     function closeFileViewer() {
