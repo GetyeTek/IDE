@@ -2860,7 +2860,7 @@
         if(!confirm("Execute SQL to enable pg_cron and pg_net extensions?")) return;
         try {
             const sql = "CREATE EXTENSION IF NOT EXISTS pg_cron; CREATE EXTENSION IF NOT EXISTS pg_net;";
-            const res = await fetch("https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor", {
+            const res = await fetch(SQL_CONFIG.URL, {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SQL_CONFIG.ANON, 'apikey': SQL_CONFIG.ANON },
                 body: JSON.stringify({ query: sql })
@@ -8443,7 +8443,16 @@ async function downloadArtifact(runId) {
 
     // --- SQL EXECUTOR LOGIC ---
     const SQL_CONFIG = {
-        URL: 'https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/sql-executor',
+        get URL() {
+            if (!CONFIG.funcUrl) return '';
+            const base = CONFIG.funcUrl.substring(0, CONFIG.funcUrl.lastIndexOf('/') + 1);
+            return base + 'sql-executor';
+        },
+        get REST_BASE() {
+            if (!CONFIG.funcUrl) return '';
+            const match = CONFIG.funcUrl.match(/^https:\/\/[^/]+/);
+            return match ? match[0] : '';
+        },
         ANON: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU'
     };
     let lastSqlResultData = null;
@@ -9077,8 +9086,8 @@ async function downloadArtifact(runId) {
         try {
             let keys = [];
             if (source === 'database') {
-                const SB_URL = "https://xvldfsmxskhemkslsbym.supabase.co";
-                const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2ODgxNzksImV4cCI6MjA3ODI2NDE3OX0.5arqrx8Tt7v-hpXpo_ncoK4IX8th9IibxAuv93SSoOU";
+                const SB_URL = SQL_CONFIG.REST_BASE;
+                const SB_KEY = SQL_CONFIG.ANON;
                 const res = await fetch(SB_URL + '/rest/v1/api_keys?service=eq.gemini&select=*', { headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY } });
                 keys = await res.json();
             } else {
