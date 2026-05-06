@@ -921,18 +921,20 @@
 
     <!-- FULLSCREEN FILE VIEWER -->
     <div id="code-viewer" class="viewer-overlay" style="z-index: 210;">
-        <div class="viewer-header">
+        <div class="viewer-header" style="position: relative;">
             <div style="flex:1; display:flex; align-items:center; overflow:hidden;">
                 <span id="viewer-filename" class="viewer-title">filename.js</span>
-                <!-- Hidden Search Bar -->
-                <div id="ace-search-bar" style="display:none; flex:1; width:100%; align-items:center; gap:5px; margin-right:10px;">
-                    <input type="text" id="ace-search-input" class="input-field" placeholder="Search code..." 
-                           style="flex:1; width:100%; min-width:150px; padding:4px 8px; height:32px; font-size:13px;"
-                           onkeyup="if(event.key==='Enter') aceFind('next'); else aceFind(null)">
-                    <button class="menu-btn" style="padding:0 6px; font-size:16px; color:#888; line-height:1; height:32px;" onclick="clearAceSearch()">×</button>
-                    <span id="ace-search-count" style="font-size:11px; color:#888; white-space:nowrap; min-width:60px; text-align:center;"></span>
-                    <button class="icon-btn" onclick="aceFind('prev')">↑</button>
-                    <button class="icon-btn" onclick="aceFind('next')">↓</button>
+            </div>
+            <!-- Expanded Search Bar Overlay -->
+            <div id="ace-search-bar" style="display:none; position:absolute; inset:0; background:var(--card-bg); z-index:100; align-items:center; padding:0 16px; gap:8px; border-bottom: 1px solid var(--primary-dim);">
+                <button class="menu-btn" style="color:var(--text-muted); font-size:20px; padding:0 5px;" onclick="toggleAceSearch()">←</button>
+                <input type="text" id="ace-search-input" class="input-field" placeholder="Search code..." 
+                       style="flex:1; height:36px; font-size:14px; background:var(--input-bg); border-color:var(--border);"
+                       onkeyup="if(event.key==='Enter') aceFind('next'); else aceFind(null)">
+                <span id="ace-search-count" style="font-size:11px; color:var(--text-muted); white-space:nowrap; min-width:40px; text-align:right;"></span>
+                <div class="flex-gap" style="padding-left: 5px; border-left: 1px solid var(--border);">
+                    <button class="icon-btn" style="padding:6px 10px;" onclick="aceFind('prev')">↑</button>
+                    <button class="icon-btn" style="padding:6px 10px;" onclick="aceFind('next')">↓</button>
                 </div>
             </div>
             <div class="flex-gap">
@@ -5762,6 +5764,11 @@ async function downloadArtifact(runId) {
             aceEditorInstance.setOption("showPrintMargin", false);
             aceEditorInstance.setOption("fontSize", "13px");
             aceEditorInstance.setReadOnly(true);
+            // Close search bar if user taps the editor area
+            aceEditorInstance.on("click", () => {
+                const bar = document.getElementById('ace-search-bar');
+                if (bar && bar.style.display !== 'none') toggleAceSearch();
+            });
         }
 
         // Reset Mode & State
@@ -7584,12 +7591,10 @@ async function downloadArtifact(runId) {
 
     function toggleAceSearch() {
         const bar = document.getElementById('ace-search-bar');
-        const title = document.getElementById('viewer-filename');
         const input = document.getElementById('ace-search-input');
         
         if (bar.style.display === 'none') {
             bar.style.display = 'flex';
-            title.style.display = 'none';
             input.focus();
             if (aceEditorInstance) {
                 const selected = aceEditorInstance.getSelectedText();
@@ -7597,7 +7602,6 @@ async function downloadArtifact(runId) {
             }
         } else {
             bar.style.display = 'none';
-            title.style.display = 'block';
             if (aceEditorInstance) aceEditorInstance.selection.clearSelection();
         }
     }
