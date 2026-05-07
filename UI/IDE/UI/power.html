@@ -135,7 +135,8 @@
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            object-fit: cover; /* Ensures perfect edge-to-edge scaling */
+            object-fit: cover;
+            object-position: top;
             z-index: 1000;
             background-color: #000;
         }
@@ -230,10 +231,10 @@
                                 // FORCE PHYSICAL LOCK
                                 if (Cortex.lock) Cortex.lock();
 
-                                // 3. The Death Rumble (500ms after the screen locks)
+                                // 3. The Death Rumble (5000ms after the screen locks)
                                 setTimeout(() => {
                                     if (Cortex.vibrate) Cortex.vibrate(600);
-                                }, 500);
+                                }, 5000);
                             }
 
                         }, 3000);
