@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --icon-fill: #ffffff;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            /* Slim Height Profile */
+            --bar-height: 26px; 
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: transparent;
+            font-family: var(--font-family);
+            overflow: hidden;
+        }
+
+        /* Absolute Top Positioning - Reduced Height */
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: var(--bar-height);
+            background-color: var(--bg-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            box-sizing: border-box;
+            user-select: none;
+            z-index: 9999;
+        }
+
+        /* Left Side: Clock */
+        .clock {
+            font-size: 13px; /* Slightly smaller for slim bar */
+            font-weight: 600;
+            color: var(--text-color);
+            letter-spacing: -0.1px;
+            /* Precise vertical centering for Samsung fonts */
+            padding-top: 1px;
+        }
+
+        /* Right Side: Icons */
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .icon-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Scaled down Alarm */
+        .custom-alarm-icon {
+            height: 12px;
+            width: auto;
+        }
+
+        .custom-alarm-icon path {
+            fill: var(--icon-fill);
+        }
+
+        /* Scaled down Signal Bars */
+        .signal-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 1.1px;
+            height: 9px;
+            margin-right: 1px;
+        }
+
+        .bar {
+            width: 1.1px;
+            background-color: var(--icon-fill);
+            border-radius: 0.1px;
+        }
+        .bar.b1 { height: 30%; }
+        .bar.b2 { height: 50%; }
+        .bar.b3 { height: 75%; }
+        .bar.b4 { height: 100%; }
+
+        /* Battery Group */
+        .battery-group {
+            display: flex;
+            align-items: center;
+            gap: 1px;
+        }
+
+        .battery-percentage {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-color);
+            letter-spacing: -0.3px;
+        }
+
+        /* Scaled down Battery Icon */
+        .battery-wrapper {
+            position: relative;
+            width: 11px;
+            height: 17px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .battery-icon-shell {
+            position: absolute;
+            width: 11px;
+            height: 17px;
+            fill: var(--icon-fill);
+            opacity: 0.3;
+        }
+
+        .battery-fill-clip {
+            position: absolute;
+            width: 11px;
+            height: 17px;
+            fill: var(--icon-fill);
+            clip-path: inset(0% 0 0 0); 
+            transition: clip-path 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-left" onclick="if(window.Cortex) Cortex.close()">
+        <div class="clock" id="time">--:-- --</div>
+    </div>
+    
+    <div class="status-right">
+        <!-- Alarm -->
+        <div class="icon-container">
+            <svg class="custom-alarm-icon" viewBox="0 0 87 41">
+                <path d="M 9 8 L 6 11 L 4 11 L 4 14 Q 5 14 7 14 L 10 11 Q 10 8 10 8 L 9 8 Z M 26 8 Q 26 9 26 11 L 30 14 Q 31 14 32 14 L 32 13 L 28 8 L 26 8 Z M 67 8 Q 66 9 65 9 L 61 13 L 61 14 L 67 19 L 68 19 L 68 19 L 68 9 Q 68 7 67 8 Z M 75 8 L 72 11 Q 72 12 71 13 L 71 14 L 74 17 L 74 18 L 72 20 Q 72 21 71 22 L 71 23 L 74 26 L 74 27 L 72 29 Q 72 30 71 31 L 71 32 L 75 35 L 76 35 L 76 34 L 74 32 L 74 30 L 76 28 L 76 25 L 74 23 L 74 21 L 76 19 L 76 16 L 74 14 L 74 12 L 76 10 Q 77 7 75 8 Z M 50 9 L 50 11 L 54 15 L 54 16 Q 53 16 51 16 L 48 19 L 48 25 L 50 26 L 57 26 L 62 31 L 63 31 L 67 35 L 68 34 L 68 26 L 52 9 L 50 9 Z M 14 11 Q 13 12 12 12 L 7 17 Q 7 18 6 19 L 6 21 L 5 22 L 6 23 L 6 28 L 8 31 L 6 33 Q 6 34 6 35 L 8 35 L 10 33 Q 12 33 13 34 L 15 34 L 16 35 L 21 35 Q 21 34 24 34 L 25 33 L 27 33 L 29 35 L 30 35 L 30 34 L 28 31 Q 28 29 29 29 L 29 28 L 30 27 L 30 19 Q 29 18 29 17 L 25 12 Q 23 12 23 11 L 14 11 Z M 17.5 14 L 18.5 14 L 20 15.5 L 20 20.5 L 20 21 Q 20.8 21 23.5 21 L 25 22.5 L 25 23.5 L 23.5 25 L 18.5 25 L 16 22.5 L 16 15.5 L 17.5 14 Z" />
+            </svg>
+        </div>
+
+        <!-- Signal -->
+        <div class="signal-bars">
+            <div class="bar b1"></div>
+            <div class="bar b2"></div>
+            <div class="bar b3"></div>
+            <div class="bar b4"></div>
+        </div>
+
+        <!-- Battery -->
+        <div class="battery-group">
+            <span class="battery-percentage" id="batt-level">--%</span>
+            <div class="battery-wrapper">
+                <svg class="battery-icon-shell" viewBox="0 0 24 24">
+                    <path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/>
+                </svg>
+                <svg id="batt-fill" class="battery-fill-clip" viewBox="0 0 24 24">
+                    <path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateTime() {
+        const now = new Date();
+        let hours = now.getHours();
+        let minutes = now.getMinutes();
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12;
+        hours = hours ? hours : 12; 
+        minutes = minutes < 10 ? '0' + minutes : minutes;
+        document.getElementById('time').textContent = hours + ':' + minutes + ' ' + ampm;
+    }
+
+    function updateBattery() {
+        let level = 100;
+        try {
+            if (window.Cortex) level = Cortex.getBattery();
+        } catch (e) {}
+
+        document.getElementById('batt-level').textContent = level + '%';
+        const topInset = 100 - level;
+        document.getElementById('batt-fill').style.clipPath = `inset(${topInset}% 0 0 0)`;
+    }
+    
+    updateTime();
+    updateBattery();
+    setInterval(updateTime, 1000);
+    setInterval(updateBattery, 5000);
+</script>
+</body>
+</html>
