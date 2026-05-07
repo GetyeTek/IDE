@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Samsung Boot Sequence</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Standardized styles for the crisp screenshots */
+        .boot-img {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 1000;
+            background-color: #000;
+        }
+
+        #boot1 { z-index: 1001; }
+        #boot2 { z-index: 1002; }
+    </style>
+</head>
+<body>
+
+    <!-- PRE-LOAD IMAGES -->
+    <img id="boot1" class="boot-img" src="boot1.png" alt="Boot Phase 1">
+    <img id="boot2" class="boot-img" src="boot2.png" alt="Boot Phase 2">
+
+    <script>
+        window.onload = function() {
+            const b1 = document.getElementById('boot1');
+            const b2 = document.getElementById('boot2');
+
+            // 1. Initial "Power On" Haptics and Brightness Restoration
+            if (window.Cortex) {
+                if (Cortex.vibrate) Cortex.vibrate(150);
+                if (Cortex.setDim) Cortex.setDim(100);
+            }
+
+            // 2. Phase 1: Show Boot Image 1 (Samsung / Knox Screen)
+            b1.style.display = 'block';
+
+            // 3. Phase 2 Transition (After 15 Seconds)
+            setTimeout(() => {
+                b1.style.display = 'none';
+                b2.style.display = 'block';
+
+                // 4. Final Completion (After another 15 Seconds)
+                setTimeout(() => {
+                    finishBoot();
+                }, 15000);
+
+            }, 15000);
+        };
+
+        function finishBoot() {
+            if (window.Cortex) {
+                // Signal state machine that device is now fully "awake"
+                if (Cortex.reportPowerState) Cortex.reportPowerState("NORMAL");
+                
+                // Remove overlay and land user on the Launcher
+                if (Cortex.close) Cortex.close();
+            }
+        }
+    </script>
+</body>
+</html>
