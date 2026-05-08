@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cortex UI - Shutdown Sequence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Handlee&display=swap" rel="stylesheet">
     <style>
         :root {
             --icon-1-s: 54px; --icon-1-x: -1px; --icon-1-y: -44px;
@@ -141,15 +144,28 @@
 
         .instruction-text {
             position: absolute;
-            top: calc(50% + 95px);
+            top: calc(50% + 92px);
             width: 100%;
-            text-align: center;
-            font-size: 17.5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Handlee', cursive;
             color: #ffffff;
             opacity: 0;
             transition: opacity 0.3s ease;
             pointer-events: none;
             z-index: 50;
+        }
+
+        .action-label {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .action-desc {
+            font-size: 16px;
+            opacity: 0.9;
         }
     </style>
 </head>
@@ -161,7 +177,10 @@
     <img id="power-off-img" src="power_off.png" alt="Shutdown Screen">
 
     <div class="ui-container" id="main-wrap">
-        <div id="desc-text" class="instruction-text"></div>
+        <div id="desc-container" class="instruction-text">
+            <div id="action-label" class="action-label"></div>
+            <div id="action-desc" class="action-desc"></div>
+        </div>
         <div class="icon-grid" id="icon-grid">
             <div class="icon-item" onclick="handleAction('power', this)">
                 <svg id="svg-1" class="icon-svg" viewBox="0 0 1024 1024">
@@ -226,7 +245,10 @@
         });
 
         function handleAction(type, element) {
-            const descText = document.getElementById('desc-text');
+            const label = document.getElementById('action-label');
+            const desc = document.getElementById('action-desc');
+            const container = document.getElementById('desc-container');
+
             if (element.classList.contains('active')) {
                 if (type === 'power') {
                     element.style.opacity = "0.5";
@@ -272,20 +294,27 @@
                 overlay.classList.add('active-state');
 
                 // Show instruction text
-                if (type === 'power') descText.innerText = 'Tap again to turn off your phone';
-                else if (type === 'restart') descText.innerText = 'Tap again to restart your phone';
-                else if (type === 'emergency') descText.innerText = 'Tap again to turn on Emergency mode';
-                descText.style.opacity = '1';
+                if (type === 'power') {
+                    label.innerText = 'Power off';
+                    desc.innerText = 'Tap again to turn off your phone';
+                } else if (type === 'restart') {
+                    label.innerText = 'Restart';
+                    desc.innerText = 'Tap again to restart your phone';
+                } else if (type === 'emergency') {
+                    label.innerText = 'Emergency mode';
+                    desc.innerText = 'Tap again to turn on Emergency mode';
+                }
+                container.style.opacity = '1';
             }
         }
 
         function resetUI() {
-            const descText = document.getElementById('desc-text');
+            const container = document.getElementById('desc-container');
             items.forEach(el => { el.classList.remove('active'); el.style.opacity = "1"; });
             grid.classList.remove('active-state');
             overlay.classList.remove('active-state');
             mainWrap.style.pointerEvents = "auto";
-            descText.style.opacity = '0';
+            container.style.opacity = '0';
         }
     </script>
 </body>
