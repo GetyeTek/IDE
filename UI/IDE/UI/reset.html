@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Samsung One UI Final Reset</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Handlee&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-black: #000000;
+            --card-bg: #111111;
+            --text-white: #ffffff;
+            --text-grey: #9a9a9a;
+            --divider-bg: #090909;
+            --border-color: #242424;
+            
+            --nav-height: 60px;
+            --expanded-height: 200px; 
+            --fs-body: 16.5px;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: var(--bg-black);
+            color: var(--text-white);
+            font-family: 'Handlee', cursive;
+            overflow: hidden;
+        }
+
+        /* SCROLL SNAP CONTAINER */
+        #scrollWrapper {
+            width: 100%; height: 100vh;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        /* Fixed Navigation Overlay */
+        .fixed-nav {
+            position: fixed; top: 0; left: 0; width: 100%; height: var(--nav-height);
+            display: flex; align-items: center; padding: 0 8px; z-index: 100;
+            background-color: transparent; pointer-events: none;
+        }
+
+        /* Back Button Positioned dynamically via JS */
+        .back-btn {
+            position: fixed; 
+            left: 8px;
+            width: 48px; height: 48px;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 101; pointer-events: auto;
+        }
+
+        .small-title { position: absolute; left: 56px; font-size: 21px; opacity: 0; pointer-events: none; }
+
+        /* EXPANDABLE HEADER */
+        .expandable-header {
+            height: var(--expanded-height); width: 100%;
+            display: flex; justify-content: center; align-items: center;
+            scroll-snap-align: start;
+            position: relative;
+            background-color: var(--bg-black);
+        }
+
+        .large-title { font-size: 34px; text-align: center; margin-top: 10px; }
+
+        /* CONTENT CARD */
+        .content-card {
+            background-color: var(--card-bg);
+            border-top-left-radius: 32px;
+            border-top-right-radius: 32px;
+            padding: 0px 22px 120px 22px; 
+            min-height: 100vh;
+            position: relative;
+            z-index: 5;
+            scroll-snap-align: start;
+            scroll-margin-top: var(--nav-height);
+        }
+
+        /* TEXT STYLING */
+        .main-warning-text { 
+            font-size: var(--fs-body); 
+            line-height: 1.4; 
+            margin-bottom: 12px;
+            margin-top: 45px; 
+        }
+
+        .bullet-list { 
+            margin: 0; 
+            padding: 0; 
+            list-style: none;
+            padding-left: 14px; 
+        }
+        .bullet-item { font-size: var(--fs-body); color: var(--text-grey); padding-left: 18px; margin-bottom: 5px; position: relative; }
+        .bullet-item::before { content: "•"; position: absolute; left: 4px; }
+
+        .note-text { 
+            color: var(--text-grey); 
+            font-size: var(--fs-body); 
+            margin-top: 14px; 
+            line-height: 1.4; 
+        }
+
+        .signed-in-text { font-size: var(--fs-body); margin: 30px 0 18px 0; }
+
+        /* ACCOUNT SECTION */
+        .section-label {
+            background-color: var(--divider-bg);
+            margin: 0 -22px;
+            padding: 8px 22px;
+            font-size: 13px;
+            color: var(--text-grey);
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .account-row { display: flex; align-items: center; padding: 14px 0; }
+        .icon-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 14px; }
+        .bg-google { background-color: #4285f4; }
+        .bg-telegram { background-color: #2da6da; }
+        .account-email { font-size: 15px; }
+
+        /* APP UNINSTALL SECTION */
+        .app-uninstall-warning {
+            font-size: 16px; line-height: 1.4;
+            color: #d1d1d1; margin: 35px 0 22px 0;
+            padding-top: 20px; border-top: 1px solid var(--border-color);
+        }
+
+        .app-row { display: flex; align-items: center; padding: 11px 0; }
+        .app-icon { width: 34px; height: 34px; margin-right: 18px; object-fit: contain; border-radius: 8px; }
+        .app-name { font-size: 18px; color: #ffffff; }
+
+        /* RESET BUTTON */
+        .reset-container { display: flex; justify-content: center; margin: 40px 0 50px 0; }
+        .reset-btn {
+            background-color: #555555; color: white;
+            padding: 12px 75px; border-radius: 30px;
+            font-size: 20px; font-family: 'Handlee', cursive; border: none;
+            transition: opacity 0.2s;
+        }
+
+        .reset-btn:active { opacity: 0.6; }
+
+        /* TIP SECTION */
+        .tip-section { padding: 0 5px; }
+        .tip-title { font-size: 22px; margin-bottom: 12px; }
+        .tip-text { font-size: 17px; line-height: 1.5; color: #ffffff; }
+        .tip-text span { text-decoration: underline; font-style: italic; }
+
+        #scrollWrapper::-webkit-scrollbar { display: none; }
+
+        /* SCREEN 2 STYLES (FROM SCREENSHOT) */
+        #screen2 {
+            display: none;
+            padding-bottom: 200px;
+        }
+
+        .screen2-warning {
+            font-size: 19px;
+            line-height: 1.4;
+            margin-top: 40px;
+            color: #ffffff;
+        }
+
+        .screen2-info {
+            font-size: 19px;
+            line-height: 1.4;
+            margin-top: 35px;
+            color: #ffffff;
+        }
+
+        .delete-all-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 50px;
+        }
+
+        .delete-all-btn {
+            background-color: #6d6d6d;
+            color: white;
+            padding: 14px 60px;
+            border-radius: 35px;
+            font-size: 22px;
+            font-family: 'Handlee', cursive;
+            border: none;
+        }
+
+        /* STUTTER OVERLAY */
+        #stutterOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.05);
+            z-index: 9999;
+            display: none;
+            pointer-events: all; /* Blocks clicks during stutter */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="stutterOverlay"></div>
+
+    <!-- Fixed Overlay -->
+    <div class="fixed-nav" id="topNav">
+        <div class="small-title" id="smallTitle">Factory data reset</div>
+    </div>
+
+    <!-- Back Button Chevron -->
+    <div class="back-btn" id="backBtn">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="white">
+            <path d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z" />
+        </svg>
+    </div>
+
+    <div id="scrollWrapper">
+        <!-- Expanded Area -->
+        <div class="expandable-header">
+            <div class="large-title" id="largeTitle">Factory data reset</div>
+        </div>
+
+        <!-- The Content Area -->
+        <div class="content-card">
+            
+            <!-- STEP 1 CONTENT -->
+            <div id="screen1">
+                <div class="main-warning-text">All data will be erased from your phone, including your:</div>
+                
+                <div class="bullet-list">
+                    <div class="bullet-item">Google account</div>
+                    <div class="bullet-item">System and app data</div>
+                    <div class="bullet-item">Settings</div>
+                    <div class="bullet-item">Downloaded apps</div>
+                    <div class="bullet-item">Music</div>
+                    <div class="bullet-item">Pictures</div>
+                    <div class="bullet-item">All other user data</div>
+                    <div class="bullet-item">Service provider apps and content</div>
+                    <div class="bullet-item">The decryption key for files on the SD card</div>
+                </div>
+
+                <div class="note-text">(You will not be able to use encrypted files on the SD card after you reset your device to factory defaults.)</div>
+
+                <div class="signed-in-text">You are currently signed in to the following accounts:</div>
+
+                <div class="section-label">Personal</div>
+
+                <div class="account-row">
+                    <div class="icon-circle bg-google">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C9.03,19.27 6.48,16.68 6.48,13.12C6.48,9.57 9.03,6.97 12.19,6.97C14.12,6.97 15.6,7.75 16.57,8.68L18.5,6.75C17.18,5.46 15.1,4.24 12.19,4.24C7.32,4.24 3.5,8.04 3.5,13.12C3.5,18.2 7.32,22 12.19,22C17.38,22 21.44,18.3 21.44,13.12C21.44,12.38 21.39,11.75 21.35,11.1V11.1Z" /></svg>
+                    </div>
+                    <div class="account-email">getyetekluz@gmail.com</div>
+                </div>
+                <div class="account-row">
+                    <div class="icon-circle bg-telegram">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M9.78,18.65L10.06,14.42L17.74,7.5C18.08,7.19 17.67,7.04 17.22,7.31L7.74,13.3L3.64,12.03C2.75,11.75 2.75,11.14 3.82,10.72L19.82,4.56C20.56,4.29 21.21,4.74 20.97,5.86L18.24,18.75C18.03,19.71 17.46,19.95 16.66,19.5L12.5,16.44L10.49,18.38C10.27,18.6 10.08,18.79 9.78,18.79V18.65Z" /></svg>
+                    </div>
+                    <div class="account-email">8087130772</div>
+                </div>
+                <div class="account-row">
+                    <div class="icon-circle bg-telegram">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M9.78,18.65L10.06,14.42L17.74,7.5C18.08,7.19 17.67,7.04 17.22,7.31L7.74,13.3L3.64,12.03C2.75,11.75 2.75,11.14 3.82,10.72L19.82,4.56C20.56,4.29 21.21,4.74 20.97,5.86L18.24,18.75C18.03,19.71 17.46,19.95 16.66,19.5L12.5,16.44L10.49,18.38C10.27,18.6 10.08,18.79 9.78,18.79V18.65Z" /></svg>
+                    </div>
+                    <div class="account-email">7581490017</div>
+                </div>
+
+                <div class="app-uninstall-warning">
+                    The following apps will be uninstalled. Some apps may be reinstalled after the reset depending on your service provider.
+                </div>
+
+                <div class="app-row"><img class="app-icon" src="sam_health.png"><div class="app-name">Samsung Health</div></div>
+                <div class="app-row"><img class="app-icon" src="sam_internet.png"><div class="app-name">Samsung Internet</div></div>
+                <div class="app-row"><img class="app-icon" src="sam_members.png"><div class="app-name">Samsung Members</div></div>
+                <div class="app-row"><img class="app-icon" src="sam_notes.png"><div class="app-name">Samsung Notes</div></div>
+                <div class="app-row"><img class="app-icon" src="drive.png"><div class="app-name">Drive</div></div>
+                <div class="app-row"><img class="app-icon" src="linkedin.png"><div class="app-name">LinkedIn</div></div>
+                <div class="app-row"><img class="app-icon" src="outlook.png"><div class="app-name">Outlook</div></div>
+                <div class="app-row"><img class="app-icon" src="photos.png"><div class="app-name">Photos</div></div>
+                <div class="app-row"><img class="app-icon" src="spotify.png"><div class="app-name">Spotify</div></div>
+                <div class="app-row"><img class="app-icon" src="yt_music.png"><div class="app-name">YouTube Music</div></div>
+
+                <div class="reset-container">
+                    <button class="reset-btn" id="resetStep1">Reset</button>
+                </div>
+
+                <div class="tip-section">
+                    <div class="tip-title">Tip</div>
+                    <div class="tip-text">
+                        You can use <span>Smart Switch</span> to back up your data to an SD card or USB storage device before resetting your phone.
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2 CONTENT (EXACTLY LIKE SCREENSHOT) -->
+            <div id="screen2">
+                <div class="screen2-warning">
+                    All your personal information and downloaded apps will be erased and can't be recovered.
+                </div>
+                
+                <div class="screen2-info">
+                    Data that has been backed up to the SD card won't be erased. You can restore SD card data using Smart Switch after the reset.
+                </div>
+
+                <div class="delete-all-container">
+                    <button class="delete-all-btn">Delete all</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const scrollWrapper = document.getElementById('scrollWrapper');
+        const largeTitle = document.getElementById('largeTitle');
+        const smallTitle = document.getElementById('smallTitle');
+        const backBtn = document.getElementById('backBtn');
+        const topNav = document.getElementById('topNav');
+        const screen1 = document.getElementById('screen1');
+        const screen2 = document.getElementById('screen2');
+        const resetBtn = document.getElementById('resetStep1');
+        const stutterOverlay = document.getElementById('stutterOverlay');
+
+        // SNAP_THRESHOLD determines where the "collapsed" state starts
+        const SNAP_THRESHOLD = 140; 
+
+        window.addEventListener('load', () => {
+            // Start at the collapsed position
+            scrollWrapper.scrollTop = SNAP_THRESHOLD;
+            updateHeader(SNAP_THRESHOLD);
+        });
+
+        scrollWrapper.addEventListener('scroll', () => {
+            updateHeader(scrollWrapper.scrollTop);
+        });
+
+        function updateHeader(scrollTop) {
+            let progress = scrollTop / SNAP_THRESHOLD;
+            if (progress < 0) progress = 0;
+            if (progress > 1) progress = 1;
+
+            // Opacity for Titles
+            largeTitle.style.opacity = 1 - (progress * 1.5); 
+            if (progress > 0.8) {
+                smallTitle.style.opacity = (progress - 0.8) * 5;
+            } else {
+                smallTitle.style.opacity = 0;
+            }
+
+            // BACK BUTTON MOVEMENT
+            const collapsedPos = 6;
+            const expandedPos = 180; 
+            const currentPos = expandedPos - (progress * (expandedPos - collapsedPos));
+            backBtn.style.top = `${currentPos}px`;
+
+            // Background of top nav appears as we scroll
+            topNav.style.backgroundColor = `rgba(0, 0, 0, ${progress})`;
+        }
+
+        // RESET BUTTON TRANSITION LOGIC
+        resetBtn.addEventListener('click', () => {
+            // 1. Show stutter/freeze effect
+            stutterOverlay.style.display = 'block';
+            
+            // 2. 2-second delay for realisticness
+            setTimeout(() => {
+                // Remove stutter overlay
+                stutterOverlay.style.display = 'none';
+
+                // Swap screens
+                screen1.style.display = 'none';
+                screen2.style.display = 'block';
+
+                // Reset scroll to top so the header is expanded on the new screen
+                scrollWrapper.scrollTo({ top: 0, behavior: 'instant' });
+                updateHeader(0);
+
+            }, 2000); 
+        });
+
+        document.body.addEventListener('click', (e) => {
+            if (!e.target.closest('.back-btn') && !e.target.closest('.reset-btn') && !e.target.closest('.delete-all-btn')) {
+                if (window.Cortex) Cortex.close();
+            }
+        });
+    </script>
+</body>
+</html>
