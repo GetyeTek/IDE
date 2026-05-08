@@ -236,6 +236,11 @@
 
         mainWrap.addEventListener('click', function(e) {
             if (e.target === this || e.target.id === 'main-wrap') {
+                // Lift native touch blocker whenever background is tapped
+                if (window.Cortex && window.Cortex.releaseTouch) {
+                    Cortex.releaseTouch();
+                }
+
                 if (grid.classList.contains('active-state')) {
                     // If 1 button is focused, just go back to the 3-button list
                     resetUI();
