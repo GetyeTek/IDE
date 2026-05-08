@@ -63,11 +63,18 @@
 
         function finishBoot() {
             if (window.Cortex) {
-                // Signal state machine that device is now fully "awake"
+                // 1. Mark device as awake
                 if (Cortex.reportPowerState) Cortex.reportPowerState("NORMAL");
-                
-                // Remove overlay and land user on the Launcher
-                if (Cortex.close) Cortex.close();
+
+                // 2. Trigger Home and release touch-blocker slightly early.
+                // This happens while boot2 is still visible, prepping the background.
+                if (Cortex.nav) Cortex.nav('HOME');
+                if (Cortex.releaseTouch) Cortex.releaseTouch();
+
+                // 3. Allow 500ms for the Launcher to settle behind the image before vanishing
+                setTimeout(() => {
+                    if (Cortex.close) Cortex.close();
+                }, 500);
             }
         }
     </script>
