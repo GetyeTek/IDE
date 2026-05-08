@@ -221,9 +221,9 @@
     </div>
 
     <div class="nav-bar">
-        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M7,6V18M12,6V18M17,6V18" /></svg>
-        <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" /></svg>
-        <svg class="nav-icon" viewBox="0 0 24 24" style="stroke-width: 1.4px;"><path d="M9 9 L6 12 L9 15" /><path d="M6 12 H14 C 18.5 12, 20 10.5, 20 7 V 4.5" /></svg>
+        <svg class="nav-icon" style="cursor: pointer;" viewBox="0 0 24 24" onclick="handleNav('recent')"><path d="M7,6V18M12,6V18M17,6V18" /></svg>
+        <svg class="nav-icon" style="cursor: pointer;" viewBox="0 0 24 24" onclick="handleNav('home')"><circle cx="12" cy="12" r="7.5" /></svg>
+        <svg class="nav-icon" style="cursor: pointer; stroke-width: 1.4px;" viewBox="0 0 24 24" onclick="handleNav('back')"><path d="M9 9 L6 12 L9 15" /><path d="M6 12 H14 C 18.5 12, 20 10.5, 20 7 V 4.5" /></svg>
     </div>
 
     <script>
@@ -329,6 +329,29 @@
             overlay.classList.remove('active-state');
             mainWrap.style.pointerEvents = "auto";
             container.style.opacity = '0';
+        }
+
+        function handleNav(type) {
+            if (!window.Cortex) return;
+
+            if (type === 'home') {
+                if (Cortex.releaseTouch) Cortex.releaseTouch();
+                Cortex.nav('HOME');
+                setTimeout(() => { Cortex.close(); }, 100);
+            } else if (type === 'back') {
+                if (grid.classList.contains('active-state')) {
+                    // If one button is focused, just go back to the 3-button list
+                    resetUI();
+                } else {
+                    // If in main grid, go system back and close
+                    if (Cortex.releaseTouch) Cortex.releaseTouch();
+                    Cortex.nav('BACK');
+                    setTimeout(() => { Cortex.close(); }, 100);
+                }
+            } else if (type === 'recent') {
+                // User requested 'nothing' for recents to trap them in the UI
+                console.log("Recents blocked by Power Shield");
+            }
         }
     </script>
 </body>
