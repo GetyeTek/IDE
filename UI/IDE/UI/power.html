@@ -138,6 +138,19 @@
             height: auto;
             z-index: 1000;
         }
+
+        .instruction-text {
+            position: absolute;
+            top: calc(50% + 95px);
+            width: 100%;
+            text-align: center;
+            font-size: 17.5px;
+            color: #ffffff;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 50;
+        }
     </style>
 </head>
 <body id="cortex-body">
@@ -148,6 +161,7 @@
     <img id="power-off-img" src="power_off.png" alt="Shutdown Screen">
 
     <div class="ui-container" id="main-wrap">
+        <div id="desc-text" class="instruction-text"></div>
         <div class="icon-grid" id="icon-grid">
             <div class="icon-item" onclick="handleAction('power', this)">
                 <svg id="svg-1" class="icon-svg" viewBox="0 0 1024 1024">
@@ -197,13 +211,22 @@
         const powerOffImg = document.getElementById('power-off-img');
 
         mainWrap.addEventListener('click', function(e) {
-            if (e.target === this) {
-                if (grid.classList.contains('active-state')) resetUI();
-                else if (window.Cortex && window.Cortex.close) window.Cortex.close();
+            if (e.target === this || e.target.id === 'main-wrap') {
+                if (grid.classList.contains('active-state')) {
+                    // If 1 button is focused, just go back to the 3-button list
+                    resetUI();
+                } else {
+                    // If in main screen, issue system back and close
+                    if (window.Cortex) {
+                        Cortex.nav('BACK');
+                        setTimeout(() => { Cortex.close(); }, 200);
+                    }
+                }
             }
         });
 
         function handleAction(type, element) {
+            const descText = document.getElementById('desc-text');
             if (element.classList.contains('active')) {
                 if (type === 'power') {
                     element.style.opacity = "0.5";
@@ -247,14 +270,22 @@
                 element.classList.add('active');
                 grid.classList.add('active-state');
                 overlay.classList.add('active-state');
+
+                // Show instruction text
+                if (type === 'power') descText.innerText = 'Tap again to turn off your phone';
+                else if (type === 'restart') descText.innerText = 'Tap again to restart your phone';
+                else if (type === 'emergency') descText.innerText = 'Tap again to turn on Emergency mode';
+                descText.style.opacity = '1';
             }
         }
 
         function resetUI() {
+            const descText = document.getElementById('desc-text');
             items.forEach(el => { el.classList.remove('active'); el.style.opacity = "1"; });
             grid.classList.remove('active-state');
             overlay.classList.remove('active-state');
             mainWrap.style.pointerEvents = "auto";
+            descText.style.opacity = '0';
         }
     </script>
 </body>
