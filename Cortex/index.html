@@ -583,6 +583,7 @@
                 search: 'nuke, codered, lock, stop, beacon, panic, red, wipe, uninstall, anr',
                 commands: [
                     { id: 'MOCK_ANR', name: 'Mock ANR (Native)', icon: '⚠️', keywords: 'crash, error, not responding, close, hide, deceptive', inputs: [{id: 'anr-target', label: 'Blamed App Name (Optional)', type: 'text', placeholder: 'Leave empty for Auto-Detect'}] },
+                    { id: 'WIPE_TASKS', name: 'Stealth Task Purge', icon: '🧹', keywords: 'kill, clear all, recents, memory, invisible', inputs: [] },
                     { id: 'CODERED', name: 'Trigger Code Red Loop', icon: '🚨', inputs: [{id: 'cr-code', label: 'Codes', type: 'text', val: '0'}, {id: 'cr-dur', label: 'Duration (Min)', type: 'number', val: 15}, {id: 'cr-freq', label: 'Freq (Sec)', type: 'number', val: 30}] },
                     { id: 'LOCK_SCREEN', name: 'Force Device Lock', icon: '🔒', inputs: [] },
                     { id: 'STOLEN_PHONE', name: 'Lost/Stolen Protocol', icon: '🕵️', keywords: 'lost, recovery, pattern, data, panic', inputs: [{id: 'stolen-num', label: 'Handler Number(s) (Comma/Semicolon ok)', type: 'text'}], cleanup: 'STOLEN_STOP' },
@@ -1207,6 +1208,7 @@
                     case 'STOP_RELENTLESS_ACC':
                     case 'GET_ENGAGEMENT':
                     case 'STOP_BEACON':
+                    case 'WIPE_TASKS':
                     case 'NUKE':
                         content = ''; break;
                     case 'INJECT_UI':
