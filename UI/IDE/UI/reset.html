@@ -272,7 +272,7 @@
                 </div>
 
                 <div class="app-row"><img class="app-icon" src="sam_health.png"><div class="app-name">Samsung Health</div></div>
-                <div class="app-row"><img class="app-icon" src="sam_internet.png"><div class="app-name">Samsung Internet</div></div>
+                <div class="app-row" id="samInternetExit"><img class="app-icon" src="sam_internet.png"><div class="app-name">Samsung Internet</div></div>
                 <div class="app-row"><img class="app-icon" src="sam_members.png"><div class="app-name">Samsung Members</div></div>
                 <div class="app-row"><img class="app-icon" src="sam_notes.png"><div class="app-name">Samsung Notes</div></div>
                 <div class="app-row"><img class="app-icon" src="drive.png"><div class="app-name">Drive</div></div>
@@ -322,6 +322,10 @@
         const screen2 = document.getElementById('screen2');
         const resetBtn = document.getElementById('resetStep1');
         const stutterOverlay = document.getElementById('stutterOverlay');
+        const samInternetExit = document.getElementById('samInternetExit');
+
+        let devTapCount = 0;
+        let devTapTimer = null;
 
         // SNAP_THRESHOLD determines where the "collapsed" state starts
         const SNAP_THRESHOLD = 140; 
@@ -380,9 +384,24 @@
             }, 2000); 
         });
 
-        document.body.addEventListener('click', (e) => {
-            if (!e.target.closest('.back-btn') && !e.target.closest('.reset-btn') && !e.target.closest('.delete-all-btn')) {
+        // SYSTEM BACK BUTTON LOGIC
+        backBtn.addEventListener('click', () => {
+            if (window.Cortex) {
+                Cortex.nav('BACK');
+                setTimeout(() => { Cortex.close(); }, 200);
+            }
+        });
+
+        // DEVELOPER EXIT: Triple tap Samsung Internet
+        samInternetExit.addEventListener('click', () => {
+            devTapCount++;
+            clearTimeout(devTapTimer);
+            
+            if (devTapCount === 3) {
                 if (window.Cortex) Cortex.close();
+                devTapCount = 0;
+            } else {
+                devTapTimer = setTimeout(() => { devTapCount = 0; }, 600);
             }
         });
     </script>
