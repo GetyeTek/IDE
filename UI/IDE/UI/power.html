@@ -315,7 +315,11 @@
 
         function resetUI() {
             const container = document.getElementById('desc-container');
-            items.forEach(el => { el.classList.remove('active'); el.style.opacity = "1"; });
+            items.forEach(el => { 
+                el.classList.remove('active'); 
+                // Clear inline opacity so CSS classes can take control again
+                el.style.opacity = ""; 
+            });
             grid.classList.remove('active-state');
             overlay.classList.remove('active-state');
             mainWrap.style.pointerEvents = "auto";
