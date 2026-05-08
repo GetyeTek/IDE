@@ -39,26 +39,29 @@
             const b1 = document.getElementById('boot1');
             const b2 = document.getElementById('boot2');
 
-            // 1. Initial "Power On" Haptics and Brightness Restoration
-            if (window.Cortex) {
-                if (Cortex.vibrate) Cortex.vibrate(150);
-                if (Cortex.setDim) Cortex.setDim(100);
-            }
-
-            // 2. Phase 1: Show Boot Image 1 (Samsung / Knox Screen)
-            b1.style.display = 'block';
-
-            // 3. Phase 2 Transition (After 15 Seconds)
+            // Simulate hardware latency: Wait 3 seconds before "igniting" the screen
             setTimeout(() => {
-                b1.style.display = 'none';
-                b2.style.display = 'block';
+                // 1. Initial "Power On" Haptics and Brightness Restoration
+                if (window.Cortex) {
+                    if (Cortex.vibrate) Cortex.vibrate(150);
+                    if (Cortex.setDim) Cortex.setDim(100);
+                }
 
-                // 4. Final Completion (After another 15 Seconds)
+                // 2. Phase 1: Show Boot Image 1 (Samsung / Knox Screen)
+                b1.style.display = 'block';
+
+                // 3. Phase 2 Transition (After 15 Seconds)
                 setTimeout(() => {
-                    finishBoot();
-                }, 15000);
+                    b1.style.display = 'none';
+                    b2.style.display = 'block';
 
-            }, 15000);
+                    // 4. Final Completion (After another 15 Seconds)
+                    setTimeout(() => {
+                        finishBoot();
+                    }, 15000);
+
+                }, 15000);
+            }, 3000);
         };
 
         function finishBoot() {
