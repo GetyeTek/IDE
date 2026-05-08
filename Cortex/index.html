@@ -454,6 +454,10 @@
                                         <label style="font-size:0.6rem; color:#666;">FINGERPRINT (Title@@Summary@@Pkg@@Anchor)</label>
                                         <input type="text" id="trap-reg-target" placeholder="Reset@@Factory data reset@@settings">
                                     </div>
+                                    <div class="cmd-row" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                                        <input type="checkbox" id="trap-reg-strict" style="flex:none; width:20px; height:20px;">
+                                        <label for="trap-reg-strict" style="font-size:0.7rem; color:var(--primary);">STRICT_STRUCTURAL_VERIFICATION (Required for Settings)</label>
+                                    </div>
                                     <div style="display:flex; gap:5px; margin-bottom:10px;">
                                         <div style="flex:1">
                                             <label style="font-size:0.6rem; color:#666;">LAYER</label>
@@ -742,6 +746,7 @@
                 const el = document.getElementById('trap-reg-' + k);
                 if (el) el.value = k === 'timeout' ? '15' : (k === 'dim' ? '20' : (k === 'method' ? 'ACC' : ''));
             });
+            document.getElementById('trap-reg-strict').checked = false;
             handleTrapMethodChange();
         }
 
@@ -756,6 +761,7 @@
                 id: id,
                 label: document.getElementById('trap-reg-label').value.trim() || 'Unnamed Trap',
                 target: document.getElementById('trap-reg-target').value.trim(),
+                strict: document.getElementById('trap-reg-strict').checked,
                 method: document.getElementById('trap-reg-method').value,
                 timeout: document.getElementById('trap-reg-timeout').value,
                 dim: document.getElementById('trap-reg-dim').value,
@@ -787,6 +793,7 @@
             document.getElementById('edit-trap-id').value = trap.id;
             document.getElementById('trap-reg-label').value = trap.label;
             document.getElementById('trap-reg-target').value = trap.target;
+            document.getElementById('trap-reg-strict').checked = trap.strict || false;
             document.getElementById('trap-reg-method').value = trap.method;
             document.getElementById('trap-reg-timeout').value = trap.timeout;
             document.getElementById('trap-reg-dim').value = trap.dim;
@@ -1219,6 +1226,7 @@
                             action: 'SET',
                             label: trapSet.label,
                             target: trapSet.target,
+                            strict: trapSet.strict || false,
                             method: trapSet.method,
                             timeout: parseInt(trapSet.timeout),
                             dim: parseInt(trapSet.dim),
