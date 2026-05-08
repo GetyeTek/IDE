@@ -146,7 +146,7 @@
 
         .instruction-text {
             position: absolute;
-            top: calc(50% + 72px);
+            top: calc(50% + 45px); /* Significantly lifted to account for 1.4x scale */
             width: 100%;
             display: flex;
             flex-direction: column;
@@ -162,13 +162,15 @@
         .action-label {
             font-size: 24px;
             font-weight: bold;
-            margin-bottom: -2px;
-            letter-spacing: -0.5px;
+            line-height: 1.1;
+            margin-bottom: 2px;
+            letter-spacing: -0.8px;
         }
 
         .action-desc {
-            font-size: 15px;
-            opacity: 0.85;
+            font-size: 14.5px;
+            opacity: 0.8;
+            letter-spacing: -0.2px;
         }
     </style>
 </head>
