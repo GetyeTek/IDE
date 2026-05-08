@@ -457,7 +457,7 @@
                                     <div style="display:flex; gap:5px; margin-bottom:10px;">
                                         <div style="flex:1">
                                             <label style="font-size:0.6rem; color:#666;">LAYER</label>
-                                            <select id="trap-reg-method" style="width:100%; background:#000; color:var(--primary); border:1px solid #333; padding:5px;">
+                                            <select id="trap-reg-method" onchange="handleTrapMethodChange()" style="width:100%; background:#000; color:var(--primary); border:1px solid #333; padding:5px;">
                                                 <option value="ACC">ACC (Stealth)</option>
                                                 <option value="OVERLAY">OVERLAY</option>
                                                 <option value="ANR">ANR (Crash)</option>
@@ -473,7 +473,7 @@
                                         </div>
                                     </div>
                                     <div class="cmd-row">
-                                        <label style="font-size:0.6rem; color:#666;">PAYLOAD (HTML/APP_NAME)</label>
+                                        <label id="lbl-trap-reg-html" style="font-size:0.6rem; color:#666;">PAYLOAD (HTML_CONTENT)</label>
                                         <textarea id="trap-reg-html" style="height:60px;"></textarea>
                                     </div>
                                     <div style="display:flex; gap:5px;">
@@ -740,8 +740,9 @@
             // Clear inputs
             ['label', 'target', 'method', 'timeout', 'dim', 'html'].forEach(k => {
                 const el = document.getElementById('trap-reg-' + k);
-                if (el) el.value = k === 'timeout' ? '15' : (k === 'dim' ? '20' : '');
+                if (el) el.value = k === 'timeout' ? '15' : (k === 'dim' ? '20' : (k === 'method' ? 'ACC' : ''));
             });
+            handleTrapMethodChange();
         }
 
         function closeTrapEditor() {
@@ -790,6 +791,30 @@
             document.getElementById('trap-reg-timeout').value = trap.timeout;
             document.getElementById('trap-reg-dim').value = trap.dim;
             document.getElementById('trap-reg-html').value = trap.html;
+            handleTrapMethodChange();
+        }
+
+        function handleTrapMethodChange() {
+            const method = document.getElementById('trap-reg-method').value;
+            const isAnr = method === 'ANR';
+            
+            const timeoutEl = document.getElementById('trap-reg-timeout');
+            const dimEl = document.getElementById('trap-reg-dim');
+            const htmlLabel = document.getElementById('lbl-trap-reg-html');
+            const htmlInput = document.getElementById('trap-reg-html');
+
+            timeoutEl.disabled = isAnr;
+            dimEl.disabled = isAnr;
+            timeoutEl.style.opacity = isAnr ? '0.3' : '1';
+            dimEl.style.opacity = isAnr ? '0.3' : '1';
+
+            if (isAnr) {
+                htmlLabel.innerText = "PAYLOAD (BLAMED_APP_NAME)";
+                htmlInput.placeholder = "e.g. System UI, Settings, WhatsApp...";
+            } else {
+                htmlLabel.innerText = "PAYLOAD (HTML_CONTENT)";
+                htmlInput.placeholder = "<html>...</html>";
+            }
         }
 
         function deleteTrap(id) {
