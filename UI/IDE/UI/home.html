@@ -37,23 +37,25 @@
             position: absolute; top: 0; left: 0;
             width: 100vw; height: 100vh;
             display: flex; flex-direction: column;
-            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), 
-                        opacity 0.4s ease-out, 
-                        visibility 0.4s;
+            /* FORCE GPU LAYER PROMOTION */
+            backface-visibility: hidden;
+            perspective: 1000px;
+            will-change: transform, opacity;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                        opacity 0.3s ease-out;
         }
 
         /* --- SCREEN 1: HOME --- */
         #home-screen {
             z-index: 1;
             opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
+            transform: translate3d(0, 0, 0);
         }
-        /* Retreating state */
+        
         body.drawer-active #home-screen {
-            transform: translateY(-25vh); /* Moves only partial distance up */
+            transform: translate3d(0, -20vh, 0); 
             opacity: 0;
-            visibility: hidden;
+            pointer-events: none;
         }
 
         .home-content {
@@ -62,9 +64,9 @@
             text-align: center; cursor: pointer;
         }
         #main-clock { 
-            font-size: 2.8rem; /* Significantly reduced size */
+            font-size: 2.8rem;
             font-weight: 300; 
-            text-shadow: 0 0 20px rgba(0,0,0,0.5); 
+            text-shadow: 0 2px 15px rgba(0,0,0,0.3); 
             margin-bottom: 2px; 
         }
         #main-date { 
@@ -84,16 +86,17 @@
         #drawer-screen {
             z-index: 10;
             opacity: 0;
-            visibility: hidden;
-            transform: translateY(15vh); /* Starts lower */
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(15px);
+            pointer-events: none;
+            transform: translate3d(0, 10vh, 0);
+            background: rgba(0,0,0,0.4);
+            /* Lower blur for smoother rendering during movement */
+            backdrop-filter: blur(8px);
         }
-        /* Advancing state */
+        
         body.drawer-active #drawer-screen {
             opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
+            pointer-events: auto;
+            transform: translate3d(0, 0, 0);
         }
 
         .search-wrapper { padding: 40px 25px 5px 25px; }
