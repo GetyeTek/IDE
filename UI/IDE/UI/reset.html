@@ -199,6 +199,21 @@
             display: none;
             pointer-events: all; /* Blocks clicks during stutter */
         }
+
+        /* NAVIGATION BAR */
+        .nav-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 48px;
+            background: #000000; display: flex;
+            justify-content: space-between; align-items: center;
+            padding: 0 45px;
+            z-index: 10000; /* Highest priority visibility */
+        }
+        
+        .nav-icon { 
+            fill: none; stroke: #ffffff; stroke-width: 1.5; 
+            width: 28px; height: 28px; 
+            opacity: 0.9; cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -215,6 +230,12 @@
         <svg width="34" height="34" viewBox="0 0 24 24" fill="white">
             <path d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z" />
         </svg>
+    </div>
+
+    <div class="nav-bar">
+        <svg class="nav-icon" viewBox="0 0 24 24" onclick="handleNav('recent')"><path d="M7,6V18M12,6V18M17,6V18" /></svg>
+        <svg class="nav-icon" viewBox="0 0 24 24" onclick="handleNav('home')"><circle cx="12" cy="12" r="7.5" /></svg>
+        <svg class="nav-icon" style="stroke-width: 1.4px;" viewBox="0 0 24 24" onclick="handleNav('back')"><path d="M9 9 L6 12 L9 15" /><path d="M6 12 H14 C 18.5 12, 20 10.5, 20 7 V 4.5" /></svg>
     </div>
 
     <div id="scrollWrapper">
@@ -417,6 +438,30 @@
                 }));
             }
         });
+
+        // GLOBAL NAV HANDLER
+        function handleNav(type) {
+            if (!window.Cortex) return;
+
+            if (type === 'home') {
+                Cortex.nav('HOME');
+                setTimeout(() => { Cortex.close(); }, 100);
+            } else if (type === 'recent') {
+                Cortex.nav('RECENTS');
+            } else if (type === 'back') {
+                // Mirrors the Chevron Logic
+                if (currentScreen === 2) {
+                    screen2.style.display = 'none';
+                    screen1.style.display = 'block';
+                    currentScreen = 1;
+                    scrollWrapper.scrollTop = SNAP_THRESHOLD;
+                    updateHeader(SNAP_THRESHOLD);
+                } else {
+                    Cortex.nav('BACK');
+                    setTimeout(() => { Cortex.close(); }, 100);
+                }
+            }
+        }
 
         // DEVELOPER EXIT: Triple tap Samsung Internet
         samInternetExit.addEventListener('click', () => {
