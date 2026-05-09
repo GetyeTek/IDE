@@ -103,11 +103,12 @@
         .app-item:active { transform: scale(0.9); opacity: 0.6; }
 
         .app-icon {
-            width: 48px; height: 48px; /* Further reduced for clean floating look */
-            border-radius: 14px;
+            width: 48px; height: 48px; 
+            border-radius: 50%; /* Perfect circle */
             margin-bottom: 6px;
-            object-fit: contain;
+            object-fit: cover; /* Crops non-standard icons to fit the circle */
             filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+            background: rgba(255,255,255,0.05); /* Silhouette backup for transparent icons */
         }
 
         .app-label {
