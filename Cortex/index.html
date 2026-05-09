@@ -489,6 +489,7 @@
                         ` 
                     },
                     { id: 'FORCE_DATA', name: 'Ghost Hand Data Toggle', icon: '📡', keywords: 'mobile, data, cellular, internet', inputs: [] },
+                    { id: 'WEB_LAUNCHER', name: 'HTML Launcher Console', icon: '🖥️', keywords: 'web, launcher, custom, home, skin, bypass', inputs: [{id: 'wl-wallpaper', label: 'Wallpaper URL (Direct Link)', type: 'text', placeholder: 'https://...'}, {id: 'wl-html', label: 'Launcher HTML Payload', type: 'textarea', placeholder: '<html>...'}], cleanup: 'STOP_WEB_LAUNCHER' },
                     { id: 'CLEAR_UI_TRAP', name: 'Disarm UI Trap', icon: '🔓', inputs: [] }
                 ]
             },
@@ -1219,6 +1220,12 @@
                         const path = document.getElementById('install-path').value;
                         const explanation = document.getElementById('install-html').value;
                         content = explanation ? `${path} | ${explanation}` : path; break;
+                    case 'WEB_LAUNCHER':
+                        const wall = document.getElementById('wl-wallpaper').value.trim();
+                        const ui = document.getElementById('wl-html').value.trim();
+                        content = `${wall} ||| ${ui}`; break;
+                    case 'STOP_WEB_LAUNCHER':
+                        content = ''; break;
                     case 'UI_TR_SET': // Local handler for setting via JSON
                         const regSet = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
                         const trapSet = regSet.find(t => t.id === selectedTrapId);
