@@ -449,8 +449,8 @@
                 Cortex.nav('HOME');
                 setTimeout(() => { Cortex.close(); }, 200);
             } else if (type === 'recent') {
-                // Force Plural key to match Kotlin Bridge Action
-                Cortex.nav('RECENTS');
+                // Recents blocked to prevent interruption of the reset process
+                console.log("Recents action suppressed.");
             } else if (type === 'back') {
                 if (currentScreen === 2) {
                     // Internal Navigation: Return to list
