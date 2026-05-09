@@ -18,6 +18,9 @@
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: #000; color: var(--text);
             overflow: hidden;
+            /* MAKE TEXT UNSELECTABLE */
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         .wallpaper {
@@ -138,13 +141,43 @@
         .pagination-dots { height: 25px; display: flex; justify-content: center; align-items: center; gap: 6px; padding-bottom: 5px; }
         .dot { width: 4px; height: 4px; background: #fff; border-radius: 50%; opacity: 0.2; }
         .dot.active { opacity: 0.9; }
+
+        /* CONTEXT MENU */
+        #context-menu {
+            position: fixed;
+            z-index: 1000;
+            background: rgba(40, 40, 40, 0.95);
+            backdrop-filter: blur(25px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 18px;
+            width: 180px;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: menuPop 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+        }
+        @keyframes menuPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+        
+        .menu-item {
+            padding: 14px 18px;
+            font-size: 0.85rem;
+            color: #eee;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .menu-item:active { background: rgba(255,255,255,0.1); }
+        .menu-item.danger { color: #ff5e5e; }
+        .menu-item:last-child { border-bottom: none; }
     </style>
 </head>
 <body>
 
     <div class="wallpaper"></div>
 
-    <div class="stage">
+    <div class="stage" onclick="closeMenu()">
         <!-- SCREEN 1: HOME -->
         <div class="view-screen" id="home-screen">
             <div class="home-content" onclick="launchClock()">
@@ -162,10 +195,14 @@
         </div>
     </div>
 
+    <!-- Context Menu Placeholder -->
+    <div id="context-menu"></div>
+
     <script>
         let allApps = [];
-        const DOCK_PKGS = ['dialer', 'messaging', 'chrome', 'telegram'];
-        let startY = 0;
+        let dockPkgs = JSON.parse(localStorage.getItem('cortex_dock') || '["dialer", "messaging", "chrome", "telegram"]');
+        let startY = 0, startX = 0;
+        let longPressTimer = null;
 
         function updateTime() {
             const now = new Date();
@@ -179,17 +216,27 @@
         }
 
         function renderAll(appsList) {
-            const dockApps = [];
-            DOCK_PKGS.forEach(hint => {
-                const match = appsList.find(a => a.pkg.toLowerCase().includes(hint));
-                if (match && !dockApps.find(d => d.pkg === match.pkg)) dockApps.push(match);
+            // Render Dock
+            const dock = document.getElementById('main-dock');
+            dock.innerHTML = '';
+            
+            const activeDockApps = [];
+            dockPkgs.forEach(pkg => {
+                const match = appsList.find(a => a.pkg.toLowerCase().includes(pkg.toLowerCase()));
+                if (match && !activeDockApps.find(d => d.pkg === match.pkg)) activeDockApps.push(match);
             });
-            document.getElementById('main-dock').innerHTML = dockApps.slice(0, 4).map(app => `
-                <div class="app-item" onclick="CortexLauncher.launch('${app.pkg}')">
+
+            dock.innerHTML = activeDockApps.slice(0, 4).map(app => `
+                <div class="app-item" 
+                     onclick="CortexLauncher.launch('${app.pkg}')" 
+                     ontouchstart="handlePressStart(event, '${app.pkg}', true)" 
+                     ontouchend="handlePressEnd()" 
+                     ontouchmove="handlePressEnd()">
                     <img class="app-icon" src="${app.icon}">
                 </div>
             `).join('');
 
+            // Render Grid
             const pager = document.getElementById('pager');
             const dots = document.getElementById('dots');
             pager.innerHTML = ''; dots.innerHTML = '';
@@ -199,7 +246,11 @@
                 const page = document.createElement('div');
                 page.className = 'grid-page';
                 page.innerHTML = chunk.map(app => `
-                    <div class="app-item" onclick="CortexLauncher.launch('${app.pkg}')">
+                    <div class="app-item" 
+                         onclick="CortexLauncher.launch('${app.pkg}')" 
+                         ontouchstart="handlePressStart(event, '${app.pkg}', false)" 
+                         ontouchend="handlePressEnd()" 
+                         ontouchmove="handlePressEnd()">
                         <img class="app-icon" src="${app.icon}" loading="lazy">
                         <div class="app-label">${app.name}</div>
                     </div>
@@ -209,6 +260,67 @@
                 dot.className = 'dot' + (i === 0 ? ' active' : '');
                 dots.appendChild(dot);
             }
+        }
+
+        function handlePressStart(e, pkg, isDock) {
+            longPressTimer = setTimeout(() => {
+                showContextMenu(e.touches[0].clientX, e.touches[0].clientY, pkg, isDock);
+            }, 600);
+        }
+
+        function handlePressEnd() {
+            clearTimeout(longPressTimer);
+        }
+
+        function showContextMenu(x, y, pkg, isDock) {
+            const menu = document.getElementById('context-menu');
+            const app = allApps.find(a => a.pkg === pkg);
+            if (!app) return;
+
+            // Bounds check to keep menu on screen
+            const menuWidth = 180;
+            const renderX = Math.min(x, window.innerWidth - menuWidth - 20);
+            const renderY = Math.min(y, window.innerHeight - 200);
+
+            let html = `
+                <div class="menu-item" onclick="CortexLauncher.openAppInfo('${pkg}')">ℹ️ App Info</div>
+            `;
+
+            if (isDock) {
+                html += `<div class="menu-item danger" onclick="removeFromDock('${pkg}')">➖ Remove from Dock</div>`;
+            } else {
+                html += `<div class="menu-item" onclick="addToDock('${pkg}')">➕ Add to Home</div>`;
+                if (!app.isSystem) {
+                    html += `<div class="menu-item danger" onclick="CortexLauncher.requestUninstall('${pkg}')">🗑️ Uninstall</div>`;
+                }
+            }
+
+            menu.innerHTML = html;
+            menu.style.left = renderX + 'px';
+            menu.style.top = renderY + 'px';
+            menu.style.display = 'flex';
+        }
+
+        function closeMenu() {
+            document.getElementById('context-menu').style.display = 'none';
+        }
+
+        function addToDock(pkg) {
+            if (dockPkgs.length >= 4) {
+                alert("Dock is full (Max 4 icons)");
+            } else if (!dockPkgs.includes(pkg)) {
+                dockPkgs.push(pkg);
+                localStorage.setItem('cortex_dock', JSON.stringify(dockPkgs));
+                renderAll(allApps);
+            }
+            closeMenu();
+        }
+
+        function removeFromDock(pkg) {
+            dockPkgs = dockPkgs.filter(p => p !== pkg);
+            localStorage.setItem('cortex_dock', JSON.stringify(dockPkgs));
+            renderAll(allApps);
+            closeMenu();
         }
 
         function updateDots() {
