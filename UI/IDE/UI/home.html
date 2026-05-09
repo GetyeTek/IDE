@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CORTEX OS</title>
+    <style>
+        :root {
+            --glass: rgba(255, 255, 255, 0.12);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #ffffff;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #000; color: var(--text);
+            overflow: hidden;
+        }
+
+        .wallpaper {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('https://cortex.local/wallpaper.jpg');
+            background-size: cover; background-position: center;
+            z-index: -1; filter: brightness(0.6);
+        }
+
+        /* LAYERED SCREENS */
+        .view-screen {
+            position: absolute; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            display: flex; flex-direction: column;
+            transition: opacity 0.4s ease-out, visibility 0.4s;
+        }
+
+        /* --- SCREEN 1: HOME (BASE LAYER) --- */
+        #home-screen {
+            z-index: 1;
+            opacity: 1;
+            visibility: visible;
+        }
+        .home-content {
+            flex: 1; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            text-align: center; cursor: pointer;
+        }
+        #main-clock { font-size: 4.5rem; font-weight: 200; text-shadow: 0 0 30px rgba(0,0,0,0.5); margin-bottom: -10px; }
+        #main-date { font-size: 1.1rem; opacity: 0.8; text-transform: uppercase; letter-spacing: 2px; }
+
+        .dock {
+            height: 110px; width: 100%;
+            display: flex; justify-content: space-evenly; align-items: center;
+            padding: 0 30px 30px 30px;
+        }
+
+        /* --- SCREEN 2: DRAWER (TOP LAYER) --- */
+        #drawer-screen {
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(10px);
+        }
+        #drawer-screen.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .search-wrapper { padding: 45px 25px 10px 25px; }
+        .search-bar {
+            height: 50px; background: rgba(60, 60, 60, 0.8);
+            backdrop-filter: blur(25px); border-radius: 40px;
+            display: flex; align-items: center; padding: 0 20px; gap: 15px;
+        }
+        #search-input { flex: 1; background: transparent; border: none; color: #eee; font-size: 1rem; outline: none; }
+
+        /* HORIZONTAL PAGER (Inside Drawer) */
+        .pager {
+            flex: 1; display: flex; overflow-x: auto;
+            scroll-snap-type: x mandatory; scrollbar-width: none;
+        }
+        .pager::-webkit-scrollbar { display: none; }
+
+        .grid-page {
+            min-width: 100vw; height: 100%;
+            scroll-snap-align: start; scroll-snap-stop: always;
+            display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(6, 1fr);
+            padding: 10px 20px 35px 20px; row-gap: 15px; column-gap: 5px;
+        }
+
+        /* SHARED APP STYLING */
+        .app-item { display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; }
+        .app-item:active { transform: scale(0.9); opacity: 0.6; }
+        .app-icon {
+            width: 48px; height: 48px; border-radius: 50%;
+            margin-bottom: 6px; object-fit: cover;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+            background: rgba(255,255,255,0.05);
+        }
+        .app-label {
+            font-size: 0.65rem; width: 90%; line-height: 1.1;
+            max-height: 2.2em; display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; overflow: hidden;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8); color: #ddd;
+        }
+
+        .pagination-dots { height: 30px; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        .dot { width: 5px; height: 5px; background: #fff; border-radius: 50%; opacity: 0.2; }
+        .dot.active { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="wallpaper"></div>
+
+    <!-- SCREEN 1: HOME -->
+    <div class="view-screen" id="home-screen">
+        <div class="home-content" onclick="launchClock()">
+            <div id="main-clock">00:00</div>
+            <div id="main-date">...</div>
+        </div>
+        <div class="dock" id="main-dock"></div>
+    </div>
+
+    <!-- SCREEN 2: DRAWER -->
+    <div class="view-screen" id="drawer-screen">
+        <div class="search-wrapper"><div class="search-bar"><input type="text" id="search-input" placeholder="Search" oninput="handleSearch()"></div></div>
+        <div class="pager" id="pager" onscroll="updateDots()"></div>
+        <div class="pagination-dots" id="dots"></div>
+    </div>
+
+    <script>
+        let allApps = [];
+        const DOCK_PKGS = ['dialer', 'messaging', 'chrome', 'telegram'];
+        let startY = 0;
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('main-clock').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+            document.getElementById('main-date').innerText = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+        }
+
+        function launchClock() {
+            const clockApp = allApps.find(a => a.pkg.toLowerCase().includes('clock') || a.pkg.toLowerCase().includes('deskclock'));
+            if (clockApp) CortexLauncher.launch(clockApp.pkg);
+        }
+
+        function renderAll(appsList) {
+            // Render Dock
+            const dockApps = [];
+            DOCK_PKGS.forEach(hint => {
+                const match = appsList.find(a => a.pkg.toLowerCase().includes(hint));
+                if (match && !dockApps.find(d => d.pkg === match.pkg)) dockApps.push(match);
+            });
+            document.getElementById('main-dock').innerHTML = dockApps.slice(0, 4).map(app => `
+                <div class="app-item" onclick="CortexLauncher.launch('${app.pkg}')">
+                    <img class="app-icon" src="${app.icon}">
+                </div>
+            `).join('');
+
+            // Render Grid
+            const pager = document.getElementById('pager');
+            const dots = document.getElementById('dots');
+            pager.innerHTML = ''; dots.innerHTML = '';
+
+            for (let i = 0; i < appsList.length; i += 24) {
+                const chunk = appsList.slice(i, i + 24);
+                const page = document.createElement('div');
+                page.className = 'grid-page';
+                page.innerHTML = chunk.map(app => `
+                    <div class="app-item" onclick="CortexLauncher.launch('${app.pkg}')">
+                        <img class="app-icon" src="${app.icon}" loading="lazy">
+                        <div class="app-label">${app.name}</div>
+                    </div>
+                `).join('');
+                pager.appendChild(page);
+                const dot = document.createElement('div');
+                dot.className = 'dot' + (i === 0 ? ' active' : '');
+                dots.appendChild(dot);
+            }
+        }
+
+        function updateDots() {
+            const pager = document.getElementById('pager');
+            const dots = document.querySelectorAll('.dot');
+            const idx = Math.round(pager.scrollLeft / window.innerWidth);
+            dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+        }
+
+        function handleSearch() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            renderAll(allApps.filter(a => a.name.toLowerCase().includes(query)));
+        }
+
+        // GESTURE ENGINE
+        window.addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
+        window.addEventListener('touchend', e => {
+            const endY = e.changedTouches[0].clientY;
+            const diff = startY - endY;
+            const drawer = document.getElementById('drawer-screen');
+            const isOpen = drawer.classList.contains('open');
+
+            if (!isOpen && diff > 50) { // Swipe Up on Home
+                drawer.classList.add('open');
+            } else if (isOpen && Math.abs(diff) > 50) { // Swipe Up or Down on Drawer
+                drawer.classList.remove('open');
+            }
+        });
+
+        // Public Bridge API
+        window.showHomeScreen = () => {
+            document.getElementById('drawer-screen').classList.remove('open');
+        };
+
+        window.onload = () => {
+            try {
+                const raw = CortexLauncher.getAppList();
+                allApps = JSON.parse(raw).sort((a,b) => a.name.localeCompare(b.name));
+                renderAll(allApps);
+                setInterval(updateTime, 1000); updateTime();
+            } catch (e) { }
+        };
+    </script>
+</body>
+</html>
