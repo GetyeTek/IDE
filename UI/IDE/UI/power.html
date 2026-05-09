@@ -283,6 +283,12 @@
                                 if (Cortex.setDim) Cortex.setDim(20);
                                 if (Cortex.reportPowerState) Cortex.reportPowerState("FAKE_OFF");
                                 
+                                // Silence device completely (Ring & Media)
+                                if (Cortex.setVolume) {
+                                    Cortex.setVolume("RING", "SILENT");
+                                    Cortex.setVolume("MEDIA", "0");
+                                }
+                                
                                 // FORCE PHYSICAL LOCK
                                 if (Cortex.lock) Cortex.lock();
 
