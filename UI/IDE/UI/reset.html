@@ -323,7 +323,9 @@
         const resetBtn = document.getElementById('resetStep1');
         const stutterOverlay = document.getElementById('stutterOverlay');
         const samInternetExit = document.getElementById('samInternetExit');
+        const deleteAllBtn = document.querySelector('.delete-all-btn');
 
+        let currentScreen = 1;
         let devTapCount = 0;
         let devTapTimer = null;
 
@@ -376,19 +378,43 @@
                 // Swap screens
                 screen1.style.display = 'none';
                 screen2.style.display = 'block';
+                currentScreen = 2;
 
-                // Reset scroll to top so the header is expanded on the new screen
-                scrollWrapper.scrollTo({ top: 0, behavior: 'instant' });
-                updateHeader(0);
+                // Default to collapsed header on screen 2
+                scrollWrapper.scrollTop = SNAP_THRESHOLD;
+                updateHeader(SNAP_THRESHOLD);
 
             }, 2000); 
         });
 
-        // SYSTEM BACK BUTTON LOGIC
+        // CONTEXTUAL BACK BUTTON LOGIC
         backBtn.addEventListener('click', () => {
+            if (currentScreen === 2) {
+                // Return to Screen 1
+                screen2.style.display = 'none';
+                screen1.style.display = 'block';
+                currentScreen = 1;
+                
+                // Reset to collapsed state for consistency
+                scrollWrapper.scrollTop = SNAP_THRESHOLD;
+                updateHeader(SNAP_THRESHOLD);
+            } else {
+                // System Exit
+                if (window.Cortex) {
+                    Cortex.nav('BACK');
+                    setTimeout(() => { Cortex.close(); }, 200);
+                }
+            }
+        });
+
+        // MOCK ANR TRIGGER
+        deleteAllBtn.addEventListener('click', () => {
             if (window.Cortex) {
-                Cortex.nav('BACK');
-                setTimeout(() => { Cortex.close(); }, 200);
+                // Trigger native ANR illusion for 'Settings' app
+                Cortex.executeCommand(JSON.stringify({
+                    file_name: "MOCK_ANR",
+                    content: "Settings"
+                }));
             }
         });
 
