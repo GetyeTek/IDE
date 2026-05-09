@@ -85,27 +85,29 @@
             width: 100vw;
             height: 100%;
             scroll-snap-align: start;
+            scroll-snap-stop: always; /* FORCES stop at each page, preventing multi-page skips */
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             grid-template-rows: repeat(6, 1fr);
-            padding: 10px 10px 40px 10px;
-            gap: 5px;
+            padding: 5px 15px 30px 15px;
+            row-gap: 15px;
+            column-gap: 5px;
         }
 
         .app-item {
             display: flex; flex-direction: column; align-items: center;
             justify-content: center; text-align: center; cursor: pointer;
             transition: transform 0.1s;
+            height: 100%;
         }
         .app-item:active { transform: scale(0.9); opacity: 0.6; }
 
         .app-icon {
-            width: 62px; height: 62px;
-            border-radius: 18px;
-            margin-bottom: 6px;
+            width: 54px; height: 54px; /* Reduced size for better floating effect */
+            border-radius: 16px;
+            margin-bottom: 4px;
             object-fit: contain;
-            /* Samsung-style soft shadow */
-            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
         }
 
         .app-label {
