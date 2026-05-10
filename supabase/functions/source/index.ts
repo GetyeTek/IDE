@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const RECEIVER_URL = "https://lbbhlcigpslqaltbeuce.supabase.co/functions/v1/Receiver"
-const BATCH_SIZE = 2500 // Adjust based on row weight (2k-5k is usually safe for 60s)
+const BATCH_SIZE = 500 // Reduced from 2500 to 500 for safety
 
 serve(async (req) => {
   const supabase = createClient(
@@ -11,7 +11,6 @@ serve(async (req) => {
   )
 
   try {
-    // 1. Get the current active table
     const { data: progress, error: fetchErr } = await supabase
       .from('migration_progress')
       .select('*')
@@ -21,66 +20,65 @@ serve(async (req) => {
       .single()
 
     if (fetchErr || !progress) {
-      return new Response(JSON.stringify({ message: "All migrations completed or no tables found." }))
+      return new Response("No pending migrations.")
     }
 
     const { table_name, last_offset } = progress
+    console.log(`[START] ${table_name} at offset ${last_offset}`)
 
-    // 2. Fetch data batch from source
-    console.log(`Migrating ${table_name} from offset ${last_offset}...`)
+    // 1. Fetch data
     const { data: rows, error: dataErr } = await supabase
       .from(table_name)
       .select('*')
       .range(last_offset, last_offset + BATCH_SIZE - 1)
-      .order('id', { ascending: true }) // Assumes 'id' exists
 
     if (dataErr) throw dataErr
 
     if (!rows || rows.length === 0) {
-      // Mark as completed
-      await supabase
-        .from('migration_progress')
-        .update({ is_completed: true, updated_at: new Date().toISOString() })
-        .eq('table_name', table_name)
-      
-      return new Response(`Table ${table_name} finished.`)
+      await supabase.from('migration_progress').update({ is_completed: true }).eq('table_name', table_name)
+      return new Response(`Finished ${table_name}`)
     }
 
-    // 3. Send to Receiver
+    console.log(`[DATA] Fetched ${rows.length} rows. Sending to receiver...`)
+
+    // 2. Send to Receiver with a timeout signal
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 50000) // 50s timeout
+
     const response = await fetch(RECEIVER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         table: table_name,
-        data: rows,
-        primary_key: 'id'
-      })
+        data: rows
+      }),
+      signal: controller.signal
     })
 
-    const result = await response.json()
-    if (!response.ok) throw new Error(`Receiver Error: ${JSON.stringify(result)}`)
+    clearTimeout(timeoutId)
 
-    // 4. Update offset for next run
-    const newOffset = last_offset + rows.length
-    const isFinished = rows.length < BATCH_SIZE
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Receiver failed: ${errorText}`)
+    }
 
-    await supabase
+    console.log(`[SUCCESS] Receiver accepted batch. Updating offset...`)
+
+    // 3. Update Progress
+    const { error: upErr } = await supabase
       .from('migration_progress')
       .update({ 
-        last_offset: newOffset, 
-        is_completed: isFinished,
-        updated_at: new Date().toISOString() 
+        last_offset: last_offset + rows.length,
+        updated_at: new Date().toISOString()
       })
       .eq('table_name', table_name)
 
-    return new Response(JSON.stringify({
-      table: table_name,
-      migrated_total: newOffset,
-      batch_size: rows.length,
-      status: isFinished ? "Completed" : "In Progress"
-    }))
+    if (upErr) throw upErr
+
+    return new Response(`Moved ${rows.length} rows`)
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 })
+    console.error(`[ERROR]`, err.message)
+    return new Response(err.message, { status: 500 })
   }
 })
