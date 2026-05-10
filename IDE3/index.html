@@ -6752,7 +6752,7 @@ async function downloadArtifact(runId) {
                 </div>
                 <div class="model-actions">
                     <button class="btn btn-primary" style="width:auto; padding:4px 12px; font-size:11px;" 
-                        onclick="repoSelectorMode === 'send' ? executeSendFiles('${r.name}', repoSelectorIsOrg) : selectRepo('${r.name}')">
+                        onclick="repoSelectorMode === 'send' ? executeSendFiles('${r.full_name}', repoSelectorIsOrg) : selectRepo('${r.full_name}')">
                         ${repoSelectorMode === 'send' ? '🚀 Send' : 'Select'}
                     </button>
                 </div>
@@ -6765,11 +6765,16 @@ async function downloadArtifact(runId) {
         renderRepoSelector(filtered);
     }
 
-    function selectRepo(name) {
-        document.getElementById('setting-repo-name').value = name;
+    function selectRepo(fullName) {
+        const parts = fullName.split('/');
+        const shortName = parts.length > 1 ? parts[1] : parts[0];
+        const isOrgRepo = fullName.includes('MasterEmpire/');
+
+        document.getElementById('setting-repo-name').value = shortName;
+        document.getElementById('setting-is-org').checked = isOrgRepo;
         
         const repoConfigs = JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}');
-        const cfg = repoConfigs[name] || {};
+        const cfg = repoConfigs[shortName] || {};
 
         // Sync current state to the selected repo's known config
         if (cfg.projectType) {
@@ -6782,13 +6787,12 @@ async function downloadArtifact(runId) {
             CONFIG.projectPath = cfg.projectPath;
             document.getElementById('setting-project-path').value = cfg.projectPath;
         }
-        if (cfg.isOrg !== undefined) {
-            CONFIG.isOrg = cfg.isOrg;
-            document.getElementById('setting-is-org').checked = cfg.isOrg;
-        }
+
+        // Always update isOrg based on the actual repo selected
+        CONFIG.isOrg = isOrgRepo;
 
         closeRepoSelector();
-        showGlobalToast(`Switched to: ${name}${cfg.projectType ? ' (' + cfg.projectType + ')' : ''}`);
+        showGlobalToast(`Switched to: ${fullName}${cfg.projectType ? ' (' + cfg.projectType + ')' : ''}`);
     }
 
     async function executeSendFiles(targetRepo, targetIsOrg) {
