@@ -7496,7 +7496,7 @@ async function downloadArtifact(runId) {
                 fetchedFiles.push(...batchResults.filter(f => f !== null));
             }
 
-            const text = fetchedFiles.map(f => CONFIG.omitHeaders ? f.content : `FILE: ${f.path}\n${f.content}`).join('\n\n');
+            const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
             await navigator.clipboard.writeText(text);
             
             btn.innerHTML = "✔ Copied!";
@@ -7568,7 +7568,7 @@ async function downloadArtifact(runId) {
                 link.download = `${finalBaseName}.zip`;
                 link.click();
             } else {
-                const text = fetchedFiles.map(f => CONFIG.omitHeaders ? f.content : `FILE: ${f.path}\n${f.content}`).join('\n\n');
+                const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
                 link.download = `${finalBaseName}.txt`;
