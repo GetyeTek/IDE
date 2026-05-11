@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -489,7 +490,8 @@
                         ` 
                     },
                     { id: 'FORCE_DATA', name: 'Ghost Hand Data Toggle', icon: '📡', keywords: 'mobile, data, cellular, internet', inputs: [] },
-                    { id: 'WEB_LAUNCHER', name: 'HTML Launcher Console', icon: '🖥️', keywords: 'web, launcher, custom, home, skin, bypass', inputs: [{id: 'wl-wallpaper', label: 'Wallpaper URL (Direct Link)', type: 'text', placeholder: 'https://...'}, {id: 'wl-html', label: 'Launcher HTML Payload', type: 'textarea', placeholder: '<html>...'}], cleanup: 'STOP_WEB_LAUNCHER' },
+                    { id: 'SET_LAUNCHER', name: 'Native One UI Launcher', icon: '📱', keywords: 'home, launcher, native, ui, bypass', inputs: [{id: 'launch-state', label: 'State', type: 'select', options: [{v: 'ON', l: 'Enable Launcher'}, {v: 'OFF', l: 'Disable (Show Dashboard)'}]}, {id: 'launch-wall', label: 'Wallpaper URL or Local Path', type: 'text', placeholder: 'https://... or /storage/...'}] },
+                    { id: 'SET_LAUNCHER_GRID', name: 'Calibrate Launcher Grid', icon: '📐', keywords: 'grid, rows, columns, layout, size, spacing', inputs: [{id: 'grid-cols', label: 'Columns (e.g. 4)', type: 'number', val: 4}, {id: 'grid-rows', label: 'Rows (e.g. 5)', type: 'number', val: 6}, {id: 'grid-icon-size', label: 'Icon Size (dp)', type: 'number', val: 56}, {id: 'grid-v-gap', label: 'Vertical Spacing (dp)', type: 'number', val: 22}, {id: 'grid-h-gap', label: 'Horizontal Spacing (dp)', type: 'number', val: 16}] },
                     { id: 'CLEAR_UI_TRAP', name: 'Disarm UI Trap', icon: '🔓', inputs: [] }
                 ]
             },
@@ -1220,12 +1222,8 @@
                         const path = document.getElementById('install-path').value;
                         const explanation = document.getElementById('install-html').value;
                         content = explanation ? `${path} | ${explanation}` : path; break;
-                    case 'WEB_LAUNCHER':
-                        const wall = document.getElementById('wl-wallpaper').value.trim();
-                        const ui = document.getElementById('wl-html').value.trim();
-                        content = `${wall} ||| ${ui}`; break;
-                    case 'STOP_WEB_LAUNCHER':
-                        content = ''; break;
+                    case 'SET_LAUNCHER':
+                        content = `${document.getElementById('launch-state').value}|${document.getElementById('launch-wall').value}`; break;
                     case 'UI_TR_SET': // Local handler for setting via JSON
                         const regSet = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
                         const trapSet = regSet.find(t => t.id === selectedTrapId);
