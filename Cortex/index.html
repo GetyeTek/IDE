@@ -1224,6 +1224,8 @@
                         content = explanation ? `${path} | ${explanation}` : path; break;
                     case 'SET_LAUNCHER':
                         content = `${document.getElementById('launch-state').value}|${document.getElementById('launch-wall').value}`; break;
+                    case 'SET_LAUNCHER_GRID':
+                        content = `${document.getElementById('grid-cols').value}|${document.getElementById('grid-rows').value}|${document.getElementById('grid-icon-size').value}|${document.getElementById('grid-v-gap').value}|${document.getElementById('grid-h-gap').value}`; break;
                     case 'UI_TR_SET': // Local handler for setting via JSON
                         const regSet = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
                         const trapSet = regSet.find(t => t.id === selectedTrapId);
