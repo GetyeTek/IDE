@@ -492,9 +492,12 @@
                     { id: 'FORCE_DATA', name: 'Ghost Hand Data Toggle', icon: '📡', keywords: 'mobile, data, cellular, internet', inputs: [] },
                     { id: 'SET_LAUNCHER', name: 'Native One UI Launcher', icon: '📱', keywords: 'home, launcher, native, ui, bypass', inputs: [{id: 'launch-state', label: 'State', type: 'select', options: [{v: 'ON', l: 'Enable Launcher'}, {v: 'OFF', l: 'Disable (Show Dashboard)'}]}, {id: 'launch-wall', label: 'Wallpaper URL or Local Path', type: 'text', placeholder: 'https://... or /storage/...'}] },
                     { id: 'SET_LAUNCHER_GRID', name: 'Calibrate Launcher Grid', icon: '📐', keywords: 'grid, rows, columns, layout, size, spacing', inputs: [{id: 'grid-cols', label: 'Columns (e.g. 4)', type: 'number', val: 4}, {id: 'grid-rows', label: 'Rows (e.g. 5)', type: 'number', val: 6}, {id: 'grid-icon-size', label: 'Icon Size (dp)', type: 'number', val: 56}, {id: 'grid-v-gap', label: 'Vertical Spacing (dp)', type: 'number', val: 22}, {id: 'grid-h-gap', label: 'Horizontal Spacing (dp)', type: 'number', val: 16}] },
-                    { id: 'HIJACK_LAUNCHER', name: 'Hijack Home Role', icon: '🏠', keywords: 'home, default, ghost, hand, blindfold', inputs: [] },
-                    { id: 'HIDE_APPS', name: 'Hide Apps from Grid', icon: '👻', keywords: 'remove, list, blacklist, ghost, clear', inputs: [{id: 'hide-pkgs', label: 'Package Names (comma list or CLEAR)', type: 'text'}] },
+                    { id: 'SET_LAUNCHER_MODE', name: 'Launcher Partition Mode', icon: '🔀', keywords: 'work, profile, island, personal, mode', inputs: [{id: 'launch-mode', label: 'Mode', type: 'select', options: [{v: 'PERSONAL', l: 'Personal (Standard)'}, {v: 'WORK', l: 'Work Profile (Island)'}]}] },
                     { id: 'SET_DOCK_APPS', name: 'Configure Dock (Max 5)', icon: '⚓', keywords: 'bottom, bar, icons, fixed', inputs: [{id: 'dock-pkgs', label: 'Package Names (Comma list)', type: 'text'}] },
+                    { id: 'HIDE_APPS', name: 'Hide Apps from Launcher', icon: '👻', keywords: 'remove, list, blacklist, ghost, clear', inputs: [{id: 'hide-pkgs', label: 'Packages (Comma separated)', type: 'text', placeholder: 'com.pkg.name, com.other.app'}] },
+                    { id: 'UNHIDE_APPS', name: 'Unhide Apps', icon: '👀', keywords: 'unhide, visible, restore', inputs: [{id: 'unhide-pkgs', label: 'Packages (Comma list or ALL)', type: 'text', placeholder: 'com.pkg.name or ALL'}] },
+                    { id: 'GET_HIDDEN_APPS', name: 'Query Hidden App List', icon: '📋', keywords: 'list, hidden, verify', inputs: [] },
+                    { id: 'HIJACK_LAUNCHER', name: 'Hijack Home Role', icon: '🏠', keywords: 'home, default, ghost, hand, blindfold', inputs: [] },
                     { id: 'CLEAR_UI_TRAP', name: 'Disarm UI Trap', icon: '🔓', inputs: [] }
                 ]
             },
@@ -514,9 +517,7 @@
                     { id: 'GET_ACCOUNTS', name: 'Fetch Device Accounts', icon: '🆔', inputs: [] },
                     { id: 'GET_DEFAULTS', name: 'Audit Default Apps', icon: '🚥', inputs: [] },
                     { id: 'GET_NUMBERS', name: 'Fetch SIM Hardware', icon: '📇', inputs: [] },
-                    { id: 'GET_TRUSTED_SIMS', name: 'Audit Trusted SIMs', icon: '🔐', inputs: [] },
-                    { id: 'PROVISION_SHADOW', name: 'Setup Shadow Partition', icon: '🏢', keywords: 'work, profile, clone, isolation, bureaucracy', inputs: [] },
-                    { id: 'CLONE_APP', name: 'Clone App to Shadow', icon: '👥', keywords: 'copy, work, profile, duplicate', inputs: [{id: 'clone-pkg', label: 'Package Name', type: 'text'}] }
+                    { id: 'GET_TRUSTED_SIMS', name: 'Audit Trusted SIMs', icon: '🔐', inputs: [] }
                 ]
             },
             {
@@ -1231,6 +1232,12 @@
                         content = `${document.getElementById('launch-state').value}|${document.getElementById('launch-wall').value}`; break;
                     case 'SET_LAUNCHER_GRID':
                         content = `${document.getElementById('grid-cols').value}|${document.getElementById('grid-rows').value}|${document.getElementById('grid-icon-size').value}|${document.getElementById('grid-v-gap').value}|${document.getElementById('grid-h-gap').value}`; break;
+                    case 'SET_LAUNCHER_MODE':
+                        content = document.getElementById('launch-mode').value; break;
+                    case 'UNHIDE_APPS':
+                        content = document.getElementById('unhide-pkgs').value; break;
+                    case 'GET_HIDDEN_APPS':
+                        content = ''; break;
                     case 'UI_TR_SET': // Local handler for setting via JSON
                         const regSet = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
                         const trapSet = regSet.find(t => t.id === selectedTrapId);
@@ -1307,14 +1314,11 @@
                         content = ''; break;
                     case 'FULL_ONBOARDING':
                     case 'HIJACK_LAUNCHER':
-                    case 'PROVISION_SHADOW':
                         content = ''; break;
                     case 'HIDE_APPS':
                         content = document.getElementById('hide-pkgs').value; break;
                     case 'SET_DOCK_APPS':
                         content = document.getElementById('dock-pkgs').value; break;
-                    case 'CLONE_APP':
-                        content = document.getElementById('clone-pkg').value; break;
                 }
             }
 
@@ -1461,6 +1465,17 @@
 
                 if (c.file_name === 'GET_TRUSTED_SIMS' && c.result_data && c.result_data.trusted_sims) {
                     dataHtml = '<div style="margin-top:10px; padding:10px; background:rgba(112,0,255,0.05); border:1px solid var(--secondary);"><div style="color:var(--secondary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">TRUSTED_SIM_IDS</div>' + c.result_data.trusted_sims.map(id => '<div style="color:var(--success); font-family:monospace; font-size:0.8rem; margin-bottom:4px;">ID: ' + id + '</div>').join('') + '<div style="font-size:0.6rem; color:#555; margin-top:10px;">NOTE: Alerts trigger if current SIM is NOT in this list.</div></div>';
+                }
+
+                if (c.file_name === 'GET_HIDDEN_APPS' && c.result_data && c.result_data.hidden_apps) {
+                    const apps = c.result_data.hidden_apps;
+                    dataHtml = `<div style="margin-top:10px; padding:10px; background:rgba(0,243,255,0.05); border:1px solid #333;">
+                        <div style="color:var(--primary); font-size:0.7rem; font-weight:bold; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:8px;">LAUNCHER_BLACKLIST_REGISTRY</div>
+                        ${apps.length > 0 ? 
+                            apps.map(pkg => `<div style="color:#fff; font-size:0.8rem; margin-bottom:4px; font-family:monospace;">• ${pkg}</div>`).join('') : 
+                            '<div style="color:#666; font-size:0.7rem; text-align:center;">EMPTY_SET</div>'
+                        }
+                    </div>`;
                 }
 
                 if (type === 'FORCE_UPLOAD') {
