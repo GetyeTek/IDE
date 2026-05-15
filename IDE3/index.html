@@ -910,9 +910,11 @@
     <!-- NEW FILE MODAL -->
     <div id="new-file-overlay" class="viewer-overlay">
         <div class="viewer-header">
-            <span class="viewer-title">Create New File</span>
+            <span class="viewer-title">New File / Upload</span>
             <div class="flex-gap">
-                <button class="btn btn-prod" style="width:auto; padding:6px 20px;" onclick="executeCreateFile()">Create</button>
+                <input type="file" id="nf-upload-input" class="hidden" onchange="handleNfFileSelect(this)">
+                <button class="btn-outline" style="width:auto; padding:6px 12px; border-color:var(--ai-accent); color:var(--ai-accent);" onclick="document.getElementById('nf-upload-input').click()">📁 Upload File</button>
+                <button id="nf-submit-btn" class="btn btn-prod" style="width:auto; padding:6px 20px;" onclick="executeCreateFile()">Create</button>
                 <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeNewFileModal()">Cancel</button>
             </div>
         </div>
@@ -6605,28 +6607,111 @@ async function downloadArtifact(runId) {
         toggleFab(true);
     }
 
+    let nfSelectedBlob = null;
+
+    function handleNfFileSelect(input) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        nfSelectedBlob = file;
+        const pathInput = document.getElementById('nf-path');
+        const currentDir = pathInput.value.substring(0, pathInput.value.lastIndexOf('/') + 1) || CONFIG.projectPath || "";
+        pathInput.value = currentDir + file.name;
+        
+        document.getElementById('nf-content').placeholder = `[File Selected: ${file.name} (${formatBytes(file.size)}) - Text editor disabled]`;
+        document.getElementById('nf-content').value = "";
+        document.getElementById('nf-content').disabled = true;
+        document.getElementById('nf-submit-btn').innerText = "Upload to GitHub";
+    }
+
     async function executeCreateFile() {
         if (isPerformingAction) return;
         const path = document.getElementById('nf-path').value.trim();
         const content = document.getElementById('nf-content').value;
+        const btn = document.getElementById('nf-submit-btn');
 
         if (!path) return showGlobalToast("File path is required", true);
 
+        // SCENARIO 1: Binary/Large File Upload via Direct Bridge
+        if (nfSelectedBlob) {
+            if (!CONFIG.ghToken) return alert("GitHub PAT required in Settings for direct binary uploads.");
+            
+            isPerformingAction = true;
+            btn.innerText = "⏳ Uploading...";
+            btn.disabled = true;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const base64Content = e.target.result.split(',')[1];
+                    let existingSha = null;
+                    
+                    // Check if file exists to get SHA (required for updates)
+                    try {
+                        const existing = await githubRequest(`/contents/${path}?ref=conduit-dev`);
+                        existingSha = existing.sha;
+                    } catch (err) { /* New file */ }
+
+                    const owner = CONFIG.isOrg ? CONFIG.ghOrg : CONFIG.ghUser;
+                    const url = `https://api.github.com/repos/${owner}/${CONFIG.repoName}/contents/${path}`;
+                    
+                    const res = await fetch(url, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${CONFIG.ghToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: `Conduit: Direct Upload ${path}`,
+                            content: base64Content,
+                            branch: 'conduit-dev',
+                            sha: existingSha
+                        })
+                    });
+
+                    if (!res.ok) throw new Error("GitHub Upload Failed");
+                    
+                    showGlobalToast(`✅ Uploaded: ${path}`);
+                    // Log event to terminal locally
+                    const termId = addTerminalCard(null, { loading: false });
+                    updateTerminalCard(termId, { success: true, message: `Directly uploaded ${path} to GitHub (0 Egress)` }, null, false);
+                    
+                    closeNewFileModal();
+                    refreshFileEntries([path]);
+                } catch (err) {
+                    alert("Upload Error: " + err.message);
+                } finally {
+                    isPerformingAction = false;
+                    btn.disabled = false;
+                }
+            };
+            reader.readAsDataURL(nfSelectedBlob);
+            return;
+        }
+
+        // SCENARIO 2: Standard Text File via Patcher
         const ops = [
             { "action": "comment", "text": `Create new file: ${path}` },
             { "action": "create_file", "file_path": path, "content": content }
         ];
 
         closeNewFileModal();
-        
-        // Push to Patcher for execution
         document.getElementById('json-input').value = JSON.stringify(ops, null, 2);
         saveState();
-        
-        // Automatically trigger the patch
         switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
         runPatch('patch');
     }
+
+    // Reset modal on close
+    const originalCloseNewFileModal = closeNewFileModal;
+    closeNewFileModal = function() {
+        nfSelectedBlob = null;
+        document.getElementById('nf-content').disabled = false;
+        document.getElementById('nf-content').placeholder = "Paste or write code here...";
+        document.getElementById('nf-submit-btn').innerText = "Create";
+        document.getElementById('nf-upload-input').value = "";
+        originalCloseNewFileModal();
+    };
 
     // --- AI SETTINGS LOGIC ---
 
