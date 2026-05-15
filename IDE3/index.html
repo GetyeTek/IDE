@@ -4525,14 +4525,19 @@
             const BATCH_SIZE = 5;
             for (let i = 0; i < filesToProcess.length; i += BATCH_SIZE) {
                 const batch = filesToProcess.slice(i, i + BATCH_SIZE);
-                const batchResults = await Promise.all(batch.map(async (path) => {
+                            const batchResults = await Promise.all(batch.map(async (path) => {
+                let data;
+                if (CONFIG.ghToken) {
+                    data = await githubRequest(`/contents/${path}?ref=conduit-dev`);
+                } else {
                     const res = await fetch(CONFIG.funcUrl, {
                         method: 'POST', headers: {'Content-Type': 'application/json'},
                         body: apiBody({ action: 'preview_file', file_path: path })
                     });
-                    const data = await res.json();
-                    return { path, content: b64DecodeUnicode(data.content || "") };
-                }));
+                    data = await res.json();
+                }
+                return { path, content: b64DecodeUnicode(data.content || "") };
+            }));
 
                 batchResults.forEach(res => {
                     const targetPath = moveFolder ? res.path.replace(oldDir, newDir) : newPath;
@@ -5623,48 +5628,37 @@ async function downloadArtifact(runId) {
         // Determine mode based on the first item type in the UNFILTERED list to maintain UI consistency
         const mode = currentDiscoveryItems.some(i => i.type === 'function') ? 'function' : 'source';
         renderDiscoveryList(filtered, mode);
-    }
-
-    async function triggerRemoteDeploy(repo, funcName) {
-        if (!confirm(`🚀 Trigger deployment for '${funcName}' inside remote repo '${repo}'?`)) return;
-        
-        showGlobalToast(`Signaling ${repo}...`);
-        try {
-            const res = await fetch(CONFIG.funcUrl, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ 
-                    action: 'trigger_build', 
-                    repo_name: repo, // Target the foreign repo
-                    workflow_id: 'deploy.yml', 
-                    branch: 'conduit-dev', // Assuming standard convention
-                    inputs: { function_name: funcName }
-                })
+            batchResults.forEach(res => {
+                const targetPath = moveFolder ? res.path.replace(oldDir, newDir) : newPath;
+                ops.push({ "action": "delete_file", "file_path": res.path });
+                ops.push({ "action": "create_file", "file_path": targetPath, "content": res.content });
             });
-            const data = await res.json();
+
+            closeRenameModal();
+
+            // 2. Load into Patcher and EXECUTE
+            document.getElementById('json-input').value = JSON.stringify(ops, null, 2);
+            saveState();
             
-            if (data.success) {
-                showGlobalToast("✅ Remote deployment triggered!");
-                // Optional: Switch to CI/CD? No, that would require switching repo context.
-            } else {
-                throw new Error(data.error || "Unknown error");
-            }
-        } catch(e) {
-            alert("Remote Deploy Failed: " + e.message);
-        }
-    }
+            // 3. Switch to Patcher and run it immediately
+            switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
+            showGlobalToast("🚀 Executing Rename/Move...");
+            
+            // Automatically trigger the patch so it's not "fake"
+            await runPatch('patch');
 
-    async function importFunction(repo, path, name) {
-        showGlobalToast(`Importing ${name}...`);
-        try {
-            const res = await fetch(CONFIG.funcUrl, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: apiBody({ action: 'preview_file', repo_name: repo, file_path: path })
-            });
-            const data = await res.json();
-            if (data.content) {
-                document.getElementById('ef-name').value = name;
-                document.getElementById('ef-code').value = b64DecodeUnicode(data.content);
-                document.getElementById('discovery-overlay').classList.remove('active');
+            // 4. Prompt for AI Healing after the patch is confirmed
+            setTimeout(() => {
+                if (confirm("Rename complete! Shall I ask AI to scan and heal imports in other files?")) {
+                    startNewChat();
+                    toggleChat(true);
+                    chatHistory.push({ 
+                        role: 'user', 
+                        text: `I just renamed "${currentRenamePath}" to "${newPath}". Please scan my project and provide a JSON patch to update any other files that import this file.` 
+                    });
+                    processAIResponse();
+                }
+            }, 1500);
                 document.getElementById('ef-status-msg').innerText = `Imported from ${repo}. Ready to deploy.`;
             } else throw new Error("Content empty");
         } catch(e) { alert("Import failed: " + e.message); }
