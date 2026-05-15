@@ -1591,17 +1591,28 @@ serve(async (req) => {
     if (action === "fetch_project_bundle") {
         const ref = ref_sha || DEV_BRANCH;
         const scope = (project_path || "").trim();
-        const treeData = await githubFetch(TARGET_REPO, `/git/trees/${ref}?recursive=1`);
-        const blobs = (treeData.tree || []).filter((f: any) => f.type === "blob" && (!scope || f.path.startsWith(scope)));
-        
         const bundle: Record<string, any> = {};
-        // Aggressive server-side parallel fetch
-        await Promise.all(blobs.map(async (f: any) => {
-            try {
-                const { content } = await getFileRaw(TARGET_REPO, f.path, ref);
-                bundle[f.path] = { content, sha: f.sha, size: f.size };
-            } catch (e) {}
-        }));
+
+        if (payload.single_file) {
+            // EGRESS OPTIMIZATION: Only fetch index.html
+            const targetPath = scope + "index.html";
+            const { content, sha } = await getFileRaw(TARGET_REPO, targetPath, ref);
+            if (content) {
+                bundle[targetPath] = { content, sha, size: (content.length * 0.75) };
+            }
+        } else {
+            // FULL BUNDLE: Traditional recursive fetch
+            const treeData = await githubFetch(TARGET_REPO, `/git/trees/${ref}?recursive=1`);
+            const blobs = (treeData.tree || []).filter((f: any) => f.type === "blob" && (!scope || f.path.startsWith(scope)));
+            
+            // Aggressive server-side parallel fetch
+            await Promise.all(blobs.map(async (f: any) => {
+                try {
+                    const { content } = await getFileRaw(TARGET_REPO, f.path, ref);
+                    bundle[f.path] = { content, sha: f.sha, size: f.size };
+                } catch (e) {}
+            }));
+        }
         
         return new Response(JSON.stringify({ files: bundle }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
