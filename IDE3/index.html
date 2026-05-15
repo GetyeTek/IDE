@@ -1309,6 +1309,12 @@
             </div>
             <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeRepoSelector()">Close</button>
         </div>
+        <div id="repo-send-params" style="display:none; padding:10px 16px; background:rgba(217, 70, 239, 0.05); border-bottom:1px solid var(--border);">
+             <div class="flex-gap" style="align-items:center;">
+                 <label class="input-label" style="margin:0; white-space:nowrap;">Target Folder:</label>
+                 <input type="text" id="repo-target-path" class="input-field" placeholder="e.g. imports/ (Leave empty for root)" style="height:32px; font-size:12px;">
+             </div>
+        </div>
         <div id="repo-selector-list" style="flex:1; overflow-y:auto; padding:10px;"></div>
     </div>
 
@@ -6903,7 +6909,9 @@ async function downloadArtifact(runId) {
         repoSelectorMode = 'send';
         document.getElementById('repo-selector-title').innerText = "Send to Repository";
         document.getElementById('repo-type-toggle').style.display = 'flex';
-        repoSelectorIsOrg = CONFIG.isOrg; // Default to current mode
+        document.getElementById('repo-send-params').style.display = 'block';
+        document.getElementById('repo-target-path').value = "";
+        repoSelectorIsOrg = CONFIG.isOrg; 
         updateRepoToggleUI();
         fetchRepoList();
     }
@@ -7000,24 +7008,34 @@ async function downloadArtifact(runId) {
 
     async function executeSendFiles(targetRepo, targetIsOrg) {
         const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
-        if (!confirm(`🚀 Send ${checked.length} files to ${targetRepo}? Existing files will be overwritten.`)) return;
+        let targetDir = document.getElementById('repo-target-path').value.trim();
+        if (targetDir && !targetDir.endsWith('/')) targetDir += '/';
+
+        const msg = `🚀 Send ${checked.length} files to ${targetRepo}${targetDir ? ' (Folder: ' + targetDir + ')' : ''}? Existing files will be overwritten.`;
+        if (!confirm(msg)) return;
 
         closeRepoSelector();
         showGlobalToast("📦 Gathering files...");
 
         try {
-            const operations = [{ action: 'comment', text: `[Inbound] Transfer from ${CONFIG.repoName}` }];
+            const operations = [{ action: 'comment', text: `[Inbound] Transfer from ${CONFIG.repoName}${targetDir ? ' to ' + targetDir : ''}` }];
             
             for (const path of checked) {
-                const res = await fetch(CONFIG.funcUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: apiBody({ action: 'preview_file', file_path: path })
-                });
-                const data = await res.json();
+                let data;
+                if (CONFIG.ghToken) {
+                    data = await githubRequest(`/contents/${path}?ref=conduit-dev`);
+                } else {
+                    const res = await fetch(CONFIG.funcUrl, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: apiBody({ action: 'preview_file', file_path: path })
+                    });
+                    data = await res.json();
+                }
+
                 if (data.content) {
                     operations.push({
                         action: 'create_file',
-                        file_path: path,
+                        file_path: targetDir + path,
                         content: b64DecodeUnicode(data.content)
                     });
                 }
@@ -7464,6 +7482,7 @@ async function downloadArtifact(runId) {
         // Reset state for next use
         document.getElementById('repo-selector-title').innerText = "Select Repository";
         document.getElementById('repo-type-toggle').style.display = 'none';
+        document.getElementById('repo-send-params').style.display = 'none';
         repoSelectorMode = 'settings';
     }
 
