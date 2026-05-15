@@ -769,6 +769,14 @@
                         <option value="native">📱 Native App (Preview Disabled)</option>
                     </select>
                 </div>
+                <div id="preview-mode-group" class="input-group">
+                    <label class="input-label">Preview Fetch Strategy</label>
+                    <select id="setting-preview-mode" class="input-field" style="appearance: auto;">
+                        <option value="single">📄 Single File (index.html only)</option>
+                        <option value="full">📦 Entire Project (Slow/Data Intensive)</option>
+                    </select>
+                    <p style="font-size:10px; color:#666; margin-top:5px;">Single file mode drastically reduces Supabase egress bandwidth for self-contained HTML files.</p>
+                </div>
                 <div class="input-group">
                     <label class="input-label">EF Deployment Mode</label>
                     <select id="setting-ef-mode" class="input-field" style="appearance: auto;">
@@ -1840,6 +1848,9 @@
         if (cfg.projectPath !== undefined) {
             document.getElementById('setting-project-path').value = cfg.projectPath;
         }
+        if (cfg.previewFetchMode) {
+            document.getElementById('setting-preview-mode').value = cfg.previewFetchMode;
+        }
         if (cfg.isOrg !== undefined) {
             document.getElementById('setting-is-org').checked = cfg.isOrg;
         }
@@ -1859,6 +1870,7 @@
         efDeploymentMode: localStorage.getItem('conduit_ef_mode') || 'default',
         projectType: initialRepoConfig.projectType || 'web',
         omitHeaders: localStorage.getItem('conduit_omitHeaders') === 'true',
+        previewFetchMode: initialRepoConfig.previewFetchMode || 'single',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
         consoleHalf: localStorage.getItem('conduit_console_half') === 'true'
@@ -1975,6 +1987,7 @@
         document.getElementById('setting-is-org').checked = CONFIG.isOrg;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
         document.getElementById('setting-project-type').value = CONFIG.projectType;
+        document.getElementById('setting-preview-mode').value = CONFIG.previewFetchMode;
         document.getElementById('viewer-omit-toggle').checked = CONFIG.omitHeaders;
         togglePreviewSettingsVisibility(CONFIG.projectType);
 
@@ -2894,6 +2907,7 @@
         const wasmValidation = document.getElementById('setting-wasm-validation').checked;
         const efDeploymentMode = document.getElementById('setting-ef-mode').value;
         const projectType = document.getElementById('setting-project-type').value;
+        const previewFetchMode = document.getElementById('setting-preview-mode').value;
         const omitHeaders = CONFIG.omitHeaders;
         const floatingConsole = document.getElementById('setting-floating-console').checked;
         const consoleHalf = document.getElementById('setting-console-half').checked;
@@ -2918,10 +2932,11 @@
 
         // Update Repo-Specific Config Map
         const repoConfigs = JSON.parse(localStorage.getItem('conduit_repo_configs') || '{}');
-        repoConfigs[repoName] = { 
+                repoConfigs[repoName] = {
             projectType, 
             isOrg, 
-            projectPath 
+            projectPath,
+            previewFetchMode
         };
         localStorage.setItem('conduit_repo_configs', JSON.stringify(repoConfigs));
 
@@ -2937,7 +2952,7 @@
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
 
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf, projectType, omitHeaders };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf, projectType, omitHeaders, previewFetchMode };
         
         applyPreviewTabVisibility(); 
         initFloatingHUD();
@@ -3927,10 +3942,16 @@
         const fileCache = {}; window.CURRENT_FILE_CACHE = fileCache;
 
         try {
-            // ONE SINGLE REQUEST to fetch everything in the project scope
+            // OPTIMIZED REQUEST: Check if we only need index.html to save egress
+            const isSingle = CONFIG.previewFetchMode === 'single';
             const bundleRes = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ action: 'fetch_project_bundle', project_path: effectiveRoot, ref_sha: sha })
+                body: apiBody({ 
+                    action: 'fetch_project_bundle', 
+                    project_path: effectiveRoot, 
+                    ref_sha: sha, 
+                    single_file: isSingle 
+                })
             });
             const bundleData = await bundleRes.json();
             const files = bundleData.files || {};
