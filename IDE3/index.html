@@ -715,6 +715,20 @@
                     <input type="text" id="setting-func-url" class="input-field" placeholder="https://...supabase.co/functions/v1/ide-brain">
                 </div>
                 <div class="input-group">
+                    <label class="input-label" style="color:var(--ai-accent)">GitHub PAT (Direct Bridge - Egress Saver)</label>
+                    <input type="password" id="setting-gh-token" class="input-field" placeholder="ghp_xxxx...">
+                </div>
+                <div class="flex-gap">
+                    <div class="input-group" style="flex:1">
+                        <label class="input-label">GH Username</label>
+                        <input type="text" id="setting-gh-user" class="input-field" placeholder="GetyeTek">
+                    </div>
+                    <div class="input-group" style="flex:1">
+                        <label class="input-label">GH Org Name</label>
+                        <input type="text" id="setting-gh-org" class="input-field" placeholder="MasterEmpire">
+                    </div>
+                </div>
+                <div class="input-group">
                     <div class="flex-between" style="margin-bottom: 6px;">
                         <label class="input-label" style="margin:0">GitHub Repo Name</label>
                         <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
@@ -1873,7 +1887,10 @@
         previewFetchMode: initialRepoConfig.previewFetchMode || 'single',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
-        consoleHalf: localStorage.getItem('conduit_console_half') === 'true'
+        consoleHalf: localStorage.getItem('conduit_console_half') === 'true',
+        ghToken: localStorage.getItem('conduit_gh_token') || '',
+        ghUser: localStorage.getItem('conduit_gh_user') || 'GetyeTek',
+        ghOrg: localStorage.getItem('conduit_gh_org') || 'MasterEmpire'
     };
     
     // Global State
@@ -1983,6 +2000,9 @@
 
         // Load Settings into UI
         document.getElementById('setting-func-url').value = CONFIG.funcUrl;
+        document.getElementById('setting-gh-token').value = CONFIG.ghToken;
+        document.getElementById('setting-gh-user').value = CONFIG.ghUser;
+        document.getElementById('setting-gh-org').value = CONFIG.ghOrg;
         document.getElementById('setting-repo-name').value = CONFIG.repoName;
         document.getElementById('setting-is-org').checked = CONFIG.isOrg;
         document.getElementById('setting-project-path').value = CONFIG.projectPath;
@@ -2204,6 +2224,25 @@
         const bytes = new TextEncoder().encode(str);
         const binString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
         return btoa(binString);
+    }
+
+    async function githubRequest(path, options = {}) {
+        if (!CONFIG.ghToken) throw new Error("GitHub PAT missing in Settings. Cannot use Direct Bridge.");
+        const owner = CONFIG.isOrg ? CONFIG.ghOrg : CONFIG.ghUser;
+        const url = `https://api.github.com/repos/${owner}/${CONFIG.repoName}${path}`;
+        const res = await fetch(url, {
+            ...options,
+            headers: {
+                'Authorization': `token ${CONFIG.ghToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                ...options.headers
+            }
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(`GitHub API: ${err.message}`);
+        }
+        return res.json();
     }
 
     function base64ToUint8Array(base64) {
@@ -2896,6 +2935,9 @@
 
     async function saveSettings() {
         const funcUrl = document.getElementById('setting-func-url').value.trim();
+        const ghToken = document.getElementById('setting-gh-token').value.trim();
+        const ghUser = document.getElementById('setting-gh-user').value.trim();
+        const ghOrg = document.getElementById('setting-gh-org').value.trim();
         const repoName = document.getElementById('setting-repo-name').value.trim() || 'IDE';
         let projectPath = document.getElementById('setting-project-path').value.trim();
         if(projectPath && !projectPath.endsWith('/')) projectPath += '/';
@@ -2916,6 +2958,9 @@
         
         // Global Preferences
         localStorage.setItem('conduit_funcUrl', funcUrl);
+        localStorage.setItem('conduit_gh_token', ghToken);
+        localStorage.setItem('conduit_gh_user', ghUser);
+        localStorage.setItem('conduit_gh_org', ghOrg);
         localStorage.setItem('conduit_showPreview', showPreview);
         localStorage.setItem('conduit_wasm_validation', wasmValidation);
         localStorage.setItem('conduit_ef_mode', efDeploymentMode);
@@ -2952,7 +2997,7 @@
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
 
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf, projectType, omitHeaders, previewFetchMode };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf, projectType, omitHeaders, previewFetchMode, ghToken, ghUser, ghOrg };
         
         applyPreviewTabVisibility(); 
         initFloatingHUD();
@@ -3971,19 +4016,45 @@
         const fileCache = {}; window.CURRENT_FILE_CACHE = fileCache;
 
         try {
-            // OPTIMIZED REQUEST: Check if we only need index.html to save egress
             const isSingle = CONFIG.previewFetchMode === 'single';
-            const bundleRes = await fetch(CONFIG.funcUrl, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: apiBody({ 
-                    action: 'fetch_project_bundle', 
-                    project_path: effectiveRoot, 
-                    ref_sha: sha, 
-                    single_file: isSingle 
-                })
-            });
-            const bundleData = await bundleRes.json();
-            const files = bundleData.files || {};
+            let files = {};
+
+            if (CONFIG.ghToken) {
+                // [DIRECT GH BRIDGE] Bypass Supabase Egress
+                const ref = sha || 'conduit-dev';
+                if (isSingle) {
+                    const targetPath = effectiveRoot + "index.html";
+                    const data = await githubRequest(`/contents/${targetPath}?ref=${ref}`);
+                    if (data.content) files[targetPath] = { content: data.content, sha: data.sha, size: data.size };
+                } else {
+                    // Full Bundle Fetch from GH API
+                    const treeData = await githubRequest(`/git/trees/${ref}?recursive=1`);
+                    const blobs = (treeData.tree || []).filter(f => f.type === "blob" && (!effectiveRoot || f.path.startsWith(effectiveRoot)));
+                    
+                    showGlobalToast(`[GH Bridge] Bundling ${blobs.length} files...`);
+                    
+                    // Parallel Content Fetching
+                    const BATCH_SIZE = 12;
+                    for (let i = 0; i < blobs.length; i += BATCH_SIZE) {
+                        const batch = blobs.slice(i, i + BATCH_SIZE);
+                        const results = await Promise.all(batch.map(async (b) => {
+                             try {
+                                 const data = await githubRequest(`/contents/${b.path}?ref=${ref}`);
+                                 return { path: b.path, content: data.content, sha: data.sha, size: data.size };
+                             } catch (e) { return null; }
+                        }));
+                        results.forEach(r => { if(r) files[r.path] = r; });
+                    }
+                }
+            } else {
+                // [LEGACY] Fetch via Supabase
+                const bundleRes = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'fetch_project_bundle', project_path: effectiveRoot, ref_sha: sha, single_file: isSingle })
+                });
+                const bundleData = await bundleRes.json();
+                files = bundleData.files || {};
+            }
             
             if (Object.keys(files).length === 0) throw new Error(`No files found in scope: ${effectiveRoot}`);
 
@@ -5834,17 +5905,19 @@ async function downloadArtifact(runId) {
         aceEditorInstance.setValue("Loading content...", -1);
         
         try {
-            const res = await fetch(CONFIG.funcUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: apiBody({
-                    action: 'preview_file',
-                    file_path: path
-                })
-            });
-            const data = await res.json();
+            let data;
+            if (CONFIG.ghToken) {
+                // Direct GH Bridge (Egress Saving)
+                data = await githubRequest(`/contents/${path}?ref=conduit-dev`);
+            } else {
+                // Fallback to Supabase (Legacy)
+                const res = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: apiBody({ action: 'preview_file', file_path: path })
+                });
+                data = await res.json();
+            }
+
             document.getElementById('viewer-filename').innerText = path;
             
             let mode = "ace/mode/text";
@@ -7517,31 +7590,29 @@ async function downloadArtifact(runId) {
             });
 
         if (checked.length === 0) return showGlobalToast("No textual files selected", true);
+        if (!CONFIG.ghToken) return alert("Direct Bridge requires a GitHub Token in Settings to bypass Supabase egress.");
         
         if (isPerformingAction) return;
         isPerformingAction = true;
 
         const btn = document.getElementById('btn-context-copy');
         const originalHtml = btn.innerHTML;
-        btn.innerHTML = "⏳ Fetching...";
+        btn.innerHTML = "⏳ GH Bridge...";
         
         try {
             const fetchedFiles = [];
-            const BATCH_SIZE = 8;
+            const BATCH_SIZE = 10; // GitHub API handles high concurrency well
             
             for (let i = 0; i < checked.length; i += BATCH_SIZE) {
                 const batch = checked.slice(i, i + BATCH_SIZE);
-                showGlobalToast(`⚡ Copying: ${i + 1}-${Math.min(i + BATCH_SIZE, checked.length)} of ${checked.length}...`);
+                showGlobalToast(`Direct GH Fetch: ${i + 1}-${Math.min(i + BATCH_SIZE, checked.length)} of ${checked.length}...`);
 
                 const batchResults = await Promise.all(batch.map(async (path) => {
-                    const res = await fetch(CONFIG.funcUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: apiBody({ action: 'preview_file', file_path: path })
-                    });
-                    const data = await res.json();
-                    if (!data.content) return null;
-                    return { path, content: b64DecodeUnicode(data.content) };
+                    try {
+                        const data = await githubRequest(`/contents/${path}?ref=conduit-dev`);
+                        if (!data.content) return null;
+                        return { path, content: b64DecodeUnicode(data.content) };
+                    } catch (e) { return null; }
                 }));
 
                 fetchedFiles.push(...batchResults.filter(f => f !== null));
@@ -7550,10 +7621,10 @@ async function downloadArtifact(runId) {
             const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
             await navigator.clipboard.writeText(text);
             
-            btn.innerHTML = "✔ Copied!";
+            btn.innerHTML = "✔ GH Copied!";
             btn.style.color = "var(--prod)";
             btn.style.borderColor = "var(--prod)";
-            showGlobalToast(`Successfully copied ${fetchedFiles.length} files`);
+            showGlobalToast(`[Direct Bridge] Successfully copied ${fetchedFiles.length} files (0 Egress)`);
             
             setTimeout(() => {
                 btn.innerHTML = originalHtml;
@@ -7562,7 +7633,7 @@ async function downloadArtifact(runId) {
             }, 2000);
 
         } catch (e) {
-            showGlobalToast("Copy failed: " + e.message, true);
+            showGlobalToast("Direct Copy failed: " + e.message, true);
             btn.innerHTML = originalHtml;
         } finally {
             isPerformingAction = false;
