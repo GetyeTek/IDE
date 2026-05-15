@@ -1550,9 +1550,35 @@ serve(async (req) => {
     }
 
     if (action === "fetch") {
-      const treeData = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
-      const branchData = await githubFetch(TARGET_REPO, `/branches/${DEV_BRANCH}`);
-      const branchDate = branchData.commit.commit.committer.date;
+      const { only_paths } = payload;
+      let files = [];
+
+      if (only_paths && Array.isArray(only_paths)) {
+          // TARGETED METADATA FETCH
+          files = await Promise.all(only_paths.map(async (path) => {
+              try {
+                  const data = await githubFetch(TARGET_REPO, `/contents/${path}?ref=${DEV_BRANCH}`);
+                  return {
+                      path: path,
+                      sha: data.sha,
+                      size: data.size,
+                      last_updated: new Date().toISOString() // Approximate to current patch time
+                  };
+              } catch (e) { return null; }
+          }));
+          files = files.filter(f => f !== null);
+      } else {
+          // FULL TREE SCAN
+          const treeData = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
+          const branchData = await githubFetch(TARGET_REPO, `/branches/${DEV_BRANCH}`);
+          const branchDate = branchData.commit.commit.committer.date;
+          files = treeData.tree.filter((f: any) => f.type === "blob").map((f: any) => ({
+              path: f.path,
+              sha: f.sha,
+              size: f.size,
+              last_updated: branchDate
+          }));
+      }
 
       // 1. Fetch recent history to map file-specific updates
       const { data: history } = await supabase
@@ -1575,15 +1601,7 @@ serve(async (req) => {
         });
       }
 
-      const files = treeData.tree
-        .filter((f: any) => f.type === "blob")
-        .map((f: any) => ({
-          path: f.path,
-          sha: f.sha,
-          size: f.size,
-          // Priority: 1. IDE History Date, 2. Branch Update Date
-          last_updated: fileDateMap[f.path] || branchDate
-        }));
+
 
       return new Response(JSON.stringify({ files }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
