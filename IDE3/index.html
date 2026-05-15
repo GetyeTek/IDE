@@ -3072,6 +3072,34 @@
         }
     }
 
+    async function refreshFileEntries(paths) {
+        if (!paths || paths.length === 0) return;
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'fetch', only_paths: paths })
+            });
+            const data = await res.json();
+            const updatedFiles = data.files || [];
+            
+            // Merge into local state
+            updatedFiles.forEach(upd => {
+                const idx = window.repoFiles.findIndex(f => f.path === upd.path);
+                if (idx !== -1) window.repoFiles[idx] = upd;
+                else window.repoFiles.push(upd);
+            });
+
+            // Filter out paths that might have been deleted (returned as non-existent)
+            const returnedPaths = updatedFiles.map(f => f.path);
+            paths.forEach(p => {
+                if (!returnedPaths.includes(p)) {
+                    window.repoFiles = window.repoFiles.filter(f => f.path !== p);
+                }
+            });
+
+            renderFileList(window.repoFiles);
+        } catch (e) { console.warn("Partial metadata refresh failed", e); }
+
     // --- AI CHAT LOGIC ---
     function toggleChat(show) {
         document.getElementById('chat-overlay').classList.toggle('active', show);
@@ -3522,10 +3550,11 @@
             updateTerminalCard(termId, data, payload, true);
 
             if(data.success) {
+                const patchedPaths = payload.filter(p => p.file_path).map(p => p.file_path);
                 if(actionType === 'patch') setTimeout(() => bundleAndPreview(null), 1500);
                 setTimeout(() => { 
-                    fetchState(true, true); // Use force sync to update history and CI/CD
-                    fetchFileList(); 
+                    fetchState(true, true); 
+                    refreshFileEntries(patchedPaths);
                 }, 1000);
             }
         } catch (e) {
@@ -4451,6 +4480,7 @@
             switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
             
             showGlobalToast("Rename loaded. Review and Test Patch.");
+            refreshFileEntries([currentRenamePath, newPath]);
 
             // 4. Prompt for AI Healing
             setTimeout(() => {
@@ -5905,8 +5935,8 @@ async function downloadArtifact(runId) {
                 originalViewerContent = newContent;
                 saveBtn.style.display = 'none';
                 showGlobalToast("File updated successfully");
-                // Log to terminal via existing state fetch
                 fetchState(false, true);
+                refreshFileEntries([currentViewerPath]);
             } else {
                 throw new Error(data.error || "Save failed");
             }
