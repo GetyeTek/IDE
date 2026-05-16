@@ -7759,10 +7759,20 @@ async function downloadArtifact(runId) {
     }
 
     async function processExport(type) {
-        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
+        let checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
         const statusEl = document.getElementById('export-status');
         
         if (checked.length === 0) return alert("No files selected.");
+
+        // Parity with Global Copy: Filter binaries for TXT mode
+        if (type === 'txt') {
+            const binaryExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'mp4', 'mov', 'webm', 'zip', 'pdf', 'woff', 'woff2', 'ttf', 'otf', 'exe', 'apk'];
+            checked = checked.filter(path => {
+                const ext = path.split('.').pop().toLowerCase();
+                return !binaryExtensions.includes(ext);
+            });
+            if (checked.length === 0) return alert("No textual files found in selection to merge.");
+        }
 
         if (exportController) exportController.abort(); 
         exportController = new AbortController();
