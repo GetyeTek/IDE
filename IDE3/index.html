@@ -7737,12 +7737,30 @@ async function downloadArtifact(runId) {
             }
 
             const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
-            await navigator.clipboard.writeText(text);
-            
-            btn.innerHTML = "✔ GH Copied!";
-            btn.style.color = "var(--prod)";
-            btn.style.borderColor = "var(--prod)";
-            showGlobalToast(`[Direct Bridge] Successfully copied ${fetchedFiles.length} files (0 Egress)`);
+            const blob = new Blob([text], { type: 'text/plain' });
+            const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+
+            try {
+                // Use advanced Clipboard API for large data handling
+                if (navigator.clipboard && window.ClipboardItem) {
+                    const data = [new ClipboardItem({ [blob.type]: blob })];
+                    await navigator.clipboard.write(data);
+                } else {
+                    await navigator.clipboard.writeText(text);
+                }
+                
+                btn.innerHTML = "✔ " + sizeMB + "MB";
+                btn.style.color = "var(--prod)";
+                btn.style.borderColor = "var(--prod)";
+                showGlobalToast(`[GH Bridge] Copied ${fetchedFiles.length} files (${sizeMB} MB)`);
+            } catch (clipErr) {
+                console.warn("Clipboard transfer failed, falling back to download.", clipErr);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `context_dump_${sizeMB}MB.txt`;
+                a.click();
+                showGlobalToast(`Clipboard limit reached. Downloaded as .txt instead (${sizeMB}MB)`, true);
+            }
             
             setTimeout(() => {
                 btn.innerHTML = originalHtml;
