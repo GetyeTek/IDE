@@ -1291,6 +1291,13 @@
                     <label class="input-label">DEX / Asset Filename</label>
                     <input type="text" id="tb-file-name" class="input-field" placeholder="e.g. build_artifact.dex">
                 </div>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px dashed var(--border);">
+                    <input type="checkbox" id="tb-skip-res" style="accent-color:var(--ai-accent); transform: scale(1.1);">
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-size:12px; color:#eee; font-weight:600;">Skip Dynamic Resources</span>
+                        <span style="font-size:10px; color:var(--text-muted);">Ignore contents of 'dynamic_res' folder</span>
+                    </div>
+                </label>
             </div>
             <p style="font-size: 11px; color: var(--text-muted);">This will trigger a repository dispatch event on GitHub. Inputs are remembered per workflow.</p>
         </div>
@@ -4799,6 +4806,7 @@
         const branch = document.getElementById('tb-branch').value.trim();
         const appLabel = document.getElementById('tb-app-label').value.trim();
         const fileName = document.getElementById('tb-file-name').value.trim();
+        const skipRes = document.getElementById('tb-skip-res').checked;
 
         if (!workflowFile || !branch) return showGlobalToast("Workflow and Branch are required", true);
 
@@ -4816,6 +4824,7 @@
         const dynamicInputs = {};
         if (appLabel) dynamicInputs.app_label = appLabel;
         if (fileName) dynamicInputs.file_name = fileName;
+        dynamicInputs.skip_res = skipRes.toString();
 
         closeTriggerModal();
 
