@@ -4854,6 +4854,7 @@
                 // Store parameters for 'Build Anyway' fallback
                 currentSyntaxContext.workflowFile = workflowFile;
                 currentSyntaxContext.branch = branch;
+                currentSyntaxContext.inputs = dynamicInputs; // Preserve labels/filenames/toggles
 
                 openSyntaxReport(data.file_path, data.errors[0]);
                 return;
@@ -4994,6 +4995,7 @@
                     action: 'trigger_build', 
                     workflow_id: ctx.workflowFile, 
                     branch: ctx.branch, 
+                    inputs: ctx.inputs, // Inject preserved parameters
                     validate_pre_build: false 
                 })
             });
