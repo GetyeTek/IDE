@@ -4822,9 +4822,13 @@
 
         // Build inputs payload
         const dynamicInputs = {};
-        if (appLabel) dynamicInputs.app_label = appLabel;
-        if (fileName) dynamicInputs.file_name = fileName;
-        dynamicInputs.skip_res = skipRes.toString();
+        // Only inject Speedster parameters if a Label or Filename is provided.
+        // This prevents 'Unexpected Input' errors on workflows that don't support skip_res.
+        if (appLabel || fileName) {
+            if (appLabel) dynamicInputs.app_label = appLabel;
+            if (fileName) dynamicInputs.file_name = fileName;
+            dynamicInputs.skip_res = skipRes.toString();
+        }
 
         closeTriggerModal();
 
