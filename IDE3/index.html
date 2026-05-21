@@ -8886,7 +8886,7 @@ async function downloadArtifact(runId) {
 
                 let newQuery = nextMode === 'info' 
                     ? `-- Table Structure for ${row.table_name}\nSELECT table_name, column_name, data_type, is_nullable, column_default \nFROM information_schema.columns \nWHERE table_name = '${row.table_name}' \nAND table_schema = 'public'\nORDER BY ordinal_position;` 
-                    : `SELECT * FROM public."${row.table_name}" LIMIT 20;`;
+                    : `SELECT * FROM public."${row.table_name}" ORDER BY 1 DESC LIMIT 1;`;
 
                 editor.value = appendMode ? (currentVal + separator + newQuery) : newQuery;
                 editor.scrollTop = editor.scrollHeight;
