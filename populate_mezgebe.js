@@ -14,6 +14,10 @@ const zipPath = path.join(process.cwd(), 'Classes', 'Mezgebe.zip');
 const BATCH_SIZE = 1000;
 
 async function main() {
+    const maskedKey = process.env.SUPABASE_SERVICE_ROLE_KEY ? `***${process.env.SUPABASE_SERVICE_ROLE_KEY.slice(-4)}` : 'MISSING';
+    console.log('🔗 Connection Details:');
+    console.log(`   URL: ${process.env.SUPABASE_URL}`);
+    console.log(`   KEY: ${maskedKey}`);
     console.log('🚀 Starting Mezgebe Queue Population...');
 
     if (!fs.existsSync(zipPath)) {
