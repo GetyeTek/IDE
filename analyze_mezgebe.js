@@ -51,10 +51,17 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
         const prompt = `You are an Elite Forensics Researcher and Reverse Engineer. You are analyzing 'Mezgebe', an Ethiopian scripture application. Your focus is on how the app protects religious assets, fetches scriptures from remote servers, and manages data integrity.\n\nSCOPE OF ANALYSIS:\n1. ASSET FETCHING & PROTECTION: Identify logic related to downloading content, asset decryption keys, or verification of scripture integrity.\n2. ROSETTA STONES: Look for mapping files, translation tables, or ID-to-content logic that acts as a key for reverse engineering the database structure.\n3. NETWORK INTEGRITY: Identify API endpoints for asset fetching, custom headers, or signing logic used to prevent scraping.\n4. SENSITIVE LEAKAGE: Hardcoded keys, server paths, or internal dev notes.\n5. ANTI-REVERSING: Identify XOR loops, string masking, or reflection used to hide the asset-handling logic.\n\nOUTPUT REQUIREMENT:\nYou MUST output valid JSON only with two keys: 'analysis' (a condensed, high-intensity technical breakdown) and 'score' (1-10).\n\nSCORING RULE: Assign a higher score (8-10) to files containing 'Rosetta Stones', asset decryption logic, or core server-communication protocols essential for reverse engineering. Assign lower for UI or generic helpers.\n\nFILE CONTENT:\n${content}`;
 
         const result = await model.generateContent(prompt);
-        let analysis = result.response.text();
+        const rawResponse = result.response.text();
         
-        // Sanitization: Strip markdown backticks if present
-        analysis = analysis.replace(/```json|```/g, '').trim();
+        // Robust JSON Extraction: Find the bounds of the actual JSON object
+        const start = rawResponse.indexOf('{');
+        const end = rawResponse.lastIndexOf('}');
+        
+        if (start === -1 || end === -1) {
+            throw new Error('AI response did not contain a valid JSON object');
+        }
+        
+        const analysis = rawResponse.slice(start, end + 1);
 
         await supabase.from('mezgebe_analysis').insert({
             file_path: filePath,
@@ -70,7 +77,8 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
 
         console.log(`✅ [Zip ${source_index}] Success: ${filePath}`);
     } catch (err) {
-        console.error(`❌ Failed: ${task.file_path} | Error: ${err.message}`);
+        console.error(`❌ Failed: ${task.file_path} | Source: ${task.source_index} | Error: ${err.message}`);
+        console.log(`♻️ Leaving ${task.file_path} as 'pending' for retry.`);
     }
 }
 
@@ -89,12 +97,16 @@ async function main() {
 
     const keys = await getLeastUsedKeys();
     const WAVE_SIZE = Math.min(keys.length, 10);
+    console.log(`🚀 Processing ${tasks.length} Mezgebe tasks. Wave size: ${WAVE_SIZE}`);
 
     for (let i = 0; i < tasks.length; i += WAVE_SIZE) {
         const currentWave = tasks.slice(i, i + WAVE_SIZE);
+        console.log(`🌊 Launching wave ${Math.floor(i / WAVE_SIZE) + 1}...`);
+
         await Promise.all(currentWave.map((task, index) => {
             const key = keys[index % keys.length];
-            return processFile(task, key, i + index + 1, tasks.length);
+            const globalIndex = i + index + 1;
+            return processFile(task, key, globalIndex, tasks.length);
         }));
         if (i + WAVE_SIZE < tasks.length) await sleep(3000);
     }
