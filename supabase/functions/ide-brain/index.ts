@@ -1247,10 +1247,56 @@ serve(async (req) => {
         ? (repo_name.includes('/') ? repo_name : `${OWNER}/${repo_name}`) 
         : `${OWNER}/${DEFAULT_REPO}`;
 
-    await ensureBranchExists(TARGET_REPO);
+            await ensureBranchExists(TARGET_REPO);
 
-    // 1. INIT
-    if (action === "init") {
+        // --- KEY MANAGER API ACTIONS ---
+        if (action === "fetch_api_keys") {
+            const { data, error } = await supabase
+                .from('api_keys')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return new Response(JSON.stringify({ keys: data || [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        if (action === "cooldown_api_keys") {
+            const { keys } = body;
+            if (!Array.isArray(keys) || keys.length === 0) throw new Error("Keys array required");
+            const cooldownTime = new Date(Date.now() + 3600 * 1000).toISOString();
+            const { data, error } = await supabase
+                .from('api_keys')
+                .update({ cooldown_until: cooldownTime, is_active: true })
+                .in('api_key', keys)
+                .select();
+            if (error) throw error;
+            return new Response(JSON.stringify({ success: true, count: data?.length || 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        if (action === "delete_api_keys") {
+            const { keys } = body;
+            if (!Array.isArray(keys) || keys.length === 0) throw new Error("Keys array required");
+            const { data, error } = await supabase
+                .from('api_keys')
+                .delete()
+                .in('api_key', keys)
+                .select();
+            if (error) throw error;
+            return new Response(JSON.stringify({ success: true, count: data?.length || 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        if (action === "import_api_keys") {
+            const { keys } = body;
+            if (!Array.isArray(keys) || keys.length === 0) throw new Error("Keys array required");
+            const { data, error } = await supabase
+                .from('api_keys')
+                .insert(keys)
+                .select();
+            if (error) throw error;
+            return new Response(JSON.stringify({ success: true, count: data?.length || 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // 1. INIT
+        if (action === "init") {
         const scope = project_path || "";
         const historyLimit = 20;
         const logLimit = 20;
