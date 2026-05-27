@@ -1287,9 +1287,16 @@ serve(async (req) => {
         if (action === "import_api_keys") {
             const { keys } = body;
             if (!Array.isArray(keys) || keys.length === 0) throw new Error("Keys array required");
+
+            // Ensure each key has a UUID, patching tables that lack a default value generator
+            const keysWithIds = keys.map((k: any) => ({
+                ...k,
+                id: k.id || crypto.randomUUID()
+            }));
+
             const { data, error } = await supabase
                 .from('api_keys')
-                .insert(keys)
+                .insert(keysWithIds)
                 .select();
             if (error) throw error;
             return new Response(JSON.stringify({ success: true, count: data?.length || 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
