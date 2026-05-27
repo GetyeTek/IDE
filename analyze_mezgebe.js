@@ -46,7 +46,7 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
 
         const cleanKey = apiKeyRecord.api_key.trim().replace(/^"|"$/g, '');
         const genAI = new GoogleGenerativeAI(cleanKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
         const prompt = `You are an Elite Cyber-Security Architect performing forensic analysis on the 'Mezgebe' application. Your goal is to map out internal mechanics and high-value targets.\n\nSCOPE:\n1. AUTH & SESSIONS: JWT, biometric logic, or token storage.\n2. INTEGRITY: HMAC, custom hashing, or AES/RSA encryption logic.\n3. LEAKAGE: Hardcoded keys, endpoints, or merchant IDs.\n4. ANTI-REVERSING: Reflection, XOR loops, or obfuscation artifacts.\n5. FINANCIAL LOGIC: Balance handling and transaction flow.\n\nFILE CONTENT:\n${content}\n\nWrap criticality at end: <RE_CRITICALITY>[SCORE] - [REASON]</RE_CRITICALITY>`;
 
