@@ -33,15 +33,16 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
         
         console.log(`[${currentCount}/${totalCount}] 📥 Process Start: ${filePath} (Source: ${source_index})`);
 
-        if (!zipCache.has(source_index)) {
-            console.log(`🔍 [Zip ${source_index}] Cache miss. Initializing AdmZip...`);
-            const zipPath = path.join(classesDir, `${source_index}tele_class.dex.zip`);
+        const zipFileName = 'Mezgebe.zip';
+        if (!zipCache.has(zipFileName)) {
+            console.log(`🔍 [${zipFileName}] Cache miss. Initializing AdmZip...`);
+            const zipPath = path.join(classesDir, zipFileName);
             if (!fs.existsSync(zipPath)) throw new Error(`Zip not found: ${zipPath}`);
-            zipCache.set(source_index, new AdmZip(zipPath));
-            console.log(`📦 [Zip ${source_index}] Successfully cached.`);
+            zipCache.set(zipFileName, new AdmZip(zipPath));
+            console.log(`📦 [${zipFileName}] Successfully cached.`);
         }
         
-        const zip = zipCache.get(source_index);
+        const zip = zipCache.get(zipFileName);
         const entry = zip.getEntry(filePath);
         if (!entry) throw new Error(`Entry ${filePath} not in zip ${source_index}`);
         
