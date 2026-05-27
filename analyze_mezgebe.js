@@ -26,15 +26,19 @@ async function getLeastUsedKeys() {
 }
 
 async function processFile(task, apiKeyRecord, currentCount, totalCount) {
+    const startTime = Date.now();
     try {
         const { file_path: filePath, source_index } = task;
         const maskedKey = `***${String(apiKeyRecord.id).slice(-4)}`;
         
+        console.log(`[${currentCount}/${totalCount}] 📥 Process Start: ${filePath} (Source: ${source_index})`);
+
         if (!zipCache.has(source_index)) {
+            console.log(`🔍 [Zip ${source_index}] Cache miss. Initializing AdmZip...`);
             const zipPath = path.join(classesDir, `${source_index}tele_class.dex.zip`);
             if (!fs.existsSync(zipPath)) throw new Error(`Zip not found: ${zipPath}`);
-            const zipInstance = new AdmZip(zipPath);
-            zipCache.set(source_index, zipInstance);
+            zipCache.set(source_index, new AdmZip(zipPath));
+            console.log(`📦 [Zip ${source_index}] Successfully cached.`);
         }
         
         const zip = zipCache.get(source_index);
@@ -42,27 +46,30 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
         if (!entry) throw new Error(`Entry ${filePath} not in zip ${source_index}`);
         
         const content = entry.getData().toString('utf8');
-        console.log(`[${currentCount}/${totalCount}] 🛠️ Analyzing Mezgebe: ${filePath} using Key: ${maskedKey}`);
+        console.log(`📑 [${currentCount}/${totalCount}] File Read: ${filePath} (${content.length} bytes)`);
 
         const cleanKey = apiKeyRecord.api_key.trim().replace(/^"|"$/g, '');
         const genAI = new GoogleGenerativeAI(cleanKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
-        const prompt = `You are an Elite Forensics Researcher and Reverse Engineer. You are analyzing 'Mezgebe', an Ethiopian scripture application. Your focus is on how the app protects religious assets, fetches scriptures from remote servers, and manages data integrity.\n\nSCOPE OF ANALYSIS:\n1. ASSET FETCHING & PROTECTION: Identify logic related to downloading content, asset decryption keys, or verification of scripture integrity.\n2. ROSETTA STONES: Look for mapping files, translation tables, or ID-to-content logic that acts as a key for reverse engineering the database structure.\n3. NETWORK INTEGRITY: Identify API endpoints for asset fetching, custom headers, or signing logic used to prevent scraping.\n4. SENSITIVE LEAKAGE: Hardcoded keys, server paths, or internal dev notes.\n5. ANTI-REVERSING: Identify XOR loops, string masking, or reflection used to hide the asset-handling logic.\n\nOUTPUT REQUIREMENT:\nYou MUST output valid JSON only with two keys: 'analysis' (a condensed, high-intensity technical breakdown) and 'score' (1-10).\n\nSCORING RULE: Assign a higher score (8-10) to files containing 'Rosetta Stones', asset decryption logic, or core server-communication protocols essential for reverse engineering. Assign lower for UI or generic helpers.\n\nFILE CONTENT:\n${content}`;
+        console.log(`🤖 [${currentCount}/${totalCount}] Sending to Gemini... (Key: ${maskedKey})`);
+        const prompt = `### ROLE
 
         const result = await model.generateContent(prompt);
         const rawResponse = result.response.text();
+        console.log(`📡 [${currentCount}/${totalCount}] AI Data Received (${rawResponse.length} chars).`);
         
-        // Robust JSON Extraction: Find the bounds of the actual JSON object
         const start = rawResponse.indexOf('{');
         const end = rawResponse.lastIndexOf('}');
         
         if (start === -1 || end === -1) {
+            console.error("Response format failure:", rawResponse);
             throw new Error('AI response did not contain a valid JSON object');
         }
         
         const analysis = rawResponse.slice(start, end + 1);
 
+        console.log(`💾 [${currentCount}/${totalCount}] Writing to Supabase...`);
         await supabase.from('mezgebe_analysis').insert({
             file_path: filePath,
             source_index: source_index,
@@ -75,7 +82,8 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
 
         await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', apiKeyRecord.id);
 
-        console.log(`✅ [Zip ${source_index}] Success: ${filePath}`);
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`✅ [${currentCount}/${totalCount}] Complete: ${filePath} (${duration}s)`);
     } catch (err) {
         console.error(`❌ Failed: ${task.file_path} | Source: ${task.source_index} | Error: ${err.message}`);
         console.log(`♻️ Leaving ${task.file_path} as 'pending' for retry.`);
