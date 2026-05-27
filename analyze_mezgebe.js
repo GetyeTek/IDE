@@ -56,7 +56,7 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
         const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
         console.log(`🤖 [${currentCount}/${totalCount}] Sending to Gemini... (Key: ${maskedKey})`);
-        const prompt = `### ROLE
+        const prompt = `### ROLE\nYou are an Elite Forensics Researcher and Reverse Engineer. You are analyzing 'Mezgebe', an Ethiopian scripture application.\n\n### SCOPE OF ANALYSIS\n1. ASSET FETCHING & PROTECTION: Identify logic for downloading content, decryption keys, or integrity checks.\n2. ROSETTA STONES: Find mapping files, ID-to-Content logic, or translation tables that bridge the app to the database.\n3. NETWORK INTEGRITY: Locate API endpoints, custom HTTP headers, or request signing logic.\n4. SENSITIVE LEAKAGE: Hardcoded credentials, internal server paths, or dev notes.\n5. ANTI-REVERSING: Identify string masking or reflection used to hide logic.\n\n### OUTPUT REQUIREMENT\nYou MUST output valid JSON only with two keys: 'analysis' (high-intensity technical breakdown) and 'score' (1-10).\n\n### FILE CONTENT\n${content}`;
 
         const result = await model.generateContent(prompt);
         const rawResponse = result.response.text();
