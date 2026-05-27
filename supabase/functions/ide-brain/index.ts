@@ -1288,10 +1288,11 @@ serve(async (req) => {
             const { keys } = body;
             if (!Array.isArray(keys) || keys.length === 0) throw new Error("Keys array required");
 
-            // Ensure each key has a UUID, patching tables that lack a default value generator
-            const keysWithIds = keys.map((k: any) => ({
+            // Generate a safe bigint ID (Date.now() * 1000 + index) for databases lacking auto-increment sequences
+            const baseTime = Date.now() * 1000;
+            const keysWithIds = keys.map((k: any, idx: number) => ({
                 ...k,
-                id: k.id || crypto.randomUUID()
+                id: k.id || (baseTime + idx)
             }));
 
             const { data, error } = await supabase
