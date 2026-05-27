@@ -10,11 +10,13 @@ const classesDir = path.join(process.cwd(), 'Classes');
 const zipCache = new Map();
 
 async function getLeastUsedKeys() {
+    const now = new Date().toISOString();
     const { data, error } = await supabase
         .from('api_keys')
         .select('*')
         .eq('is_active', true)
         .eq('service', 'gemini')
+        .or(`cooldown_until.is.null,cooldown_until.lte.${now}`)
         .order('last_used_at', { ascending: true });
     if (error) throw error;
     
@@ -86,7 +88,20 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         console.log(`✅ [${currentCount}/${totalCount}] Complete: ${filePath} (${duration}s)`);
     } catch (err) {
-        console.error(`❌ Failed: ${task.file_path} | Source: ${task.source_index} | Error: ${err.message}`);
+        const isQuotaError = err.message.includes('429') || 
+                             err.message.toLowerCase().includes('resource has been exhausted') || 
+                             err.message.toLowerCase().includes('quota exceeded');
+
+        if (isQuotaError) {
+            const cooldownTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+            console.error(`⚠️  QUOTA EXHAUSTED for Key ${apiKeyRecord.id}. Cooling down until ${cooldownTime}`);
+            await supabase.from('api_keys')
+                .update({ cooldown_until: cooldownTime })
+                .eq('id', apiKeyRecord.id);
+        } else {
+            console.error(`❌ Failed: ${task.file_path} | Source: ${task.source_index} | Error: ${err.message}`);
+        }
+        
         console.log(`♻️ Leaving ${task.file_path} as 'pending' for retry.`);
     }
 }
