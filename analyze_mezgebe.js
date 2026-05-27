@@ -48,10 +48,13 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
         const genAI = new GoogleGenerativeAI(cleanKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' });
 
-        const prompt = `You are an Elite Cyber-Security Architect performing forensic analysis on the 'Mezgebe' application. Your goal is to map out internal mechanics and high-value targets.\n\nSCOPE:\n1. AUTH & SESSIONS: JWT, biometric logic, or token storage.\n2. INTEGRITY: HMAC, custom hashing, or AES/RSA encryption logic.\n3. LEAKAGE: Hardcoded keys, endpoints, or merchant IDs.\n4. ANTI-REVERSING: Reflection, XOR loops, or obfuscation artifacts.\n5. FINANCIAL LOGIC: Balance handling and transaction flow.\n\nFILE CONTENT:\n${content}\n\nWrap criticality at end: <RE_CRITICALITY>[SCORE] - [REASON]</RE_CRITICALITY>`;
+        const prompt = `You are an Elite Forensics Researcher and Reverse Engineer. You are analyzing 'Mezgebe', an Ethiopian scripture application. Your focus is on how the app protects religious assets, fetches scriptures from remote servers, and manages data integrity.\n\nSCOPE OF ANALYSIS:\n1. ASSET FETCHING & PROTECTION: Identify logic related to downloading content, asset decryption keys, or verification of scripture integrity.\n2. ROSETTA STONES: Look for mapping files, translation tables, or ID-to-content logic that acts as a key for reverse engineering the database structure.\n3. NETWORK INTEGRITY: Identify API endpoints for asset fetching, custom headers, or signing logic used to prevent scraping.\n4. SENSITIVE LEAKAGE: Hardcoded keys, server paths, or internal dev notes.\n5. ANTI-REVERSING: Identify XOR loops, string masking, or reflection used to hide the asset-handling logic.\n\nOUTPUT REQUIREMENT:\nYou MUST output valid JSON only with two keys: 'analysis' (a condensed, high-intensity technical breakdown) and 'score' (1-10).\n\nSCORING RULE: Assign a higher score (8-10) to files containing 'Rosetta Stones', asset decryption logic, or core server-communication protocols essential for reverse engineering. Assign lower for UI or generic helpers.\n\nFILE CONTENT:\n${content}`;
 
         const result = await model.generateContent(prompt);
-        const analysis = result.response.text();
+        let analysis = result.response.text();
+        
+        // Sanitization: Strip markdown backticks if present
+        analysis = analysis.replace(/```json|```/g, '').trim();
 
         await supabase.from('mezgebe_analysis').insert({
             file_path: filePath,
