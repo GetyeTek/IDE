@@ -7823,13 +7823,18 @@ async function downloadArtifact(runId) {
                 statusEl.style.color = "var(--ai-accent)";
 
                 const batchResults = await Promise.all(batch.map(async (path) => {
-                    const res = await fetch(CONFIG.funcUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: apiBody({ action: 'preview_file', file_path: path }),
-                        signal: signal 
-                    });
-                    const data = await res.json();
+                    let data;
+                    if (CONFIG.ghToken) {
+                        data = await githubRequest(`/contents/${path}?ref=conduit-dev`, { signal });
+                    } else {
+                        const res = await fetch(CONFIG.funcUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: apiBody({ action: 'preview_file', file_path: path }),
+                            signal: signal 
+                        });
+                        data = await res.json();
+                    }
                     if (!data.content) return null;
                     return { path, content: b64DecodeUnicode(data.content) };
                 }));
