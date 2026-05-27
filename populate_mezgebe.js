@@ -40,17 +40,34 @@ async function main() {
     const zip = new AdmZip(zipPath);
     const entries = zip.getEntries();
     
+    const whitelist = [
+        'sources/a/', 'sources/b/', 'sources/c/', 'sources/d/', 
+        'sources/e/', 'sources/g/', 'sources/h/'
+    ];
+
+    const blacklistFiles = ['R.java', 'BuildConfig.java'];
+
     const newEntries = [];
     for (const entry of entries) {
-        // Skip directories and system files
-        if (entry.isDirectory || entry.entryName.includes('__MACOSX')) continue;
+        const path = entry.entryName;
+
+        // 1. Basic Filters (Directories, MacOS metadata)
+        if (entry.isDirectory || path.includes('__MACOSX')) continue;
+
+        // 2. Logic Whitelist (Only keep folders a, b, c, d, e, g, h)
+        const isLogicFile = whitelist.some(prefix => path.startsWith(prefix));
         
-        if (!existingPaths.has(entry.entryName)) {
-            newEntries.push({
-                file_path: entry.entryName,
-                source_index: 0,
-                status: 'pending'
-            });
+        // 3. Boilerplate Filter (Ignore R.java, etc)
+        const isBoilerplate = blacklistFiles.some(suffix => path.endsWith(suffix));
+
+        if (isLogicFile && !isBoilerplate) {
+            if (!existingPaths.has(path)) {
+                newEntries.push({
+                    file_path: path,
+                    source_index: 0,
+                    status: 'pending'
+                });
+            }
         }
     }
 
