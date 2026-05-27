@@ -108,31 +108,63 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
 async function main() {
-    const { data: tasks } = await supabase.from('mezgebe_logs')
+    const { data: rawTasks } = await supabase.from('mezgebe_logs')
         .select('file_path, source_index')
         .eq('status', 'pending')
         .limit(40);
 
-    if (!tasks || tasks.length === 0) {
+    if (!rawTasks || rawTasks.length === 0) {
         console.log('No more Mezgebe files. Chain ended.');
         return;
     }
 
-    const keys = await getLeastUsedKeys();
-    const WAVE_SIZE = Math.min(keys.length, 10);
-    console.log(`🚀 Processing ${tasks.length} Mezgebe tasks. Wave size: ${WAVE_SIZE}`);
+    // 1. Shuffle tasks to break linear patterns
+    const tasks = shuffleArray([...rawTasks]);
+    const availableKeys = await getLeastUsedKeys();
+    
+    console.log(`🚀 Processing ${tasks.length} Mezgebe tasks with ${availableKeys.length} available keys.`);
 
-    for (let i = 0; i < tasks.length; i += WAVE_SIZE) {
-        const currentWave = tasks.slice(i, i + WAVE_SIZE);
-        console.log(`🌊 Launching wave ${Math.floor(i / WAVE_SIZE) + 1}...`);
+    let processedCount = 0;
+    while (tasks.length > 0) {
+        // 2. Dynamic Wave Sizing (Randomly take 3 to 7 tasks)
+        const currentWaveSize = Math.min(tasks.length, availableKeys.length, getRandomInt(3, 7));
+        const currentWave = tasks.splice(0, currentWaveSize);
+        
+        // 3. Shuffle keys for this wave to prevent circular rotation patterns
+        const waveKeys = shuffleArray([...availableKeys]).slice(0, currentWaveSize);
+
+        console.log(`🌊 Launching wave (Size: ${currentWaveSize})...`);
 
         await Promise.all(currentWave.map((task, index) => {
-            const key = keys[index % keys.length];
-            const globalIndex = i + index + 1;
-            return processFile(task, key, globalIndex, tasks.length);
+            processedCount++;
+            return processFile(task, waveKeys[index], processedCount, rawTasks.length);
         }));
-        if (i + WAVE_SIZE < tasks.length) await sleep(3000);
+
+        if (tasks.length > 0) {
+            // 4. Randomized Jitter (4 to 12 seconds)
+            let sleepTime = getRandomInt(4000, 12000);
+            
+            // 5. 10% Chance of a "Human Deep Breath" (30 to 60 seconds)
+            if (Math.random() > 0.9) {
+                sleepTime = getRandomInt(30000, 60000);
+                console.log(`☕ Taking a human coffee break... (${(sleepTime/1000).toFixed(0)}s)`);
+            } else {
+                console.log(`⏳ Jittering... (${(sleepTime/1000).toFixed(1)}s)`);
+            }
+            
+            await sleep(sleepTime);
+        }
     }
 
     const { data: remaining } = await supabase.from('mezgebe_logs').select('id').eq('status', 'pending').limit(1);
