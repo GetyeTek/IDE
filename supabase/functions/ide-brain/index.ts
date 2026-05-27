@@ -1938,23 +1938,30 @@ serve(async (req) => {
 
         if (!projectRef || !cloudKey) throw new Error("Missing ProjectRef or CONDUIT_ACCESS_TOKEN");
 
-        // Defensive Timestamp Handling: Handle both ms and us inputs
-        let endTimestamp = before ? parseInt(before) : Date.now();
-        if (endTimestamp > 10000000000000) endTimestamp = Math.floor(endTimestamp / 1000); // Convert us to ms
+        // Defensive Timestamp Handling: Handle ISO strings, ms, and us inputs safely
+        let endTimestamp = Date.now();
+        if (before) {
+            if (typeof before === 'string' && before.includes('T')) {
+                endTimestamp = new Date(before).getTime();
+            } else {
+                endTimestamp = parseInt(before);
+                if (endTimestamp > 10000000000000) endTimestamp = Math.floor(endTimestamp / 1000);
+            }
+        }
         
         const endDate = new Date(endTimestamp);
         const startDate = new Date(endDate.getTime() - (24 * 60 * 60 * 1000));
 
-        // 1. Target function_logs for STDOUT (console.log)
-        // 2. Target function_edge_logs for network metadata (status codes, latency)
-        // Optimized query to avoid ARRAY/STRUCT metadata errors
+        // 1. FORMAT_TIMESTAMP enforces strict ISO strings, dodging JS magnitude/nanosecond bugs (future dates).
+        // 2. CROSS JOIN UNNEST accurately filters by the function's internal ID, preventing mixed-up logs.
         const sql = `
             SELECT 
-                timestamp, 
-                event_message
+                FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E3SZ', timestamp) as timestamp, 
+                event_message,
+                m.level as level
             FROM function_logs
-            WHERE 
-                event_message LIKE '%${function_slug}%'
+            CROSS JOIN UNNEST(metadata) AS m
+            WHERE m.function_id = '${function_slug}'
             ORDER BY timestamp DESC 
             LIMIT 50
         `.trim();
@@ -1992,14 +1999,13 @@ serve(async (req) => {
 
         // 3. Map to IDE Format
         const normalizedLogs = rawRows.map((row: any) => {
-            // Convert Supabase microseconds (16 digits) to JS milliseconds (13 digits)
-            let ts = row.timestamp || Date.now();
-            if (ts > 10000000000000) ts = Math.floor(ts / 1000);
+            // Timestamp is now strictly an ISO string from FORMAT_TIMESTAMP
+            let ts = row.timestamp || new Date().toISOString();
 
             return {
                 timestamp: ts,
                 event_message: row.event_message || row.message || "(No message)",
-                level: row.level || row.metadata?.level || "info",
+                level: row.level || "info",
                 function_id: function_slug
             };
         });
