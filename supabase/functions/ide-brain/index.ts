@@ -1956,13 +1956,13 @@ serve(async (req) => {
         // 2. CROSS JOIN UNNEST accurately filters by the function's internal ID, preventing mixed-up logs.
         const sql = `
             SELECT 
-                FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E3SZ', timestamp) as timestamp, 
-                event_message,
+                FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E3SZ', f.timestamp) as timestamp, 
+                f.event_message,
                 m.level as level
-            FROM function_logs
-            CROSS JOIN UNNEST(metadata) AS m
+            FROM function_logs f
+            CROSS JOIN UNNEST(f.metadata) AS m
             WHERE m.function_id = '${function_slug}'
-            ORDER BY timestamp DESC 
+            ORDER BY f.timestamp DESC 
             LIMIT 50
         `.trim();
         
