@@ -100,7 +100,8 @@ async function processFile(task, apiKeyRecord, currentCount, totalCount) {
 
         if (isQuotaError) {
             const cooldownTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-            console.error(`⚠️  QUOTA EXHAUSTED for Key ${apiKeyRecord.id}. Cooling down until ${cooldownTime}`);
+            const rawKeyString = apiKeyRecord.api_key;
+            console.error(`⚠️  QUOTA EXHAUSTED | ID: ${apiKeyRecord.id} | Key: ${rawKeyString} | Cooldown Until: ${cooldownTime}`);
             await supabase.from('api_keys')
                 .update({ cooldown_until: cooldownTime })
                 .eq('id', apiKeyRecord.id);
