@@ -173,19 +173,42 @@ async function callGeminiApi(supabase: any, _ignoredModel: string, prompt: strin
 
 (async () => {
   console.log(`[${REQUEST_ID}] [START] Worker Logic Activated for Record: ${RECORD_ID}`);
+  console.log(`[${REQUEST_ID}] [CONFIG] Supabase URL: ${SUPABASE_URL}`);
+  
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  const paths = JSON.parse(IMAGE_PATHS_RAW);
+  console.log(`[${REQUEST_ID}] [CLIENT] Supabase client initialized.`);
+
+  let paths = [];
+  try {
+    paths = JSON.parse(IMAGE_PATHS_RAW);
+    console.log(`[${REQUEST_ID}] [INIT] Successfully parsed ${paths.length} image paths.`);
+  } catch (e) {
+    console.error(`[${REQUEST_ID}] [INIT_ERR] Failed to parse IMAGE_PATHS: ${IMAGE_PATHS_RAW}`);
+    throw e;
+  }
 
   try {
     const geminiParts: any[] = [{ text: OCR_PROMPT_TEMPLATE }];
     for (const path of paths) {
-      console.log(`[${REQUEST_ID}] [STORAGE] Downloading: ${path}`);
-      const { data: blob } = await supabase.storage.from('images').download(path);
+      console.log(`[${REQUEST_ID}] [STORAGE] Attempting download: ${path}`);
+      const { data: blob, error: dlError } = await supabase.storage.from('images').download(path);
+      
+      if (dlError) {
+        console.error(`[${REQUEST_ID}] [STORAGE_ERR] Failed to download ${path}:`, dlError.message);
+        continue;
+      }
+
       if (blob) {
         const buffer = await blob.arrayBuffer();
+        console.log(`[${REQUEST_ID}] [STORAGE_SUCCESS] Downloaded ${path}. Size: ${buffer.byteLength} bytes.`);
+        const b64 = encodeBase64(buffer);
+        console.log(`[${REQUEST_ID}] [ENCODER] Base64 conversion complete for ${path}.`);
+        
         geminiParts.push({ 
-          inline_data: { mime_type: "image/jpeg", data: encodeBase64(buffer) } 
+          inline_data: { mime_type: "image/jpeg", data: b64 } 
         });
+      } else {
+        console.warn(`[${REQUEST_ID}] [STORAGE_WARN] Blob is empty for path: ${path}`);
       }
     }
 
@@ -200,7 +223,10 @@ async function callGeminiApi(supabase: any, _ignoredModel: string, prompt: strin
       }
     };
 
-    console.log(`[${REQUEST_ID}] [OCR_STAGE] Launching Worlds A and B...`);
+    console.log(`[${REQUEST_ID}] [OCR_STAGE] Launching Parallel Worlds for OCR...`);
+    console.log(`[${REQUEST_ID}] [OCR_STAGE] World A Model: ${PRIMARY_MODEL}`);
+    console.log(`[${REQUEST_ID}] [OCR_STAGE] World B Model: ${FALLBACK_MODEL}`);
+    
     const worldAPromise = runWorld(PRIMARY_MODEL, "World_A");
     const worldBPromise = runWorld(FALLBACK_MODEL, "World_B");
 
@@ -217,31 +243,48 @@ async function callGeminiApi(supabase: any, _ignoredModel: string, prompt: strin
 
     const bestWorld = successfulWorlds.reduce((prev, curr) => (prev.json.confidence_score > curr.json.confidence_score) ? prev : curr);
     const ocrJson = bestWorld.json;
-    console.log(`[${REQUEST_ID}] [OCR_STAGE] Winner: ${bestWorld.name} Score: ${ocrJson.confidence_score}`);
+    console.log(`[${REQUEST_ID}] [OCR_RESULT] Winner Selected: ${bestWorld.name} (Using Model: ${bestWorld.model})`);
+    console.log(`[${REQUEST_ID}] [OCR_RESULT] Final Confidence Score: ${ocrJson.confidence_score}`);
 
     // --- CONFIDENCE GATEKEEPER ---
     if (ocrJson.confidence_score <= 6) {
-      console.warn(`[${REQUEST_ID}] REJECTED: Score ${ocrJson.confidence_score} too low.`);
-      await supabase.from('processed_images').update({ status: 'low_quality' }).eq('id', RECORD_ID);
+      console.warn(`[${REQUEST_ID}] [GATEKEEPER] REJECTED: Score ${ocrJson.confidence_score} is below threshold (6).`);
+      const { error: updateErr } = await supabase.from('processed_images').update({ status: 'low_quality' }).eq('id', RECORD_ID);
+      if (updateErr) console.error(`[${REQUEST_ID}] [DB_ERR] Failed to update status to low_quality:`, updateErr.message);
+      else console.log(`[${REQUEST_ID}] [DB_SUCCESS] Record marked as 'low_quality'.`);
       return;
     }
+    console.log(`[${REQUEST_ID}] [GATEKEEPER] PASSED: Confidence meets requirements.`);
 
     // --- SOLVER STAGE ---
+    console.log(`[${REQUEST_ID}] [SOLVER_STAGE] Formatting transcription for Solver...`);
     const friendlyText = formatTranscriptionForAI(ocrJson, REQUEST_ID);
-    // Use the model that won the OCR race for the solver stage
+    
+    console.log(`[${REQUEST_ID}] [SOLVER_STAGE] Requesting solutions from AI model: ${bestWorld.model}...`);
     const solutionRaw = await callGeminiApi(supabase, bestWorld.model, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, REQUEST_ID);
+    
+    console.log(`[${REQUEST_ID}] [SOLVER_STAGE] Parsing solver response...`);
     const solutionJson = JSON.parse(extractJson(solutionRaw));
 
     // Merge confidence into final payload for app announcement
     solutionJson.confidence_score = ocrJson.confidence_score;
+    console.log(`[${REQUEST_ID}] [MERGE] Confidence score injected into solution payload.`);
 
-    await supabase.from('processed_images').update({
+    console.log(`[${REQUEST_ID}] [DB_FINAL_UPDATE] Attempting to upload results to 'processed_images' table...`);
+    const { error: finalError } = await supabase.from('processed_images').update({
       transcription: ocrJson,
       solution_json: solutionJson,
       status: 'completed'
     }).eq('id', RECORD_ID);
 
-    console.log(`[${REQUEST_ID}] [FINISH] Record ${RECORD_ID} completed.`);
+    if (finalError) {
+      console.error(`[${REQUEST_ID}] [DB_FINAL_ERR] SQL Update Failed:`, finalError.message);
+      console.error(`[${REQUEST_ID}] [DB_FINAL_ERR] Details:`, finalError.details);
+      throw new Error(`Database update failed: ${finalError.message}`);
+    }
+
+    console.log(`[${REQUEST_ID}] [DB_FINAL_SUCCESS] Result successfully written to table.`);
+    console.log(`[${REQUEST_ID}] [FINISH] Worker processing cycle complete for Record: ${RECORD_ID}`);
   } catch (err) {
     console.error(`[${REQUEST_ID}] [FATAL_ERROR]:`, err);
     await supabase.from('processed_images').update({ status: 'error' }).eq('id', RECORD_ID);
