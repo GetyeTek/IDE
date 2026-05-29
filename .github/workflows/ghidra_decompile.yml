@@ -82,13 +82,23 @@ jobs:
             -postScript decompile.java \
             -deleteProject
           
-          if [ ! -f "decompiled_output.c" ]; then
-            echo "::error::No decompiler output was generated." 
+          if [ ! -f "decompiled_chunk_1.txt" ]; then
+            echo "::error::No decompiler output chunks were generated." 
             exit 1
           fi
+
+          # Compress each chunk independently to achieve a zip-inside-zip format
+          mkdir -p zipped_chunks
+          for f in decompiled_chunk_*.txt; do
+            if [ -f "$f" ]; then
+              zipName="zipped_chunks/${f%.txt}.zip"
+              echo "[+] Compressing $f into $zipName"
+              zip -j "$zipName" "$f"
+            fi
+          done
 
       - name: Upload Decompiled Source
         uses: actions/upload-artifact@v4
         with:
           name: decompiled-source
-          path: decompiled_output.c
+          path: zipped_chunks/
