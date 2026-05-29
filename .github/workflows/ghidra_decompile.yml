@@ -1,0 +1,92 @@
+name: Ghidra Decompile Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      custom_path:
+        description: 'Optional: Direct path to a specific .so file (e.g., binaries/my_lib.so)'
+        required: false
+        default: ''
+
+jobs:
+  ghidra-decompile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Install Ghidra 12.1
+        run: |
+          echo "[+] Downloading Ghidra 12.1..."
+          wget -q https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1_build/ghidra_12.1_PUBLIC_20260513.zip
+          echo "[+] Unpacking archive..."
+          unzip -q ghidra_12.1_PUBLIC_20260513.zip
+          mv ghidra_12.1_PUBLIC ghidra
+          echo "GHIDRA_HOME=$GITHUB_WORKSPACE/ghidra" >> $GITHUB_ENV
+
+      - name: Locate Target Binary
+        id: locate-binary
+        run: |
+          INPUT_PATH="${{ github.event.inputs.custom_path }}"
+          TARGET_FILE=""
+          
+          # 1. Evaluate input parameter
+          if [ -n "$INPUT_PATH" ]; then
+            if [ -f "$INPUT_PATH" ]; then
+              TARGET_FILE="$INPUT_PATH"
+            else
+              echo "::error::Specified custom path '$INPUT_PATH' was not found in workspace."
+              exit 1
+            fi
+          fi
+          
+          # 2. Check the standard 'binaries' directory
+          if [ -z "$TARGET_FILE" ]; then
+            if [ -d "binaries" ]; then
+              TARGET_FILE=$(find binaries/ -name "*.so" | head -n 1)
+            fi
+          fi
+          
+          # 3. Fallback: Search the general workspace
+          if [ -z "$TARGET_FILE" ]; then
+            echo "[!] Standard path empty. Scanning workspace for any .so files..."
+            TARGET_FILE=$(find . -maxdepth 2 -name "*.so" -not -path "*/ghidra/*" | head -n 1)
+          fi
+          
+          if [ -z "$TARGET_FILE" ]; then
+            echo "::error::No .so files could be identified. Place your file in a 'binaries/' directory or specify its path."
+            exit 1
+          fi
+          
+          echo "[+] Target located: $TARGET_FILE"
+          echo "TARGET_FILE=$TARGET_FILE" >> $GITHUB_ENV
+
+      - name: Run Headless Analyzer
+        run: |
+          mkdir -p ghidra_project
+          
+          # Execute Ghidra in Headless command-line mode
+          ./ghidra/support/analyzeHeadless ./ghidra_project DecompileProject \
+            -import "$TARGET_FILE" \
+            -postScript ./scripts/decompile.py \
+            -deleteProject
+          
+          if [ ! -f "decompiled_output.c" ]; then
+            echo "::error::No decompiler output was generated." 
+            exit 1
+          fi
+
+      - name: Upload Decompiled Source
+        uses: actions/upload-artifact@v4
+        with:
+          name: decompiled-source
+          path: decompiled_output.c
