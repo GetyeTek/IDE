@@ -78,6 +78,7 @@ jobs:
           ./ghidra/support/analyzeHeadless "$GITHUB_WORKSPACE/ghidra_project" DecompileProject \
             -import "$TARGET_FILE" \
             -scriptPath "$GITHUB_WORKSPACE/scripts" \
+            -preScript pre_analysis.py \
             -postScript decompile.py \
             -deleteProject
           
