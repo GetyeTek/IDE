@@ -72,12 +72,13 @@ jobs:
 
       - name: Run Headless Analyzer
         run: |
-          mkdir -p ghidra_project
+          mkdir -p "$GITHUB_WORKSPACE/ghidra_project"
           
-          # Execute Ghidra in Headless command-line mode
-          ./ghidra/support/analyzeHeadless ./ghidra_project DecompileProject \
+          # Execute Ghidra in Headless command-line mode using absolute paths
+          ./ghidra/support/analyzeHeadless "$GITHUB_WORKSPACE/ghidra_project" DecompileProject \
             -import "$TARGET_FILE" \
-            -postScript ./scripts/decompile.py \
+            -scriptPath "$GITHUB_WORKSPACE/scripts" \
+            -postScript decompile.py \
             -deleteProject
           
           if [ ! -f "decompiled_output.c" ]; then
