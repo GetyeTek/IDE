@@ -4352,7 +4352,7 @@
             // Custom self-contained Inspector HUD for popped-out / standalone views
             function injectConduitConsole() {
                 const style = document.createElement('style');
-                style.textContent = `
+                style.textContent = \`
                     #conduit-hud-btn {
                         position: fixed; bottom: 20px; right: 20px; width: 44px; height: 44px;
                         background: #151517; border: 1px solid #d946ef; border-radius: 50%;
@@ -4395,7 +4395,7 @@
                         border-bottom: 1px solid #27272a; font-family: monospace;
                     }
                     .hud-net-details.open { display: block; }
-                `;
+                \`;
                 document.head.appendChild(style);
 
                 const btn = document.createElement('div');
@@ -4415,7 +4415,7 @@
 
                 const overlay = document.createElement('div');
                 overlay.id = 'conduit-hud-overlay';
-                overlay.innerHTML = `
+                overlay.innerHTML = \`
                     <div class="hud-header">
                         <div class="hud-tabs">
                             <button class="hud-tab active" id="tab-console-btn">Console</button>
@@ -4430,7 +4430,7 @@
                         <div id="hud-view-console" class="hud-view active"></div>
                         <div id="hud-view-network" class="hud-view"></div>
                     </div>
-                `;
+                \`;
                 document.body.appendChild(overlay);
 
                 const consoleView = document.getElementById('hud-view-console');
@@ -4463,30 +4463,30 @@
                 };
 
                 function renderConsole() {
-                    consoleView.innerHTML = window.localLogs.map(log => `
-                        <div class="hud-log-row hud-log-${log.method === 'warn' ? 'warn' : (log.method === 'error' ? 'error' : 'info')}">
-                            <span style="color:#555; font-size:9px; margin-right:8px;">${log.time}</span>
-                            <span>${escapeHtml(log.msg)}</span>
+                    consoleView.innerHTML = window.localLogs.map(log => \`
+                        <div class="hud-log-row hud-log-\${log.method === 'warn' ? 'warn' : (log.method === 'error' ? 'error' : 'info')}">
+                            <span style="color:#555; font-size:9px; margin-right:8px;">\${log.time}</span>
+                            <span>\${escapeHtml(log.msg)}</span>
                         </div>
-                    `).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No logs found</div>';
+                    \`).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No logs found</div>';
                 }
 
                 function renderNetwork() {
                     networkView.innerHTML = window.localNetwork.map((req, idx) => {
                         const detailsId = 'hud-net-details-' + idx;
-                        return `
-                            <div class="hud-net-grid" onclick="document.getElementById('${detailsId}').classList.toggle('open')">
-                                <span style="color:#d946ef; font-weight:bold;">${req.method}</span>
-                                <span style="color:${req.status >= 400 ? '#ef4444' : '#22c55e'}">${req.status}</span>
-                                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${req.url}</span>
-                                <span style="text-align:right; color:#666;">${req.duration}ms</span>
+                        return \`
+                            <div class="hud-net-grid" onclick="document.getElementById('\${detailsId}').classList.toggle('open')">
+                                <span style="color:#d946ef; font-weight:bold;">\${req.method}</span>
+                                <span style="color:\${req.status >= 400 ? '#ef4444' : '#22c55e'}">\${req.status}</span>
+                                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${req.url}</span>
+                                <span style="text-align:right; color:#666;">\${req.duration}ms</span>
                             </div>
-                            <div id="${detailsId}" class="hud-net-details">
-                                <div style="margin-bottom:8px;"><b style="color:#555">REQUEST BODY:</b><br>${escapeHtml(JSON.stringify(req.requestBody, null, 2) || 'null')}</div>
-                                <div><b style="color:#555">RESPONSE BODY:</b><br>${escapeHtml(JSON.stringify(req.responseBody, null, 2) || 'null')}</div>
+                            <div id="\${detailsId}" class="hud-net-details">
+                                <div style="margin-bottom:8px;"><b style="color:#555">REQUEST BODY:</b><br>\${escapeHtml(JSON.stringify(req.requestBody, null, 2) || 'null')}</div>
+                                <div><b style="color:#555">RESPONSE BODY:</b><br>\${escapeHtml(JSON.stringify(req.responseBody, null, 2) || 'null')}</div>
                             </div>
-                        `;
-                    }).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No network requests found</div>';
+                        \`;
+                    \`).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No network requests found</div>';
                 }
 
                 function escapeHtml(text) {
@@ -4501,7 +4501,7 @@
                     injectConduitConsole();
                 }
             });
-        `;
+        \`;
         if (doc.head) {
                 doc.head.insertBefore(baseScript, doc.head.firstChild);
             } else {
