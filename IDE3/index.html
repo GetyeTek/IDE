@@ -4462,6 +4462,7 @@
                             <button class="hud-tab" id="tab-network-btn">Network</button>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
+                            <button class="hud-tab" id="hud-copy-all-btn">Copy All</button>
                             <button class="hud-tab" id="hud-clear-btn" style="color:#ef4444; border-color:rgba(239,68,68,0.2);">Clear</button>
                             <button class="hud-close" id="hud-close-btn">×</button>
                         </div>
@@ -4500,6 +4501,39 @@
                     window.localNetwork = [];
                     renderConsole();
                     renderNetwork();
+                };
+
+                document.getElementById('hud-copy-all-btn').onclick = (e) => {
+                    const btn = e.target;
+                    const isConsole = consoleTabBtn.classList.contains('active');
+                    let text = '';
+                    
+                    if (isConsole) {
+                        text = window.localLogs.map(l => '[' + l.time + '] ' + l.msg).join('\\n');
+                    } else {
+                        text = window.localNetwork.map(n => n.method + ' ' + n.status + ' ' + n.url + ' (' + n.duration + 'ms)').join('\\n');
+                    }
+                    
+                    if (!text) {
+                        const orig = btn.innerText;
+                        btn.innerText = 'Empty';
+                        setTimeout(() => btn.innerText = orig, 1000);
+                        return;
+                    }
+                    
+                    navigator.clipboard.writeText(text).then(() => {
+                        const orig = btn.innerText;
+                        const origColor = btn.style.color;
+                        const origBorder = btn.style.borderColor;
+                        btn.innerText = 'Copied!';
+                        btn.style.color = '#22c55e';
+                        btn.style.borderColor = '#22c55e';
+                        setTimeout(() => {
+                            btn.innerText = orig;
+                            btn.style.color = origColor;
+                            btn.style.borderColor = origBorder;
+                        }, 1500);
+                    });
                 };
 
                 window.copyHudEntry = function(btn) {
