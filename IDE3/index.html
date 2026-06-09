@@ -4381,23 +4381,27 @@
                     .hud-body { flex: 1; overflow-y: auto; padding: 12px; background: #0a0a0c; }
                     .hud-view { display: none; height: 100%; overflow-y: auto; }
                     .hud-view.active { display: block; }
-                    .hud-log-row {
-                        padding: 6px 10px; border-bottom: 1px solid #1a1a1c; font-family: monospace;
-                        font-size: 11px; display: flex; align-items: flex-start; gap: 8px; word-break: break-all;
-                    }
+                    .hud-row { padding: 8px 12px; border-bottom: 1px solid #1a1a1c; font-family: 'JetBrains Mono', monospace; font-size: 11px; position: relative; display: flex; align-items: flex-start; word-break: break-word; }
+                    .hud-row details summary::-webkit-details-marker { color: #d946ef; margin-top: 3px; }
+                    .hud-row details[open] summary { border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; margin-bottom: 4px; }
+                    .hud-row:hover .hud-copy-btn { opacity: 1; }
+                    .hud-copy-btn { position: absolute; right: 8px; top: 8px; opacity: 0; background: #222; border: 1px solid #444; color: #888; padding: 2px 6px; border-radius: 4px; cursor: pointer; z-index: 10; font-size: 10px; }
+                    .hud-copy-btn:hover { color: white; border-color: #3b82f6; }
                     .hud-log-info { border-left: 3px solid #3b82f6; }
                     .hud-log-warn { border-left: 3px solid #eab308; background: rgba(234, 179, 8, 0.05); }
                     .hud-log-error { border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
                     .hud-net-grid {
                         display: grid; grid-template-columns: 60px 50px 1fr 60px; gap: 8px;
-                        cursor: pointer; align-items: center; font-family: monospace; font-size: 11px;
-                        padding: 8px; border-bottom: 1px solid #1a1a1c;
+                        cursor: pointer; align-items: center; width: 100%;
                     }
                     .hud-net-details {
-                        background: #000; padding: 10px; font-size: 10px; display: none;
-                        border-bottom: 1px solid #27272a; font-family: monospace;
+                        background: #000; margin: 8px -12px -8px -12px; padding: 12px; 
+                        border-top: 1px solid #222; display: none; width: calc(100% + 24px); position: relative;
                     }
                     .hud-net-details.open { display: block; }
+                    .json-key { color: #d946ef; }
+                    .json-string { color: #22c55e; }
+                    .json-number { color: #60a5fa; }
                 \`;
                 document.head.appendChild(style);
 
@@ -4498,31 +4502,82 @@
                     renderNetwork();
                 };
 
+                window.copyHudEntry = function(btn) {
+                    const row = btn.closest('.hud-row');
+                    const details = row ? row.querySelector('.hud-net-details.open') : null;
+                    const text = details ? details.innerText.replace('Copy JSON', '') : (row ? row.innerText.replace('Copy', '') : '');
+                    navigator.clipboard.writeText(text.trim()).then(() => {
+                        const orig = btn.innerText;
+                        btn.innerText = 'Copied'; setTimeout(() => btn.innerText = orig, 1000);
+                    });
+                };
+
                 function renderConsole() {
-                    consoleView.innerHTML = window.localLogs.map(log => \`
-                        <div class="hud-log-row hud-log-\${log.method === 'warn' ? 'warn' : (log.method === 'error' ? 'error' : 'info')}">
-                            <span style="color:#555; font-size:9px; margin-right:8px;">\${log.time}</span>
-                            <span>\${escapeHtml(log.msg)}</span>
-                        </div>
-                    \`).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No logs found</div>';
+                    consoleView.innerHTML = window.localLogs.map(log => {
+                        const method = log.method === 'warn' ? 'warn' : (log.method === 'error' ? 'error' : 'info');
+                        const isMultiline = log.msg.includes('\\n') || log.msg.length > 120 || log.msg.includes('stack:');
+                        
+                        if (!isMultiline) {
+                            return \`
+                            <div class="hud-row hud-log-\${method}">
+                                <button class="hud-copy-btn" onclick="window.copyHudEntry(this)">Copy</button>
+                                <span style="color:#555; margin-right:10px; font-size:9px;">\${log.time}</span>
+                                <span style="white-space:pre-wrap; word-break:break-all;">\${escapeHtml(log.msg)}</span>
+                            </div>\`;
+                        } else {
+                            const lines = log.msg.split('\\n');
+                            const firstLine = lines[0].substring(0, 100) + (lines[0].length > 100 ? '...' : '');
+                            return \`
+                            <div class="hud-row hud-log-\${method}">
+                                <button class="hud-copy-btn" onclick="window.copyHudEntry(this)">Copy</button>
+                                <details style="width:100%">
+                                    <summary style="cursor:pointer; outline:none; display:flex; align-items:flex-start; gap:8px;">
+                                        <span style="color:#555; font-size:9px; margin-top:2px;">\${log.time}</span>
+                                        <span style="color:#a1a1aa; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${escapeHtml(firstLine)}</span>
+                                    </summary>
+                                    <div style="margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.05); overflow-x:auto;">
+                                        <pre style="white-space:pre-wrap; word-break:break-all; font-family:'JetBrains Mono', monospace; font-size:10px; color:#ccc; margin:0;">\${escapeHtml(log.msg)}</pre>
+                                    </div>
+                                </details>
+                            </div>\`;
+                        }
+                    }).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No logs found</div>';
+                    setTimeout(() => { consoleView.scrollTop = consoleView.scrollHeight; }, 10);
                 }
 
                 function renderNetwork() {
-                    networkView.innerHTML = window.localNetwork.map((req, idx) => {
+                    networkView.innerHTML = \`
+                        <div style="padding:10px 12px; font-size:10px; color:#444; border-bottom:1px solid #222; display:grid; grid-template-columns:50px 45px 1fr 60px; gap:8px; font-family:'JetBrains Mono', monospace;">
+                            <span>METHOD</span><span>STATUS</span><span>URL</span><span style="text-align:right">TIME</span>
+                        </div>
+                    \` + window.localNetwork.map((req, idx) => {
                         const detailsId = 'hud-net-details-' + idx;
                         return \`
-                            <div class="hud-net-grid" onclick="document.getElementById('\${detailsId}').classList.toggle('open')">
-                                <span style="color:#d946ef; font-weight:bold;">\${req.method}</span>
-                                <span style="color:\${req.status >= 400 ? '#ef4444' : '#22c55e'}">\${req.status}</span>
-                                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${req.url}</span>
-                                <span style="text-align:right; color:#666;">\${req.duration}ms</span>
-                            </div>
-                            <div id="\${detailsId}" class="hud-net-details">
-                                <div style="margin-bottom:8px;"><b style="color:#555">REQUEST BODY:</b><br>\${escapeHtml(JSON.stringify(req.requestBody, null, 2) || 'null')}</div>
-                                <div><b style="color:#555">RESPONSE BODY:</b><br>\${escapeHtml(JSON.stringify(req.responseBody, null, 2) || 'null')}</div>
+                            <div class="hud-row" style="flex-direction:column; padding:8px 12px 0 12px;">
+                                <div class="hud-net-grid" style="padding-bottom:8px;" onclick="document.getElementById('\${detailsId}').classList.toggle('open')">
+                                    <span style="font-weight:bold; color:#d946ef">\${req.method}</span>
+                                    <span style="color:\${req.status >= 400 ? '#ef4444' : '#22c55e'}">\${req.status}</span>
+                                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${req.url}</span>
+                                    <span style="text-align:right; color:#666;">\${req.duration}ms</span>
+                                </div>
+                                <div id="\${detailsId}" class="hud-net-details">
+                                    <button class="hud-copy-btn" onclick="window.copyHudEntry(this)" style="opacity:1; top:12px; right:12px;">Copy JSON</button>
+                                    <div style="margin-bottom:10px;"><b style="color:#555">REQUEST:</b><br>\${renderJsonHighlight(req.requestBody)}</div>
+                                    <div><b style="color:#555">RESPONSE:</b><br>\${renderJsonHighlight(req.responseBody)}</div>
+                                </div>
                             </div>
                         \`;
                     }).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No network requests found</div>';
+                    setTimeout(() => { networkView.scrollTop = networkView.scrollHeight; }, 10);
+                }
+
+                function renderJsonHighlight(obj) {
+                    if (!obj) return '<span style="color:#444">null</span>';
+                    const str = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+                    const html = escapeHtml(str).replace(/"(\\w+)":/g, '<span class="json-key">"$1"</span>:')
+                                     .replace(/: "(.*?)"/g, ': <span class="json-string">"$1"</span>')
+                                     .replace(/: (\\d+)/g, ': <span class="json-number">$1</span>');
+                    return \`<pre style="margin:0; font-size:10px; color:#ccc; white-space:pre-wrap; word-break:break-all;">\${html}</pre>\`;
                 }
 
                 function escapeHtml(text) {
