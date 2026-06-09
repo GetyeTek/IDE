@@ -4357,12 +4357,15 @@
                         position: fixed; bottom: 20px; right: 20px; width: 44px; height: 44px;
                         background: #151517; border: 1px solid #d946ef; border-radius: 50%;
                         display: flex; align-items: center; justify-content: center; z-index: 9999999;
-                        box-shadow: 0 4px 15px rgba(217, 70, 239, 0.3); cursor: pointer; font-size: 18px;
+                        box-shadow: 0 4px 15px rgba(217, 70, 239, 0.3); cursor: move; font-size: 18px;
+                        touch-action: none; user-select: none;
                     }
                     #conduit-hud-overlay {
-                        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-                        background: #050505; color: #ffffff; z-index: 9999998; display: none;
+                        position: fixed; top: auto; bottom: 0; left: 0; width: 100vw; height: 60vh;
+                        background: rgba(5, 5, 7, 0.85); backdrop-filter: blur(15px); border-top: 1px solid #27272a;
+                        color: #ffffff; z-index: 9999998; display: none;
                         flex-direction: column; font-family: -apple-system, system-ui, sans-serif;
+                        box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
                     }
                     .hud-header {
                         display: flex; align-items: center; justify-content: space-between;
@@ -4401,7 +4404,40 @@
                 const btn = document.createElement('div');
                 btn.id = 'conduit-hud-btn';
                 btn.innerHTML = '📟';
-                btn.onclick = () => {
+                
+                let isDragging = false, isMoved = false;
+                let x = 0, y = 0, initialX, initialY;
+
+                const dragStart = (e) => {
+                    isDragging = true; isMoved = false;
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    initialX = clientX - x;
+                    initialY = clientY - y;
+                };
+                
+                const dragMove = (e) => {
+                    if (!isDragging) return;
+                    isMoved = true;
+                    e.preventDefault();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    x = clientX - initialX;
+                    y = clientY - initialY;
+                    btn.style.transform = \`translate3d(\${x}px, \${y}px, 0)\`;
+                };
+                
+                const dragEnd = () => { setTimeout(() => { isDragging = false; }, 0); };
+
+                btn.addEventListener('touchstart', dragStart, {passive: false});
+                btn.addEventListener('touchmove', dragMove, {passive: false});
+                btn.addEventListener('touchend', dragEnd);
+                btn.addEventListener('mousedown', dragStart);
+                document.addEventListener('mousemove', dragMove, {passive: false});
+                document.addEventListener('mouseup', dragEnd);
+
+                btn.onclick = (e) => {
+                    if (isMoved) { isMoved = false; return; }
                     const overlay = document.getElementById('conduit-hud-overlay');
                     if (overlay.style.display === 'none' || !overlay.style.display) {
                         overlay.style.display = 'flex';
