@@ -4349,6 +4349,11 @@
                     }
                 };
             `;
+            if (doc.head) {
+                doc.head.insertBefore(baseScript, doc.head.firstChild);
+            } else {
+                doc.documentElement.insertBefore(baseScript, doc.documentElement.firstChild);
+            }
             const finalHtml = doc.documentElement.outerHTML;
             const finalBlob = new Blob([finalHtml], { type: 'text/html' });
             
