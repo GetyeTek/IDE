@@ -2180,53 +2180,153 @@
     // --- CORE UTILS ---
     /**
      * Tries to parse JSON. If it fails due to bad escaping (common with AI),
-     * it attempts to double-escape backslashes that aren't valid JSON control chars.
+     * it initiates a multi-stage heuristic structural and token-level scanner
+     * to recover strings with unescaped internal quotes and raw newlines,
+     * and shows the exact parse exception if it remains unresolvable.
      */
     function smartJSONParse(jsonString) {
         let input = jsonString.trim();
         
-        // 1. Markdown/Code-block stripping
-        input = input.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+        // 1. Strip Markdown boundaries
+        input = input.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
 
+        // Safe evaluation harness
         const attemptParse = (str) => {
             try { return JSON.parse(str); } catch(e) { return null; }
         };
 
-        // Try native first
+        // Try standard parsing first
         let result = attemptParse(input);
         if (result) return result;
 
-        console.warn("Malformed JSON detected. Initiating Structural Healing...");
+        console.warn('Malformed JSON detected. Initiating Structural Healing...');
 
-        // 2. Structural Reconstruction
-        let fixed = input;
-        
-        // Fix missing leading/trailing brackets
-        if (fixed.startsWith('{') && fixed.endsWith('}')) fixed = '[' + fixed + ']';
-        else if (fixed.startsWith('{') && !fixed.startsWith('[')) fixed = '[' + fixed;
-        else if (fixed.endsWith('}') && !fixed.endsWith(']')) fixed = fixed + ']';
-        else if (fixed.startsWith('"action"')) fixed = '[{' + fixed + '}]';
-
-        // 3. Delimiter & Syntax Healing
-        fixed = fixed
-            .replace(/}\s*{/g, '},{')             // Fix missing commas between objects
-            .replace(/,\s*]/g, ']')                // Fix trailing commas
-            .replace(/\\(?!["\\/bfnrtu])/g, "\\\\") // Double-escape illegal backslashes
-            .replace(/(\n)/g, (match, p1, offset) => { // Handle literal newlines in strings
-                const before = fixed.slice(0, offset);
-                const quoteCount = (before.match(/"/g) || []).length;
-                return (quoteCount % 2 === 1) ? "\\n" : "\n";
-            });
-
-        result = attemptParse(fixed);
-        if (result) {
-            document.getElementById('json-input').value = JSON.stringify(result, null, 2);
-            saveState();
-            showGlobalToast("✨ Payload Structures Healed");
-            return result;
+        // Heuristic function to verify if a double-quote is a real JSON structural boundary
+        function isRealClosingQuote(str, quoteIdx) {
+            let nextIdx = quoteIdx + 1;
+            while (nextIdx < str.length && /\s/.test(str[nextIdx])) {
+                nextIdx++;
+            }
+            if (nextIdx >= str.length) return true; // EOF is a valid structural limit
+            
+            let nextChar = str[nextIdx];
+            
+            // Key boundary check (followed by colon and a valid value starter)
+            if (nextChar === ':') {
+                let valIdx = nextIdx + 1;
+                while (valIdx < str.length && /\s/.test(str[valIdx])) {
+                    valIdx++;
+                }
+                if (valIdx >= str.length) return true;
+                let valChar = str[valIdx];
+                return /["{\[\\d\\-tfn]/.test(valChar); 
+            }
+            
+            // Delimiter boundary check (followed by comma and a valid element starter)
+            if (nextChar === ',') {
+                let nextElementIdx = nextIdx + 1;
+                while (nextElementIdx < str.length && /\s/.test(str[nextElementIdx])) {
+                    nextElementIdx++;
+                }
+                if (nextElementIdx >= str.length) return true;
+                let nextElementChar = str[nextElementIdx];
+                return /["{\[\\d\\-tfn\]}]/.test(nextElementChar); 
+            }
+            
+            // Closing bracket/brace boundaries
+            if (nextChar === '}' || nextChar === ']') {
+                return true;
+            }
+            
+            return false;
         }
 
-        throw new Error("JSON too corrupted for auto-fix. Check brackets/commas manually.");
+        // 2. Character-by-character state-machine scanner
+        let fixed = '';
+        let i = 0;
+        let inString = false;
+
+        while (i < input.length) {
+            let char = input[i];
+
+            if (!inString) {
+                if (char === '\"') {
+                    inString = true;
+                    fixed += '\"';
+                } else {
+                    fixed += char;
+                }
+                i++;
+            } else { 
+                if (char === '\"') {
+                    // Count preceding backslashes to see if it's already escaped
+                    let backslashes = 0;
+                    let k = i - 1;
+                    while (k >= 0 && input[k] === '\\') {
+                        backslashes++;
+                        k--;
+                    }
+                    
+                    if (backslashes % 2 === 1) {
+                        // Already escaped quote
+                        fixed += '\"';
+                        i++;
+                        continue;
+                    }
+
+                    // Check if this quote is the true end-of-string or an unescaped internal one
+                    if (isRealClosingQuote(input, i)) {
+                        inString = false;
+                        fixed += '\"';
+                    } else {
+                        // Unescaped quote: convert to escaped sequence
+                        fixed += '\\"';
+                    }
+                } else if (char === '\n') {
+                    // Safely sanitize unescaped raw newlines inside a string literal
+                    fixed += '\\n';
+                } else if (char === '\r') {
+                    fixed += '\\r';
+                } else if (char === '\t') {
+                    fixed += '\\t';
+                } else {
+                    fixed += char;
+                }
+                i++;
+            }
+        }
+
+        // 3. Structural Reconstruction
+        // Fix missing outer brackets if they are completely missing
+        let trimmedFixed = fixed.trim();
+        if (trimmedFixed.startsWith('{') && trimmedFixed.endsWith('}')) {
+            fixed = '[' + fixed + ']';
+        } else if (trimmedFixed.startsWith('{') && !trimmedFixed.startsWith('[')) { 
+            fixed = '[' + fixed;
+        } else if (trimmedFixed.endsWith('}') && !trimmedFixed.endsWith(']')) { 
+            fixed = fixed + ']';
+        } else if (trimmedFixed.startsWith('\"action\"')) { 
+            fixed = '[{' + fixed + '}]';
+        }
+
+        // Normalize delimiters and trailing elements
+        fixed = fixed
+            .replace(/}\s*{/g, '},{')             // Fix missing commas between objects
+            .replace(/,\s*]/g, ']')                // Fix trailing commas in arrays
+            .replace(/,\s*}/g, '}')                // Fix trailing commas in objects
+            .replace(/\\(?!["\\/bfnrtu])/g, "\\\\"); // Fix illegal backslash sequences
+
+        // Final verification pass
+        try {
+            const parsed = JSON.parse(fixed);
+            document.getElementById('json-input').value = JSON.stringify(parsed, null, 2); 
+            saveState();
+            showGlobalToast('✨ Payload Structures Healed');
+            return parsed;
+        } catch (err) {
+            // Throw the exact parsing error instead of a generic message
+            throw new Error('Structural healing unsuccessful. JSON Parse Error: ' + err.message);
+        }
     }
 
     function b64DecodeUnicode(str) {
