@@ -2180,9 +2180,8 @@
     // --- CORE UTILS ---
     /**
      * Tries to parse JSON. If it fails due to bad escaping (common with AI),
-     * it initiates a multi-stage heuristic structural and token-level scanner
-     * to recover strings with unescaped internal quotes and raw newlines,
-     * and shows the exact parse exception if it remains unresolvable.
+     * it initiates a surgical regex preprocessor to isolate parent string values
+     * and escape all internal unescaped quotes/newlines, returning the exact error if failed.
      */
     function smartJSONParse(jsonString) {
         let input = jsonString.trim();
@@ -2201,103 +2200,42 @@
 
         console.warn('Malformed JSON detected. Initiating Structural Healing...');
 
-        // Heuristic function to verify if a double-quote is a real JSON structural boundary
-        function isRealClosingQuote(str, quoteIdx) {
-            let nextIdx = quoteIdx + 1;
-            while (nextIdx < str.length && /\s/.test(str[nextIdx])) {
-                nextIdx++;
-            }
-            if (nextIdx >= str.length) return true; // EOF is a valid structural limit
-            
-            let nextChar = str[nextIdx];
-            
-            // Key boundary check (followed by colon and a valid value starter)
-            if (nextChar === ':') {
-                let valIdx = nextIdx + 1;
-                while (valIdx < str.length && /\s/.test(str[valIdx])) {
-                    valIdx++;
-                }
-                if (valIdx >= str.length) return true;
-                let valChar = str[valIdx];
-                return /["{\[\\d\\-tfn]/.test(valChar); 
-            }
-            
-            // Delimiter boundary check (followed by comma and a valid element starter)
-            if (nextChar === ',') {
-                let nextElementIdx = nextIdx + 1;
-                while (nextElementIdx < str.length && /\s/.test(str[nextElementIdx])) {
-                    nextElementIdx++;
-                }
-                if (nextElementIdx >= str.length) return true;
-                let nextElementChar = str[nextElementIdx];
-                return /["{\[\\d\\-tfn\]}]/.test(nextElementChar); 
-            }
-            
-            // Closing bracket/brace boundaries
-            if (nextChar === '}' || nextChar === ']') {
-                return true;
-            }
-            
-            return false;
-        }
+        // 2. Surgical String Escaper
+        // Converts physical newlines to \n, and safely escapes unescaped double quotes
+        const sanitizeValue = (val) => {
+            let sanitized = val
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\r')
+                .replace(/\t/g, '\\t');
+                
+            // Normalize double escaping: first remove any existing \" -> " and then escape all of them
+            sanitized = sanitized.replace(/\\"/g, '"').replace(/"/g, '\\"');
+            return sanitized;
+        };
 
-        // 2. Character-by-character state-machine scanner
-        let fixed = '';
-        let i = 0;
-        let inString = false;
+        let fixed = input;
 
-        while (i < input.length) {
-            let char = input[i];
+        // Escape "find_block"
+        fixed = fixed.replace(/"find_block"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"(?:replace_with|file_path|action)")/g, (match, p1) => {
+            return '"find_block": "' + sanitizeValue(p1) + '"';
+        });
 
-            if (!inString) {
-                if (char === '\"') {
-                    inString = true;
-                    fixed += '\"';
-                } else {
-                    fixed += char;
-                }
-                i++;
-            } else { 
-                if (char === '\"') {
-                    // Count preceding backslashes to see if it's already escaped
-                    let backslashes = 0;
-                    let k = i - 1;
-                    while (k >= 0 && input[k] === '\\') {
-                        backslashes++;
-                        k--;
-                    }
-                    
-                    if (backslashes % 2 === 1) {
-                        // Already escaped quote
-                        fixed += '\"';
-                        i++;
-                        continue;
-                    }
+        // Escape "replace_with"
+        fixed = fixed.replace(/"replace_with"\s*:\s*"([\s\S]*?)"(?=\s*}\s*(?:,|\]|$))/g, (match, p1) => {
+            return '"replace_with": "' + sanitizeValue(p1) + '"';
+        });
 
-                    // Check if this quote is the true end-of-string or an unescaped internal one
-                    if (isRealClosingQuote(input, i)) {
-                        inString = false;
-                        fixed += '\"';
-                    } else {
-                        // Unescaped quote: convert to escaped sequence
-                        fixed += '\\"';
-                    }
-                } else if (char === '\n') {
-                    // Safely sanitize unescaped raw newlines inside a string literal
-                    fixed += '\\n';
-                } else if (char === '\r') {
-                    fixed += '\\r';
-                } else if (char === '\t') {
-                    fixed += '\\t';
-                } else {
-                    fixed += char;
-                }
-                i++;
-            }
-        }
+        // Escape "content"
+        fixed = fixed.replace(/"content"\s*:\s*"([\s\S]*?)"(?=\s*}\s*(?:,|\]|$))/g, (match, p1) => {
+            return '"content": "' + sanitizeValue(p1) + '"';
+        });
+
+        // Escape "text"
+        fixed = fixed.replace(/"text"\s*:\s*"([\s\S]*?)"(?=\s*(?:,|\}|\]))/g, (match, p1) => {
+            return '"text": "' + sanitizeValue(p1) + '"';
+        });
 
         // 3. Structural Reconstruction
-        // Fix missing outer brackets if they are completely missing
         let trimmedFixed = fixed.trim();
         if (trimmedFixed.startsWith('{') && trimmedFixed.endsWith('}')) {
             fixed = '[' + fixed + ']';
@@ -2305,7 +2243,7 @@
             fixed = '[' + fixed;
         } else if (trimmedFixed.endsWith('}') && !trimmedFixed.endsWith(']')) { 
             fixed = fixed + ']';
-        } else if (trimmedFixed.startsWith('\"action\"')) { 
+        } else if (trimmedFixed.startsWith('"action"')) { 
             fixed = '[{' + fixed + '}]';
         }
 
