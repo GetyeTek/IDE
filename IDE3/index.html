@@ -2182,88 +2182,160 @@
      * Tries to parse JSON. If it fails due to bad escaping (common with AI),
      * it initiates a surgical regex preprocessor to isolate parent string values
      * and escape all internal unescaped quotes/newlines, returning the exact error if failed.
+    /**
+     * Parses the highly robust, escaping-agnostic Conduit XML Patch (CXP) Markup
+     * and compiles it into a standard JSON operations array on-the-fly.
      */
+    function parseCXP(input) {
+        const operations = [];
+        
+        const cleanContent = (txt) => {
+            return txt.replace(/^\r?\n/, '').replace(/\r?\n\s*$/, '');
+        };
+
+        // 1. Extract Top-level Comments
+        const commentMatch = input.match(/<comment>([\s\S]*?)<\/comment>/i);
+        if (commentMatch) {
+            operations.push({
+                action: 'comment',
+                text: commentMatch[1].trim()
+            });
+        }
+
+        // 2. Extract Replace Blocks
+        const replaceRegex = /<replace_block\s+file="([^"]+)">([\s\S]*?)<\/replace_block>/gi;
+        let match;
+        while ((match = replaceRegex.exec(input)) !== null) {
+            const filePath = match[1].trim();
+            const inner = match[2];
+            const findMatch = inner.match(/<find>([\s\S]*?)<\/find>/i);
+            const replaceWithMatch = inner.match(/<replace_with>([\s\S]*?)<\/replace_with>/i);
+
+            if (findMatch && replaceWithMatch) {
+                operations.push({
+                    action: 'replace_block',
+                    file_path: filePath,
+                    find_block: cleanContent(findMatch[1]),
+                    replace_with: cleanContent(replaceWithMatch[1])
+                });
+            }
+        }
+
+        // 3. Extract Create File Blocks
+        const createRegex = /<create_file\s+file="([^"]+)">([\s\S]*?)<\/create_file>/gi;
+        while ((match = createRegex.exec(input)) !== null) {
+            const filePath = match[1].trim();
+            const inner = match[2];
+            const contentMatch = inner.match(/<content>([\s\S]*?)<\/content>/i);
+            if (contentMatch) {
+                operations.push({
+                    action: 'create_file',
+                    file_path: filePath,
+                    content: cleanContent(contentMatch[1])
+                });
+            }
+        }
+
+        // 4. Extract Delete File Blocks
+        const deleteRegex = /<delete_file\s+file="([^"]+)"(?:\s*\/|\s*><\/delete_file)>/gi;
+        while ((match = deleteRegex.exec(input)) !== null) {
+            operations.push({
+                action: 'delete_file',
+                file_path: match[1].trim()
+            });
+        }
+
+        return operations;
+    }
+
     function smartJSONParse(jsonString) {
         let input = jsonString.trim();
         
-        // 1. Strip Markdown boundaries
+        const isCxp = input.startsWith('<') || input.includes('<patch>') || input.includes('<replace_block') || input.includes('<comment>');
+
+        if (isCxp) {
+            try {
+                const parsed = parseCXP(input);
+                if (parsed.length === 0) throw new Error("CXP document contains no valid operational blocks.");
+                saveState();
+                showGlobalToast("✨ CXP Patch Compiled");
+                return parsed;
+            } catch (err) {
+                throw new Error("CXP Compilation Error: " + err.message);
+            }
+        }
+
         input = input.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
 
-        // Safe evaluation harness
         const attemptParse = (str) => {
             try { return JSON.parse(str); } catch(e) { return null; }
         };
 
-        // Try standard parsing first
         let result = attemptParse(input);
         if (result) return result;
 
-        console.warn('Malformed JSON detected. Initiating Structural Healing...');
+        console.warn("Malformed JSON detected. Initiating Structural Healing...");
 
-        // 2. Surgical String Escaper
-        // Converts physical newlines to \n, and safely escapes unescaped double quotes
-        const sanitizeValue = (val) => {
-            let sanitized = val
-                .replace(/\n/g, '\\n')
-                .replace(/\r/g, '\\r')
-                .replace(/\t/g, '\\t');
-                
-            // Normalize double escaping: first remove any existing \" -> " and then escape all of them
-            sanitized = sanitized.replace(/\\"/g, '"').replace(/"/g, '\\"');
-            return sanitized;
-        };
-
-        let fixed = input;
-
-        // Escape "find_block"
-        fixed = fixed.replace(/"find_block"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"(?:replace_with|file_path|action)")/g, (match, p1) => {
-            return '"find_block": "' + sanitizeValue(p1) + '"';
-        });
-
-        // Escape "replace_with"
-        fixed = fixed.replace(/"replace_with"\s*:\s*"([\s\S]*?)"(?=\s*}\s*(?:,|\]|$))/g, (match, p1) => {
-            return '"replace_with": "' + sanitizeValue(p1) + '"';
-        });
-
-        // Escape "content"
-        fixed = fixed.replace(/"content"\s*:\s*"([\s\S]*?)"(?=\s*}\s*(?:,|\]|$))/g, (match, p1) => {
-            return '"content": "' + sanitizeValue(p1) + '"';
-        });
-
-        // Escape "text"
-        fixed = fixed.replace(/"text"\s*:\s*"([\s\S]*?)"(?=\s*(?:,|\}|\]))/g, (match, p1) => {
-            return '"text": "' + sanitizeValue(p1) + '"';
-        });
-
-        // 3. Structural Reconstruction
-        let trimmedFixed = fixed.trim();
-        if (trimmedFixed.startsWith('{') && trimmedFixed.endsWith('}')) {
-            fixed = '[' + fixed + ']';
-        } else if (trimmedFixed.startsWith('{') && !trimmedFixed.startsWith('[')) { 
-            fixed = '[' + fixed;
-        } else if (trimmedFixed.endsWith('}') && !trimmedFixed.endsWith(']')) { 
-            fixed = fixed + ']';
-        } else if (trimmedFixed.startsWith('"action"')) { 
-            fixed = '[{' + fixed + '}]';
+        function isRealClosingQuote(str, quoteIdx) {
+            let nextIdx = quoteIdx + 1;
+            while (nextIdx < str.length && /\s/.test(str[nextIdx])) { nextIdx++; }
+            if (nextIdx >= str.length) return true;
+            let nextChar = str[nextIdx];
+            if (nextChar === ':') {
+                let valIdx = nextIdx + 1;
+                while (valIdx < str.length && /\s/.test(str[valIdx])) { valIdx++; }
+                if (valIdx >= str.length) return true;
+                return /["{\[\d\-tfn]/.test(str[valIdx]);
+            }
+            if (nextChar === ',' || nextChar === '}' || nextChar === ']') return true;
+            return false;
         }
 
-        // Normalize delimiters and trailing elements
-        fixed = fixed
-            .replace(/}\s*{/g, '},{')             // Fix missing commas between objects
-            .replace(/,\s*]/g, ']')                // Fix trailing commas in arrays
-            .replace(/,\s*}/g, '}')                // Fix trailing commas in objects
-            .replace(/\\(?!["\\/bfnrtu])/g, "\\\\"); // Fix illegal backslash sequences
+        let fixed = '';
+        let i = 0;
+        let inString = false;
 
-        // Final verification pass
+        while (i < input.length) {
+            let char = input[i];
+            if (!inString) {
+                if (char === '"') { inString = true; fixed += '"'; } else { fixed += char; }
+                i++;
+            } else { 
+                if (char === '"') {
+                    let backslashes = 0;
+                    let k = i - 1;
+                    while (k >= 0 && input[k] === '\\') { backslashes++; k--; }
+                    if (backslashes % 2 === 1) { fixed += '"'; i++; continue; }
+                    if (isRealClosingQuote(input, i)) { inString = false; fixed += '"'; } 
+                    else { fixed += '\\"'; }
+                } else if (char === '\n') { fixed += '\\n'; }
+                else if (char === '\r') { fixed += '\\r'; }
+                else if (char === '\t') { fixed += '\\t'; }
+                else { fixed += char; }
+                i++;
+            }
+        }
+
+        let trimmedFixed = fixed.trim();
+        if (trimmedFixed.startsWith('{') && trimmedFixed.endsWith('}')) { fixed = '[' + fixed + ']'; }
+        else if (trimmedFixed.startsWith('{') && !trimmedFixed.startsWith('[')) { fixed = '[' + fixed; }
+        else if (trimmedFixed.endsWith('}') && !trimmedFixed.endsWith(']')) { fixed = fixed + ']'; }
+        else if (trimmedFixed.startsWith('"action"')) { fixed = '[{' + fixed + '}]'; }
+
+        fixed = fixed
+            .replace(/}\s*{/g, '},{')
+            .replace(/,\s*]/g, ']')
+            .replace(/,\s*}/g, '}')
+            .replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
+
         try {
             const parsed = JSON.parse(fixed);
-            document.getElementById('json-input').value = JSON.stringify(parsed, null, 2); 
+            document.getElementById('json-input').value = JSON.stringify(parsed, null, 2);
             saveState();
             showGlobalToast('✨ Payload Structures Healed');
             return parsed;
         } catch (err) {
-            // Throw the exact parsing error instead of a generic message
-            throw new Error('Structural healing unsuccessful. JSON Parse Error: ' + err.message);
+            throw new Error('JSON Parse Error: ' + err.message);
         }
     }
 
