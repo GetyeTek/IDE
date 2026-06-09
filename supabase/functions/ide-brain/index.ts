@@ -205,6 +205,88 @@ function getNumberedContent(content: string): string {
   return lines.map((line, i) => `${(i + 1).toString().padStart(pad)} | ${line}`).join("\n");
 }
 
+// Extract attributes safely (supports single/double quotes, unquoted, and whitespace drift)
+function extractAttribute(tag: string, attr: string): string {
+  const regex = new RegExp(`${attr}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
+  const match = tag.match(regex);
+  if (match) {
+    return (match[1] || match[2] || match[3] || "").trim();
+  }
+  return "";
+}
+
+// Parses Case-Insensitive, quote/spacing-agnostic XML CXP markup
+function parseCXP(input: string): any[] {
+  const operations: any[] = [];
+  
+  const cleanContent = (txt: string) => {
+    return txt.replace(/^\r?\n/, '').replace(/\r?\n\s*$/, '');
+  };
+
+  // 1. Extract Top-level Comments
+  const commentRegex = /<comment>([\s\S]*?)<\/comment>/gi;
+  let commentMatch;
+  while ((commentMatch = commentRegex.exec(input)) !== null) {
+    operations.push({
+      action: 'comment',
+      text: commentMatch[1].trim()
+    });
+  }
+
+  // 2. Extract Replace Blocks
+  const replaceBlockRegex = /<replace_block([^>]*)>([\s\S]*?)<\/replace_block>/gi;
+  let match;
+  while ((match = replaceBlockRegex.exec(input)) !== null) {
+    const attrArea = match[1];
+    const inner = match[2];
+    const filePath = extractAttribute(attrArea, "file");
+
+    const findMatch = inner.match(/<find>([\s\S]*?)<\/find>/i);
+    const replaceWithMatch = inner.match(/<replace_with>([\s\S]*?)<\/replace_with>/i);
+
+    if (filePath && findMatch && replaceWithMatch) {
+      operations.push({
+        action: 'replace_block',
+        file_path: filePath,
+        find_block: cleanContent(findMatch[1]),
+        replace_with: cleanContent(replaceWithMatch[1])
+      });
+    }
+  }
+
+  // 3. Extract Create File Blocks
+  const createBlockRegex = /<create_file([^>]*)>([\s\S]*?)<\/create_file>/gi;
+  while ((match = createBlockRegex.exec(input)) !== null) {
+    const attrArea = match[1];
+    const inner = match[2];
+    const filePath = extractAttribute(attrArea, "file");
+    const contentMatch = inner.match(/<content>([\s\S]*?)<\/content>/i);
+
+    if (filePath && contentMatch) {
+      operations.push({
+        action: 'create_file',
+        file_path: filePath,
+        content: cleanContent(contentMatch[1])
+      });
+    }
+  }
+
+  // 4. Extract Delete File Blocks (Supports both self-closing or explicit closing forms)
+  const deleteBlockRegex = /<delete_file([^>]*?)(?:\/>|>(?:[\s\S]*?)<\/delete_file>)/gi;
+  while ((match = deleteBlockRegex.exec(input)) !== null) {
+    const attrArea = match[1];
+    const filePath = extractAttribute(attrArea, "file");
+    if (filePath) {
+      operations.push({
+        action: 'delete_file',
+        file_path: filePath
+      });
+    }
+  }
+
+  return operations;
+}
+
 // --- GITHUB API HELPERS ---
 const getHeaders = () => ({
   "Authorization": `token ${Deno.env.get("GITHUB_PAT")}`,
@@ -1234,12 +1316,35 @@ async function validateWithTreeSitter(code: string, filePath: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const body = await req.json();
-    const { 
+    const bodyText = await req.text();
+    let body: any = {};
+    
+    // Auto-detect if request payload itself is raw XML CXP Markup
+    const isCxpBody = bodyText.trim().startsWith('<') || bodyText.includes('<replace_block') || bodyText.includes('<comment>');
+    
+    if (isCxpBody) {
+      body = {
+        action: "patch",
+        operations: parseCXP(bodyText)
+      };
+    } else {
+      try {
+        body = JSON.parse(bodyText);
+      } catch (e) {
+        throw new Error(`Invalid JSON or XML payload: ${e.message}`);
+      }
+    }
+
+    let { 
       action, operations, file_path, ref_sha, version_name, repo_name, 
       code_block, error_message, messages, context_files, auto_sanity, 
       workflow_id, branch, inputs, run_id, project_path, chat_id, title, user_prompt, ai_config, is_org, ...payload 
     } = body;
+
+    // Compile XML string to standard JSON operations on-the-fly if passed inside standard JSON property
+    if (typeof operations === 'string') {
+      operations = parseCXP(operations);
+    }
 
     const OWNER = is_org ? ORG_NAME : GITHUB_USER;
     // Ensure TARGET_REPO is always 'owner/name'
