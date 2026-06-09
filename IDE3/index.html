@@ -616,7 +616,7 @@
                     </div>
                 </div>
             </div>
-            <input type="text" class="input-field" placeholder="Fuzzy search files..." style="margin-bottom: 12px;" onkeyup="filterFiles(this.value)">
+            <input type="text" id="file-search-input" class="input-field" placeholder="Fuzzy search files..." style="margin-bottom: 12px;" onkeyup="filterFiles(this.value)">
             <div class="card" style="padding: 0;">
                 <div id="file-list-container" class="file-list" style="min-height: 200px;">
                     <div style="padding:20px; text-align:center; color:var(--text-muted); font-size: 13px;">Connect to repo to see files.</div>
@@ -6117,10 +6117,20 @@ async function downloadArtifact(runId) {
 
     function renderFileList(files) {
         const container = document.getElementById('file-list-container');
-        updateChatContextIndicator();
-        setTimeout(syncSelectAllState, 50);
         container.innerHTML = '';
-        if (!files || files.length === 0) return container.innerHTML = '<div style="padding:20px; text-align:center;">No files found.</div>';
+        if (!files || files.length === 0) {
+            container.innerHTML = '<div style="padding:20px; text-align:center;">No files found.</div>';
+            return;
+        }
+
+        // 1. Ensure selection state is initialized globally
+        window.fileSelectionState = window.fileSelectionState || {};
+        files.forEach(f => {
+            if (window.fileSelectionState[f.path] === undefined) {
+                const isExcluded = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/');
+                window.fileSelectionState[f.path] = !isExcluded;
+            }
+        });
 
         const pinned = JSON.parse(localStorage.getItem('conduit_pinned_files') || '[]');
         
@@ -6146,8 +6156,10 @@ async function downloadArtifact(runId) {
 
             const fileSize = formatBytes(file.size);
             const updated = timeAgo(file.last_updated);
-            const isExcluded = file.path.endsWith('index.ts') || file.path.includes('supabase/functions/');
-            const checkedAttr = isExcluded ? '' : 'checked';
+            
+            // 2. Read selection from global state
+            const isChecked = window.fileSelectionState[file.path];
+            const checkedAttr = isChecked ? 'checked' : '';
 
             div.innerHTML = `
                 <div class="v-info" onclick="openFileViewer('${file.path}')" style="cursor:pointer; flex:1; min-width: 0; padding-right: 10px;">
@@ -6173,10 +6185,19 @@ async function downloadArtifact(runId) {
                             <div class="menu-item danger" onclick="stageDeleteFile('${file.path}')">🗑 Delete</div>
                         </div>
                     </div>
-                    <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="updateChatContextIndicator(); syncSelectAllState();" style="accent-color:var(--primary)">
+                    <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="window.fileSelectionState[this.value] = this.checked; updateChatContextIndicator(); syncSelectAllState();" style="accent-color:var(--primary)">
                 </div>`;
             container.appendChild(div);
         });
+
+        // 3. Re-apply any active search filter after rendering
+        const searchInput = document.getElementById('file-search-input');
+        if (searchInput && searchInput.value) {
+            filterFiles(searchInput.value);
+        } else {
+            updateChatContextIndicator();
+            setTimeout(syncSelectAllState, 50);
+        }
     }
 
     async function openFileViewer(path) {
@@ -6578,7 +6599,14 @@ async function downloadArtifact(runId) {
     }
 
     function toggleAllFiles(s) {
-        document.querySelectorAll('.file-check').forEach(cb => cb.checked = s.checked);
+        document.querySelectorAll('.file-check').forEach(cb => {
+            const item = cb.closest('.file-item');
+            // Only toggle if the file is currently visible (matches filter)
+            if (item && item.style.display !== 'none') {
+                cb.checked = s.checked;
+                window.fileSelectionState[cb.value] = s.checked;
+            }
+        });
         updateChatContextIndicator();
         syncSelectAllState();
     }
@@ -6586,11 +6614,21 @@ async function downloadArtifact(runId) {
     function syncSelectAllState() {
         const master = document.getElementById('master-file-check');
         if (!master) return;
-        const checks = Array.from(document.querySelectorAll('#file-list-container .file-check'));
-        if (checks.length === 0) return;
+        
+        // Only evaluate checkboxes that are currently visible
+        const visibleChecks = Array.from(document.querySelectorAll('#file-list-container .file-item'))
+            .filter(item => item.style.display !== 'none')
+            .map(item => item.querySelector('.file-check'))
+            .filter(Boolean);
+            
+        if (visibleChecks.length === 0) {
+            master.checked = false;
+            master.indeterminate = false;
+            return;
+        }
 
-        const allChecked = checks.every(c => c.checked);
-        const someChecked = checks.some(c => c.checked);
+        const allChecked = visibleChecks.every(c => c.checked);
+        const someChecked = visibleChecks.some(c => c.checked);
 
         master.indeterminate = someChecked && !allChecked;
         master.checked = allChecked;
@@ -6667,8 +6705,23 @@ async function downloadArtifact(runId) {
 
     function filterFiles(q) {
         if (!window.repoFiles) return;
-        if (!q) return renderFileList(window.repoFiles);
-        renderFileList(window.repoFiles.filter(i => i.path.toLowerCase().includes(q.toLowerCase())));
+        const query = (q || '').toLowerCase();
+        
+        const items = document.querySelectorAll('#file-list-container .file-item');
+        items.forEach(item => {
+            const nameEl = item.querySelector('.v-info strong');
+            const pathEl = item.querySelector('.v-info small');
+            const text = (nameEl ? nameEl.innerText : '').toLowerCase();
+            const path = (pathEl ? pathEl.innerText : '').toLowerCase();
+            
+            if (text.includes(query) || path.includes(query)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+        
+        syncSelectAllState();
     }
 
     function loadVersion(i) {
