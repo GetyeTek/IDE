@@ -4486,7 +4486,7 @@
                                 <div><b style="color:#555">RESPONSE BODY:</b><br>\${escapeHtml(JSON.stringify(req.responseBody, null, 2) || 'null')}</div>
                             </div>
                         \`;
-                    \`).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No network requests found</div>';
+                    }).join('') || '<div style="color:#444; text-align:center; padding:40px; font-size:11px;">No network requests found</div>';
                 }
 
                 function escapeHtml(text) {
