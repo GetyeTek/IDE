@@ -6342,6 +6342,13 @@ async function downloadArtifact(runId) {
                 const bar = document.getElementById('ace-search-bar');
                 if (bar && bar.style.display !== 'none') toggleAceSearch();
             });
+
+            // Listen for changes to show Save button (attached ONCE)
+            aceEditorInstance.session.on('change', () => {
+                const currentContent = aceEditorInstance.getValue();
+                const hasChanged = currentContent !== originalViewerContent;
+                document.getElementById('viewer-save-btn').style.display = hasChanged ? 'block' : 'none';
+            });
         }
 
         // Reset Mode & State
@@ -6380,13 +6387,6 @@ async function downloadArtifact(runId) {
             const content = b64DecodeUnicode(data.content);
             originalViewerContent = content;
             aceEditorInstance.setValue(content, -1);
-
-            // Listen for changes to show Save button
-            aceEditorInstance.session.on('change', () => {
-                const currentContent = aceEditorInstance.getValue();
-                const hasChanged = currentContent !== originalViewerContent;
-                document.getElementById('viewer-save-btn').style.display = hasChanged ? 'block' : 'none';
-            });
         } catch (e) {
             aceEditorInstance.setValue(e.message, -1);
         }
@@ -6859,18 +6859,27 @@ async function downloadArtifact(runId) {
         }
     }
 
+    let saveStateTimeout;
     function saveState() {
         const val = document.getElementById('json-input').value;
-        // Isolated tab save
-        sessionStorage.setItem('conduit_autosave', val);
-        // Global fallback for persistence
-        localStorage.setItem('conduit_autosave', val);
         
         if (historyIndex === -1 || editHistory[historyIndex] !== val) {
             editHistory = editHistory.slice(0, historyIndex + 1);
             editHistory.push(val);
             historyIndex++;
+            // Cap history at 50 items to prevent memory exhaustion
+            if (editHistory.length > 50) {
+                editHistory.shift();
+                historyIndex--;
+            }
         }
+
+        // Debounce storage writes to prevent UI stuttering
+        clearTimeout(saveStateTimeout);
+        saveStateTimeout = setTimeout(() => {
+            sessionStorage.setItem('conduit_autosave', val);
+            localStorage.setItem('conduit_autosave', val);
+        }, 500);
     }
 
     function editorUndo() {
@@ -9243,6 +9252,7 @@ async function downloadArtifact(runId) {
         fetchSqlSchema();
     }
 
+    let saveSqlStateTimeout;
     function saveSqlState() {
         const val = document.getElementById('sqlEditor').value;
         if (!val.trim() && sqlHistory.length === 0) return;
@@ -9259,7 +9269,11 @@ async function downloadArtifact(runId) {
                 sqlHistoryIndex--;
             }
 
-            persistSqlHistory();
+            // Debounce storage write
+            clearTimeout(saveSqlStateTimeout);
+            saveSqlStateTimeout = setTimeout(() => {
+                persistSqlHistory();
+            }, 500);
         }
     }
 
