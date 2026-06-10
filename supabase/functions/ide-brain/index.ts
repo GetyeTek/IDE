@@ -1138,7 +1138,34 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
 
     const fileResults: any[] = [];
     const opsByFile: Record<string, any[]> = {};
-    actualOps.forEach((op: any) => { if (op.file_path) { if (!opsByFile[op.file_path]) opsByFile[op.file_path] = []; opsByFile[op.file_path].push(op); } });
+    const missingPathOps: any[] = [];
+
+    actualOps.forEach((op: any) => {
+        // Normalize AI hallucinations
+        op.file_path = op.file_path || op.file || op.path;
+        
+        if (op.file_path) {
+            if (!opsByFile[op.file_path]) opsByFile[op.file_path] = [];
+            opsByFile[op.file_path].push(op);
+        } else {
+            missingPathOps.push(op);
+        }
+    });
+
+    if (missingPathOps.length > 0) {
+        anyOpFailed = true;
+        fileResults.push({
+            file: "MISSING_FILE_PATH",
+            status: "error",
+            operations: missingPathOps.map(op => ({
+                type: op.action || "unknown",
+                success: false,
+                score: 0,
+                message: `CRITICAL: Operation rejected because 'file_path' is missing or malformed.`,
+                ...op
+            }))
+        });
+    }
 
     let lastCommitSha = "";
     let anyOpFailed = false;
