@@ -8697,14 +8697,21 @@ async function downloadArtifact(runId) {
             let text = await navigator.clipboard.readText();
             if (!text) return;
 
-            // Apply immediate healing on paste for UX
-            try {
-                // Use the new smart parser logic but just for formatting
-                const healed = smartJSONParse(text);
-                document.getElementById('json-input').value = JSON.stringify(healed, null, 2);
-            } catch(e) {
-                // If healer fails, paste raw so user can see the mess
+            // Check if it's CXP XML before attempting JSON formatting
+            const isCxp = text.trim().startsWith('&lt;') || text.includes('&lt;patch&gt;') || text.includes('&lt;replace_block') || text.includes('&lt;comment&gt;');
+
+            if (isCxp) {
+                // Keep raw XML in the editor exactly as pasted
                 document.getElementById('json-input').value = text;
+            } else {
+                // Apply immediate JSON healing/formatting
+                try {
+                    const healed = smartJSONParse(text);
+                    document.getElementById('json-input').value = JSON.stringify(healed, null, 2);
+                } catch(e) {
+                    // If healer fails, paste raw so user can see the mess
+                    document.getElementById('json-input').value = text;
+                }
             }
             
             saveState();
