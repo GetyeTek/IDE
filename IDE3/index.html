@@ -2187,8 +2187,11 @@
      * and compiles it into a standard JSON operations array on-the-fly.
      */
     function parseCXP(input) {
-        const operations = [];
+        console.group("🔍 [Conduit CXP Parser Debug]");
+        console.log("Raw Input Length:", input.length, "characters");
         
+        const operations = [];
+
         const cleanContent = (txt) => {
             return txt.replace(/^\r?\n/, '').replace(/\r?\n\s*$/, '');
         };
@@ -2196,57 +2199,35 @@
         // 1. Extract Top-level Comments
         const commentMatch = input.match(/<comment>([\s\S]*?)<\/comment>/i);
         if (commentMatch) {
+            console.log("✅ Comment Extracted:", commentMatch[1].trim());
             operations.push({
                 action: 'comment',
                 text: commentMatch[1].trim()
             });
+        } else {
+            console.warn("⚠️ No <comment> tag found.");
         }
 
-([\s\S]*?)<\/replace_with>/i);
-
-            if (findMatch && replaceWithMatch) {
-                operations.push({
-                    action: 'replace_block',
-                    file_path: filePath,
-                    find_block: cleanContent(findMatch[1]),
-                    replace_with: cleanContent(replaceWithMatch[1])
-                });
-            }
-        }
-
-        // 3. Extract Create File Blocks
-        const createRegex = /<create_file\s+file="([^"]+)">([\s\S]*?)<\/create_file>/gi;
-        while ((match = createRegex.exec(input)) !== null) {
-            const filePath = match[1].trim();
-            const inner = match[2];
-            const contentMatch = inner.match(/<content>([\s\S]*?)<\/content>/i);
-            if (contentMatch) {
-                operations.push({
-                    action: 'create_file',
-                    file_path: filePath,
-                    content: cleanContent(contentMatch[1])
-                });
-            }
-        }
-
-        // 4. Extract Delete File Blocks
-        const deleteRegex = /<delete_file\s+file="([^"]+)"(?:\s*\/|\s*><\/delete_file)>/gi;
-        while ((match = deleteRegex.exec(input)) !== null) {
-            operations.push({
-                action: 'delete_file',
-                file_path: match[1].trim()
-            });
-        }</find>
-<replace_with>        // 2. Extract Replace Blocks (Robust)
+        // 2. Extract Replace Blocks (Robust regex supporting attributes in any order and single/double quotes)
         const replaceRegex = /<replace_block[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/replace_block>/gi;
         let match;
+        let replaceCount = 0;
+        
         while ((match = replaceRegex.exec(input)) !== null) {
+            replaceCount++;
             const filePath = match[1].trim();
             const inner = match[2];
+            
             const findMatch = inner.match(/<find>([\s\S]*?)<\/find>/i);
             const replaceWithMatch = inner.match(/<replace_with>([\s\S]*?)<\/replace_with>/i);
 
-            if (findMatch && replaceWithMatch) {
+            console.log(`[Replace Block #${replaceCount}] Found target file:`, filePath);
+            
+            if (!findMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <find>...</find> tags!`);
+            if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</replace_with> tags!`);
+
+            if (filePath && findMatch && replaceWithMatch) {
+                console.log(`✅ [Replace Block #${replaceCount}] Parsed successfully!`);
                 operations.push({
                     action: 'replace_block',
                     file_path: filePath,
@@ -2255,14 +2236,22 @@
                 });
             }
         }
+        console.log(`Total <replace_block> tags matched: ${replaceCount}`);
 
         // 3. Extract Create File Blocks (Robust)
         const createRegex = /<create_file[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/create_file>/gi;
+        let createCount = 0;
         while ((match = createRegex.exec(input)) !== null) {
+            createCount++;
             const filePath = match[1].trim();
             const inner = match[2];
             const contentMatch = inner.match(/<content>([\s\S]*?)<\/content>/i);
-            if (contentMatch) {
+
+            console.log(`[Create Block #${createCount}] Found target file:`, filePath);
+            if (!contentMatch) console.error(`❌ [Create Block #${createCount}] Missing <content>...</content> tags!`);
+
+            if (filePath && contentMatch) {
+                console.log(`✅ [Create Block #${createCount}] Parsed successfully!`);
                 operations.push({
                     action: 'create_file',
                     file_path: filePath,
@@ -2270,16 +2259,24 @@
                 });
             }
         }
+        console.log(`Total <create_file> tags matched: ${createCount}`);
 
         // 4. Extract Delete File Blocks (Robust)
         const deleteRegex = /<delete_file[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*(?:\/|><\/delete_file)>/gi;
+        let deleteCount = 0;
         while ((match = deleteRegex.exec(input)) !== null) {
+            deleteCount++;
+            const filePath = match[1].trim();
+            console.log(`✅ [Delete Block #${deleteCount}] Matched for file:`, filePath);
             operations.push({
                 action: 'delete_file',
-                file_path: match[1].trim()
+                file_path: filePath
             });
         }
+        console.log(`Total <delete_file> tags matched: ${deleteCount}`);
 
+        console.log("Final compiled operations sent to backend:", JSON.stringify(operations, null, 2));
+        console.groupEnd();
         return operations;
     }
 
@@ -3742,6 +3739,12 @@
                 }
             }
 
+            console.group("🚀 [Conduit Network Dispatch Debug]");
+            console.log("Action Type:", actionType);
+            console.log("Target API URL:", CONFIG.funcUrl);
+            console.log("Final compiled operations payload to transmit:", JSON.stringify(payload, null, 2));
+            console.groupEnd();
+
             const res = await fetch(CONFIG.funcUrl, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: apiBody({ 
@@ -3934,8 +3937,14 @@
 
         if(response.results && Array.isArray(response.results)) {
             if (response.results.length === 0) {
-                 failCount++; // Force the UI to render this as a failure
-                 opHtml = `<div class="op-row row-fail"><div class="op-details" style="color:var(--danger); font-weight:bold; padding:12px;">❌ FATAL: No operations were executed.</div><div class="op-details" style="color:#aaa; padding:0 12px 12px 12px;">The patching engine received zero valid operations. This usually means the AI hallucinated the XML/JSON schema (e.g. missing 'file_path' attribute or using malformed syntax). Check your payload.</div></div>`;
+                 failCount++; // Force the UI card to render as a red FAILED card
+                 opHtml = `
+                    <div class="op-row row-fail">
+                        <div class="op-title" style="color:var(--danger); font-weight:bold;">❌ FATAL: No operations were executed!</div>
+                        <div class="op-details" style="color:#ffcdcd; background:rgba(239, 68, 68, 0.05); padding:10px; border-radius:6px; margin: 8px 0;">
+                            The backend returned 0 operational results. This usually means that all sent actions were stripped out because they were empty, or they lacked valid 'file_path' target properties.
+                        </div>
+                    </div>`;
             } else {
                 response.results.forEach(fileRes => {
                     opHtml += `<div style="background:#111; padding:6px 12px; font-weight:bold; color:#fff; border-bottom:1px solid #222; display:flex; justify-content:space-between;"><span>📄 ${escapeHtml(fileRes.file)}</span><span style="opacity:0.5; font-size:10px">${escapeHtml(fileRes.status)}</span></div>`;
@@ -8732,8 +8741,8 @@ async function downloadArtifact(runId) {
             let text = await navigator.clipboard.readText();
             if (!text) return;
 
-            // Check if it's CXP XML before attempting JSON formatting
-            const isCxp = text.trim().startsWith('&lt;') || text.includes('&lt;patch&gt;') || text.includes('&lt;replace_block') || text.includes('&lt;comment&gt;');
+            // Check if it's CXP XML before attempting JSON formatting (Robust Raw Check)
+            const isCxp = text.trim().startsWith('<') || text.includes('<patch>') || text.includes('<replace_block') || text.includes('<comment>');
 
             if (isCxp) {
                 // Keep raw XML in the editor exactly as pasted
