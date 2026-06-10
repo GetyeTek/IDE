@@ -1113,6 +1113,14 @@ function applyOperation(content: string, op: any) {
 
 // --- CORE PROCESSING LOGIC ---
 async function processOperations(TARGET_REPO: string, operations: any[], projectPath: string, autoSanity: boolean, config?: AIConfig) {
+    console.log("\n=== 📡 [Backend processOperations Execution Start] ===");
+    console.log(`[Backend Debug] Raw payload operations array size: ${operations ? operations.length : 0}`);
+    console.log("[Backend Debug] Full raw payload dump:", JSON.stringify(operations, null, 2));
+
+    if (!operations || operations.length === 0) {
+        console.warn("⚠️ [Backend Debug] The incoming operations array is completely empty!");
+    }
+
     const scopePath = projectPath || "";
     if (scopePath) {
         const invalidOps = operations.filter((op: any) => {
@@ -1130,7 +1138,13 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     if (operations[0]?.action === 'comment') {
         patchNote = operations[0].text || "";
         actualOps = operations.slice(1);
+        console.log(`[Backend Debug] Top-level comment stripped ("${patchNote.split('\n')[0]}"). Code operations remaining to apply: ${actualOps.length}`);
     }
+
+    if (actualOps.length === 0) {
+        console.warn("⚠️ [Backend Debug] Zero code operations left to process! The request contained either only a comment, or was entirely blank.");
+    }
+    
     const patchTitle = patchNote ? patchNote.split('\n')[0].substring(0, 60) : `Patch: ${actualOps.length} operations`;
     
     const devBranchRef = await githubFetch(TARGET_REPO, `/git/ref/heads/${DEV_BRANCH}`);
@@ -1140,14 +1154,20 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     const opsByFile: Record<string, any[]> = {};
     const missingPathOps: any[] = [];
 
-    actualOps.forEach((op: any) => {
-        // Normalize AI hallucinations
-        op.file_path = op.file_path || op.file || op.path;
+    console.log(`[Backend Debug] Total operations received: ${actualOps.length}`);
+
+    actualOps.forEach((op: any, index: number) => {
+        // Normalize AI schema hallucinations
+        const originalPath = op.file_path || op.file || op.path;
+        op.file_path = originalPath;
+
+        console.log(`[Backend Debug] Op #${index + 1}: Action='${op.action || op.type}', Resolved File Path='${op.file_path || "UNDEFINED"}'`);
         
         if (op.file_path) {
             if (!opsByFile[op.file_path]) opsByFile[op.file_path] = [];
             opsByFile[op.file_path].push(op);
         } else {
+            console.error(`[Backend Debug] Op #${index + 1} rejected due to missing file path target!`);
             missingPathOps.push(op);
         }
     });
@@ -1155,14 +1175,14 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     if (missingPathOps.length > 0) {
         anyOpFailed = true;
         fileResults.push({
-            file: "MISSING_FILE_PATH",
+            file: "MISSING_FILE_PATH_ERROR",
             status: "error",
-            operations: missingPathOps.map(op => ({
-                type: op.action || "unknown",
+            operations: missingPathOps.map((op, idx) => ({
+                type: op.action || op.type || "unknown",
                 success: false,
                 score: 0,
-                message: `CRITICAL: Operation rejected because 'file_path' is missing or malformed.`,
-                ...op
+                message: `CRITICAL: This action was discarded because the backend engine could not resolve a target file path. (Check schema properties)`,
+                data: op
             }))
         });
     }
@@ -1346,8 +1366,8 @@ serve(async (req) => {
     const bodyText = await req.text();
     let body: any = {};
     
-    // Auto-detect if request payload itself is raw XML CXP Markup
-    const isCxpBody = bodyText.trim().startsWith('<') || bodyText.includes('<replace_block') || bodyText.includes('<comment>');
+    // Auto-detect if request payload itself is raw XML CXP Markup (Strict prefix check to avoid confusing JSON strings)
+    const isCxpBody = bodyText.trim().startsWith('<');
     
     if (isCxpBody) {
       body = {
