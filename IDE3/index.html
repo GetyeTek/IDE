@@ -2063,6 +2063,7 @@
             const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ');
             const time = new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
             window.ideLogData.push({ method, msg, time });
+            if (window.ideLogData.length > 100) window.ideLogData.shift();
             
             const container = document.getElementById('ins-console-ide');
             if (container) renderLogLine(container, method, msg, time);
@@ -2089,7 +2090,13 @@
                 responseBody: resBody
             };
             window.ideNetData.push(netEntry);
-            renderNetworkRow('ide', netEntry);
+            if (window.ideNetData.length > 50) window.ideNetData.shift();
+            
+            const overlay = document.getElementById('inspector-overlay');
+            const netView = document.getElementById('ins-view-network');
+            if (overlay && overlay.classList.contains('active') && netView && netView.style.display !== 'none' && window.currentLogSource === 'ide') {
+                renderNetworkRow('ide', netEntry);
+            }
             return response;
         } catch(err) { throw err; }
     };
@@ -2122,6 +2129,7 @@
         }
         
         container.appendChild(row);
+        if (container.childElementCount > 100) container.removeChild(container.firstElementChild);
         if (container.scrollHeight - container.scrollTop < 1000) container.scrollTop = container.scrollHeight;
     }
 
@@ -2144,6 +2152,7 @@
                 <div><b style="color:#555">RESPONSE:</b><br>${renderJsonHighlight(req.responseBody)}</div>
             </div>`;
         list.appendChild(row);
+        if (list.childElementCount > 50) list.removeChild(list.firstElementChild);
         if (list.parentElement.scrollHeight - list.parentElement.scrollTop < 1000) list.parentElement.scrollTop = list.parentElement.scrollHeight;
     }
 
@@ -2154,6 +2163,7 @@
             const { method, args, time } = e.data;
             const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
             window.inspectorLogData.push({ method, msg, time });
+            if (window.inspectorLogData.length > 100) window.inspectorLogData.shift();
             const container = document.getElementById('ins-console-app');
             if (container) renderLogLine(container, method, msg, time);
         }
@@ -2161,7 +2171,13 @@
         if (e.data.type === 'CONDUIT_NETWORK') {
             const req = e.data.payload;
             window.inspectorNetData.push(req);
-            renderNetworkRow('app', req);
+            if (window.inspectorNetData.length > 50) window.inspectorNetData.shift();
+            
+            const overlay = document.getElementById('inspector-overlay');
+            const netView = document.getElementById('ins-view-network');
+            if (overlay && overlay.classList.contains('active') && netView && netView.style.display !== 'none' && window.currentLogSource === 'app') {
+                renderNetworkRow('app', req);
+            }
         }
 
         if (e.data.type === 'CONDUIT_NAVIGATE') {
@@ -4183,6 +4199,12 @@
         iframe.replaceWith(loaderIframe);
         iframe = loaderIframe;
 
+        // Cleanup old Blob URLs to prevent severe memory leaks
+        if (window.ACTIVE_BLOB_URLS && window.ACTIVE_BLOB_URLS.length > 0) {
+            window.ACTIVE_BLOB_URLS.forEach(url => URL.revokeObjectURL(url));
+        }
+        window.ACTIVE_BLOB_URLS = [];
+
         const fileCache = {}; window.CURRENT_FILE_CACHE = fileCache;
 
         try {
@@ -4308,6 +4330,7 @@
                 const mime = mimeMap[file.ext] || 'application/octet-stream';
                 const blob = new Blob([file.content], { type: mime });
                 file.blobUrl = URL.createObjectURL(blob);
+                window.ACTIVE_BLOB_URLS.push(file.blobUrl);
                 
                 // Register exact path
                 importMap.imports[virtualPath] = file.blobUrl;
@@ -4652,6 +4675,9 @@
                 function renderJsonHighlight(obj) {
                     if (!obj) return '<span style="color:#444">null</span>';
                     const str = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+                    if (str.length > 20000) {
+                        return \`<pre style="margin:0; font-size:10px; color:#ccc; white-space:pre-wrap; word-break:break-all;">\${escapeHtml(str)}</pre>\`;
+                    }
                     const html = escapeHtml(str).replace(/"(\\w+)":/g, '<span class="json-key">"$1"</span>:')
                                      .replace(/: "(.*?)"/g, ': <span class="json-string">"$1"</span>')
                                      .replace(/: (\\d+)/g, ': <span class="json-number">$1</span>');
@@ -9015,6 +9041,15 @@ async function downloadArtifact(runId) {
         overlay.classList.toggle('inspector-half', CONFIG.consoleHalf);
         overlay.classList.add('active');
         toggleFab(false);
+        
+        const netView = document.getElementById('ins-view-network');
+        if (netView && netView.style.display !== 'none') {
+            const data = window.currentLogSource === 'app' ? window.inspectorNetData : window.ideNetData;
+            const listId = window.currentLogSource === 'app' ? 'ins-net-app' : 'ins-net-ide';
+            const list = document.getElementById(listId);
+            list.innerHTML = '';
+            data.forEach(req => renderNetworkRow(window.currentLogSource, req));
+        }
     }
 
     function closeInspector() {
@@ -9076,6 +9111,15 @@ async function downloadArtifact(runId) {
         document.getElementById('log-src-app').style.color = isApp ? 'white' : 'var(--text-muted)';
         document.getElementById('log-src-ide').style.background = isApp ? 'transparent' : 'var(--primary)';
         document.getElementById('log-src-ide').style.color = isApp ? 'var(--text-muted)' : 'white';
+
+        const netView = document.getElementById('ins-view-network');
+        if (netView && netView.style.display !== 'none') {
+            const data = isApp ? window.inspectorNetData : window.ideNetData;
+            const listId = isApp ? 'ins-net-app' : 'ins-net-ide';
+            const list = document.getElementById(listId);
+            list.innerHTML = '';
+            data.forEach(req => renderNetworkRow(source, req));
+        }
     }
 
     function clearInspector() {
@@ -9109,6 +9153,12 @@ async function downloadArtifact(runId) {
         if (tab === 'edge') {
             syncInsEdgeFunctionList();
             fetchInsEdgeLogs();
+        } else if (tab === 'network') {
+            const data = window.currentLogSource === 'app' ? window.inspectorNetData : window.ideNetData;
+            const listId = window.currentLogSource === 'app' ? 'ins-net-app' : 'ins-net-ide';
+            const list = document.getElementById(listId);
+            list.innerHTML = '';
+            data.forEach(req => renderNetworkRow(window.currentLogSource, req));
         }
     }
 
@@ -9243,10 +9293,13 @@ async function downloadArtifact(runId) {
     function renderJsonHighlight(obj) {
         if (!obj) return '<span style="color:#444">null</span>';
         const str = typeof obj === 'string' ? obj : JSON.stringify(obj, (k,v) => typeof v === 'bigint' ? v.toString() : v, 2);
+        if (str.length > 20000) {
+            return `<pre style="margin:0; font-size:10px; color:#ccc; white-space:pre-wrap; word-break:break-all;">${escapeHtml(str)}</pre>`;
+        }
         const html = escapeHtml(str).replace(/"(\w+)":/g, '<span class="json-key">"$1"</span>:')
                          .replace(/: "(.*?)"/g, ': <span class="json-string">"$1"</span>')
                          .replace(/: (\d+)/g, ': <span class="json-number">$1</span>');
-        return `<pre style="margin:0; font-size:10px; color:#ccc;">${html}</pre>`;
+        return `<pre style="margin:0; font-size:10px; color:#ccc; white-space:pre-wrap; word-break:break-all;">${html}</pre>`;
     }
 
     // --- SQL EXECUTOR LOGIC ---
