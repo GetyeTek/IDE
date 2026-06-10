@@ -2202,14 +2202,7 @@
             });
         }
 
-        // 2. Extract Replace Blocks
-        const replaceRegex = /<replace_block\s+file="([^"]+)">([\s\S]*?)<\/replace_block>/gi;
-        let match;
-        while ((match = replaceRegex.exec(input)) !== null) {
-            const filePath = match[1].trim();
-            const inner = match[2];
-            const findMatch = inner.match(/<find>([\s\S]*?)<\/find>/i);
-            const replaceWithMatch = inner.match(/<replace_with>([\s\S]*?)<\/replace_with>/i);
+([\s\S]*?)<\/replace_with>/i);
 
             if (findMatch && replaceWithMatch) {
                 operations.push({
@@ -2238,6 +2231,48 @@
 
         // 4. Extract Delete File Blocks
         const deleteRegex = /<delete_file\s+file="([^"]+)"(?:\s*\/|\s*><\/delete_file)>/gi;
+        while ((match = deleteRegex.exec(input)) !== null) {
+            operations.push({
+                action: 'delete_file',
+                file_path: match[1].trim()
+            });
+        }</find>
+<replace_with>        // 2. Extract Replace Blocks (Robust)
+        const replaceRegex = /<replace_block[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/replace_block>/gi;
+        let match;
+        while ((match = replaceRegex.exec(input)) !== null) {
+            const filePath = match[1].trim();
+            const inner = match[2];
+            const findMatch = inner.match(/<find>([\s\S]*?)<\/find>/i);
+            const replaceWithMatch = inner.match(/<replace_with>([\s\S]*?)<\/replace_with>/i);
+
+            if (findMatch && replaceWithMatch) {
+                operations.push({
+                    action: 'replace_block',
+                    file_path: filePath,
+                    find_block: cleanContent(findMatch[1]),
+                    replace_with: cleanContent(replaceWithMatch[1])
+                });
+            }
+        }
+
+        // 3. Extract Create File Blocks (Robust)
+        const createRegex = /<create_file[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/create_file>/gi;
+        while ((match = createRegex.exec(input)) !== null) {
+            const filePath = match[1].trim();
+            const inner = match[2];
+            const contentMatch = inner.match(/<content>([\s\S]*?)<\/content>/i);
+            if (contentMatch) {
+                operations.push({
+                    action: 'create_file',
+                    file_path: filePath,
+                    content: cleanContent(contentMatch[1])
+                });
+            }
+        }
+
+        // 4. Extract Delete File Blocks (Robust)
+        const deleteRegex = /<delete_file[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*(?:\/|><\/delete_file)>/gi;
         while ((match = deleteRegex.exec(input)) !== null) {
             operations.push({
                 action: 'delete_file',
@@ -3899,8 +3934,8 @@
 
         if(response.results && Array.isArray(response.results)) {
             if (response.results.length === 0) {
-                 // FIX: explicit message when no operations were performed
-                 opHtml = `<div class="op-row"><div class="op-details" style="color:#666; font-style:italic; padding:12px;">No files were modified. (Check file_path and action parameters)</div></div>`;
+                 failCount++; // Force the UI to render this as a failure
+                 opHtml = `<div class="op-row row-fail"><div class="op-details" style="color:var(--danger); font-weight:bold; padding:12px;">❌ FATAL: No operations were executed.</div><div class="op-details" style="color:#aaa; padding:0 12px 12px 12px;">The patching engine received zero valid operations. This usually means the AI hallucinated the XML/JSON schema (e.g. missing 'file_path' attribute or using malformed syntax). Check your payload.</div></div>`;
             } else {
                 response.results.forEach(fileRes => {
                     opHtml += `<div style="background:#111; padding:6px 12px; font-weight:bold; color:#fff; border-bottom:1px solid #222; display:flex; justify-content:space-between;"><span>📄 ${escapeHtml(fileRes.file)}</span><span style="opacity:0.5; font-size:10px">${escapeHtml(fileRes.status)}</span></div>`;
