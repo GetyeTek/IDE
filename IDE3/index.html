@@ -3829,6 +3829,7 @@
                 })
             });
             const data = await res.json();
+            window.LAST_PATCH_RESPONSE = data; // Save for Staging UI cross-referencing
             updateTerminalCard(termId, data, payload, true);
 
             if(data.success) {
@@ -4930,9 +4931,34 @@
             pendingOps = Array.isArray(payload) ? payload : (payload.operations || []);
             if (pendingOps.length === 0) return alert("No operations to stage.");
             
+            // Cross-reference with the last patch response to highlight AI fixes
+            if (window.LAST_PATCH_RESPONSE && window.LAST_PATCH_RESPONSE.results) {
+                const fileOps = {};
+                window.LAST_PATCH_RESPONSE.results.forEach(resFile => {
+                    fileOps[resFile.file] = [...(resFile.operations || [])];
+                });
+
+                pendingOps.forEach(op => {
+                    if (op.action === 'comment') return;
+                    const targetPath = op.file_path || op.file || "";
+                    const targetFile = Object.keys(fileOps).find(f => f.endsWith(targetPath));
+                    
+                    if (targetFile && fileOps[targetFile].length > 0) {
+                        const matchIdx = fileOps[targetFile].findIndex(execOp => execOp.type === op.action);
+                        if (matchIdx !== -1) {
+                            const execOp = fileOps[targetFile].splice(matchIdx, 1)[0];
+                            if (execOp.is_ai_fix || (execOp.message && execOp.message.includes('AI'))) {
+                                op._ai_healed = true;
+                                op._ai_message = execOp.message;
+                            }
+                        }
+                    }
+                });
+            }
+            
             renderStagingUI();
             document.getElementById('staging-overlay').classList.add('active');
-        } catch(e) { alert("JSON Error: " + e.message); }
+        } catch(e) { alert("Format Error: " + e.message); }
     }
 
     function renderStagingUI() {
@@ -4947,18 +4973,25 @@
             const removed = op.find_block || "";
             const typeLabel = op.action === 'replace_block' ? 'MOD' : (op.action === 'create_file' ? 'ADD' : 'DEL');
             
+            const isHealed = op._ai_healed;
+            const borderColor = isHealed ? 'var(--dev)' : 'var(--border)';
+            const headerBg = isHealed ? 'rgba(234, 179, 8, 0.1)' : '';
+
             const div = document.createElement('div');
             div.className = 'stage-item';
+            div.style.borderColor = borderColor;
             div.innerHTML = `
-                <div class="stage-header" onclick="toggleStageOp(${i}, this)" style="align-items: flex-start;">
+                ${isHealed ? `<div style="background:var(--dev); color:black; padding:4px 10px; font-size:10px; font-weight:bold; display:flex; justify-content:space-between;"><span>🤖 AI HEALED OPERATION</span><span>Review or Remove</span></div>` : ''}
+                <div class="stage-header" onclick="toggleStageOp(${i}, this)" style="align-items: flex-start; background:${headerBg}">
                     <div style="display:flex; flex-direction:column; gap:4px; align-items:center; width:35px; flex-shrink:0;">
                         <span style="color:var(--ai-accent); font-weight:bold; font-size:10px;">${typeLabel}</span>
                         ${renderDiffMeter(added, removed)}
                     </div>
-                    <span class="stage-path">${op.file_path}</span>
+                    <span class="stage-path">${op.file_path || op.file}</span>
                     <button class="menu-btn" style="color:var(--danger); flex-shrink:0; padding: 0 8px; font-size: 18px;" onclick="event.stopPropagation(); removeStagedOp(${i})">×</button>
                 </div>
-                <div id="stage-body-${i}" style="display:none; padding:12px; background:#0a0a0a; border-top:1px solid var(--border);">
+                <div id="stage-body-${i}" style="display:none; padding:12px; background:#0a0a0a; border-top:1px solid ${borderColor};">
+                    ${isHealed ? `<div style="color:var(--dev); font-size:11px; margin-bottom:10px; font-style:italic;">"${op._ai_message}"</div>` : ''}
                     ${removed ? `<div class="code-block-wrapper"><label class="code-label">Removing</label><pre class="code-pre diff-remove">${escapeHtml(removed)}</pre></div>` : ''}
                     ${added ? `<div class="code-block-wrapper"><label class="code-label">Adding</label><pre class="code-pre diff-add">${escapeHtml(added)}</pre></div>` : ''}
                     <button class="btn-outline" style="width:100%; margin-top:10px; font-size:11px; padding:8px;" onclick="previewStageDiff(${i})">🔍 Full Side-by-Side Diff</button>
@@ -4985,8 +5018,17 @@
 
     function removeStagedOp(i) {
         pendingOps.splice(i, 1);
-        // Sync back to editor so state is preserved
-        document.getElementById('json-input').value = JSON.stringify(pendingOps, null, 2);
+        
+        // Strip the transient AI flags before formatting to XML to keep the payload clean
+        const cleanOps = pendingOps.map(op => {
+            const clone = { ...op };
+            delete clone._ai_healed;
+            delete clone._ai_message;
+            return clone;
+        });
+
+        // Sync back to editor as CXP Markup so state is preserved naturally
+        document.getElementById('json-input').value = operationsToCXP(cleanOps);
         saveState();
         renderStagingUI();
     }
