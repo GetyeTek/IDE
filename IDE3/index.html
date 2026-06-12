@@ -4166,6 +4166,7 @@
                             <div class="menu-item" onclick="traceLogToRun('${response.sha}')">View Build Log</div>
                         ` : ''}
                         <div class="menu-item danger" style="border-top: 1px solid #333;" onclick="deleteLog('${id}')">Delete Log</div>
+                        ${hasAI ? `&lt;div class="menu-item" style="color:var(--ai-accent); border-top: 1px solid #333;" onclick="copyHealedFiles('${id}')"&gt;📋 Copy Healed (CIF)&lt;/div&gt;` : ''}
                     </div>
                 </div>
             </div>
@@ -9015,6 +9016,48 @@ async function downloadArtifact(runId) {
             document.getElementById('json-input').scrollIntoView({ behavior: 'smooth' });
         } catch(e) {
             showGlobalToast("Failed to parse log payload", true);
+        }
+    }
+
+    async function copyHealedFiles(logId) {
+        const responseData = document.getElementById(logId + '-response-data').value;
+        if (!responseData) return;
+
+        let res;
+        try { res = JSON.parse(responseData); } catch(e) { return; }
+
+        // Find files that have at least one AI-healed operation
+        const infectedPaths = (res.results || [])
+            .filter(f => (f.operations || []).some(op => op.is_ai_fix === true))
+            .map(f => f.file);
+
+        if (infectedPaths.length === 0) {
+            return showGlobalToast("No AI-healed (infected) files found in this log.", true);
+        }
+
+        if (!CONFIG.ghToken) return alert("Direct Bridge (GitHub Token) required for CIF extraction.");
+
+        showGlobalToast(`🧬 CIF: Fetching ${infectedPaths.length} healed files...`);
+        
+        try {
+            const fetchedFiles = [];
+            for (const path of infectedPaths) {
+                try {
+                    const data = await githubRequest(`/contents/${path}?ref=conduit-dev`);
+                    if (data.content) {
+                        fetchedFiles.push({ path, content: b64DecodeUnicode(data.content) });
+                    }
+                } catch (e) { console.warn("CIF: Failed to fetch " + path); }
+            }
+
+            if (fetchedFiles.length === 0) throw new Error("Could not retrieve file contents.");
+
+            const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
+            await navigator.clipboard.writeText(text);
+            
+            showGlobalToast(`✅ CIF Copied: ${fetchedFiles.length} files`);
+        } catch (e) {
+            showGlobalToast("CIF Failed: " + e.message, true);
         }
     }
 
