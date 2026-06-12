@@ -1205,7 +1205,7 @@
 
     <!-- HISTORY ACTIONS FAB GROUP -->
     <div id="history-actions-fab" class="flex-gap" style="position:fixed; bottom:100px; right:20px; z-index:150; display:none;">
-        <button class="btn btn-outline" onclick="copySelectedHistoryJSON()" style="width:auto; padding:12px 16px; border-radius:16px; background:var(--card-bg); border-color:var(--ai-accent); color:var(--ai-accent); box-shadow:0 5px 20px rgba(0,0,0,0.4);">📋 Copy JSON</button>
+        <button class="btn btn-outline" onclick="copySelectedHistoryXML()" style="width:auto; padding:12px 16px; border-radius:16px; background:var(--card-bg); border-color:var(--ai-accent); color:var(--ai-accent); box-shadow:0 5px 20px rgba(0,0,0,0.4);">📋 Copy XML</button>
         <button class="btn btn-danger" onclick="deleteSelectedHistory()" style="width:auto; padding:12px 16px; border-radius:16px; box-shadow:0 5px 20px rgba(0,0,0,0.4);">🗑️ Delete Selected</button>
     </div>
 
@@ -2213,6 +2213,44 @@
     };
 
     // --- CORE UTILS ---
+    
+    /**
+     * Converts a JSON operations array back into CXP XML Markup.
+     */
+    function operationsToCXP(ops) {
+        if (!Array.isArray(ops)) ops = ops.operations || [];
+        if (!Array.isArray(ops) || ops.length === 0) return "";
+        
+        let xmlOutput = "";
+        let comments = [];
+
+        // Obfuscate tags to prevent the IDE's own CXP regex parser from intercepting them
+        const t = {
+            rb: '<re' + 'place_block', rbe: '</re' + 'place_block>',
+            f: '<fi' + 'nd>', fe: '</fi' + 'nd>',
+            rw: '<re' + 'place_wi' + 'th>', rwe: '</re' + 'place_wi' + 'th>',
+            cf: '<cre' + 'ate_file', cfe: '</cre' + 'ate_file>',
+            df: '<del' + 'ete_file',
+            c: '<com' + 'ment>', ce: '</com' + 'ment>',
+            cnt: '<con' + 'tent>', cnte: '</con' + 'tent>'
+        };
+
+        ops.forEach(op => {
+            if (op.action === 'comment') {
+                if (op.text) comments.push(op.text);
+            } else if (op.action === 'replace_block') {
+                xmlOutput += `\n${t.rb} file="${op.file_path || op.file}">\n${t.f}\n${op.find_block || op.find}\n${t.fe}\n${t.rw}\n${op.replace_with || op.replace}\n${t.rwe}\n${t.rbe}\n`;
+            } else if (op.action === 'create_file') {
+                xmlOutput += `\n${t.cf} file="${op.file_path || op.file}">\n${t.cnt}\n${op.content}\n${t.cnte}\n${t.cfe}\n`;
+            } else if (op.action === 'delete_file') {
+                xmlOutput += `\n${t.df} file="${op.file_path || op.file}" />\n`;
+            }
+        });
+
+        const finalComment = comments.length > 0 ? comments.join('\n---\n') : 'Recovered XML Payload';
+        return `${t.c}\n${finalComment}\n${t.ce}\n${xmlOutput}`.trim();
+    }
+
     /**
      * Tries to parse JSON. If it fails due to bad escaping (common with AI),
      * it initiates a surgical regex preprocessor to isolate parent string values
@@ -4120,7 +4158,7 @@
                     <div id="${id}-menu" class="menu-dropdown">
                         <div class="menu-item" onclick="viewLogComment('${id}')">View Comment</div>
                         <div class="menu-item" onclick="viewLogData('${id}', false)">View Response JSON</div>
-                        <div class="menu-item" onclick="viewLogData('${id}', true)">View Payload JSON</div>
+                        <div class="menu-item" onclick="viewLogData('${id}', true)">View Payload XML</div>
                         <div class="menu-item" style="color:var(--primary);" onclick="loadLogToEditor('${id}')">Load into Editor</div>
                         ${response.sha_before ? `<div class="menu-item" style="color:var(--dev); border-top: 1px solid #333;" onclick="undoLog('${id}', '${response.sha_before}')">Undo Patch</div>` : ''}
                         ${response.sha ? `
@@ -8613,9 +8651,21 @@ async function downloadArtifact(runId) {
     }
 
     function viewLogData(id, isPayload) {
-        const data = document.getElementById(id + (isPayload ? '-payload-data' : '-response-data')).value;
-        document.getElementById('op-modal-title').innerText = isPayload ? 'Payload JSON' : 'Response JSON';
-        document.getElementById('op-modal-body').innerHTML = `<div style="padding:10px;"><pre class="code-pre">${data}</pre><button class="btn btn-primary" onclick="navigator.clipboard.writeText(this.previousElementSibling.innerText)">Copy</button></div>`;
+        const rawData = document.getElementById(id + (isPayload ? '-payload-data' : '-response-data')).value;
+        let displayData = rawData;
+        
+        if (isPayload) {
+            try {
+                const parsed = JSON.parse(rawData);
+                const ops = Array.isArray(parsed) ? parsed : (parsed.operations || []);
+                if (ops.length > 0) {
+                    displayData = operationsToCXP(ops);
+                }
+            } catch(e) {}
+        }
+        
+        document.getElementById('op-modal-title').innerText = isPayload ? 'Payload XML' : 'Response JSON';
+        document.getElementById('op-modal-body').innerHTML = `<div style="padding:10px;"><pre class="code-pre">${escapeHtml(displayData)}</pre><button class="btn btn-primary" onclick="navigator.clipboard.writeText(this.previousElementSibling.innerText)">Copy</button></div>`;
         document.getElementById('op-modal').style.display = 'flex';
     }
 
@@ -8787,24 +8837,35 @@ async function downloadArtifact(runId) {
         }
     }
 
-    async function copySelectedHistoryJSON() {
+    async function copySelectedHistoryXML() {
         const checked = Array.from(document.querySelectorAll('.history-check:checked')).map(cb => cb.value);
         if (!checked.length) return;
         
         const allOps = [];
-        checked.forEach(id => {
+
+        // Iterate in reverse to maintain chronological order
+        const sortedChecked = [...checked].sort((a, b) => {
+            const idxA = dbHistory.findIndex(h => String(h.id) === String(a));
+            const idxB = dbHistory.findIndex(h => String(h.id) === String(b));
+            return idxB - idxA; 
+        });
+
+        sortedChecked.forEach(id => {
             const entry = dbHistory.find(h => String(h.id) === String(id));
             if (entry && entry.ops && Array.isArray(entry.ops)) {
                 allOps.push(...entry.ops);
             }
         });
 
-        if (allOps.length === 0) return showGlobalToast("No operations found in selection", true);
+        if (allOps.length === 0) {
+            return showGlobalToast("No valid operations to copy", true);
+        }
+
+        const finalMarkup = operationsToCXP(allOps);
 
         try {
-            // Standardize: Remove any duplicates and combine into a clean JSON string
-            await navigator.clipboard.writeText(JSON.stringify(allOps, null, 2));
-            showGlobalToast("📋 Combined JSON copied to clipboard!");
+            await navigator.clipboard.writeText(finalMarkup);
+            showGlobalToast("📋 CXP XML Patch copied!");
         } catch (e) {
             showGlobalToast("Copy failed", true);
         }
@@ -8947,9 +9008,9 @@ async function downloadArtifact(runId) {
             const ops = Array.isArray(parsed) ? parsed : (parsed.operations || []);
             if (ops.length === 0) return showGlobalToast("No operations found in log", true);
             
-            document.getElementById('json-input').value = JSON.stringify(ops, null, 2);
+            document.getElementById('json-input').value = operationsToCXP(ops);
             saveState();
-            showGlobalToast("📥 Payload loaded into Editor");
+            showGlobalToast("📥 Payload loaded into Editor as XML");
             // Smooth scroll to top of editor
             document.getElementById('json-input').scrollIntoView({ behavior: 'smooth' });
         } catch(e) {
