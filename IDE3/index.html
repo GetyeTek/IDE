@@ -711,7 +711,13 @@
             </div>
             <div class="card">
                 <div class="input-group">
-                    <label class="input-label">Supabase Edge Function URL</label>
+                    <div class="flex-between" style="margin-bottom:6px;">
+                        <label class="input-label" style="margin:0">Supabase Edge Function URL</label>
+                        <div id="backend-toggle-group" class="flex-gap" style="background:#0a0a0a; padding:2px; border-radius:8px; border:1px solid var(--border);">
+                            <button id="active-slot-a" onclick="switchActiveBackendSlot('a')" class="btn-outline" style="width:30px; height:20px; padding:0; font-size:9px; border:none; border-radius:6px; font-weight:bold;">A</button>
+                            <button id="active-slot-b" onclick="switchActiveBackendSlot('b')" class="btn-outline" style="width:30px; height:20px; padding:0; font-size:9px; border:none; border-radius:6px; font-weight:bold;">B</button>
+                        </div>
+                    </div>
                     <input type="text" id="setting-func-url" class="input-field" placeholder="https://...supabase.co/functions/v1/ide-brain">
                 </div>
                 <div class="input-group">
@@ -1239,13 +1245,26 @@
         </div>
     </div>
 
-    <!-- REPO SETTINGS OVERLAY -->
+    <!-- SYSTEM MANAGEMENT OVERLAY -->
     <div id="repo-settings-overlay" class="viewer-overlay">
         <div class="viewer-header">
-            <span class="viewer-title">Repository Settings</span>
+            <span class="viewer-title">System Management</span>
             <button class="btn-outline" style="width:auto; padding:6px 14px;" onclick="closeRepoSettings()">Close</button>
         </div>
         <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            <div class="ai-section-title">Backend Environments</div>
+            <div class="card" style="display:flex; flex-direction:column; gap:12px;">
+                <div class="input-group" style="margin:0">
+                    <label class="input-label">Primary Backend (Slot A)</label>
+                    <input type="text" id="def-backend-a" class="input-field" placeholder="https://...supabase.co/functions/v1/ide-brain" oninput="localStorage.setItem('conduit_backend_a', this.value)">
+                </div>
+                <div class="input-group" style="margin:0">
+                    <label class="input-label">Secondary Backend (Slot B)</label>
+                    <input type="text" id="def-backend-b" class="input-field" placeholder="Alternative URL..." oninput="localStorage.setItem('conduit_backend_b', this.value)">
+                </div>
+                <p style="font-size:10px; color:#666;">Define your URLs here, then use the A/B toggle on the main Settings tab to switch active targets.</p>
+            </div>
+
             <div class="ai-section-title">Advanced Actions</div>
             <div class="card" style="padding: 0; overflow: hidden;">
                 <div class="history-item" onclick="initRepoMigration()">
@@ -1255,7 +1274,6 @@
                     </div>
                     <span style="color:#666;">›</span>
                 </div>
-                <!-- Placeholder for future settings -->
             </div>
         </div>
     </div>
@@ -2038,6 +2056,7 @@
         
         renderAIConfigUI(); // Render AI Settings
         applyPreviewTabVisibility(); // Apply visibility on load
+        updateBackendToggleUI(); // Initialize active backend slot UI
 
         // Restore Editor State (Tab-specific)
         const savedJson = sessionStorage.getItem('conduit_autosave') || localStorage.getItem('conduit_autosave');
@@ -7627,7 +7646,38 @@ async function downloadArtifact(runId) {
 
     function openRepoSettings() {
         document.getElementById('repo-settings-overlay').classList.add('active');
+        document.getElementById('def-backend-a').value = localStorage.getItem('conduit_backend_a') || '';
+        document.getElementById('def-backend-b').value = localStorage.getItem('conduit_backend_b') || '';
         toggleFab(false);
+    }
+
+    function switchActiveBackendSlot(slot) {
+        const url = localStorage.getItem('conduit_backend_' + slot);
+        if (!url) {
+            showGlobalToast("Slot " + slot.toUpperCase() + " is empty. Define it in Management menu.", true);
+            return;
+        }
+        document.getElementById('setting-func-url').value = url;
+        localStorage.setItem('conduit_active_backend_slot', slot);
+        updateBackendToggleUI(slot);
+        showGlobalToast("Switched to Backend " + slot.toUpperCase());
+    }
+
+    function updateBackendToggleUI(activeSlot) {
+        const slot = activeSlot || localStorage.getItem('conduit_active_backend_slot') || 'a';
+        const btnA = document.getElementById('active-slot-a');
+        const btnB = document.getElementById('active-slot-b');
+        
+        if (!btnA || !btnB) return;
+
+        [btnA, btnB].forEach(b => {
+            b.style.background = 'transparent';
+            b.style.color = 'var(--text-muted)';
+        });
+
+        const activeBtn = slot === 'a' ? btnA : btnB;
+        activeBtn.style.background = 'var(--primary)';
+        activeBtn.style.color = 'white';
     }
 
     function closeRepoSettings() {
