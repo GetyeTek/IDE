@@ -2459,12 +2459,16 @@
     async function githubRequest(path, options = {}) {
         if (!CONFIG.ghToken) throw new Error("GitHub PAT missing in Settings. Cannot use Direct Bridge.");
         const owner = CONFIG.isOrg ? CONFIG.ghOrg : CONFIG.ghUser;
-        const url = `https://api.github.com/repos/${owner}/${CONFIG.repoName}${path}`;
+        // Prevent GitHub API caching of branch refs by appending a timestamp cache-buster
+        const cacheBuster = path.includes('?') ? `&t=${Date.now()}` : `?t=${Date.now()}`;
+        const url = `https://api.github.com/repos/${owner}/${CONFIG.repoName}${path}${cacheBuster}`;
         const res = await fetch(url, {
             ...options,
+            cache: 'no-store',
             headers: {
                 'Authorization': `token ${CONFIG.ghToken}`,
                 'Accept': 'application/vnd.github.v3+json',
+                'If-None-Match': '',
                 ...options.headers
             }
         });
@@ -4218,8 +4222,8 @@
 
     function refreshPreview() {
         const iframe = document.getElementById('preview-frame');
-        // If src exists and is not a local blob/srcdoc placeholder, it's an external URL
-        if (iframe.hasAttribute('src') && iframe.src !== "") {
+        // If src exists, is not empty, AND is not a local blob URL, it's an external URL
+        if (iframe.hasAttribute('src') && iframe.src !== "" && !iframe.src.startsWith('blob:')) {
             loadExternalUrl();
         } else {
             // Fallback to local bundler
@@ -4227,12 +4231,19 @@
         }
     }
 
+    let isBundlingInProgress = false;
+
     async function bundleAndPreview(index) {
         if (CONFIG.projectType === 'native') return;
         if(!CONFIG.funcUrl) {
             console.error('Bundler Error: No function URL configured');
             return;
         }
+        if (isBundlingInProgress) {
+            console.warn('Bundler: Build already in progress. Ignoring duplicate request.');
+            return;
+        }
+        isBundlingInProgress = true;
         document.querySelectorAll('.runtime-log').forEach(el => el.remove());
         
         let entry = (typeof index === 'number') ? dbHistory[index] : null;
@@ -4812,9 +4823,11 @@
             if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
             document.getElementById('preview-url-display').innerText = sha ? 'Viewing: ' + entry.title : 'Viewing: Live Dev (' + CONFIG.repoName + ')';
             document.getElementById('browser-url').value = '';
-                    } catch(e) {
+        } catch(e) {
             console.error('CRITICAL BUILD FAILURE:', e);
             iframe.srcdoc = '<div style="color:red; padding:20px;"><b>Preview Error:</b><br>' + e.message + '</div>'; 
+        } finally {
+            isBundlingInProgress = false;
         }
     }
 
