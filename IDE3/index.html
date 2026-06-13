@@ -4423,17 +4423,20 @@
             // 2. Rewrite external &lt;script type="module" src="..."&gt; tags into inline imports
             // This forces the browser to resolve the entry point path via the import map,
             // bypassing standard blob-relative resource fetch limitations.
+            // 2. Rewrite external <script type="module" src="..."> tags into inline imports
+            // This forces the browser to resolve the entry point path via the import map,
+            // bypassing standard blob-relative resource fetch limitations.
             doc.querySelectorAll('script[type="module"][src]').forEach(script => {
                 const src = script.getAttribute('src');
                 if (src) {
                     const inlineScript = doc.createElement('script');
                     inlineScript.type = 'module';
-                    const normalizedSrc = src.startsWith('./') ? src : './' + src;
-                    inlineScript.textContent = `import "${normalizedSrc}";`;
+                    // Convert to a bare specifier to bypass relative URL resolution on opaque origins
+                    const bareSrc = src.replace(/^(\.\/|\/)/, ''); 
+                    inlineScript.textContent = `import "${bareSrc}";`;
                     script.replaceWith(inlineScript);
                 }
             });
-            // -------------------------------------
 
             const baseScript = doc.createElement('script');
             baseScript.textContent = `
