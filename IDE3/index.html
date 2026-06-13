@@ -4408,6 +4408,33 @@
 
             const finalEntryContent = entryContent; // Already resolved above
             const doc = new DOMParser().parseFromString(finalEntryContent.content, 'text/html');
+
+            // --- CONDUIT PREVIEW ENGINE REPAIR ---
+            // 1. Serialize and inject the populated importMap into the preview document
+            const importMapScript = doc.createElement('script');
+            importMapScript.type = 'importmap';
+            importMapScript.textContent = JSON.stringify(importMap, null, 2);
+            if (doc.head) {
+                doc.head.appendChild(importMapScript);
+            } else {
+                doc.documentElement.appendChild(importMapScript);
+            }
+
+            // 2. Rewrite external &lt;script type="module" src="..."&gt; tags into inline imports
+            // This forces the browser to resolve the entry point path via the import map,
+            // bypassing standard blob-relative resource fetch limitations.
+            doc.querySelectorAll('script[type="module"][src]').forEach(script => {
+                const src = script.getAttribute('src');
+                if (src) {
+                    const inlineScript = doc.createElement('script');
+                    inlineScript.type = 'module';
+                    const normalizedSrc = src.startsWith('./') ? src : './' + src;
+                    inlineScript.textContent = `import "${normalizedSrc}";`;
+                    script.replaceWith(inlineScript);
+                }
+            });
+            // -------------------------------------
+
             const baseScript = doc.createElement('script');
             baseScript.textContent = `
                 window.IS_CONDUIT_PREVIEW = true;
