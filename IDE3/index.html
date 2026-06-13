@@ -4341,6 +4341,11 @@
             const importMap = { imports: { "react": "https://esm.sh/react@18.2.0", "react-dom": "https://esm.sh/react-dom@18.2.0", "react-dom/client": "https://esm.sh/react-dom@18.2.0/client" } };
 
             for (const fullPath in fileCache) {
+                // SECURITY & PERFORMANCE: Do not bundle backend edge functions or hidden repo configs into the frontend preview.
+                if (fullPath.includes('supabase/functions/') || fullPath.includes('.github/') || fullPath.startsWith('.')) {
+                    continue;
+                }
+
                 const file = fileCache[fullPath];
                 const virtualPath = fullPath.startsWith(effectiveRoot) ? fullPath.substring(effectiveRoot.length) : fullPath;
                 const isJs = ['js', 'mjs', 'ts', 'jsx', 'tsx'].includes(file.ext);
