@@ -375,15 +375,39 @@
 <body>
 
     <div id="ui-layer">
-        <div style="display: flex; gap: 10px; margin-bottom: 8px;">
-            <select id="engine-select" style="flex: 1; padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid var(--entre-blue);">
+        <!-- Settings Panel (Hidden by default) -->
+        <div id="settings-panel" style="display: none; background: #222; border: 1px solid #444; padding: 15px; margin-bottom: 12px; border-radius: 6px; box-sizing: border-box; color: #fff; font-family: var(--font-sans);">
+            <h3 style="margin-top: 0; color: var(--entre-blue); font-size: 16px;">Supabase Database Integration</h3>
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #aaa;">SUPABASE_URL</label>
+                <input type="text" id="db-url" placeholder="https://your-project.supabase.co" style="width: 100%; padding: 8px; box-sizing: border-box; background: #000; color: #fff; border: 1px solid #555; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #aaa;">SUPABASE_ANON_KEY</label>
+                <input type="password" id="db-anon" placeholder="eyJhbGciOi..." style="width: 100%; padding: 8px; box-sizing: border-box; background: #000; color: #fff; border: 1px solid #555; border-radius: 4px;">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="saveSettings()" style="margin-top: 0; padding: 8px; background: var(--entre-blue); font-size: 14px; width: auto;">Save Settings</button>
+                <button onclick="toggleSettings()" style="margin-top: 0; padding: 8px; background: #555; font-size: 14px; width: auto;">Close</button>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+            <button onclick="toggleSettings()" style="width: auto; padding: 8px 15px; margin-top: 0; background: #333; border: 1px solid #555;">⚙️ Settings</button>
+            <select id="book-select" style="flex: 1.5; min-width: 150px; padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid var(--entre-blue);">
+                <option value="">-- Select Book --</option>
+                <option value="Logic and Critical Thinking.pdf">Logic and Critical Thinking.pdf</option>
+            </select>
+            <button onclick="fetchBookPages()" style="flex: 1; min-width: 120px; margin-top: 0; background: #28a745;">📥 Fetch Pages</button>
+            <select id="engine-select" style="flex: 1.2; min-width: 150px; padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid var(--entre-blue);">
                 <option value="history">ENGINE: History (2021 Edition)</option>
                 <option value="logic">ENGINE: Logic (Ministry Edition)</option>
                 <option value="anthro">ENGINE: Anthropology (2026 Edition)</option>
                 <option value="psych">ENGINE: General Psychology (Legacy)</option>
                 <option value="entre">ENGINE: Entrepreneurship (MoSHE 2019)</option>
             </select>
-            <button onclick="executeEngine()">EXECUTE DRAW COMMAND</button>
+            <button onclick="executeEngine()" style="flex: 1; min-width: 150px; margin-top: 0; background: var(--entre-blue);">DRAW CANVAS</button>
+            <button onclick="exportCompiledJSON()" style="flex: 1; min-width: 150px; margin-top: 0; background: #dc3545;">📤 EXPORT JSON</button>
         </div>
         <textarea id="json-pen" placeholder="Paste strict JSON instructions..."></textarea>
     </div>
@@ -404,6 +428,116 @@
         function triggerAI(action) {
             alert(`AI Action triggered: [${action.toUpperCase()}]\n\nIn the future, this will hook into your backend API.`);
         }
+
+        // ==========================================
+        // DATABASE INTEGRATION & UTILITIES
+        // ==========================================
+        function toggleSettings() {
+            const panel = document.getElementById('settings-panel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function loadSettings() {
+            const url = localStorage.getItem('supabase_url') || '';
+            const key = localStorage.getItem('supabase_anon_key') || '';
+            document.getElementById('db-url').value = url;
+            document.getElementById('db-anon').value = key;
+        }
+
+        function saveSettings() {
+            const url = document.getElementById('db-url').value.trim();
+            const key = document.getElementById('db-anon').value.trim();
+            localStorage.setItem('supabase_url', url);
+            localStorage.setItem('supabase_anon_key', key);
+            alert('Supabase credentials saved successfully!');
+            toggleSettings();
+        }
+
+        async function fetchBookPages() {
+            const supabaseUrl = localStorage.getItem('supabase_url');
+            const supabaseKey = localStorage.getItem('supabase_anon_key');
+            
+            if (!supabaseUrl || !supabaseKey) {
+                alert('Please click on ⚙️ Settings and save your Supabase URL and Anon Key first.');
+                toggleSettings();
+                return;
+            }
+
+            const bookSelect = document.getElementById('book-select');
+            const bookName = bookSelect.value;
+            if (!bookName) {
+                alert('Please select a book to fetch pages for.');
+                return;
+            }
+
+            try {
+                const textPen = document.getElementById('json-pen');
+                textPen.value = `// Fetching records for ${bookName} from Supabase...\n// Please wait...`;
+
+                const endpoint = `${supabaseUrl}/rest/v1/logic_book_results?pdf_name=eq.${encodeURIComponent(bookName)}&select=page_number,result_json&order=page_number.asc`;
+                
+                const response = await fetch(endpoint, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error ${response.status}: ${await response.text()}`);
+                }
+
+                const data = await response.json();
+                if (!data || data.length === 0) {
+                    alert('No records found in logic_book_results table for this book.');
+                    textPen.value = '';
+                    return;
+                }
+
+                const compiledBook = {};
+                data.forEach(row => {
+                    const parsedJson = typeof row.result_json === 'string' ? JSON.parse(row.result_json) : row.result_json;
+                    Object.assign(compiledBook, parsedJson);
+                });
+
+                textPen.value = JSON.stringify(compiledBook, null, 2);
+
+                document.getElementById('engine-select').value = 'logic';
+                executeEngine();
+
+                alert(`Successfully fetched and rendered ${data.length} pages for: ${bookName}`);
+
+            } catch (err) {
+                alert('Error fetching pages from Supabase: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        function exportCompiledJSON() {
+            const raw = document.getElementById('json-pen').value;
+            if (!raw.trim()) {
+                alert('There is no content in the editor to export.');
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(raw);
+                const blob = new Blob([JSON.stringify(parsed, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `compiled-book-export.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Failed to export. Ensure the content in the text editor is valid JSON.');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', loadSettings);
 
         // ==========================================
         // BASE RENDERER (Universal Tools)
