@@ -342,8 +342,8 @@ serve(async (req) => {
         // Fetch round-robin API key
         selectedKeyObj = await getGeminiApiKey(supabase);
 
-        // Call Gemini 1.5 Pro Multimodal API directly with the PDF binary
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${selectedKeyObj.api_key}`;
+        // Call Gemini 3.1 Flash Lite Preview Multimodal API directly with the PDF binary
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${selectedKeyObj.api_key}`;
         
         const payload = {
           contents: [{
