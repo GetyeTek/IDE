@@ -1,0 +1,841 @@
+<![CDATA[<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate PDF Manufacturer</title>
+    <style>
+        /* =========================================
+           GLOBAL & VARIABLES
+        ========================================= */
+        :root {
+            --pdf-width: 794px;
+            --pdf-height: 1123px;
+            --grey-bg: #d9d9d9;
+            --font-serif: 'Times New Roman', Times, 'Nyala', 'Kefa', 'Abyssinica SIL', serif;
+            --font-sans: Arial, Helvetica, sans-serif;
+            
+            /* Engine Specific Variables */
+            --entre-blue: #007bff;
+            --entre-grey: #f2f2f2;
+            --logic-red: #800000;
+        }
+
+        body {
+            background-color: #2c2c2c;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: var(--font-sans);
+        }
+
+        /* Microscopic Typography Fixes */
+        sup, sub { vertical-align: baseline; position: relative; top: -0.4em; font-size: 0.75em; line-height: 0; }
+        sub { top: 0.4em; }
+
+        /* =========================================
+           UI LAYER
+        ========================================= */
+        #ui-layer {
+            width: 100%;
+            background: #1a1a1a;
+            padding: 10px;
+            box-sizing: border-box;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 2px solid var(--entre-blue);
+        }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            background: #000;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border: 1px solid #333;
+            padding: 8px;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px;
+            background: var(--entre-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover { background: #0056b3; }
+
+        #exit-viewer {
+            position: fixed; top: 20px; left: 20px; background: rgba(0,0,0,0.6); color: white;
+            padding: 10px 20px; border-radius: 30px; cursor: pointer; display: none;
+            z-index: 3000; font-weight: bold; border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(5px);
+        }
+        #magnify-toggle {
+            position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px;
+            background: var(--entre-blue); color: white; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            z-index: 2000; font-size: 24px;
+        }
+
+        /* READER MODE OVERRIDES */
+        body.viewer-active { background-color: #1a1a1a !important; padding-top: 0 !important; }
+        body.viewer-active #ui-layer { display: none !important; }
+        body.viewer-active .page-wrapper { margin-bottom: 20px; }
+        body.viewer-active .page-canvas { box-shadow: 0 0 50px #000; border: none; }
+        body.viewer-active #exit-viewer { display: flex !important; }
+        body.viewer-active #magnify-toggle { display: none; }
+        body.viewer-active .ai-btn-inline { background: #333 !important; color: #4ade80 !important; border-color: #4ade80 !important; }
+
+        #document-container { width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+        /* =========================================
+           CANVAS & UNIVERSAL COMPONENTS
+        ========================================= */
+        .page-wrapper {
+            width: 100%; display: flex; justify-content: center; overflow: hidden; margin-top: 20px;
+        }
+        .page-canvas {
+            background-color: white; width: var(--pdf-width); min-height: var(--pdf-height);
+            padding: 60px 70px 40px 70px; box-sizing: border-box; position: relative;
+            box-shadow: 0 0 30px rgba(0,0,0,0.2); font-family: var(--font-serif);
+            color: #000; page-break-after: always; transform-origin: top center;
+            flex-shrink: 0; display: flex; flex-direction: column;
+        }
+
+        /* Universal Tags */
+        .manual-flag {
+            position: absolute; top: 0; right: 0; background: #ff4757; color: white;
+            padding: 6px 15px; font-size: 12px; font-weight: bold; border-bottom-left-radius: 8px;
+            z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-family: var(--font-sans);
+        }
+        
+        .ai-btn-inline {
+            display: inline-block; width: auto !important; background: #e8f0fe !important;
+            border: 1px solid #aec2ec !important; border-radius: 12px !important;
+            padding: 2px 8px !important; font-size: 12px !important; color: #1a73e8 !important;
+            cursor: pointer; font-family: var(--font-sans); font-weight: bold;
+            margin-left: 6px !important; margin-top: 0 !important; vertical-align: baseline;
+            white-space: nowrap; line-height: 1.2; text-decoration: none;
+        }
+
+        .univ-graphic-container { width: 100%; display: flex; flex-direction: column; align-items: center; margin: 15px 0; }
+        .univ-graphic-caption { font-size: 13px; font-style: italic; margin-top: 10px; color: #444; }
+        .univ-graphic-container img, .univ-graphic-container svg { max-width: 100%; height: auto; }
+
+        .univ-canvas-placeholder {
+            border: 2px dashed #999; background: #f0f0f0; display: flex;
+            align-items: center; justify-content: center; margin: 20px 0;
+            font-family: var(--font-sans); font-weight: bold; color: #666;
+        }
+
+        .univ-p-block { text-align: justify; margin-bottom: 14px; font-size: 15.5px; line-height: 1.5; text-justify: inter-word; hyphens: auto; }
+        .univ-h-block { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; }
+        center { display: block; width: 100%; margin: 5px 0; }
+
+        .univ-footer {
+            margin-top: auto; padding-top: 20px; height: 40px; width: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: white; font-size: 15px; font-variant-numeric: tabular-nums;
+        }
+
+        .univ-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }
+        .univ-table th, .univ-table td { border: 1px solid #000; padding: 6px; text-align: left; }
+        .univ-table th { background: #eee; font-weight: bold; }
+
+        .univ-list-block { padding-left: 25px; margin: 10px 0; }
+        .univ-list-block ul, .univ-list-block ol { padding: 0; margin: 0; }
+        .univ-list-block li { margin-bottom: 4px; text-align: justify; font-size: 14.5px; line-height: 1.3; }
+
+        /* =========================================
+           ENGINE 1: PSYCHOLOGY (Legacy)
+        ========================================= */
+        .engine-psych .univ-list-block { padding-left: 40px; margin-bottom: 15px; }
+        .engine-psych .univ-list-block li { margin-bottom: 8px; font-size: 15.5px; }
+        
+        .engine-psych .chapter-header { text-align: center; margin-bottom: 40px; }
+        .engine-psych .chapter-number { display: block; font-size: 20px; font-weight: bold; margin-bottom: 10px; }
+        .engine-psych .chapter-title { display: block; font-size: 24px; font-weight: bold; text-transform: uppercase; padding-bottom: 5px; }
+        
+        .engine-psych .appetizer-block { font-style: italic; border-left: 4px solid var(--entre-blue); padding: 10px 20px; margin: 20px 0; background: #f9f9f9; line-height: 1.6; }
+        .engine-psych .appetizer-label { font-weight: bold; display: block; margin-bottom: 10px; font-style: normal; text-transform: uppercase; color: var(--entre-blue); }
+        
+        .engine-psych .reference-block { padding-left: 30px; text-indent: -30px; font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+        
+        .engine-psych .title-page { text-align: center; display: flex; flex-direction: column; justify-content: center; height: 100%; }
+        .engine-psych .title-main { font-size: 28px; font-weight: bold; margin-bottom: 10px; }
+        .engine-psych .title-sub { font-size: 20px; margin-bottom: 50px; }
+        .engine-psych .contributor-item { margin-bottom: 15px; font-size: 16px; }
+        .engine-psych .contributor-name { font-weight: bold; display: block; }
+        .engine-psych .contributor-detail { font-style: italic; font-size: 14px; color: #444; }
+
+        .engine-psych .section-header { font-weight: bold; font-size: 17px; margin-top: 25px; margin-bottom: 10px; }
+        .engine-psych .overview-block { margin: 25px 0; }
+        .engine-psych .overview-label { font-weight: bold; font-size: 17px; margin-bottom: 5px; display: block; }
+
+        .engine-psych .academic-container { margin-top: 20px; }
+        .engine-psych .academic-label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
+        .engine-psych .academic-box { background: #eeeeee; border: 1px solid #000; padding: 12px 15px; margin-top: 0; }
+        .engine-psych .academic-box ul { margin: 0; padding-left: 20px; }
+        .engine-psych .academic-box li { margin-bottom: 8px; font-size: 14.5px; }
+
+        .engine-psych .summary-block { border-top: 3px solid var(--entre-blue); margin-top: 30px; padding-top: 10px; }
+        .engine-psych .summary-label { font-weight: bold; font-size: 19px; color: var(--entre-blue); margin-bottom: 10px; display: block; }
+
+        .engine-psych .definition-highlight { border: 1px solid #000; padding: 12px 20px; margin: 20px 40px; border-radius: 4px; }
+        .engine-psych .definition-highlight ul { margin: 0; padding-left: 15px; list-style-type: disc; }
+        .engine-psych .definition-highlight li { font-style: italic; font-weight: normal; font-size: 15px; }
+
+        .engine-psych .toc-container { margin: 10px 0; }
+        .engine-psych .toc-entry { display: flex; align-items: flex-end; margin-bottom: 4px; font-size: 14.5px; }
+        .engine-psych .toc-text { flex-shrink: 0; }
+        .engine-psych .toc-dots { flex-grow: 1; background-image: radial-gradient(circle, #000 0.8px, transparent 1.2px); background-position: 0 12px; background-size: 8px 1px; background-repeat: repeat-x; height: 16px; margin: 0 8px; }
+        .engine-psych .toc-page { flex-shrink: 0; font-weight: bold; }
+        .engine-psych .level-0 { font-weight: bold; margin-top: 10px; }
+        .engine-psych .level-1 { padding-left: 20px; }
+        .engine-psych .level-2 { padding-left: 40px; }
+        .engine-psych .level-3 { padding-left: 60px; }
+
+        /* =========================================
+           ENGINE 2: ANTHROPOLOGY
+        ========================================= */
+        .engine-anthro .anthro-unit-header { text-align: left; margin-bottom: 30px; }
+        .engine-anthro .anthro-unit-label { display: block; font-size: 18px; margin-bottom: 10px; text-align: center; }
+        .engine-anthro .anthro-unit-title { display: block; font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+        .engine-anthro .anthro-unit-hours { display: block; font-size: 16px; font-weight: bold; }
+
+        .engine-anthro .anthro-callout { display: flex; align-items: flex-start; gap: 20px; border: 1px solid #000; padding: 15px; margin: 20px 0; }
+        .engine-anthro .anthro-callout-icon { width: 80px; flex-shrink: 0; }
+        .engine-anthro .anthro-callout-icon img { width: 100%; height: auto; }
+        .engine-anthro .anthro-callout-content { flex-grow: 1; }
+        .engine-anthro .anthro-callout-title { font-weight: bold; margin-bottom: 10px; display: block; font-size: 16px; }
+
+        .engine-anthro .anthro-list { list-style: none; padding-left: 0; margin: 15px 0; }
+        .engine-anthro .anthro-list-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; text-align: justify; }
+        .engine-anthro .anthro-bullet-img { width: 22px; flex-shrink: 0; margin-top: 2px; }
+        .engine-anthro .anthro-bullet-char { width: 22px; flex-shrink: 0; font-weight: bold; font-size: 18px; line-height: 1; margin-top: -2px; }
+
+        .engine-anthro .anthro-footnote { font-size: 12.5px; margin-top: 25px; padding-top: 10px; position: relative; }
+        .engine-anthro .anthro-footnote::before { content: ''; position: absolute; top: 0; left: 0; width: 120px; border-top: 1px solid #000; }
+
+        .engine-anthro .anthro-reference { padding-left: 30px; text-indent: -30px; font-size: 14.5px; margin-bottom: 12px; line-height: 1.4; }
+        .engine-anthro .anthro-term { font-weight: bold; margin-top: 18px; margin-bottom: 4px; font-size: 15.5px; }
+
+        .engine-anthro .anthro-kv-container { margin: 20px 0; }
+        .engine-anthro .anthro-kv-row { display: flex; align-items: flex-start; margin-bottom: 10px; font-size: 17px; }
+        .engine-anthro .anthro-kv-label { font-weight: bold; width: 150px; flex-shrink: 0; }
+        .engine-anthro .anthro-kv-separator { margin-right: 15px; font-weight: bold; }
+        .engine-anthro .anthro-kv-value { flex-grow: 1; }
+
+        .engine-anthro .anthro-table-header { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+
+        .engine-anthro .anthro-toc-item { display: flex; align-items: flex-end; margin-bottom: 6px; font-size: 15px; }
+        .engine-anthro .anthro-toc-dots { flex-grow: 1; border-bottom: 1px dotted #000; margin: 0 5px; position: relative; top: -4px; }
+        .engine-anthro .anthro-toc-page { font-weight: bold; min-width: 25px; text-align: right; }
+        .engine-anthro .anthro-toc-level-1 { padding-left: 20px; }
+        .engine-anthro .anthro-toc-level-2 { padding-left: 40px; }
+
+        .engine-anthro .anthro-title-block { text-align: center; width: 100%; }
+        .engine-anthro .anthro-title-main { font-size: 28px; font-weight: bold; margin: 100px 0; }
+        .engine-anthro .anthro-title-sub { font-size: 18px; margin-bottom: 10px; }
+
+        /* =========================================
+           ENGINE 3: LOGIC
+        ========================================= */
+        .engine-logic .logic-header { border-top: 3.5px solid #444; height: 10px; margin-bottom: 40px; position: relative; }
+        .engine-logic .logic-header::after { content: ''; position: absolute; right: 40px; top: -3.5px; width: 3.5px; height: 45px; background: #444; }
+        
+        .engine-logic .logic-footer {
+            background: linear-gradient(to bottom, var(--logic-red) 0, var(--logic-red) 4px, transparent 4px, transparent 5px, var(--logic-red) 5px, var(--logic-red) 6px) top/100% 6px no-repeat;
+            margin-top: auto; padding-top: 12px; display: flex; justify-content: space-between; font-size: 14px; font-style: italic; font-variant-numeric: tabular-nums;
+        }
+        
+        .engine-logic .logic-example-label { font-weight: bold; text-decoration: underline; font-size: 16px; display: inline-block; margin-bottom: 8px; }
+        .engine-logic .logic-chapter-num { font-size: 22px; font-weight: bold; display: block; text-align: center; margin-bottom: 5px; }
+        .engine-logic .logic-chapter-title { font-size: 26px; font-weight: bold; display: block; text-align: center; text-transform: uppercase; margin-bottom: 30px; }
+        
+        .engine-logic .logic-activity-box { border: 1px solid #000; padding: 15px 25px; margin: 20px 0; font-style: italic; line-height: 1.5; }
+        .engine-logic .logic-activity-label { font-weight: bold; font-style: normal; margin-right: 10px; }
+        
+        /* Pixel perfect logic arguments */
+        .engine-logic .logic-argument-block { margin: 20px auto; width: fit-content; text-align: left; line-height: 1.6; display: flex; flex-direction: column; align-items: flex-start; }
+        .engine-logic .logic-argument-premise { width: 100%; padding: 0 10px; box-sizing: border-box; }
+        .engine-logic .logic-argument-line { border-top: 1px solid #000; margin: 4px 0; width: 100%; }
+        .engine-logic .logic-argument-conclusion { width: 100%; padding: 0 10px; box-sizing: border-box; }
+        
+        .engine-logic .logic-venn-container { display: flex; flex-direction: column; align-items: center; margin: 20px 0; }
+        .engine-logic .logic-exercise-line { border-bottom: 1px solid #aaa; margin: 18px 0; height: 1px; width: 100%; }
+        .engine-logic .logic-quote-block { margin: 20px 40px; text-align: justify; font-size: 14px; line-height: 1.6; }
+        .engine-logic .logic-square-container { display: flex; justify-content: center; margin: 30px 0; }
+        
+        .engine-logic .logic-note-box { border: 1.5px solid #000; padding: 10px 20px; margin: 20px 0; display: flex; align-items: center; }
+        .engine-logic .logic-note-label { font-weight: bold; text-decoration: underline; margin-right: 20px; font-size: 17px; }
+
+        /* =========================================
+           ENGINE 4: ENTREPRENEURSHIP
+        ========================================= */
+        .engine-entre .entre-chapter-title { text-align: center; font-weight: bold; font-size: 24px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; display: block; width: 100%; }
+        .engine-entre .entre-section-h { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; border: none; padding-left: 0; }
+        
+        .engine-entre .entre-case-box { border: 1.5px solid #000; padding: 15px 25px; margin: 20px 0; background: #fff; }
+        .engine-entre .entre-case-label { font-weight: bold; display: block; margin-bottom: 10px; font-size: 17px; text-transform: uppercase; text-decoration: underline; }
+        
+        .engine-entre .entre-activity-box { border: 1px solid #000; padding: 15px; margin: 20px 0; background: #fff; }
+        .engine-entre .entre-activity-tag { background: #000; color: #fff; padding: 4px 15px; font-weight: bold; font-size: 14px; margin-bottom: 15px; display: inline-block; text-transform: uppercase; }
+        
+        .engine-entre .entre-reflection-box { background: var(--entre-grey); border: 1px dashed #444; padding: 15px; margin: 15px 0; font-style: italic; }
+        .engine-entre .entre-reflection-label { font-weight: bold; display: block; margin-bottom: 10px; font-style: normal; }
+
+        .engine-entre .entre-bullet-item { display: flex; gap: 12px; margin-bottom: 8px; align-items: flex-start; text-align: justify; }
+        .engine-entre .entre-bullet-char { font-size: 20px; line-height: 1; flex-shrink: 0; color: #000; font-family: var(--font-serif); }
+        .engine-entre .entre-bullet-img { width: 22px; height: 22px; flex-shrink: 0; object-fit: contain; }
+        
+        .engine-entre .entre-likert-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px; }
+        .engine-entre .entre-likert-table th { background: var(--entre-grey); border: 1px solid #000; padding: 5px; text-align: center; font-weight: bold; }
+        .engine-entre .entre-likert-table td { border: 1px solid #000; padding: 8px; }
+        
+        .engine-entre .entre-ansoff-matrix { display: table; width: 100%; border-collapse: separate; border-spacing: 10px; table-layout: fixed; margin: 20px 0; }
+        .engine-entre .entre-ansoff-quadrant { display: table-cell; border: 2px solid var(--entre-blue); background: #f8f9fa; padding: 15px; vertical-align: middle; text-align: center; font-weight: bold; height: 120px; }
+        .engine-entre .entre-label-axis { font-weight: bold; color: var(--entre-blue); font-size: 12px; text-transform: uppercase; }
+
+        .engine-entre .entre-form-row { display: flex; align-items: baseline; margin-bottom: 8px; font-family: var(--font-sans); }
+        .engine-entre .entre-form-label { white-space: nowrap; margin-right: 5px; }
+        .engine-entre .entre-form-line { display: inline-block; border-bottom: 1px dotted #000; flex-grow: 1; min-width: 50px; height: 1.1em; }
+
+        /* =========================================
+           ENGINE 5: HISTORY
+        ========================================= */
+        .engine-history.history-watermark::before {
+            content: 'History of Ethiopia and the Horn Module (Hist.1102)';
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 45px; color: rgba(200, 200, 200, 0.15); white-space: nowrap; z-index: 0; pointer-events: none;
+        }
+        .engine-history .history-header-text { text-align: center; font-style: italic; font-weight: bold; font-size: 14px; margin-bottom: 30px; position: relative; z-index: 2; }
+        .engine-history .history-unit-title { text-align: center; text-transform: uppercase; font-weight: bold; font-size: 22px; margin: 20px 0; line-height: 1.2; position: relative; z-index: 2; }
+        
+        .engine-history .history-arrow-list { list-style: none; padding-left: 0; position: relative; z-index: 2; }
+        .engine-history .history-arrow-list li { position: relative; padding-left: 30px; margin-bottom: 10px; text-align: justify; }
+        .engine-history .history-arrow-list li::before { content: '➢'; position: absolute; left: 0; color: #000; font-size: 18px; }
+        
+        .engine-history .history-source-line { font-size: 13px; margin-top: 5px; color: #333; position: relative; z-index: 2; }
+        
+        .engine-history .history-cover-frame {
+            border: 4px solid #000; outline: 1px solid #000; outline-offset: -8px;
+            height: 100%; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column;
+            align-items: center; justify-content: space-between; position: relative; z-index: 2;
+            box-shadow: inset 0 0 0 10px white, inset 0 0 0 12px black;
+        }
+        .engine-history .history-bolt {
+            position: absolute; width: 20px; height: 20px; border: 2px solid #000; border-radius: 50%;
+            background: white; display: flex; align-items: center; justify-content: center; z-index: 3;
+        }
+        .engine-history .history-bolt::after { content: ''; width: 8px; height: 8px; background: #000; border-radius: 50%; }
+
+        @media print {
+            body { background: none; }
+            #ui-layer, #exit-viewer, #magnify-toggle { display: none !important; }
+            .page-canvas { margin: 0; box-shadow: none; border: none; }
+            .manual-flag { display: none !important; }
+            .ai-btn-inline { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+            <select id="engine-select" style="flex: 1; padding: 8px; border-radius: 4px; background: #333; color: white; border: 1px solid var(--entre-blue);">
+                <option value="history">ENGINE: History (2021 Edition)</option>
+                <option value="logic">ENGINE: Logic (Ministry Edition)</option>
+                <option value="anthro">ENGINE: Anthropology (2026 Edition)</option>
+                <option value="psych">ENGINE: General Psychology (Legacy)</option>
+                <option value="entre">ENGINE: Entrepreneurship (MoSHE 2019)</option>
+            </select>
+            <button onclick="executeEngine()">EXECUTE DRAW COMMAND</button>
+        </div>
+        <textarea id="json-pen" placeholder="Paste strict JSON instructions..."></textarea>
+    </div>
+
+    <div id="exit-viewer" onclick="toggleViewer()">← EXIT READER</div>
+    <div id="magnify-toggle" onclick="toggleViewer()">🔍</div>
+    <div id="document-container"></div>
+
+    <script>
+        function toggleViewer() {
+            document.body.classList.toggle('viewer-active');
+            executeEngine();
+            if (document.body.classList.contains('viewer-active')) {
+                window.scrollTo({ top: 0, behavior: 'auto' });
+            }
+        }
+
+        function triggerAI(action) {
+            alert(`AI Action triggered: [${action.toUpperCase()}]\n\nIn the future, this will hook into your backend API.`);
+        }
+
+        // ==========================================
+        // BASE RENDERER (Universal Tools)
+        // ==========================================
+        class BaseRenderer {
+            constructor(scale, engineName) {
+                this.scale = scale;
+                this.engineName = engineName;
+            }
+
+            formatText(text) {
+                if (!text) return '';
+                // Microscopic typography: Handles H_{2}O, 19^{th} smoothly without baseline shifts
+                return text.replace(/\^\{(.*?)\}/g, '<sup>$1</sup>').replace(/_\{(.*?)\}/g, '<sub>$1</sub>');
+            }
+
+            injectAITag(el) {
+                const innerBox = el.querySelector('.academic-box, .entre-case-box, .entre-activity-box, .entre-reflection-box, .logic-activity-box');
+                const listItems = el.querySelectorAll('li');
+                const target = listItems.length > 0 ? listItems[listItems.length - 1] : (innerBox || el);
+                
+                const btn = document.createElement('button');
+                btn.className = 'ai-btn-inline';
+                btn.innerHTML = '✨ AI Explore';
+                btn.onclick = () => triggerAI('explore');
+                target.appendChild(btn);
+            }
+
+            applyStyles(el, item) {
+                if (item.style) {
+                    if (item.style.align) {
+                        el.style.textAlign = item.style.align;
+                        if (item.style.align === 'center') { el.style.marginLeft = 'auto'; el.style.marginRight = 'auto'; }
+                        else if (item.style.align === 'right') { el.style.marginLeft = 'auto'; el.style.marginRight = '0'; }
+                    }
+                    if (item.style.bold) el.style.fontWeight = 'bold';
+                    if (item.style.size) el.style.fontSize = item.style.size;
+                    if (item.style.marginTop) el.style.marginTop = item.style.marginTop;
+                    if (item.style.marginBottom) el.style.marginBottom = item.style.marginBottom;
+                    if (item.style.color) el.style.color = item.style.color;
+                    if (item.style.italic) el.style.fontStyle = 'italic';
+                    if (item.style.underline) el.style.textDecoration = 'underline';
+                    if (item.style.transform) el.style.textTransform = item.style.transform;
+                    if (item.style.lineHeight) el.style.lineHeight = item.style.lineHeight;
+                    if (item.style.letterSpacing) el.style.letterSpacing = item.style.letterSpacing;
+                    if (item.style.width) el.style.width = item.style.width;
+                    if (item.style.height) el.style.height = item.style.height;
+                    if (item.style.padding) el.style.padding = item.style.padding;
+                    if (item.style.flex) el.style.flex = item.style.flex;
+                    if (item.style.border) el.style.border = item.style.border;
+                }
+                if (item.ai_ready) this.injectAITag(el);
+            }
+
+            renderCommon(item, pageKey) {
+                const el = document.createElement('div');
+                if (item.type === 'paragraph') {
+                    el.className = 'univ-p-block';
+                    el.innerHTML = this.formatText(item.body);
+                } else if (item.type === 'header') {
+                    el.className = 'univ-h-block';
+                    el.innerHTML = this.formatText(item.body);
+                } else if (item.type === 'spacer') {
+                    el.style.flexGrow = item.flex || '0';
+                    el.style.height = item.height || '0px';
+                } else if (item.type === 'graphic') {
+                    el.className = 'univ-graphic-container';
+                    el.innerHTML = `${item.svgCode ? item.svgCode : `<img src="${item.url}">`}`;
+                    if (item.caption) el.innerHTML += `<div class="univ-graphic-caption">${this.formatText(item.caption)}</div>`;
+                } else if (item.type === 'table') {
+                    let t = `<table class="univ-table ${item.tableClass || ''}">`;
+                    (item.rows || []).forEach((row, idx) => {
+                        t += '<tr>';
+                        row.forEach(c => {
+                            const isHeader = (idx === 0 && item.headerStyle);
+                            const tag = isHeader ? 'th' : 'td';
+                            let attrs = '';
+                            let content = typeof c === 'object' ? c.text : c;
+                            if (typeof c === 'object') {
+                                if (c.colSpan) attrs += ` colspan="${c.colSpan}"`;
+                                if (c.rowSpan) attrs += ` rowspan="${c.rowSpan}"`;
+                                if (c.bg) attrs += ` style="background-color:${c.bg}"`;
+                                if (c.align) attrs += ` style="text-align:${c.align}"`;
+                            }
+                            t += `<${tag}${attrs}>${this.formatText(content)}</${tag}>`;
+                        });
+                        t += '</tr>';
+                    });
+                    t += '</table>';
+                    el.innerHTML = t;
+                } else if (item.type === 'footer') {
+                    el.className = 'univ-footer';
+                    el.innerHTML = this.formatText(item.val || item.page || pageKey);
+                } else {
+                    return null; // Not a universal type
+                }
+                this.applyStyles(el, item);
+                return el;
+            }
+
+            createPage(pageKey, pageData) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'page-wrapper';
+
+                const canvas = document.createElement('div');
+                canvas.className = `page-canvas engine-${this.engineName}`;
+                canvas.id = `page-${pageKey}`;
+                canvas.style.transform = `scale(${this.scale})`;
+
+                // Specific History Watermark Logic
+                if (this.engineName === 'history' && pageData.watermark !== false) {
+                    canvas.classList.add('history-watermark');
+                }
+
+                // Global Manual Image Flag
+                if (pageData.requires_manual_image || pageData.manual_flag) {
+                    const flag = document.createElement('div');
+                    flag.className = 'manual-flag';
+                    flag.innerText = pageData.manual_flag || '🖼️ MANUAL IMAGE REQUIRED';
+                    canvas.appendChild(flag);
+                }
+
+                // Specific History Cover Frame Logic
+                let contentContainer = canvas;
+                if (this.engineName === 'history' && pageData.is_cover) {
+                    const frame = document.createElement('div');
+                    frame.className = 'history-cover-frame';
+                    ['top:5px;left:5px','top:5px;right:5px','bottom:5px;left:5px','bottom:5px;right:5px'].forEach(pos => {
+                        const bolt = document.createElement('div');
+                        bolt.className = 'history-bolt';
+                        bolt.style.cssText = pos;
+                        canvas.appendChild(bolt);
+                    });
+                    canvas.appendChild(frame);
+                    contentContainer = frame;
+                }
+
+                return { wrapper, canvas, contentContainer };
+            }
+        }
+
+        // ==========================================
+        // PSYCHOLOGY ENGINE
+        // ==========================================
+        class PsychRenderer extends BaseRenderer {
+            renderItem(item, pageKey) {
+                const univ = this.renderCommon(item, pageKey);
+                if (univ) return univ;
+
+                const el = document.createElement('div');
+                if (item.type === 'chapter-header') {
+                    el.className = 'chapter-header';
+                    el.innerHTML = `<span class="chapter-number">CHAPTER ${item.number}</span><span class="chapter-title">${this.formatText(item.title)}</span>`;
+                } else if (item.type === 'appetizer') {
+                    el.className = 'appetizer-block';
+                    el.innerHTML = `<span class="appetizer-label">${item.label || 'Learning Appetizer'}</span>${this.formatText(item.body)}`;
+                } else if (item.type === 'reference') {
+                    el.className = 'reference-block';
+                    el.innerHTML = this.formatText(item.body);
+                } else if (item.type === 'title-page') {
+                    el.className = 'title-page';
+                    el.innerHTML = `<div class="title-main">${this.formatText(item.main)}</div><div class="title-sub">${this.formatText(item.sub)}</div>`;
+                } else if (item.type === 'contributor') {
+                    el.className = 'contributor-item';
+                    el.innerHTML = `<span class="contributor-name">${this.formatText(item.name)}</span><span class="contributor-detail">${this.formatText(item.detail)}</span>`;
+                } else if (item.type === 'section-header') {
+                    el.className = 'section-header';
+                    el.innerHTML = this.formatText(item.body);
+                } else if (item.type === 'overview') {
+                    el.className = 'overview-block';
+                    el.innerHTML = `<span class="overview-label">Chapter Overview</span><div class="univ-p-block">${this.formatText(item.body)}</div>`;
+                } else if (item.type === 'summary') {
+                    el.className = 'summary-block';
+                    let list = `<span class="summary-label">Summary</span><ul>`;
+                    (item.items || item.points || []).forEach(p => list += `<li>${this.formatText(p)}</li>`);
+                    el.innerHTML = list + '</ul>';
+                } else if (item.type === 'definition-box') {
+                    el.className = 'definition-highlight';
+                    el.innerHTML = `<ul><li>${this.formatText(item.body)}</li></ul>`;
+                } else if (item.type === 'list' || item.type === 'bullet-list') {
+                    el.className = 'univ-list-block';
+                    let list = '<ul>';
+                    (item.items || item.points || []).forEach(li => list += `<li>${this.formatText(li)}</li>`);
+                    el.innerHTML = list + '</ul>';
+                } else if (item.type === 'numbered-list') {
+                    el.className = 'univ-list-block';
+                    let list = '<ol>';
+                    (item.items || item.points || []).forEach(li => list += `<li>${this.formatText(li)}</li>`);
+                    el.innerHTML = list + '</ol>';
+                } else if (item.type === 'nested-list') {
+                    el.className = `univ-list-block type-${item.listType || 'disc'}`;
+                    el.innerHTML = (item.items || []).map(i => `<li>${this.formatText(i)}</li>`).join('');
+                } else if (item.type === 'canvas') {
+                    el.className = 'univ-canvas-placeholder';
+                    el.style.width = item.w || '100%';
+                    el.style.height = item.h || '200px';
+                    el.innerText = `[ RASTER IMAGE: ${item.label || 'Empty'} ]`;
+                } else if (item.type === 'reflection' || item.type === 'brainstorming-questions') {
+                    const isRef = item.type === 'reflection';
+                    const labelText = isRef ? 'Reflection' : 'Brainstorming Questions';
+                    el.className = 'academic-container';
+                    let contentHtml = this.formatText(item.body) || '';
+                    const listData = item.questions || item.items || item.points;
+                    if (listData && Array.isArray(listData)) {
+                        contentHtml += (contentHtml ? '<br>' : '') + '<ul>' + listData.map(q => `<li>${this.formatText(q)}</li>`).join('') + '</ul>';
+                    }
+                    el.innerHTML = `<span class="academic-label">${labelText}</span><div class="academic-box">${contentHtml}</div>`;
+                } else if (item.type === 'toc') {
+                    el.className = 'toc-container';
+                    (item.entries || item.items || []).forEach(entry => {
+                        const row = document.createElement('div');
+                        const text = entry.text || entry.label || (typeof entry === 'string' ? entry : '');
+                        row.className = `toc-entry level-${entry.level || 0}`;
+                        row.innerHTML = `<span class="toc-text">${this.formatText(text)}</span><span class="toc-dots"></span><span class="toc-page">${entry.page || ''}</span>`;
+                        el.appendChild(row);
+                    });
+                }
+                
+                this.applyStyles(el, item);
+                return el;
+            }
+        }
+
+        // ==========================================
+        // ANTHROPOLOGY ENGINE
+        // ==========================================
+        class AnthroRenderer extends BaseRenderer {
+            renderItem(item, pageKey) {
+                const univ = this.renderCommon(item, pageKey);
+                if (univ) return univ;
+
+                const el = document.createElement('div');
+                if (item.type === 'unit-header') {
+                    el.className = 'anthro-unit-header';
+                    el.innerHTML = `<span class="anthro-unit-label">Unit ${item.number || ''}</span><span class="anthro-unit-title">${this.formatText(item.title) || ''}</span><span class="anthro-unit-hours">Study Hours: ${item.hours || ''}</span>`;
+                } else if (item.type === 'callout-box') {
+                    el.className = 'anthro-callout';
+                    const iconFile = item.icon === 'books' ? 'icon-books.png' : 'icon-question-man.png';
+                    let listHtml = '';
+                    if (item.items) {
+                        listHtml = '<div class="anthro-list">' + item.items.map(i => `<div class="anthro-list-item"><img src="assets/bullet-swirl.png" class="anthro-bullet-img"><div>${this.formatText(i)}</div></div>`).join('') + '</div>';
+                    }
+                    el.innerHTML = `<div class="anthro-callout-icon"><img src="assets/${iconFile}"></div><div class="anthro-callout-content"><span class="anthro-callout-title">${this.formatText(item.label) || ''}</span>${this.formatText(item.body) || ''}${listHtml}</div>`;
+                } else if (item.type === 'bullet-list') {
+                    el.className = 'anthro-list';
+                    (item.items || []).forEach(text => {
+                        const row = document.createElement('div');
+                        row.className = 'anthro-list-item';
+                        let bImg = 'bullet-swirl.png';
+                        if (item.bullet === 'spark') bImg = 'bullet-spark.png';
+                        if (item.bullet === 'checkmark') bImg = 'bullet-check.png';
+                        
+                        if (item.bullet === 'char') {
+                            row.innerHTML = `<div class="anthro-bullet-char">${item.char || '•'}</div><div>${this.formatText(text)}</div>`;
+                        } else {
+                            row.innerHTML = `<img src="assets/${bImg}" class="anthro-bullet-img"><div>${this.formatText(text)}</div>`;
+                        }
+                        el.appendChild(row);
+                    });
+                } else if (item.type === 'anthro-toc') {
+                    el.innerHTML = item.items.map(i => `<div class="anthro-toc-item anthro-toc-level-${i.level || 0}"><span>${this.formatText(i.text)}</span><div class="anthro-toc-dots"></div><span class="anthro-toc-page">${i.page}</span></div>`).join('');
+                } else if (item.type === 'title-block') {
+                    el.className = 'anthro-title-block';
+                    el.innerHTML = `<div class="anthro-title-sub">${this.formatText(item.top) || ''}</div><div class="anthro-title-main">${this.formatText(item.main) || ''}</div><div class="anthro-title-sub">${this.formatText(item.bottom) || ''}</div>`;
+                } else if (item.type === 'reference-item') {
+                    el.className = 'anthro-reference';
+                    el.innerHTML = this.formatText(item.body);
+                } else if (item.type === 'term-header') {
+                    el.className = 'anthro-term';
+                    el.innerHTML = this.formatText(item.body);
+                } else if (item.type === 'kv-list') {
+                    el.className = 'anthro-kv-container';
+                    el.innerHTML = item.items.map(row => `<div class="anthro-kv-row"><div class="anthro-kv-label">${this.formatText(row.label)}</div><div class="anthro-kv-separator">:</div><div class="anthro-kv-value">${this.formatText(row.value)}</div></div>`).join('');
+                } else if (item.type === 'footnote') {
+                    el.className = 'anthro-footnote';
+                    el.innerHTML = `<sup>${item.number || ''}</sup> ${this.formatText(item.body)}`;
+                }
+
+                this.applyStyles(el, item);
+                return el;
+            }
+        }
+
+        // ==========================================
+        // LOGIC ENGINE
+        // ==========================================
+        class LogicRenderer extends BaseRenderer {
+            renderItem(item, pageKey) {
+                const univ = this.renderCommon(item, pageKey);
+                if (univ) return univ;
+
+                const el = document.createElement('div');
+                if (item.type === 'logic-header') {
+                    el.className = 'logic-header';
+                } else if (item.type === 'logic-footer') {
+                    el.className = 'logic-footer';
+                    el.innerHTML = `<span>${this.formatText(item.authors) || ''}</span><span>Page ${item.page || pageKey}</span>`;
+                } else if (item.type === 'chapter-title') {
+                    el.innerHTML = `<span class="logic-chapter-num">CHAPTER ${item.number}</span><span class="logic-chapter-title">${this.formatText(item.title)}</span>`;
+                } else if (item.type === 'bullet-list') {
+                    el.className = 'univ-list-block';
+                    el.innerHTML = '<ul>' + (item.items || []).map(i => `<li>${this.formatText(i)}</li>`).join('') + '</ul>';
+                } else if (item.type === 'logic-activity') {
+                    el.className = 'logic-activity-box';
+                    el.innerHTML = `<span class="logic-activity-label">${this.formatText(item.label) || ''}</span>${this.formatText(item.body)}`;
+                } else if (item.type === 'logic-argument') {
+                    // Pixel perfect block that shrinks to fit the exact width of the longest line
+                    el.className = 'logic-argument-block';
+                    let html = '';
+                    (item.premises || []).forEach(p => html += `<div class="logic-argument-premise">${this.formatText(p)}</div>`);
+                    html += `<div class="logic-argument-line"></div>`;
+                    html += `<div class="logic-argument-conclusion">${this.formatText(item.conclusion)}</div>`;
+                    el.innerHTML = html;
+                } else if (item.type === 'logic-self-check') {
+                    let html = `<div style="margin-bottom:10px;"><b>${item.number}.</b> ${this.formatText(item.question)}</div>`;
+                    for(let i=0; i<(item.lines || 2); i++) { html += `<div class="logic-exercise-line"></div>`; }
+                    el.innerHTML = html;
+                } else if (item.type === 'logic-quote') {
+                    el.className = 'logic-quote-block';
+                    el.innerHTML = this.formatText(item.body);
+                } else if (item.type === 'logic-note') {
+                    el.className = 'logic-note-box';
+                    el.innerHTML = `<span class="logic-note-label">Note:</span><div style="font-style:italic;">${this.formatText(item.body)}</div>`;
+                } else if (item.type === 'logic-example') {
+                    el.innerHTML = `<div><span class="logic-example-label">${this.formatText(item.label) || 'Example'}:</span> ${this.formatText(item.body) || ''}</div>`;
+                }
+                
+                this.applyStyles(el, item);
+                return el;
+            }
+        }
+
+        // ==========================================
+        // ENTREPRENEURSHIP ENGINE
+        // ==========================================
+        class EntreRenderer extends BaseRenderer {
+            renderItem(item, pageKey) {
+                const univ = this.renderCommon(item, pageKey);
+                if (univ) return univ;
+
+                const el = document.createElement('div');
+                if (item.type === 'chapter-header') {
+                    el.className = 'entre-chapter-title';
+                    el.innerHTML = `CHAPTER ${item.number || ''}: ${this.formatText(item.title) || ''}`;
+                } else if (item.type === 'entre-case') {
+                    el.className = 'entre-case-box';
+                    el.innerHTML = `<span class="entre-case-label">${this.formatText(item.label) || 'Case Study'}</span>${this.formatText(item.body)}`;
+                } else if (item.type === 'entre-activity') {
+                    el.className = 'entre-activity-box';
+                    let html = `<div class="entre-activity-tag">Activity ${item.number || ''}</div>`;
+                    if (item.objective) html += `<div><b>Objective of activity:</b> ${this.formatText(item.objective)}</div>`;
+                    if (item.instructions) html += `<div style="margin-top:5px"><b>Instructions:</b> ${this.formatText(item.instructions)}</div>`;
+                    html += `<div style="margin-top:10px">${this.formatText(item.body) || ''}</div>`;
+                    el.innerHTML = html;
+                } else if (item.type === 'entre-reflection') {
+                    el.className = 'entre-reflection-box';
+                    let listHtml = item.items ? `<ul>${item.items.map(i => `<li>${this.formatText(i)}</li>`).join('')}</ul>` : '';
+                    el.innerHTML = `<span class="entre-reflection-label">${this.formatText(item.label) || 'Reflection Questions'}:</span><div style="font-style: italic;">${this.formatText(item.body) || ''}</div>${listHtml}`;
+                } else if (item.type === 'bullet-list') {
+                    const charMap = { 'finger': '☞', 'pen': '✍', 'arrow': '➢', 'square': '■', 'chevron': '➤', 'circle': '○', 'diamond': '❖', 'dot': '●', 'default': '•' };
+                    el.innerHTML = (item.items || []).map(text => {
+                        let bulletHtml = item.bullet === 'spark' ? `<img src="assets/bullet-spark.png" class="entre-bullet-img">` : `<div class="entre-bullet-char">${charMap[item.bullet] || charMap['default']}</div>`;
+                        return `<div class="entre-bullet-item">${bulletHtml}<div>${this.formatText(text)}</div></div>`;
+                    }).join('');
+                } else if (item.type === 'entre-likert-grid') {
+                    el.innerHTML = `<table class="entre-likert-table">
+                        <tr><th style="width:50px">S. No</th><th>Characteristic</th><th style="width:30px">1</th><th style="width:30px">2</th><th style="width:30px">3</th><th style="width:30px">4</th><th style="width:30px">5</th></tr>
+                        ${(item.rows || []).map(r => `<tr><td style="text-align:center">${r.no}</td><td>${this.formatText(r.text)}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+                    </table>`;
+                } else if (item.type === 'entre-form') {
+                    let html = '';
+                    (item.lines || []).forEach(line => {
+                        html += `<div class="entre-form-row"><span class="entre-form-label">${this.formatText(line.label)}</span><span class="entre-form-line" style="width: ${line.width || 'auto'}"></span></div>`;
+                    });
+                    el.innerHTML = html;
+                } else if (item.type === 'entre-ansoff-matrix') {
+                    el.className = 'entre-ansoff-matrix';
+                    // Expected matrix layout based on PDF structure
+                    let html = `<tr><td></td><td class="entre-label-axis">Existing Products</td><td class="entre-label-axis">New Products</td></tr>`;
+                    html += `<tr><td class="entre-label-axis" style="writing-mode: vertical-lr; transform: rotate(180deg);">Existing Markets</td><td class="entre-ansoff-quadrant">Market Penetration</td><td class="entre-ansoff-quadrant" style="background:#e8f0fe">Product Development</td></tr>`;
+                    html += `<tr><td class="entre-label-axis" style="writing-mode: vertical-lr; transform: rotate(180deg);">New Markets</td><td class="entre-ansoff-quadrant" style="background:#e8f0fe">Market Development</td><td class="entre-ansoff-quadrant" style="background:#fce8e6">Diversification</td></tr>`;
+                    el.innerHTML = html;
+                }
+
+                this.applyStyles(el, item);
+                return el;
+            }
+        }
+
+        // ==========================================
+        // HISTORY ENGINE
+        // ==========================================
+        class HistoryRenderer extends BaseRenderer {
+            renderItem(item, pageKey) {
+                const univ = this.renderCommon(item, pageKey);
+                if (univ) return univ;
+
+                const el = document.createElement('div');
+                if (item.type === 'history-header') {
+                    el.className = 'history-header-text';
+                    el.innerHTML = 'History of Ethiopia and the Horn Module (Hist.1102)';
+                } else if (item.type === 'history-unit-header') {
+                    el.innerHTML = `<div class="history-unit-title">UNIT ${item.number || ''}<br>${this.formatText(item.title) || ''} ${item.hours ? `(${item.hours} hours)` : ''}</div>`;
+                } else if (item.type === 'history-arrow-list') {
+                    el.className = 'history-arrow-list';
+                    el.innerHTML = (item.items || []).map(i => `<li>${this.formatText(i)}</li>`).join('');
+                }
+                
+                this.applyStyles(el, item);
+                return el;
+            }
+        }
+
+        // ==========================================
+        // MASTER CONTROLLER
+        // ==========================================
+        function executeEngine() {
+            const engineType = document.getElementById('engine-select').value;
+            const raw = document.getElementById('json-pen').value;
+            const container = document.getElementById('document-container');
+            container.innerHTML = '';
+
+            try {
+                const doc = JSON.parse(raw);
+                const availableWidth = window.innerWidth - 20;
+                const scale = availableWidth < 794 ? availableWidth / 794 : 1;
+
+                let renderer;
+                switch(engineType) {
+                    case 'anthro': renderer = new AnthroRenderer(scale, engineType); break;
+                    case 'logic': renderer = new LogicRenderer(scale, engineType); break;
+                    case 'psych': renderer = new PsychRenderer(scale, engineType); break;
+                    case 'entre': renderer = new EntreRenderer(scale, engineType); break;
+                    case 'history': renderer = new HistoryRenderer(scale, engineType); break;
+                }
+
+                Object.keys(doc).forEach(pageKey => {
+                    const pageData = doc[pageKey];
+                    // The renderer defines the wrapper, the canvas, and where the content gets injected (for history covers)
+                    const { wrapper, canvas, contentContainer } = renderer.createPage(pageKey, pageData);
+
+                    (pageData.content || []).forEach(item => {
+                        const el = renderer.renderItem(item, pageKey);
+                        if (el) contentContainer.appendChild(el);
+                    });
+
+                    wrapper.appendChild(canvas);
+                    container.appendChild(wrapper);
+                });
+
+            } catch (err) {
+                alert(`Engine Rendering Error (${engineType}): ` + err);
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>]]>
