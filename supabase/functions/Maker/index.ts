@@ -15,13 +15,13 @@ pixel-perfect fidelity.
 
 [STRICT OUTPUT CONSTRAINTS]
 
-1.  Output ONLY valid JSON inside a single JSON code block. Do not write backticks like "````json".
+1.  Output ONLY valid JSON inside a single JSON code block. Do not write backticks like "\`\`\`\`json".
 2.  NO explanatory text, intro, or outro outside the JSON block. Do not say
     "Here is your JSON".
 3.  Pristine JSON syntax is non-negotiable: All string values must use double
     quotes. Any internal double quotes within HTML attributes or body text must
-    be escaped as \".
-4.  No raw line breaks inside JSON strings: Use \n for line breaks inside
+    be escaped as \\\".
+4.  No raw line breaks inside JSON strings: Use \\n for line breaks inside
     strings, or <br> inside paragraph body values.
 
 [THE LOGIC BOOK SCHEMA REFERENCE]
