@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8"
 import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1"
+import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts"
 
 const SYSTEM_INSTRUCTIONS_PROMPT = `
 You are a highly precise, specialized layout translation model. Your sole task
@@ -326,10 +327,8 @@ serve(async (req) => {
         subDoc.addPage(copiedPage);
         const singlePageBytes = await subDoc.save();
 
-        // Convert the PDF binary to base64
-        const base64Pdf = btoa(
-          String.fromCharCode(...new Uint8Array(singlePageBytes))
-        );
+        // Convert the PDF binary to base64 safely without call stack exhaustion
+        const base64Pdf = encodeBase64(singlePageBytes);
 
         // Fetch round-robin API key
         selectedKeyObj = await getGeminiApiKey(supabase);
