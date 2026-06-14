@@ -267,11 +267,34 @@
         .engine-logic .logic-activity-label { font-weight: bold; font-style: normal; margin-right: 10px; }
         
         /* Pixel perfect logic arguments */
-        .engine-logic .logic-argument-block { margin: 20px auto; width: fit-content; text-align: left; line-height: 1.6; display: flex; flex-direction: column; align-items: flex-start; }
+        .engine-logic .logic-argument-block { margin: 20px auto; width: fit-content; min-width: 250px; text-align: left; line-height: 1.6; display: flex; flex-direction: column; align-items: flex-start; }
         .engine-logic .logic-argument-premise { width: 100%; padding: 0 10px; box-sizing: border-box; }
         .engine-logic .logic-argument-line { border-top: 1px solid #000; margin: 4px 0; width: 100%; }
         .engine-logic .logic-argument-conclusion { width: 100%; padding: 0 10px; box-sizing: border-box; }
         
+        /* Logic Title Pages */
+        .engine-logic .logic-title-container { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 40px 0; text-align: center; }
+        .engine-logic .logic-title-main { font-size: 20px; font-weight: bold; margin-bottom: 20px; line-height: 1.6; }
+        .engine-logic .logic-title-sub { font-size: 18px; font-weight: bold; margin-bottom: 40px; }
+        .engine-logic .logic-contributors { text-align: left; font-size: 16px; font-weight: bold; line-height: 2; margin-top: 40px; width: 100%; padding-left: 10%; }
+        
+        /* Logic Table of Contents */
+        .engine-logic .logic-toc-container { width: 100%; margin: 20px 0; }
+        .engine-logic .logic-toc-entry { display: flex; align-items: baseline; margin-bottom: 10px; font-size: 15px; }
+        .engine-logic .logic-toc-text { flex-shrink: 0; }
+        .engine-logic .logic-toc-dots { flex-grow: 1; border-bottom: 2px dotted #000; margin: 0 8px; position: relative; top: -3px; }
+        .engine-logic .logic-toc-page { flex-shrink: 0; }
+        .engine-logic .logic-toc-level-1 { padding-left: 20px; }
+        .engine-logic .logic-toc-level-2 { padding-left: 40px; }
+
+        /* Logic Specific Bullets */
+        .engine-logic .logic-bullet-list { display: flex; flex-direction: column; gap: 8px; margin: 15px 0; padding-left: 25px; }
+        .engine-logic .logic-bullet-item { display: flex; gap: 12px; align-items: flex-start; text-align: justify; line-height: 1.5; font-size: 15.5px; }
+        .engine-logic .logic-bullet-char { font-family: var(--font-sans); font-size: 16px; flex-shrink: 0; margin-top: 1px; color: #000; }
+
+        /* Logic Formula Box */
+        .engine-logic .logic-formula-box { border: 1.5px solid #000; padding: 12px 25px; margin: 25px auto; text-align: center; font-weight: bold; font-style: italic; width: fit-content; max-width: 90%; background: #fff; box-shadow: 2px 2px 0px rgba(0,0,0,0.1); }
+
         .engine-logic .logic-venn-container { display: flex; flex-direction: column; align-items: center; margin: 20px 0; }
         .engine-logic .logic-exercise-line { border-bottom: 1px solid #aaa; margin: 18px 0; height: 1px; width: 100%; }
         .engine-logic .logic-quote-block { margin: 20px 40px; text-align: justify; font-size: 14px; line-height: 1.6; }
@@ -680,9 +703,29 @@
                     el.innerHTML = `<span>${this.formatText(item.authors) || ''}</span><span>Page ${item.page || pageKey}</span>`;
                 } else if (item.type === 'chapter-title') {
                     el.innerHTML = `<span class="logic-chapter-num">CHAPTER ${item.number}</span><span class="logic-chapter-title">${this.formatText(item.title)}</span>`;
+                } else if (item.type === 'title-page') {
+                    el.className = 'logic-title-container';
+                    el.innerHTML = `<div class="logic-title-main">${this.formatText(item.main).replace(/\n/g, '<br>')}</div>` +
+                                   (item.sub ? `<div class="logic-title-sub">${this.formatText(item.sub).replace(/\n/g, '<br>')}</div>` : '') +
+                                   (item.contributors ? `<div class="logic-contributors">${this.formatText(item.contributors).replace(/\n/g, '<br>')}</div>` : '');
+                } else if (item.type === 'logic-toc') {
+                    el.className = 'logic-toc-container';
+                    (item.entries || []).forEach(entry => {
+                        const row = document.createElement('div');
+                        row.className = `logic-toc-entry logic-toc-level-${entry.level || 0}`;
+                        row.innerHTML = `<span class="logic-toc-text">${this.formatText(entry.text)}</span><span class="logic-toc-dots"></span><span class="logic-toc-page">${entry.page || ''}</span>`;
+                        el.appendChild(row);
+                    });
                 } else if (item.type === 'bullet-list') {
-                    el.className = 'univ-list-block';
-                    el.innerHTML = '<ul>' + (item.items || []).map(i => `<li>${this.formatText(i)}</li>`).join('') + '</ul>';
+                    el.className = 'logic-bullet-list';
+                    const charMap = { 'arrow': '', 'diamond': '', 'check': '', 'dot': '', 'star': '', 'default': '•' };
+                    el.innerHTML = (item.items || []).map(text => {
+                        const bulletChar = charMap[item.bullet] || charMap['default'];
+                        return `<div class="logic-bullet-item"><div class="logic-bullet-char">${bulletChar}</div><div>${this.formatText(text)}</div></div>`;
+                    }).join('');
+                } else if (item.type === 'logic-formula') {
+                    el.className = 'logic-formula-box';
+                    el.innerHTML = this.formatText(item.body);
                 } else if (item.type === 'logic-activity') {
                     el.className = 'logic-activity-box';
                     el.innerHTML = `<span class="logic-activity-label">${this.formatText(item.label) || ''}</span>${this.formatText(item.body)}`;
