@@ -407,7 +407,9 @@
                 <option value="entre">ENGINE: Entrepreneurship (MoSHE 2019)</option>
             </select>
             <button onclick="executeEngine()" style="flex: 1; min-width: 150px; margin-top: 0; background: var(--entre-blue);">DRAW CANVAS</button>
+            <button onclick="triggerJsonUpload()" style="flex: 1; min-width: 150px; margin-top: 0; background: #ffc107; color: #000; font-weight: bold;">📥 IMPORT JSON</button>
             <button onclick="exportCompiledJSON()" style="flex: 1; min-width: 150px; margin-top: 0; background: #dc3545;">📤 EXPORT JSON</button>
+            <input type="file" id="import-json-file" accept=".json" style="display: none;" onchange="handleJsonUpload(event)">
         </div>
         <textarea id="json-pen" placeholder="Paste strict JSON instructions..."></textarea>
     </div>
@@ -537,7 +539,91 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', loadSettings);
+        function triggerJsonUpload() {
+            document.getElementById('import-json-file').click();
+        }
+
+        function processJsonData(rawText, fileName = 'Imported File') {
+            try {
+                const parsed = JSON.parse(rawText);
+                document.getElementById('json-pen').value = JSON.stringify(parsed, null, 2);
+
+                // Auto-detect engine from block types inside parsed JSON
+                const firstKey = Object.keys(parsed)[0];
+                if (firstKey && parsed[firstKey] && Array.isArray(parsed[firstKey].content)) {
+                    const contentItems = parsed[firstKey].content;
+                    const hasLogicItem = contentItems.some(item => item.type && item.type.startsWith('logic-'));
+                    const hasEntreItem = contentItems.some(item => item.type && item.type.startsWith('entre-'));
+                    const hasAnthroItem = contentItems.some(item => item.type && item.type.startsWith('anthro-'));
+                    const hasHistoryItem = contentItems.some(item => item.type && item.type.startsWith('history-'));
+                    
+                    if (hasLogicItem) {
+                        document.getElementById('engine-select').value = 'logic';
+                    } else if (hasEntreItem) {
+                        document.getElementById('engine-select').value = 'entre';
+                    } else if (hasAnthroItem) {
+                        document.getElementById('engine-select').value = 'anthro';
+                    } else if (hasHistoryItem) {
+                        document.getElementById('engine-select').value = 'history';
+                    }
+                }
+
+                executeEngine();
+                alert(`Successfully imported and rendered: ${fileName}`);
+            } catch (err) {
+                alert('Failed to parse JSON: ' + err.message);
+            }
+        }
+
+        function handleJsonUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                processJsonData(e.target.result, file.name);
+                event.target.value = ''; // Reset file input
+            };
+            reader.readAsText(file);
+        }
+
+        function setupDragAndDrop() {
+            const textarea = document.getElementById('json-pen');
+            
+            textarea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                textarea.style.borderColor = 'var(--entre-blue)';
+                textarea.style.background = '#111';
+            });
+
+            textarea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                textarea.style.borderColor = '#333';
+                textarea.style.background = '#000';
+            });
+
+            textarea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                textarea.style.borderColor = '#333';
+                textarea.style.background = '#000';
+
+                const file = e.dataTransfer.files[0];
+                if (file && (file.type === 'application/json' || file.name.endsWith('.json'))) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        processJsonData(evt.target.result, file.name);
+                    };
+                    reader.readAsText(file);
+                } else {
+                    alert('Please drop a valid .json file.');
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            setupDragAndDrop();
+        });
 
         // ==========================================
         // BASE RENDERER (Universal Tools)
