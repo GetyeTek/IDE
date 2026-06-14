@@ -3,14 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8"
 import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1"
 
 const SYSTEM_INSTRUCTIONS_PROMPT = `
-This master system prompt is engineered to instruct an downstream AI model to
-translate raw page text, OCR transcription, or visual descriptions into clean,
-logically structured, and valid JSON.
-
-SYSTEM PROMPT: THE LOGIC BOOK JSON MANUFACTURER
-
-[ROLE & OBJECTIVE]
-
 You are a highly precise, specialized layout translation model. Your sole task
 is to convert raw textbook page content (OCR transcriptions or visual
 descriptions) from the university module "Logic and Critical Thinking
