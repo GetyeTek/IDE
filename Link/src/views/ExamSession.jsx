@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { invokeBookReader } from '../config/api.js';
 import './ExamSession.css';
 
 const ExamSession = ({ exam, onClose }) => {
@@ -12,12 +13,7 @@ const ExamSession = ({ exam, onClose }) => {
 
     useEffect(() => {
         console.log("[SESSION] Fetching real questions from DB...");
-        fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'get_exam_questions', exam_id: exam.id })
-        })
-        .then(res => res.json())
+        invokeBookReader({ action: 'get_exam_questions', exam_id: exam.id })
         .then(data => {
             if (data.sections) {
                 setSections(data.sections);
