@@ -164,7 +164,46 @@ const BookReader = ({ book, onClose }) => {
         return () => document.removeEventListener('selectionchange', handleSelection);
     }, []);
 
-    // 5. Physics Engine
+    // 5. Physics Engine & Bounding Constraints
+    const applyConstraints = () => {
+        if (!layerRef.current) return;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        const s = state.current;
+        const v = velocity.current;
+
+        // Extract native dimensions independent of active transform scaling
+        const rect = layerRef.current.getBoundingClientRect();
+        const contentWidth = rect.width / s.scale;
+        const contentHeight = rect.height / s.scale;
+
+        const visualW = contentWidth * s.scale;
+        const visualH = contentHeight * s.scale;
+
+        // HORIZONTAL BOUNDS (X)
+        if (visualW < vw) {
+            // If page is narrower than screen, lock it centered
+            s.x = (vw - visualW) / 2;
+            v.x = 0;
+        } else {
+            // Pin boundaries to edges
+            if (s.x > 0) { s.x = 0; v.x = 0; }
+            if (s.x < vw - visualW) { s.x = vw - visualW; v.x = 0; }
+        }
+
+        // VERTICAL BOUNDS (Y)
+        if (visualH < vh) {
+            // If total height is shorter than viewport, center it
+            s.y = (vh - visualH) / 2;
+            v.y = 0;
+        } else {
+            // Pin boundaries to edges
+            if (s.y > 0) { s.y = 0; v.y = 0; }
+            if (s.y < vh - visualH) { s.y = vh - visualH; v.y = 0; }
+        }
+    };
+
     const loop = () => {
         if (!input.current.isDragging) {
             const v = velocity.current;
@@ -176,17 +215,20 @@ const BookReader = ({ book, onClose }) => {
             }
         }
 
+        // Apply edge-containment constraints before rendering
+        applyConstraints();
+
         if (layerRef.current) {
             const { x, y, scale } = state.current;
             layerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
         }
 
-        // Basic scroll tracking for page count
-        if (pageCountRef.current && layerRef.current) {
+        // Accurate dynamic page count calculation
+        if (pageCountRef.current && layerRef.current && pages.length > 0) {
             const unscaledY = Math.abs(state.current.y) / state.current.scale;
-            const approxPageHeight = 1200; // rough canvas height + gap
-            const current = Math.max(1, Math.floor(unscaledY / approxPageHeight) + 1);
-            pageCountRef.current.innerText = `${Math.min(current, pages.length || 1)} / ${pages.length || '--'}`;
+            const approxPageHeight = 1190; // Page canvas (1130px) + Gap (60px)
+            const current = Math.max(1, Math.floor((unscaledY + 200) / approxPageHeight) + 1);
+            pageCountRef.current.innerText = `${Math.min(current, pages.length)} / ${pages.length}`;
         }
 
         requestRef.current = requestAnimationFrame(loop);
