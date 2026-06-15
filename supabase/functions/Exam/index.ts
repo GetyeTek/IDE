@@ -183,21 +183,25 @@ serve(async (req) => {
     const pdfDocCache = new Map<string, PDFDocument>();
 
     // 3. Process each task sequentially
+    // 3. Process each task sequentially
     for (const task of tasks) {
+      console.log(`[Task ${task.id}] Starting processing for "${task.pdf_name}" (Page index ${task.page_index})...`);
       let retryCount = 0;
       let success = false;
       let errorMessage = "";
       let parsedPayload = null;
 
-      while (!success && retryCount < 3) {
+      while (!success && retryCount &lt; 3) {
         let apiKeyRecord = null;
         try {
           // Get the least-used, non-cooled-down active key
           apiKeyRecord = await getNextApiKey(supabase);
+          console.log(`[Task ${task.id}] Attempt ${retryCount + 1}/3 using Key ID ${apiKeyRecord.id}`);
           
           // Check cache for fully parsed PDFDocument object first
           let srcDoc = pdfDocCache.get(task.pdf_name);
           if (!srcDoc) {
+            console.log(`[Task ${task.id}] PDF "${task.pdf_name}" not cached. Downloading from storage...`);
             let pdfBytes = pdfCache.get(task.pdf_name);
             if (!pdfBytes) {
               const { data: fileData, error: downloadErr } = await supabase.storage
@@ -208,16 +212,23 @@ serve(async (req) => {
               pdfBytes = new Uint8Array(await fileData.arrayBuffer());
               pdfCache.set(task.pdf_name, pdfBytes);
             }
+            console.log(`[Task ${task.id}] Parsing PDF "${task.pdf_name}"...`);
             srcDoc = await PDFDocument.load(pdfBytes);
             pdfDocCache.set(task.pdf_name, srcDoc);
+          } else {
+            console.log(`[Task ${task.id}] Found parsed PDF "${task.pdf_name}" in execution cache.`);
           }
 
           // Extract the single page needed using the pre-parsed PDF Document
+          console.log(`[Task ${task.id}] Extracting page index ${task.page_index}...`);
           const singlePagePdfBytes = await extractSinglePage(srcDoc, task.page_index);
           const base64Pdf = encodeBase64(singlePagePdfBytes);
+          console.log(`[Task ${task.id}] Page extracted successfully (${singlePagePdfBytes.byteLength} bytes). Encoding complete.`);
 
           // Query Gemini
+          console.log(`[Task ${task.id}] Sending request to Gemini...`);
           parsedPayload = await callGemini(apiKeyRecord.api_key, base64Pdf);
+          console.log(`[Task ${task.id}] Gemini successfully parsed content for page ${task.page_index}.`);
           success = true;
 
           // Track usage of the key
@@ -226,12 +237,15 @@ serve(async (req) => {
         } catch (err: any) {
           retryCount++;
           errorMessage = err.message || "Unknown error occurred";
+          console.warn(`[Task ${task.id}] Attempt ${retryCount}/3 failed. Error: ${errorMessage}`);
 
           if (apiKeyRecord && (err.status === 429 || errorMessage.includes("429"))) {
+            console.warn(`[Task ${task.id}] Rate limit (429) detected on Key ID ${apiKeyRecord.id}. Cooling down key for 5 minutes.`);
             // Apply a 5-minute cooldown to the key that encountered rate limits
             await cooldownKey(supabase, apiKeyRecord.id, 5);
           } else {
             // Non-429 errors or storage errors don't necessarily require a key cooldown
+            console.log(`[Task ${task.id}] Non-429 error encountered. Skipping further retries for this attempt window.`);
             break; 
           }
         }
@@ -239,6 +253,7 @@ serve(async (req) => {
 
       // 4. Update the DB based on the outcome of the page processing
       if (success && parsedPayload) {
+        console.log(`[Task ${task.id}] Inserting result payload into database...`);
         // Write results
         const { error: resultErr } = await supabase.from("results").insert({
           progress_id: task.id,
@@ -248,12 +263,14 @@ serve(async (req) => {
         });
 
         if (resultErr) {
+          console.error(`[Task ${task.id}] Failed to insert result into database: ${resultErr.message}`);
           await supabase.from("progress").update({
             status: "failed",
             error_message: `Failed to insert result: ${resultErr.message}`,
             updated_at: new Date().toISOString(),
           }).eq("id", task.id);
         } else {
+          console.log(`[Task ${task.id}] Result successfully saved. Marking progress as completed.`);
           await supabase.from("progress").update({
             status: "completed",
             error_message: null,
@@ -261,6 +278,7 @@ serve(async (req) => {
           }).eq("id", task.id);
         }
       } else {
+        console.error(`[Task ${task.id}] Task permanently failed after maximum retries. Error: ${errorMessage}`);
         // Mark task as failed
         await supabase.from("progress").update({
           status: "failed",
