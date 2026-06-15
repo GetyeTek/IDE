@@ -2251,19 +2251,8 @@
         return `${t.c}\n${finalComment}\n${t.ce}\n${xmlOutput}`.trim();
     }
 
-    /**
-     * Tries to parse JSON. If it fails due to bad escaping (common with AI),
-     * it initiates a surgical regex preprocessor to isolate parent string values
-     * and escape all internal unescaped quotes/newlines, returning the exact error if failed.
-    /**
-     * Parses the highly robust, escaping-agnostic Conduit XML Patch (CXP) Markup
-     * and compiles it into a standard JSON operations array on-the-fly.
-     */
-([\s\S]*?)<\/replace_with>/i);
-
-            console.log(`[Replace Block #${replaceCount}] Found target file:`, filePath);
-            
-            if (!findMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <find>...</find> tags!`);
+    ...</find> tags!`);
+            if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</find> tags!`);
             if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</find> tags!`);
             if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</replace_with> tags!`);
 
