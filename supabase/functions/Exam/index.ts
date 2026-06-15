@@ -161,7 +161,7 @@ serve(async (req) => {
       .select("*")
       .eq("status", "pending")
       .order("id", { ascending: true })
-      .limit(3);
+      .limit(1);
 
     if (fetchErr) throw fetchErr;
     if (!tasks || tasks.length === 0) {
