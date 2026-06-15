@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkUp: Supabase Book Batch Uploader</title>
+    <style>
+        :root {
+            --bg: #121212; --surface: #1e1e1e; --primary: #42d7b8; 
+            --text: #e0e0e0; --text-muted: #888; --danger: #ff4757;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg); color: var(--text);
+            margin: 0; padding: 2rem; display: flex; justify-content: center;
+        }
+        .container {
+            max-width: 800px; width: 100%; background: var(--surface);
+            padding: 2rem; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+        }
+        h1 { margin-top: 0; color: var(--primary); font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+        .step-card {
+            background: rgba(0,0,0,0.2); border: 1px solid #333;
+            padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;
+        }
+        .step-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #fff; }
+        
+        .input-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+        input[type="text"], input[type="password"] {
+            background: #000; border: 1px solid #444; color: #fff;
+            padding: 10px; border-radius: 6px; font-family: monospace;
+        }
+        input:focus { outline: none; border-color: var(--primary); }
+        
+        .row { display: flex; gap: 1rem; }
+        .row > .input-group { flex: 1; }
+
+        button {
+            background: var(--primary); color: #000; border: none;
+            padding: 10px 20px; border-radius: 6px; font-weight: bold;
+            cursor: pointer; transition: opacity 0.2s; font-size: 1rem;
+        }
+        button:hover { opacity: 0.8; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
+        button.danger { background: var(--danger); color: white; }
+
+        .file-upload-wrapper {
+            border: 2px dashed #444; padding: 2rem; text-align: center;
+            border-radius: 8px; cursor: pointer; transition: border-color 0.2s;
+        }
+        .file-upload-wrapper:hover { border-color: var(--primary); }
+        input[type="file"] { display: none; }
+
+        .staging-area {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #000; padding: 1rem; border-radius: 6px; border: 1px solid #333;
+            margin-bottom: 1rem;
+        }
+        .staging-stats { font-family: monospace; color: var(--primary); font-size: 1.1rem; }
+
+        .progress-container { width: 100%; background: #000; border-radius: 6px; height: 20px; overflow: hidden; margin-bottom: 10px; display: none; border: 1px solid #333;}
+        .progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }
+
+        .terminal {
+            background: #000; color: #00ff41; font-family: 'Courier New', Courier, monospace;
+            padding: 1rem; border-radius: 6px; height: 200px; overflow-y: auto;
+            font-size: 0.85rem; border: 1px solid #333;
+        }
+        .terminal p { margin: 2px 0; }
+        .term-err { color: #ff4757; }
+        .term-warn { color: #f1c40f; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🚀 Supabase Book Batch Uploader</h1>
+
+        <!-- STEP 1 -->
+        <div class="step-card">
+            <div class="step-title">Step 1: Configuration</div>
+            <div class="row">
+                <div class="input-group">
+                    <label>Supabase Project URL</label>
+                    <input type="text" id="sb-url" placeholder="https://xxxx.supabase.co">
+                </div>
+                <div class="input-group">
+                    <label>Service Role Key (or Anon Key)</label>
+                    <input type="password" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5c...">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Target Book ID (UUID from 'books' table)</label>
+                <input type="text" id="book-id" placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000">
+            </div>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; text-transform: none; color: #ccc;">
+                <input type="checkbox" id="clear-old" checked>
+                Clear existing pages for this Book ID before uploading (Recommended)
+            </label>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="step-card">
+            <div class="step-title">Step 2: Load Compiled JSON</div>
+            <div class="file-upload-wrapper" onclick="document.getElementById('file-input').click()">
+                <div style="font-size: 2rem; margin-bottom: 10px;">📁</div>
+                <div id="file-label" style="font-weight: bold; color: var(--primary);">Click to select JSON file</div>
+                <div style="font-size: 0.85rem; color: #888; margin-top: 5px;">Must be the output from the Book Patcher Tool</div>
+            </div>
+            <input type="file" id="file-input" accept=".json" onchange="handleFileUpload(event)">
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="step-card">
+            <div class="step-title">Step 3: Stage & Upload</div>
+            <div class="staging-area">
+                <div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">Pages Ready:</div>
+                    <div class="staging-stats" id="stage-count">0</div>
+                </div>
+                <button id="btn-upload" disabled onclick="startUpload()">Start Batch Upload</button>
+            </div>
+
+            <div class="progress-container" id="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+
+            <div class="terminal" id="terminal">
+                <p>> Ready. Please configure credentials and load a file.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State ---
+        let stagedPages = [];
+        const BATCH_SIZE = 50; // Supabase handles 50 rows per request easily
+
+        // --- Init ---
+        window.onload = () => {
+            const savedUrl = localStorage.getItem('supa_url');
+            const savedKey = localStorage.getItem('supa_key');
+            if (savedUrl) document.getElementById('sb-url').value = savedUrl;
+            if (savedKey) document.getElementById('sb-key').value = savedKey;
+        };
+
+        const log = (msg, type = 'info') => {
+            const term = document.getElementById('terminal');
+            const p = document.createElement('p');
+            p.innerText = `> ${msg}`;
+            if (type === 'err') p.className = 'term-err';
+            if (type === 'warn') p.className = 'term-warn';
+            term.appendChild(p);
+            term.scrollTop = term.scrollHeight;
+        };
+
+        const saveCreds = () => {
+            localStorage.setItem('supa_url', document.getElementById('sb-url').value.trim());
+            localStorage.setItem('supa_key', document.getElementById('sb-key').value.trim());
+        };
+
+        // --- File Handling ---
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('file-label').innerText = file.name;
+            log(`Reading file: ${file.name}...`);
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const rawData = JSON.parse(event.target.result);
+                    parseAndStageData(rawData);
+                } catch (err) {
+                    log(`Failed to parse JSON: ${err.message}`, 'err');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseAndStageData(masterData) {
+            log(`Parsing JSON structure...`);
+            stagedPages = [];
+            
+            for (const [key, data] of Object.entries(masterData)) {
+                // Extract number from 'page-128'
+                const pageNum = parseInt(key.replace(/\D/g, '')) || 0;
+                
+                stagedPages.push({
+                    page_number: pageNum,
+                    page_key: key,
+                    manual_flag: data.manual_flag || null,
+                    content_json: data.content || []
+                });
+            }
+
+            // Sort by page number to ensure sequential insertion
+            stagedPages.sort((a, b) => a.page_number - b.page_number);
+
+            document.getElementById('stage-count').innerText = stagedPages.length;
+            
+            if (stagedPages.length > 0) {
+                document.getElementById('btn-upload').disabled = false;
+                log(`Successfully staged ${stagedPages.length} pages. Ready to upload.`);
+            } else {
+                log(`No pages found in JSON.`, 'warn');
+            }
+        }
+
+        // --- Upload Logic ---
+        async function startUpload() {
+            const url = document.getElementById('sb-url').value.trim();
+            const key = document.getElementById('sb-key').value.trim();
+            const bookId = document.getElementById('book-id').value.trim();
+            const clearOld = document.getElementById('clear-old').checked;
+
+            if (!url || !key || !bookId) {
+                return log("Missing URL, Key, or Book ID!", "err");
+            }
+
+            saveCreds();
+            document.getElementById('btn-upload').disabled = true;
+            document.getElementById('progress-container').style.display = 'block';
+            updateProgress(0);
+
+            const headers = {
+                'apikey': key,
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal' // Don't return the giant inserted payload back
+            };
+
+            const endpoint = `${url}/rest/v1/book_pages`;
+
+            try {
+                // 1. Delete existing pages
+                if (clearOld) {
+                    log(`Clearing existing pages for book: ${bookId}...`, 'warn');
+                    const delRes = await fetch(`${endpoint}?book_id=eq.${bookId}`, {
+                        method: 'DELETE', headers
+                    });
+                    if (!delRes.ok) throw new Error(`Delete failed: ${await delRes.text()}`);
+                    log(`Old pages cleared.`);
+                }
+
+                // 2. Map book_id into the payload
+                const finalPayload = stagedPages.map(p => ({
+                    ...p,
+                    book_id: bookId
+                }));
+
+                // 3. Batch Upload
+                let successCount = 0;
+                const totalChunks = Math.ceil(finalPayload.length / BATCH_SIZE);
+
+                for (let i = 0; i < totalChunks; i++) {
+                    const chunk = finalPayload.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+                    log(`Uploading batch ${i + 1}/${totalChunks} (${chunk.length} pages)...`);
+
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify(chunk)
+                    });
+
+                    if (!res.ok) {
+                        throw new Error(`Batch ${i + 1} failed: ${await res.text()}`);
+                    }
+
+                    successCount += chunk.length;
+                    updateProgress((successCount / finalPayload.length) * 100);
+                }
+
+                log(`✅ UPLOAD COMPLETE! Successfully inserted ${successCount} pages.`, 'info');
+                document.getElementById('progress-bar').style.background = '#2ecc71';
+
+            } catch (err) {
+                log(`UPLOAD ABORTED: ${err.message}`, 'err');
+                document.getElementById('progress-bar').style.background = 'var(--danger)';
+            } finally {
+                document.getElementById('btn-upload').disabled = false;
+            }
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+        }
+    </script>
+</body>
+</html>
