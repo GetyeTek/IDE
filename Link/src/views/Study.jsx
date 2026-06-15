@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { invokeBookReader } from '../config/api.js';
 import BookReader from './BookReader.jsx';
 import ExamPavilion from './ExamPavilion.jsx';
 
@@ -53,12 +54,7 @@ const Study = ({ onOpenActivity }) => {
 
     useEffect(() => {
         // Fetch Main Books
-        fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'list_books' })
-        })
-        .then(res => res.json())
+        invokeBookReader({ action: 'list_books' })
         .then(data => {
             if(data.books) {
                 // Inject a special 'Exam' book at the start
@@ -74,12 +70,7 @@ const Study = ({ onOpenActivity }) => {
         .catch(err => console.error(err));
 
         // Fetch Universities
-        fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'list_universities' })
-        })
-        .then(res => res.json())
+        invokeBookReader({ action: 'list_universities' })
         .then(data => { if(data.universities) setUniversities(data.universities); })
         .catch(err => console.error(err));
     }, []);
