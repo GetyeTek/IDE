@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { invokeBookReader } from '../config/api.js';
 import './BookReader.css';
 
 const CONFIG = { friction: 0.93, velocityMult: 1.5, maxZoom: 4.0 };
@@ -39,14 +40,7 @@ const BookReader = ({ book, onClose }) => {
             console.log("[READER] Fetching JSON architecture for Book ID:", book.id);
             try {
                 setLoading(true);
-                const response = await fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'get_book_pages', book_id: book.id })
-                });
-                
-                if (!response.ok) throw new Error("Failed to fetch book structure");
-                const data = await response.json();
+                const data = await invokeBookReader({ action: 'get_book_pages', book_id: book.id });
                 
                 if (data.pages && data.pages.length > 0) {
                     setPages(data.pages);
