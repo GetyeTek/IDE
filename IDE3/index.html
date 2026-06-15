@@ -2251,61 +2251,75 @@
         return `${t.c}\n${finalComment}\n${t.ce}\n${xmlOutput}`.trim();
     }
 
-    ...</find> tags!`);
-            if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</find> tags!`);
-            if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</find> tags!`);
-            if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</replace_with> tags!`);
+    /**
+     * Parses Conduit XML Patch (CXP) Markup sequentially, preserving chronological order.
+     */
+    function parseCXP(input) {
+        console.group("📡 [CXP Parser]");
+        const operations = [];
+        const cleanContent = (str) => {
+            if (!str) return "";
+            return str.replace(/^\r?\n|\r?\n$/g, "");
+        };
+        const unescapeEntities = (str) => {
+            if (!str) return "";
+            return str
+                .replace(/&amp;/g, "&")
+                .replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">")
+                .replace(/&quot;/g, '"')
+                .replace(/&#039;/g, "'")
+                .replace(/&#39;/g, "'");
+        };
 
-            if (filePath && findMatch && replaceWithMatch) {
-                console.log(`✅ [Replace Block #${replaceCount}] Parsed successfully!`);
+        // Matches any valid CXP tags in order of appearance
+        const tagRegex = /<(comment|replace_block|create_file|delete_file)([^>]*?)>([\s\S]*?)<\/\1>|<(delete_file)([^>]*?)\/>/gi;
+
+        let match;
+        while ((match = tagRegex.exec(input)) !== null) {
+            const tagName = (match[1] || match[4]).toLowerCase();
+            const attrs = match[2] || match[5] || "";
+            const innerContent = match[3] || "";
+
+            const fileMatch = attrs.match(/(?:file|file_path)\s*=\s*['"]([^'"]+)['"]/i);
+            const filePath = fileMatch ? fileMatch[1].trim() : "";
+
+            if (tagName === 'comment') {
                 operations.push({
-                    action: 'replace_block',
-                    file_path: filePath,
-                    find_block: cleanContent(findMatch[1]),
-                    replace_with: cleanContent(replaceWithMatch[1])
+                    action: 'comment',
+                    text: innerContent.trim()
                 });
+            } else if (tagName === 'replace_block') {
+                const findMatch = innerContent.match(/<find>([\s\S]*?)<\/find>/i);
+                const replaceWithMatch = innerContent.match(/<replace_with>([\s\S]*?)<\/replace_with>/i);
+                if (filePath && findMatch && replaceWithMatch) {
+                    operations.push({
+                        action: 'replace_block',
+                        file_path: filePath,
+                        find_block: unescapeEntities(cleanContent(findMatch[1])),
+                        replace_with: unescapeEntities(cleanContent(replaceWithMatch[1]))
+                    });
+                }
+            } else if (tagName === 'create_file') {
+                const contentMatch = innerContent.match(/<content>([\s\S]*?)<\/content>/i);
+                if (filePath && contentMatch) {
+                    operations.push({
+                        action: 'create_file',
+                        file_path: filePath,
+                        content: unescapeEntities(cleanContent(contentMatch[1]))
+                    });
+                }
+            } else if (tagName === 'delete_file') {
+                if (filePath) {
+                    operations.push({
+                        action: 'delete_file',
+                        file_path: filePath
+                    });
+                }
             }
         }
-        console.log(`Total <replace_block> tags matched: ${replaceCount}`);
 
-        // 3. Extract Create File Blocks (Robust)
-        const createRegex = /<create_file[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/create_file>/gi;
-        let createCount = 0;
-        while ((match = createRegex.exec(input)) !== null) {
-            createCount++;
-            const filePath = match[1].trim();
-            const inner = match[2];
-            const contentMatch = inner.match(/<content>([\s\S]*?)<\/content>/i);
-
-            console.log(`[Create Block #${createCount}] Found target file:`, filePath);
-            if (!contentMatch) console.error(`❌ [Create Block #${createCount}] Missing <content>...</content> tags!`);
-
-            if (filePath && contentMatch) {
-                console.log(`✅ [Create Block #${createCount}] Parsed successfully!`);
-                operations.push({
-                    action: 'create_file',
-                    file_path: filePath,
-                    content: cleanContent(contentMatch[1])
-                });
-            }
-        }
-        console.log(`Total <create_file> tags matched: ${createCount}`);
-
-        // 4. Extract Delete File Blocks (Robust)
-        const deleteRegex = /<delete_file[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*(?:\/|><\/delete_file)>/gi;
-        let deleteCount = 0;
-        while ((match = deleteRegex.exec(input)) !== null) {
-            deleteCount++;
-            const filePath = match[1].trim();
-            console.log(`✅ [Delete Block #${deleteCount}] Matched for file:`, filePath);
-            operations.push({
-                action: 'delete_file',
-                file_path: filePath
-            });
-        }
-        console.log(`Total <delete_file> tags matched: ${deleteCount}`);
-
-        console.log("Final compiled operations sent to backend:", JSON.stringify(operations, null, 2));
+        console.log("Compiled sequential operations:", JSON.stringify(operations, null, 2));
         console.groupEnd();
         return operations;
     }
