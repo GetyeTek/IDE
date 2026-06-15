@@ -155,13 +155,13 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // 1. Fetch up to 10 pending tasks
+    // 1. Fetch up to 3 pending tasks
     const { data: tasks, error: fetchErr } = await supabase
       .from("progress")
       .select("*")
       .eq("status", "pending")
       .order("id", { ascending: true })
-      .limit(10);
+      .limit(3);
 
     if (fetchErr) throw fetchErr;
     if (!tasks || tasks.length === 0) {
