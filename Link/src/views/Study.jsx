@@ -63,6 +63,7 @@ const Study = ({ onOpenActivity }) => {
             if(data.books) {
                 // Inject a special 'Exam' book at the start
                 const examBook = { 
+                    id: "exam-trigger-001",
                     title: "Exams", 
                     isExamTrigger: true, 
                     cover_url: null 
