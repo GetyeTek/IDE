@@ -191,7 +191,7 @@ serve(async (req) => {
       let errorMessage = "";
       let parsedPayload = null;
 
-      while (!success && retryCount &lt; 3) {
+      while (!success &amp;&amp; retryCount &lt; 3) {
         let apiKeyRecord = null;
         try {
           // Get the least-used, non-cooled-down active key
