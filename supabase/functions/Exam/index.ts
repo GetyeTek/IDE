@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
+import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const GEMINI_PROMPT = `
 You are an expert digitization assistant specializing in optical character recognition (OCR), document parsing, and educational content structuring. 
@@ -148,15 +149,7 @@ Expected Output:
 }
 `;
 
-// Helper to safely convert Uint8Array to Base64 without call-stack overflows
-function arrayBufferToBase64(buffer: Uint8Array): string {
-  let binary = "";
-  const len = buffer.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(buffer[i]);
-  }
-  return btoa(binary);
-}
+
 
 serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -287,12 +280,12 @@ serve(async (req) => {
 });
 
 /**
- * Isolates and extracts a single page from a source PDF document.
+/**
+ * Isolates and extracts a single page from an already parsed PDF document instance.
  */
-async function extractSinglePage(pdfBytes: Uint8Array, pageIndex: number): Promise<Uint8Array> {
-  const srcDoc = await PDFDocument.load(pdfBytes);
+async function extractSinglePage(srcDoc: PDFDocument, pageIndex: number): Promise<Uint8Array> {
   const pageCount = srcDoc.getPageCount();
-  if (pageIndex < 0 || pageIndex >= pageCount) {
+  if (pageIndex &lt; 0 || pageIndex &gt;= pageCount) {
     throw new Error(`Page index ${pageIndex} is out of bounds for PDF containing ${pageCount} pages.`);
   }
 
