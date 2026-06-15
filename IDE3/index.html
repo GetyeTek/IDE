@@ -4139,7 +4139,7 @@
                             <div class="menu-item" onclick="traceLogToRun('${response.sha}')">View Build Log</div>
                         ` : ''}
                         <div class="menu-item danger" style="border-top: 1px solid #333;" onclick="deleteLog('${id}')">Delete Log</div>
-                        ${hasAI ? `&lt;div class="menu-item" style="color:var(--ai-accent); border-top: 1px solid #333;" onclick="copyHealedFiles('${id}')"&gt;📋 Copy Healed (CIF)&lt;/div&gt;` : ''}
+                        ${hasAI ? `<div class="menu-item" style="color:var(--ai-accent); border-top: 1px solid #333;" onclick="copyHealedFiles('${id}')">📋 Copy Healed (CIF)</div>` : ''}
                     </div>
                 </div>
             </div>
