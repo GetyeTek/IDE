@@ -2259,44 +2259,12 @@
      * Parses the highly robust, escaping-agnostic Conduit XML Patch (CXP) Markup
      * and compiles it into a standard JSON operations array on-the-fly.
      */
-    function parseCXP(input) {
-        console.group("🔍 [Conduit CXP Parser Debug]");
-        console.log("Raw Input Length:", input.length, "characters");
-        
-        const operations = [];
-
-        const cleanContent = (txt) => {
-            return txt.replace(/^\r?\n/, '').replace(/\r?\n\s*$/, '');
-        };
-
-        // 1. Extract Top-level Comments
-        const commentMatch = input.match(/<comment>([\s\S]*?)<\/comment>/i);
-        if (commentMatch) {
-            console.log("✅ Comment Extracted:", commentMatch[1].trim());
-            operations.push({
-                action: 'comment',
-                text: commentMatch[1].trim()
-            });
-        } else {
-            console.warn("⚠️ No <comment> tag found.");
-        }
-
-        // 2. Extract Replace Blocks (Robust regex supporting attributes in any order and single/double quotes)
-        const replaceRegex = /<replace_block[^>]*(?:file|file_path)\s*=\s*['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/replace_block>/gi;
-        let match;
-        let replaceCount = 0;
-        
-        while ((match = replaceRegex.exec(input)) !== null) {
-            replaceCount++;
-            const filePath = match[1].trim();
-            const inner = match[2];
-            
-            const findMatch = inner.match(/<find>([\s\S]*?)<\/find>/i);
-            const replaceWithMatch = inner.match(/<replace_with>([\s\S]*?)<\/replace_with>/i);
+([\s\S]*?)<\/replace_with>/i);
 
             console.log(`[Replace Block #${replaceCount}] Found target file:`, filePath);
             
             if (!findMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <find>...</find> tags!`);
+            if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</find> tags!`);
             if (!replaceWithMatch) console.error(`❌ [Replace Block #${replaceCount}] Failed to find <replace_with>...</replace_with> tags!`);
 
             if (filePath && findMatch && replaceWithMatch) {
