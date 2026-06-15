@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { invokeBookReader } from '../config/api.js';
 import './ExamPavilion.css';
 import ExamSession from './ExamSession.jsx';
 
@@ -13,13 +14,7 @@ const ExamPavilion = ({ university, onClose }) => {
         console.group(`%c ARCHIVE DIAGNOSTICS: ${university.name} `, 'background: #42d7b8; color: #000; font-weight: bold;');
         setLoading(true);
 
-        fetch('https://xvldfsmxskhemkslsbym.supabase.co/functions/v1/book-reader', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({ action: 'list_exams', university_id: university.id })
-        })
-        .then(res => res.json())
+        invokeBookReader({ action: 'list_exams', university_id: university.id }, controller.signal)
         .then(data => {
             if (data.exams) {
                 console.log(`Successfully fetched ${data.exams.length} exams.`);
