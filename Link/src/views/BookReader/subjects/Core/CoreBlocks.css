@@ -1,0 +1,18 @@
+.univ-p-block { text-align: justify; margin-bottom: 14px; font-size: 15.5px; line-height: 1.5; text-justify: inter-word; hyphens: auto; }
+.univ-h-block { font-weight: bold; font-size: 18px; margin: 25px 0 12px 0; font-family: 'Poppins', sans-serif; }
+
+.univ-graphic-container { width: 100%; display: flex; flex-direction: column; align-items: center; margin: 15px 0; }
+.univ-graphic-caption { font-size: 13px; font-style: italic; margin-top: 10px; color: var(--text-color); opacity: 0.8; }
+.univ-graphic-container img, .univ-graphic-container svg { max-width: 100%; height: auto; }
+
+.univ-grid { display: grid; width: 100%; gap: 12px 15px; margin: 15px 0; font-size: 15px; line-height: 1.4; }
+.univ-grid-item { text-align: left; }
+
+.univ-table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; color: var(--text-color); }
+.univ-table th, .univ-table td { border: 1px solid var(--border); padding: 6px; text-align: left; }
+.univ-table th { background: rgba(255, 255, 255, 0.05); font-weight: bold; }
+
+.univ-footer { margin-top: auto; padding-top: 20px; height: 40px; width: 100%; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+
+.ai-btn-inline { display: inline-block; width: auto; background: rgba(66, 215, 184, 0.1); border: 1px solid var(--accent); border-radius: 12px; padding: 2px 8px; font-size: 12px; color: var(--accent); font-family: 'Poppins', sans-serif; font-weight: bold; margin-left: 6px; cursor: pointer; transition: transform 0.2s; z-index: 50; position: relative; }
+.ai-btn-inline:active { transform: scale(0.9); }
