@@ -2,14 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { invokeBookReader } from '../config/api.js';
 import './BookReader.css';
 
-const CONFIG = { friction: 0.93, velocityMult: 1.5, maxZoom: 4.0 };
+const CONFIG = { friction: 0.94, velocityMult: 1.2, maxZoom: 4.0 };
 
-// Helper to translate patcher styling logic into a valid React style object
 const resolveStyles = (item) => {
     const rawStyle = item.style || {};
     const resolved = { ...rawStyle };
 
-    // Align properties mapping
     if (rawStyle.align) {
         resolved.textAlign = rawStyle.align;
         if (rawStyle.align === 'center') {
@@ -21,7 +19,6 @@ const resolveStyles = (item) => {
         }
     }
 
-    // Custom toggle formatting helpers used in Patcher's applyStyles
     if (rawStyle.bold) resolved.fontWeight = 'bold';
     if (rawStyle.italic) resolved.fontStyle = 'italic';
     if (rawStyle.underline) resolved.textDecoration = 'underline';
@@ -35,7 +32,6 @@ const BookReader = ({ book, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [pages, setPages] = useState([]);
     const [isUiVisible, setIsUiVisible] = useState(true);
-    const [isFabActive, setIsFabActive] = useState(false);
     const [currentTheme, setCurrentTheme] = useState('dark');
     const [contextMenu, setContextMenu] = useState(null);
     
@@ -47,8 +43,11 @@ const BookReader = ({ book, onClose }) => {
     const state = useRef({ x: 0, y: 0, scale: 1 });
     const velocity = useRef({ x: 0, y: 0 });
     const minScaleLimit = useRef(1.0);
-    const baseCanvasWidth = 794; // Aligned with standard A4 base (patcher: 794px)
+    const baseCanvasWidth = 794; 
     
+    const isLoopRunning = useRef(false);
+    const lastDisplayPage = useRef(1);
+
     const input = useRef({
         isDragging: false,
         startX: 0, startY: 0,
@@ -92,6 +91,7 @@ const BookReader = ({ book, onClose }) => {
             state.current.scale = minScaleLimit.current;
             state.current.x = (vw - (baseCanvasWidth * state.current.scale)) / 2;
             state.current.y = 20;
+            triggerUpdate();
         }
     }, [loading, pages]);
 
@@ -104,25 +104,20 @@ const BookReader = ({ book, onClose }) => {
         const style = resolveStyles(block);
         const bulletCharMap = { 'arrow': '', 'diamond': '', 'check': '', 'dot': '', 'star': '', 'default': '•' };
 
-        // AI Explore trigger button helper
-        const renderAIExtension = (block) => {
-            if (block.ai_ready) {
+        const renderAIExtension = (b) => {
+            if (b.ai_ready) {
                 return <button className="ai-btn-inline" onClick={() => alert("Exploring with AI...")}>✨ AI Explore</button>;
             }
             return null;
         };
 
         switch(block.type) {
-            // --- UNIVERSAL BLOCKS ---
             case 'paragraph': 
                 return <p key={idx} className="univ-p-block" style={style}>{formatText(block.body)}{renderAIExtension(block)}</p>;
-            
             case 'header': 
                 return <h2 key={idx} className="univ-h-block" style={style}>{formatText(block.body)}{renderAIExtension(block)}</h2>;
-            
             case 'spacer': 
                 return <div key={idx} style={{ height: block.height || '20px', flexGrow: block.flex || 0, ...style }} />;
-            
             case 'graphic':
                 return (
                     <div key={idx} className="univ-graphic-container" style={style}>
@@ -135,7 +130,6 @@ const BookReader = ({ book, onClose }) => {
                         {renderAIExtension(block)}
                     </div>
                 );
-
             case 'grid':
                 return (
                     <div key={idx} className="univ-grid" style={{ gridTemplateColumns: `repeat(${block.columns || 3}, 1fr)`, ...style }}>
@@ -145,7 +139,6 @@ const BookReader = ({ book, onClose }) => {
                         {renderAIExtension(block)}
                     </div>
                 );
-
             case 'table':
                 return (
                     <table key={idx} className={`univ-table ${block.tableClass || ''}`} style={style}>
@@ -160,7 +153,6 @@ const BookReader = ({ book, onClose }) => {
                                             backgroundColor: cell.bg || undefined,
                                             textAlign: cell.align || undefined
                                         } : {};
-
                                         return (
                                             <CellTag 
                                                 key={cellIdx} 
@@ -177,21 +169,16 @@ const BookReader = ({ book, onClose }) => {
                         </tbody>
                     </table>
                 );
-
             case 'footer':
                 return <div key={idx} className="univ-footer" style={style}>{formatText(block.val || block.page)}</div>;
-
-            // --- LOGIC SPECIFIC BLOCKS ---
             case 'logic-header': 
                 return <div key={idx} className="logic-header" style={style} />;
-            
             case 'logic-footer': 
                 return (
                     <div key={idx} className="logic-footer" style={style}>
                         <span>{formatText(block.authors)}</span><span>Page {block.page}</span>
                     </div>
                 );
-            
             case 'chapter-title': 
                 return (
                     <div key={idx} style={style}>
@@ -199,7 +186,6 @@ const BookReader = ({ book, onClose }) => {
                         <span className="logic-chapter-title">{formatText(block.title)}</span>
                     </div>
                 );
-            
             case 'title-page': 
                 return (
                     <div key={idx} className="logic-title-container" style={style}>
@@ -212,7 +198,6 @@ const BookReader = ({ book, onClose }) => {
                         )}
                     </div>
                 );
-
             case 'logic-toc':
                 return (
                     <div key={idx} className="logic-toc-container" style={style}>
@@ -225,7 +210,6 @@ const BookReader = ({ book, onClose }) => {
                         ))}
                     </div>
                 );
-
             case 'bullet-list': 
                 return (
                     <div key={idx} className="logic-bullet-list" style={style}>
@@ -238,7 +222,6 @@ const BookReader = ({ book, onClose }) => {
                         {renderAIExtension(block)}
                     </div>
                 );
-
             case 'logic-formula':
                 return (
                     <div key={idx} className="logic-formula-box" style={style}>
@@ -246,7 +229,6 @@ const BookReader = ({ book, onClose }) => {
                         {renderAIExtension(block)}
                     </div>
                 );
-
             case 'logic-activity': 
                 return (
                     <div key={idx} className={block.variant === 'nobox' || block.noBox ? 'logic-activity-nobox' : 'logic-activity-box'} style={style}>
@@ -255,7 +237,6 @@ const BookReader = ({ book, onClose }) => {
                         {renderAIExtension(block)}
                     </div>
                 );
-            
             case 'logic-argument': 
                 return (
                     <div key={idx} className="logic-argument-block" style={style}>
@@ -265,7 +246,6 @@ const BookReader = ({ book, onClose }) => {
                         {renderAIExtension(block)}
                     </div>
                 );
-
             case 'logic-self-check':
                 return (
                     <div key={idx} className="logic-self-check" style={style}>
@@ -277,14 +257,12 @@ const BookReader = ({ book, onClose }) => {
                         ))}
                     </div>
                 );
-
             case 'logic-quote':
                 return (
                     <div key={idx} className="logic-quote-block" style={style}>
                         {formatText(block.body)}
                     </div>
                 );
-
             case 'logic-note':
                 return (
                     <div key={idx} className={block.variant === 'nobox' || block.noBox ? 'logic-note-nobox' : 'logic-note-box'} style={style}>
@@ -292,14 +270,12 @@ const BookReader = ({ book, onClose }) => {
                         <div style={{ display: 'inline', fontStyle: 'italic' }}>{formatText(block.body)}</div>
                     </div>
                 );
-
             case 'logic-example':
                 return (
                     <div key={idx} style={style}>
                         <span className="logic-example-label">{formatText(block.label) || 'Example'}:</span> {formatText(block.body) || ''}
                     </div>
                 );
-
             default: 
                 return <div key={idx} style={{color:'red', fontSize:'10px'}}>Unsupported block: {block.type}</div>;
         }
@@ -307,6 +283,9 @@ const BookReader = ({ book, onClose }) => {
 
     useEffect(() => {
         const handleSelection = () => {
+            if (input.current.isDragging || Math.abs(velocity.current.x) > 0.5 || Math.abs(velocity.current.y) > 0.5) {
+                return;
+            }
             const selection = window.getSelection();
             if (selection && selection.toString().trim().length > 0) {
                 try {
@@ -334,6 +313,7 @@ const BookReader = ({ book, onClose }) => {
         const s = state.current;
         const v = velocity.current;
         const rect = layerRef.current.getBoundingClientRect();
+        
         const contentWidth = rect.width / s.scale;
         const contentHeight = rect.height / s.scale;
         const visualW = contentWidth * s.scale;
@@ -357,37 +337,71 @@ const BookReader = ({ book, onClose }) => {
     };
 
     const loop = () => {
+        let isMoving = false;
+
         if (!input.current.isDragging) {
             const v = velocity.current;
-            if (Math.abs(v.x) > 0.1 || Math.abs(v.y) > 0.1) {
+            if (Math.abs(v.x) > 0.05 || Math.abs(v.y) > 0.05) {
                 v.x *= CONFIG.friction;
                 v.y *= CONFIG.friction;
                 state.current.x += v.x;
                 state.current.y += v.y;
+                isMoving = true;
+            } else {
+                v.x = 0;
+                v.y = 0;
             }
+        } else {
+            isMoving = true; 
         }
+
         applyConstraints();
+
         if (layerRef.current) {
             const { x, y, scale } = state.current;
             layerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
         }
-        if (pageCountRef.current && layerRef.current && pages.length > 0) {
+
+        if (pageCountRef.current && pages.length > 0) {
             const unscaledY = Math.abs(state.current.y) / state.current.scale;
-            const approxPageHeight = 1183; // Adjusted (1123px height + 60px padding/margins)
+            const approxPageHeight = 1183; 
             const current = Math.max(1, Math.floor((unscaledY + 200) / approxPageHeight) + 1);
-            pageCountRef.current.innerText = `${Math.min(current, pages.length)} / ${pages.length}`;
+            const displayPage = Math.min(current, pages.length);
+            
+            if (lastDisplayPage.current !== displayPage) {
+                lastDisplayPage.current = displayPage;
+                pageCountRef.current.innerText = `${displayPage} / ${pages.length}`;
+            }
         }
-        requestRef.current = requestAnimationFrame(loop);
+
+        if (isMoving) {
+            requestRef.current = requestAnimationFrame(loop);
+        } else {
+            isLoopRunning.current = false;
+            requestRef.current = null;
+        }
+    };
+
+    const triggerUpdate = () => {
+        if (!isLoopRunning.current) {
+            isLoopRunning.current = true;
+            requestRef.current = requestAnimationFrame(loop);
+        }
     };
 
     useEffect(() => {
         const viewport = viewportRef.current;
         if (!viewport) return;
-        requestRef.current = requestAnimationFrame(loop);
 
         const onTouchStart = (e) => {
             if (e.target.closest('#ui-layer') || e.target.closest('.fab-container') || e.target.closest('.reader-ctx-menu')) return;
-            if (window.getSelection().toString().length > 0) return;
+            
+            const hasSelection = window.getSelection()?.toString().length > 0;
+            if (hasSelection) {
+                window.getSelection().removeAllRanges();
+                setContextMenu(null);
+            }
+
             velocity.current = { x: 0, y: 0 };
             input.current.touchStartTime = Date.now();
 
@@ -398,6 +412,7 @@ const BookReader = ({ book, onClose }) => {
                 input.current.lastX = e.touches[0].clientX;
                 input.current.lastY = e.touches[0].clientY;
                 input.current.lastTime = Date.now();
+                triggerUpdate();
             } else if (e.touches.length === 2) {
                 input.current.isDragging = false;
                 input.current.initialPinchDist = Math.hypot(
@@ -405,49 +420,62 @@ const BookReader = ({ book, onClose }) => {
                     e.touches[0].pageY - e.touches[1].pageY
                 );
                 input.current.initialScale = state.current.scale;
+                triggerUpdate();
             }
         };
 
         const onTouchMove = (e) => {
             if (e.target.closest('#ui-layer') || e.target.closest('.reader-ctx-menu')) return;
-            if (window.getSelection().toString().length > 0) return;
             e.preventDefault();
+
+            const now = Date.now();
+            const dt = now - input.current.lastTime;
 
             if (input.current.isDragging && e.touches.length === 1) {
                 const x = e.touches[0].clientX;
                 const y = e.touches[0].clientY;
-                const dt = Date.now() - input.current.lastTime;
+
                 state.current.x = x - input.current.startX;
                 state.current.y = y - input.current.startY;
 
                 if (dt > 0) {
-                    velocity.current.x = (x - input.current.lastX) * CONFIG.velocityMult;
-                    velocity.current.y = (y - input.current.lastY) * CONFIG.velocityMult;
+                    const instantVx = ((x - input.current.lastX) / dt) * 16.6;
+                    const instantVy = ((y - input.current.lastY) / dt) * 16.6;
+
+                    velocity.current.x = velocity.current.x * 0.4 + instantVx * 0.6;
+                    velocity.current.y = velocity.current.y * 0.4 + instantVy * 0.6;
                 }
+
                 input.current.lastX = x;
                 input.current.lastY = y;
-                input.current.lastTime = Date.now();
+                input.current.lastTime = now;
+                triggerUpdate();
             } else if (e.touches.length === 2) {
                 const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                 const cx = (e.touches[0].pageX + e.touches[1].pageX) / 2;
                 const cy = (e.touches[0].pageY + e.touches[1].pageY) / 2;
                 const ratio = dist / input.current.initialPinchDist;
+                
                 let newScale = input.current.initialScale * ratio;
                 newScale = Math.max(minScaleLimit.current, Math.min(newScale, CONFIG.maxZoom));
 
                 const contentX = (cx - state.current.x) / state.current.scale;
                 const contentY = (cy - state.current.y) / state.current.scale;
+                
                 state.current.x = cx - (contentX * newScale);
                 state.current.y = cy - (contentY * newScale);
                 state.current.scale = newScale;
+                triggerUpdate();
             }
         };
 
-        const onTouchEnd = () => { input.current.isDragging = false; };
+        const onTouchEnd = () => { 
+            input.current.isDragging = false; 
+        };
 
         viewport.addEventListener('touchstart', onTouchStart, { passive: false });
         viewport.addEventListener('touchmove', onTouchMove, { passive: false });
-        viewport.addEventListener('touchend', onTouchEnd);
+        viewport.addEventListener('touchend', onTouchEnd, { passive: true });
         
         return () => {
             viewport.removeEventListener('touchstart', onTouchStart);
@@ -455,18 +483,17 @@ const BookReader = ({ book, onClose }) => {
             viewport.removeEventListener('touchend', onTouchEnd);
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, []);
+    }, [pages]);
 
     const toggleTheme = () => {
         const themes = ['dark', 'sepia', 'light'];
         setCurrentTheme(themes[(themes.indexOf(currentTheme) + 1) % themes.length]);
-        setIsFabActive(false);
     };
 
     const handleMenuAction = (action) => {
         if (action === 'ask_miron') alert("Sending to AI: " + contextMenu.text.substring(0, 40));
         if (action === 'copy') navigator.clipboard.writeText(contextMenu.text);
-        window.getSelection().removeAllRanges();
+        window.getSelection()?.removeAllRanges();
         setContextMenu(null);
     };
 
@@ -505,7 +532,7 @@ const BookReader = ({ book, onClose }) => {
                         <i className="fa-solid fa-palette"></i>
                     </div>
                 </div>
-                <div className="fab-main" onClick={() => { setIsUiVisible(!isUiVisible); setIsFabActive(!isUiVisible); }}>
+                <div className="fab-main" onClick={() => { setIsUiVisible(!isUiVisible); }}>
                     <i className="fa-solid fa-layer-group"></i>
                 </div>
             </div>
@@ -520,7 +547,7 @@ const BookReader = ({ book, onClose }) => {
 
                 <div className="ui-bar reader-footer">
                     <div className="icon-btn"><i className="fa-solid fa-list"></i></div>
-                    <span style={{flex: 1, textAlign: 'center', fontFamily: 'monospace', color: '#888'}} ref={pageCountRef}>1/--</span>
+                    <span style={{flex: 1, textAlign: 'center', fontFamily: 'monospace', color: '#888'}} ref={pageCountRef}>1 / {pages.length || '--'}</span>
                     <div className="icon-btn"><i className="fa-solid fa-bookmark"></i></div>
                 </div>
             </div>
