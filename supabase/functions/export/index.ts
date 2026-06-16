@@ -17,6 +17,18 @@ const TABLES = [
   "processed_words",
 ];
 
+function toBase64(str: string) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  const len = bytes.byteLength;
+
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+
+  return btoa(binary);
+}
+
 async function uploadToGitHub(path: string, content: string) {
   const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
 
@@ -29,12 +41,14 @@ async function uploadToGitHub(path: string, content: string) {
     },
     body: JSON.stringify({
       message: `backup: ${path}`,
-      content: btoa(content),
+      content: toBase64(content),
       branch: BRANCH,
     }),
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
 }
 
 Deno.serve(async () => {
@@ -55,18 +69,19 @@ Deno.serve(async () => {
 
     if (error) return new Response(error.message);
 
-    if (!data.length) continue;
+    if (!data || data.length === 0) continue;
 
     const filePath = `backup/${table}/${offset}.json`;
+    const json = JSON.stringify(data);
 
-    await uploadToGitHub(filePath, JSON.stringify(data));
+    await uploadToGitHub(filePath, json);
 
     await supabase
       .from("github_export_progress")
       .update({
         last_offset: offset + limit,
         status: "running",
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(),
       })
       .eq("table_name", table);
   }
