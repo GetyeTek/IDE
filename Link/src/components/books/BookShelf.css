@@ -1,0 +1,4 @@
+.bookshelf-perspective { perspective: 1000px; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
+.book-container { transform-style: preserve-3d; display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 0.5rem; padding: 0 0.5rem; position: relative; z-index: 10; margin-bottom: -0.5rem; min-height: 20px; }
+.book-group { display: flex; flex-direction: column; align-items: center; }
+.shelf-wood { height: 1rem; background-color: #5C3D2E; margin: 0 0.25rem; border-radius: 0.125rem; box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.5), inset 0 2px 4px 0 rgba(255, 255, 255, 0.1); position: relative; z-index: 20; }
