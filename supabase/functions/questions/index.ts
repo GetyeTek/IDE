@@ -1,78 +1,95 @@
-// supabase/functions/migrate-questions/index.ts
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-Deno.serve(async (req) => {
+const PAGE_SIZE = 1000;
+
+Deno.serve(async () => {
+  // DESTINATION (auto from Supabase secrets)
+  const destUrl = Deno.env.get("SUPABASE_URL")!;
+  const destKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const dest = createClient(destUrl, destKey);
+
+  // SOURCE (manual placeholders)
+  const sourceUrl = "https://xvldfsmxskhemkslsbym.supabase.co";
+  const sourceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjY4ODE3OSwiZXhwIjoyMDc4MjY0MTc5fQ.S_FLg5nQ-6wMSa1Zpdr9xRlCbBj7R9BwWNs3eTOylUc";
+
+  const source = createClient(sourceUrl, sourceKey);
+
   try {
-    // 🔐 DESTINATION (auto from Supabase env)
-    const destUrl = Deno.env.get("SUPABASE_URL")!;
-    const destKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // 1. Load state
+    let { data: state } = await dest
+      .from("migration_state")
+      .select("*")
+      .eq("table_name", "questions")
+      .maybeSingle();
 
-    const dest = createClient(destUrl, destKey);
+    if (!state) {
+      await dest.from("migration_state").insert({
+        table_name: "questions",
+        last_offset: 0,
+        status: "running"
+      });
 
-    // 📡 SOURCE (YOU manually fill these)
-    const SOURCE_URL = "https://xvldfsmxskhemkslsbym.supabase.co";
-    const SOURCE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bGRmc214c2toZW1rc2xzYnltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjY4ODE3OSwiZXhwIjoyMDc4MjY0MTc5fQ.S_FLg5nQ-6wMSa1Zpdr9xRlCbBj7R9BwWNs3eTOylUc";
+      state = {
+        last_offset: 0,
+        processed_rows: 0
+      };
+    }
 
-    const source = createClient(SOURCE_URL, SOURCE_KEY);
+    const from = state.last_offset ?? 0;
+    const to = from + PAGE_SIZE - 1;
 
-    // 🧠 STEP 1: check if destination already has questions
-    const { count, error: countErr } = await dest
+    // 2. Fetch batch
+    const { data: rows, error } = await source
       .from("questions")
-      .select("*", { count: "exact", head: true });
+      .select("*")
+      .range(from, to);
 
-    if (countErr) throw countErr;
+    if (error) throw error;
 
-    if (count && count > 0) {
-      return new Response(
-        JSON.stringify({
-          message: "Questions already exist. Aborting safe mode.",
-          count,
-        }),
-        { headers: { "Content-Type": "application/json" } }
-      );
+    if (!rows || rows.length === 0) {
+      await dest.from("migration_state")
+        .update({
+          status: "done",
+          updated_at: new Date().toISOString()
+        })
+        .eq("table_name", "questions");
+
+      return new Response("DONE 🚀");
     }
 
-    // 📥 STEP 2: fetch all questions from source
-    const { data: questions, error: fetchErr } = await source
+    // 3. Insert batch (idempotent)
+    const { error: insertError } = await dest
       .from("questions")
-      .select("*");
+      .upsert(rows, { onConflict: "id" });
 
-    if (fetchErr) throw fetchErr;
+    if (insertError) throw insertError;
 
-    if (!questions || questions.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "No questions found in source." }),
-        { headers: { "Content-Type": "application/json" } }
-      );
-    }
+    // 4. Update state
+    await dest.from("migration_state")
+      .update({
+        last_offset: to + 1,
+        processed_rows: (state.processed_rows ?? 0) + rows.length,
+        status: "running",
+        updated_at: new Date().toISOString()
+      })
+      .eq("table_name", "questions");
 
-    // 🚀 STEP 3: batch insert into destination
-    const BATCH_SIZE = 100;
+    // 5. Return progress
+    return new Response(JSON.stringify({
+      fetched: rows.length,
+      next_offset: to + 1,
+      processed_total: (state.processed_rows ?? 0) + rows.length
+    }));
 
-    for (let i = 0; i < questions.length; i += BATCH_SIZE) {
-      const batch = questions.slice(i, i + BATCH_SIZE);
-
-      const { error: insertErr } = await dest
-        .from("questions")
-        .insert(batch);
-
-      if (insertErr) throw insertErr;
-    }
-
-    return new Response(
-      JSON.stringify({
-        message: "Questions migration completed 🚀",
-        inserted: questions.length,
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
   } catch (err) {
-    return new Response(
-      JSON.stringify({
-        error: err.message,
-      }),
-      { status: 500 }
-    );
+    await dest.from("migration_state")
+      .update({
+        status: "failed",
+        error: String(err),
+        updated_at: new Date().toISOString()
+      })
+      .eq("table_name", "questions");
+
+    return new Response("FAILED 💥 " + err, { status: 500 });
   }
 });
