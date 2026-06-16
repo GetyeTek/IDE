@@ -223,38 +223,70 @@ const BookReader = ({ book, onClose }) => {
     }, []);
 
     // 6. Context Menu Logic (Zero-Latency Tracking)
+    // 7. Context Menu Logic (Finger-Release Tracking)
+    const isUserTouching = useRef(false);
+
     useEffect(() => {
-        let frameId;
-        const handleSelection = () => {
-            cancelAnimationFrame(frameId);
-            frameId = requestAnimationFrame(() => {
-                if (pinchState.current.isPinching) return;
-                
-                const selection = window.getSelection();
-                if (selection && selection.toString().trim().length > 0) {
-                    try {
-                        const range = selection.getRangeAt(0);
-                        const rect = range.getBoundingClientRect();
-                        if (rect.width === 0 && rect.height === 0) return;
-                        
-                        const menuWidth = 280; const menuHeight = 100;
-                        let x = rect.left + (rect.width / 2) - (menuWidth / 2);
-                        // Position slightly above the selection cleanly
-                        let y = rect.top - menuHeight - 15; 
-                        
-                        x = Math.max(10, Math.min(x, window.innerWidth - menuWidth - 10));
-                        y = Math.max(50, y);
-                        
-                        setContextMenu({ x, y, text: selection.toString() });
-                    } catch(e) {}
-                } else {
-                    setContextMenu(null);
-                }
-            });
+        let evaluateTimer;
+
+        const checkSelection = () => {
+            if (pinchState.current.isPinching || isUserTouching.current) return;
+            
+            const selection = window.getSelection();
+            if (selection && selection.toString().trim().length > 0) {
+                try {
+                    const range = selection.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    if (rect.width === 0 && rect.height === 0) return;
+                    
+                    const menuWidth = 280; const menuHeight = 100;
+                    let x = rect.left + (rect.width / 2) - (menuWidth / 2);
+                    let y = rect.top - menuHeight - 15; 
+                    
+                    x = Math.max(10, Math.min(x, window.innerWidth - menuWidth - 10));
+                    y = Math.max(50, y);
+                    
+                    setContextMenu({ x, y, text: selection.toString() });
+                } catch(e) {}
+            } else {
+                setContextMenu(null);
+            }
         };
-        
-        document.addEventListener('selectionchange', handleSelection);
-        return () => { cancelAnimationFrame(frameId); document.removeEventListener('selectionchange', handleSelection); };
+
+        const handleSelectionChange = () => {
+            // Instantly hide the menu while the user is actively dragging handles
+            setContextMenu(null);
+            clearTimeout(evaluateTimer);
+            
+            // Only evaluate the selection if the user is not actively touching the screen
+            if (!isUserTouching.current) {
+                evaluateTimer = setTimeout(checkSelection, 100);
+            }
+        };
+
+        const handleTouchStart = () => {
+            isUserTouching.current = true;
+            setContextMenu(null); // Ensure menu hides immediately on screen touch
+        };
+
+        const handleTouchEnd = () => {
+            isUserTouching.current = false;
+            // Wait a tiny fraction of a second for the OS selection engine to finalize
+            clearTimeout(evaluateTimer);
+            evaluateTimer = setTimeout(checkSelection, 100);
+        };
+
+        // We attach these to the document to catch interactions even if they start outside the viewport
+        document.addEventListener('selectionchange', handleSelectionChange);
+        document.addEventListener('touchstart', handleTouchStart, { passive: true });
+        document.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+        return () => { 
+            clearTimeout(evaluateTimer); 
+            document.removeEventListener('selectionchange', handleSelectionChange); 
+            document.removeEventListener('touchstart', handleTouchStart);
+            document.removeEventListener('touchend', handleTouchEnd);
+        };
     }, []);
 
     const toggleTheme = () => {
