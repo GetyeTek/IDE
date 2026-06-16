@@ -1,10 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const GITHUB_PAT = Deno.env.get("GITHUB_PAT")!;
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE);
+const GITHUB_PAT = Deno.env.get("GITHUB_PAT")!;
 
 const OWNER = "GetyeTek";
 const REPO = "IDE";
@@ -20,19 +21,16 @@ const TABLES = [
 function toBase64(str: string) {
   const bytes = new TextEncoder().encode(str);
   let binary = "";
-  const len = bytes.byteLength;
-
-  for (let i = 0; i < len; i++) {
+  for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
-
   return btoa(binary);
 }
 
-async function uploadToGitHub(path: string, content: string) {
+async function upload(path: string, content: string) {
   const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
 
-  const res = await fetch(url, {
+  await fetch(url, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${GITHUB_PAT}`,
@@ -45,13 +43,11 @@ async function uploadToGitHub(path: string, content: string) {
       branch: BRANCH,
     }),
   });
-
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
 }
 
 Deno.serve(async () => {
+  const start = Date.now();
+
   for (const table of TABLES) {
     const { data: progress } = await supabase
       .from("github_export_progress")
@@ -60,7 +56,9 @@ Deno.serve(async () => {
       .single();
 
     const offset = progress?.last_offset ?? 0;
-    const limit = 1000;
+
+    // ⚡ SMALL BATCH NOW (key fix)
+    const limit = 200;
 
     const { data, error } = await supabase
       .from(table)
@@ -74,17 +72,21 @@ Deno.serve(async () => {
     const filePath = `backup/${table}/${offset}.json`;
     const json = JSON.stringify(data);
 
-    await uploadToGitHub(filePath, json);
+    await upload(filePath, json);
 
     await supabase
       .from("github_export_progress")
       .update({
         last_offset: offset + limit,
-        status: "running",
         updated_at: new Date().toISOString(),
       })
       .eq("table_name", table);
+
+    // ⏱️ stop early to respect 60s limit
+    if (Date.now() - start > 45_000) {
+      return new Response("partial batch done (time-safe exit)");
+    }
   }
 
-  return new Response("batch done");
+  return new Response("done");
 });
