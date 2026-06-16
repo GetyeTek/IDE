@@ -1,46 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { invokeBookReader } from '../config/api.js';
-import BookReader from './BookReader.jsx';
+import BookReader from './BookReader/BookReader.jsx';
+import BookShelf from '../components/books/BookShelf.jsx';
+import BookCard from '../components/books/BookCard.jsx';
 import ExamPavilion from './ExamPavilion.jsx';
 
-const universityIconMap = {
-    "Adama Science and Technology University": "fa-atom",
-    "Addis Ababa Science and Technology University": "fa-microchip",
-    "Addis Ababa University": "fa-landmark",
-    "Ambo University": "fa-bottle-water",
-    "Arba Minch University": "fa-fish-fins",
-    "Arsi University": "fa-person-running",
-    "Assosa University": "fa-gem",
-    "Bahir Dar University": "fa-ship",
-    "Bonga University": "fa-mug-hot",
-    "Bule Hora University": "fa-horse",
-    "Debark University": "fa-mountain-sun",
-    "Debre Birhan University": "fa-lightbulb",
-    "Debre Markos University": "fa-cross",
-    "Debre Tabor University": "fa-gun",
-    "Dilla University": "fa-monument",
-    "Dire Dawa University": "fa-train",
-    "Ethiopian Science and Technology Universities": "fa-vial-virus",
-    "Gambella University": "fa-droplet",
-    "General Collection": "fa-book-atlas",
-    "Haramaya University": "fa-wheat-awn",
-    "Hawassa University": "fa-fish",
-    "Injibara University": "fa-tree",
-    "Jimma University": "fa-leaf",
-    "Madda Walabu University": "fa-scroll",
-    "Mekdela Amba University": "fa-fort-awesome",
-    "Metu University": "fa-coffee",
-    "Mizan Tepi University": "fa-pepper-hot",
-    "Salale University": "fa-music",
-    "Samara University": "fa-hippo",
-    "University of Gondar": "fa-chess-rook",
-    "Wachemo University": "fa-mask",
-    "Wolaita Sodo University": "fa-house",
-    "Woldia University": "fa-shield-heart",
-    "Wolkite University": "fa-plate-wheat",
-    "Wollega University": "fa-coins",
-    "Wollo University": "fa-feather"
-};
+
 
 const Study = ({ onOpenActivity }) => {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
@@ -75,11 +40,7 @@ const Study = ({ onOpenActivity }) => {
         .catch(err => console.error(err));
     }, []);
 
-    const getBookColor = (title) => {
-        let hash = 0;
-        for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
-        return `linear-gradient(135deg, hsl(${Math.abs(hash) % 360}, 50%, 30%), hsl(${(Math.abs(hash) + 40) % 360}, 60%, 15%))`;
-    };
+
 
     // Wave Animation Logic for the Observatory Widget
     useEffect(() => {
@@ -134,31 +95,13 @@ const Study = ({ onOpenActivity }) => {
                         <div className="library-fade-overlay"></div>
                         <div className="expand-prompt"><span className="material-symbols-outlined">open_in_full</span> Tap to expand</div>
                         <div className="vignette-bg pt-4">
-                            <div style={{ height: '220px', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} className="bookshelf-perspective">
-                                <div className="book-container">
-                                    {books.length === 0 ? (
-                                        <div style={{color:'rgba(255,255,255,0.5)', gridColumn:'span 3', textAlign:'center', paddingTop:'2rem'}}>Loading...</div>
-                                    ) : (
-                                        books.slice(0, 3).map((book, i) => (
-                                            <div className="book-group" key={i}>
-                                                <div className="book-immersive" style={{ 
-                                                    backgroundImage: book.cover_url ? `url("${book.cover_url}")` : getBookColor(book.title),
-                                                    backgroundSize: 'cover',
-                                                    backgroundPosition: 'center',
-                                                    backgroundRepeat: 'no-repeat',
-                                                    display: 'flex', 
-                                                    alignItems: 'flex-end', 
-                                                    padding: '10px' 
-                                                }}>
-                                                    <div className="info-overlay" style={{opacity: 1, transform: 'none', background:'linear-gradient(to top, rgba(0,0,0,0.9), transparent)'}}>
-                                                        <h3 className="title" style={{fontSize:'0.7rem', whiteSpace:'normal', lineHeight:'1.2'}}>{book.title}</h3>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                <div className="shelf-wood"></div>
+                            <div style={{ height: '220px', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                                <BookShelf 
+                                    items={books.slice(0, 3)} 
+                                    previewMode={true} 
+                                    onBookClick={setActiveBook} 
+                                    onExamTrigger={() => { setIsLibraryOpen(true); setShelfLevel('universities'); }} 
+                                />
                             </div>
                         </div>
                     </div>
@@ -253,81 +196,14 @@ const Study = ({ onOpenActivity }) => {
                     </header>
                     <div className="flex-grow overflow-y-auto py-4 vignette-bg" style={{ flexGrow: 1, overflowY: 'auto', padding: '1rem', position: 'relative' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'auto', paddingBottom: '2rem' }} className="bookshelf-perspective">
-{(() => {
-                                    const rows = [];
-                                    const itemsToRender = shelfLevel === 'main' ? books : universities;
-                                    
-                                    for (let i = 0; i < itemsToRender.length; i += 3) {
-                                        rows.push(itemsToRender.slice(i, i + 3));
-                                    }
-                                    
-                                    if(rows.length === 0) return (
-                                        <div style={{ marginBottom: '1.5rem' }}>
-                                            <div style={{color:'rgba(255,255,255,0.2)', textAlign:'center', padding:'4rem 0', fontSize: '0.9rem'}}>No books discovered yet</div>
-                                            <div className="shelf-wood"></div>
-                                        </div>
-                                    );
-                                    
-                                                                        return rows.map((row, rowIndex) => (
-                                        <div key={rowIndex} style={{ marginBottom: '1.5rem' }}>
-                                            <div className="book-container">
-                                                {row.map((item, index) => {
-                                                    const isUniversity = shelfLevel === 'universities';
-                                                    const isExamTrigger = item.isExamTrigger;
-                                                    
-                                                    const handleClick = () => {
-                                                        if (isExamTrigger) {
-                                                            setShelfLevel('universities');
-                                                        } else if (!isUniversity) {
-                                                            setActiveBook(item);
-                                                        } else {
-                                                            setSelectedUniversity(item);
-                                                        }
-                                                    };
-
-                                                    return (
-                                                        <div 
-                                                            key={index} 
-                                                            className={`book-immersive ${isExamTrigger ? 'is-stack' : ''} ${isUniversity ? 'is-heritage' : ''}`}
-                                                            style={{ 
-                                                                backgroundImage: (isUniversity || isExamTrigger) ? 'none' : `url("${item.cover_url}")`,
-                                                                backgroundSize: 'cover',
-                                                                backgroundPosition: 'center',
-                                                                backgroundRepeat: 'no-repeat'
-                                                            }}
-                                                            onClick={handleClick}
-                                                        >
-                                                            {isExamTrigger ? (
-                                                                <div className="exam-stack-content">
-                                                                    <div className="emblem"><i className="fas fa-university"></i></div>
-                                                                    <div className="stack-title">EXAMS</div>
-                                                                </div>
-                                                            ) : isUniversity ? (
-                                                                <>
-                                                                    <div className="tilet-border-sm"></div>
-                                                                    <div className="heritage-emblem">
-                                                                        <i className={`fa-solid ${universityIconMap[item.title] || 'fa-graduation-cap'}`}></i>
-                                                                    </div>
-                                                                    <div className="heritage-content">
-                                                                        <div className="heritage-label">Collection</div>
-                                                                        <div className="heritage-title">{item.title}</div>
-                                                                    </div>
-                                                                    <div className="tilet-border-sm bottom"></div>
-                                                                </>
-                                                            ) : (
-                                                                <div className="info-overlay">
-                                                                    <h3 className="title">{item.title}</h3>
-                                                                    <div className="progress-bar"><div className="progress" style={{ width: '0%' }}></div></div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                            <div className="shelf-wood"></div>
-                                        </div>
-                                    ));                                })()}
+                            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'auto', paddingBottom: '2rem' }}>
+                                <BookShelf 
+                                    items={shelfLevel === 'main' ? books : universities} 
+                                    isUniversity={shelfLevel === 'universities'}
+                                    onBookClick={setActiveBook}
+                                    onUniversityClick={setSelectedUniversity}
+                                    onExamTrigger={() => setShelfLevel('universities')}
+                                />
                             </div>
                         </div>
                     </div>
