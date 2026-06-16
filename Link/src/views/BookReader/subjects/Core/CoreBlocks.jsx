@@ -1,5 +1,5 @@
 import React from 'react';
-import { resolveStyles, formatText, renderAIExtension } from '../utils.js';
+import { resolveStyles, formatText, renderAIExtension } from '../utils.jsx';
 import './CoreBlocks.css';
 
 export const renderCoreBlock = (block, idx, actions) => {
