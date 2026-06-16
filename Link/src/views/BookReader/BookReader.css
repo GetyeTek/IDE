@@ -39,13 +39,10 @@
     align-items: center; 
     gap: 40px; 
     padding: 40px 0; 
-    will-change: transform; 
-    backface-visibility: hidden; 
-    -webkit-backface-visibility: hidden; 
 }
 
 .page-wrapper { width: 100%; display: flex; justify-content: center; position: relative; }
-.page-canvas { background-color: var(--page-bg); color: var(--text-color); width: 794px; min-height: 1123px; padding: 60px 70px 40px 70px; box-sizing: border-box; box-shadow: 0 10px 40px rgba(0,0,0,0.5); font-family: 'Times New Roman', Times, 'Nyala', 'Kefa', 'Abyssinica SIL', serif; display: flex; flex-direction: column; flex-shrink: 0; transition: background-color 0.3s ease, color 0.3s ease; will-change: transform; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.page-canvas { background-color: var(--page-bg); color: var(--text-color); width: 794px; min-height: 1123px; padding: 60px 70px 40px 70px; box-sizing: border-box; box-shadow: 0 10px 40px rgba(0,0,0,0.5); font-family: 'Times New Roman', Times, 'Nyala', 'Kefa', 'Abyssinica SIL', serif; display: flex; flex-direction: column; flex-shrink: 0; transition: background-color 0.3s ease, color 0.3s ease; contain: content; /* Isolates layout calculations, entirely preventing the 'Void' glitch */ }
 .page-canvas * { user-select: text !important; -webkit-user-select: text !important; }
 
 .manual-flag { position: absolute; top: 0; right: 0; background: #ff4757; color: white; padding: 6px 15px; font-size: 12px; font-weight: bold; border-bottom-left-radius: 8px; z-index: 100; font-family: 'Poppins', sans-serif; }
