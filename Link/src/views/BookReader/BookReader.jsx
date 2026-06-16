@@ -222,12 +222,12 @@ const BookReader = ({ book, onClose }) => {
         };
     }, []);
 
-    // 6. Context Menu Logic
+    // 6. Context Menu Logic (Zero-Latency Tracking)
     useEffect(() => {
-        let debounceTimer;
+        let frameId;
         const handleSelection = () => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
+            cancelAnimationFrame(frameId);
+            frameId = requestAnimationFrame(() => {
                 if (pinchState.current.isPinching) return;
                 
                 const selection = window.getSelection();
@@ -239,7 +239,8 @@ const BookReader = ({ book, onClose }) => {
                         
                         const menuWidth = 280; const menuHeight = 100;
                         let x = rect.left + (rect.width / 2) - (menuWidth / 2);
-                        let y = rect.top - menuHeight;
+                        // Position slightly above the selection cleanly
+                        let y = rect.top - menuHeight - 15; 
                         
                         x = Math.max(10, Math.min(x, window.innerWidth - menuWidth - 10));
                         y = Math.max(50, y);
@@ -249,11 +250,11 @@ const BookReader = ({ book, onClose }) => {
                 } else {
                     setContextMenu(null);
                 }
-            }, 150);
+            });
         };
         
         document.addEventListener('selectionchange', handleSelection);
-        return () => { clearTimeout(debounceTimer); document.removeEventListener('selectionchange', handleSelection); };
+        return () => { cancelAnimationFrame(frameId); document.removeEventListener('selectionchange', handleSelection); };
     }, []);
 
     const toggleTheme = () => {
@@ -274,7 +275,12 @@ const BookReader = ({ book, onClose }) => {
 
     return (
         <div className={`reader-root theme-${currentTheme}`}>
-            <div id="viewport" ref={viewportRef} onScroll={handleScroll}>
+            <div 
+                id="viewport" 
+                ref={viewportRef} 
+                onScroll={handleScroll}
+                onContextMenu={(e) => e.preventDefault()} /* Kills native right-click/long-press menu on Android/Desktop */
+            >
                 <div id="scroll-container" ref={scrollContainerRef}>
                     <div id="book-layer" ref={layerRef}>
                         {pages.map((page) => (
