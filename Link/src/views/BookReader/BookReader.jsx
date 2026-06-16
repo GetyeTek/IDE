@@ -223,28 +223,38 @@ const BookReader = ({ book, onClose }) => {
     }, []);
 
     // 6. Context Menu Logic (Zero-Latency Tracking)
-    // 7. Context Menu Logic (Finger-Release Tracking)
-    const isUserTouching = useRef(false);
-
+    // 7. Context Menu Logic (Debounce-Based Tracking)
     useEffect(() => {
-        let evaluateTimer;
+        let debounceTimer;
 
         const checkSelection = () => {
-            if (pinchState.current.isPinching || isUserTouching.current) return;
+            if (pinchState.current.isPinching) return;
             
             const selection = window.getSelection();
             if (selection && selection.toString().trim().length > 0) {
                 try {
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
+                    // Ignore empty or invalid rects
                     if (rect.width === 0 && rect.height === 0) return;
                     
-                    const menuWidth = 280; const menuHeight = 100;
+                    const menuWidth = 280; 
+                    const menuHeight = 100; // Approximate height of the custom menu
+                    
+                    // Horizontally center the menu over the selection
                     let x = rect.left + (rect.width / 2) - (menuWidth / 2);
+                    
+                    // Attempt to position cleanly above the selection
                     let y = rect.top - menuHeight - 15; 
                     
+                    // Constrain horizontally to the screen bounds
                     x = Math.max(10, Math.min(x, window.innerWidth - menuWidth - 10));
-                    y = Math.max(50, y);
+                    
+                    // Y-Axis Flip: If placing it above pushes it off the top of the screen,
+                    // render it below the selection instead.
+                    if (y < 50) {
+                        y = rect.bottom + 15;
+                    }
                     
                     setContextMenu({ x, y, text: selection.toString() });
                 } catch(e) {}
@@ -254,38 +264,34 @@ const BookReader = ({ book, onClose }) => {
         };
 
         const handleSelectionChange = () => {
-            // Instantly hide the menu while the user is actively dragging handles
-            setContextMenu(null);
-            clearTimeout(evaluateTimer);
+            // Instantly hide the menu while the user is actively dragging the teardrop handles
+            setContextMenu(prev => prev !== null ? null : prev);
+            clearTimeout(debounceTimer);
             
-            // Only evaluate the selection if the user is not actively touching the screen
-            if (!isUserTouching.current) {
-                evaluateTimer = setTimeout(checkSelection, 100);
-            }
+            // Wait 250ms. If no new selectionchange fires, the user has stopped dragging.
+            debounceTimer = setTimeout(checkSelection, 250);
         };
 
-        const handleTouchStart = () => {
-            isUserTouching.current = true;
-            setContextMenu(null); // Ensure menu hides immediately on screen touch
+        // Ensure menu vanishes if the user scrolls or pans the page
+        const handleScrollOrTouch = () => {
+            setContextMenu(prev => prev !== null ? null : prev);
         };
 
-        const handleTouchEnd = () => {
-            isUserTouching.current = false;
-            // Wait a tiny fraction of a second for the OS selection engine to finalize
-            clearTimeout(evaluateTimer);
-            evaluateTimer = setTimeout(checkSelection, 100);
-        };
-
-        // We attach these to the document to catch interactions even if they start outside the viewport
         document.addEventListener('selectionchange', handleSelectionChange);
-        document.addEventListener('touchstart', handleTouchStart, { passive: true });
-        document.addEventListener('touchend', handleTouchEnd, { passive: true });
+        
+        const viewport = viewportRef.current;
+        if (viewport) {
+            viewport.addEventListener('scroll', handleScrollOrTouch, { passive: true });
+            viewport.addEventListener('touchmove', handleScrollOrTouch, { passive: true });
+        }
 
         return () => { 
-            clearTimeout(evaluateTimer); 
+            clearTimeout(debounceTimer); 
             document.removeEventListener('selectionchange', handleSelectionChange); 
-            document.removeEventListener('touchstart', handleTouchStart);
-            document.removeEventListener('touchend', handleTouchEnd);
+            if (viewport) {
+                viewport.removeEventListener('scroll', handleScrollOrTouch);
+                viewport.removeEventListener('touchmove', handleScrollOrTouch);
+            }
         };
     }, []);
 
