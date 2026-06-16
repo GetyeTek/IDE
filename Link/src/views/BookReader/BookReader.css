@@ -5,9 +5,44 @@
 .theme-dark { --bg-color: #0d0d0d; --page-bg: #1a1a1a; --text-color: #d0d0d0; --accent: #42d7b8; --border: #333333; }
 .theme-sepia { --bg-color: #d4c4a8; --page-bg: #f4ecd8; --text-color: #5b4636; --accent: #8a6a4b; --border: #d3c4b1; }
 
-#viewport { width: 100%; height: 100%; position: relative; overflow: hidden; z-index: 1; transition: background-color 0.3s; perspective: 1000px; -webkit-perspective: 1000px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+#viewport { 
+    width: 100%; 
+    height: 100%; 
+    position: relative; 
+    overflow: auto; /* Enables native scroll physics */
+    z-index: 1; 
+    transition: background-color 0.3s; 
+    -webkit-overflow-scrolling: touch; /* iOS Momentum */
+    text-align: center; /* Horizontally centers content when zoomed out */
+    touch-action: pan-x pan-y; /* Let browser handle swiping natively */
+    -ms-overflow-style: none; /* Hide scrollbar IE and Edge */
+    scrollbar-width: none; /* Hide scrollbar Firefox */
+}
 
-#book-layer { position: absolute; top: 0; left: 0; transform-origin: 0 0; width: 100%; min-height: 100%; display: flex; flex-direction: column; align-items: center; gap: 40px; padding: 40px 0; will-change: transform; transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0); transform-style: preserve-3d; -webkit-transform-style: preserve-3d; }
+#viewport::-webkit-scrollbar { 
+    display: none; /* Hide scrollbar Chrome, Safari and Opera */
+}
+
+#scroll-container {
+    display: inline-block;
+    text-align: left;
+    transform-origin: 0 0;
+    will-change: width, height;
+    margin: 0 auto; /* Centers the container */
+}
+
+#book-layer { 
+    width: 794px; /* Fixed standard width for precise scale math */
+    transform-origin: 0 0; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    gap: 40px; 
+    padding: 40px 0; 
+    will-change: transform; 
+    backface-visibility: hidden; 
+    -webkit-backface-visibility: hidden; 
+}
 
 .page-wrapper { width: 100%; display: flex; justify-content: center; position: relative; }
 .page-canvas { background-color: var(--page-bg); color: var(--text-color); width: 794px; min-height: 1123px; padding: 60px 70px 40px 70px; box-sizing: border-box; box-shadow: 0 10px 40px rgba(0,0,0,0.5); font-family: 'Times New Roman', Times, 'Nyala', 'Kefa', 'Abyssinica SIL', serif; display: flex; flex-direction: column; flex-shrink: 0; transition: background-color 0.3s ease, color 0.3s ease; will-change: transform; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
