@@ -4320,7 +4320,15 @@
                 throw new Error(`Entry file "${entryFile}" not found. The bundler scanned ${Object.keys(fileCache).length} files but couldn't find your index.html point.`);
             }
 
-            const importMap = { imports: { "react": "https://esm.sh/react@18.2.0", "react-dom": "https://esm.sh/react-dom@18.2.0", "react-dom/client": "https://esm.sh/react-dom@18.2.0/client" } };
+            const importMap = { 
+                imports: { 
+                    "react": "https://esm.sh/react@18.2.0", 
+                    "react-dom": "https://esm.sh/react-dom@18.2.0", 
+                    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+                    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+                    "react/jsx-dev-runtime": "https://esm.sh/react@18.2.0/jsx-dev-runtime"
+                } 
+            };
 
             for (const fullPath in fileCache) {
                 // SECURITY & PERFORMANCE: Do not bundle backend edge functions or hidden repo configs into the frontend preview.
@@ -4332,39 +4340,47 @@
                 const virtualPath = fullPath.startsWith(effectiveRoot) ? fullPath.substring(effectiveRoot.length) : fullPath;
                 const isJs = ['js', 'mjs', 'ts', 'jsx', 'tsx'].includes(file.ext);
 
-                if (isJs) {
-                    // Use a more restrictive regex that doesn't cross statement boundaries ([^;\n]*?)
-                    // This prevents CSS selectors like '.my-class' from being mistaken for file paths
-                    file.content = file.content.replace(/(import|export)([^;\n]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
-                        // 1. Keep absolute URLs as is
-                        if (importPath.startsWith('http')) return match;
-                        
-                        // 2. Handle Local Files
-                        // Only rewrite if it looks like a file path (has an extension or is a directory jump)
-                        if (importPath.startsWith('.') && (importPath.includes('/') || importPath.includes('.'))) {
-                            const resolvedFull = resolvePath(fullPath, importPath);
-                            if (resolvedFull.startsWith(effectiveRoot)) return `${keyword}${mid}${q1}${resolvedFull.substring(effectiveRoot.length)}${q2}`;
-                            return match;
-                        }
-
-                        // 3. Handle Bare Specifiers (NPM Packages)
-                        // If it's in our manual map (react/react-dom), the browser will handle it via importmap.
-                        // Otherwise, redirect to esm.sh for auto-resolution.
-                        if (importMap.imports[importPath]) return match;
-                        
-                        // Avoid rewriting internal virtual paths that might have been registered without extensions
-                        if (Object.keys(importMap.imports).some(k => k === importPath || k === './' + importPath)) return match;
-
-                        return `${keyword}${mid}${q1}https://esm.sh/${importPath}${q2}`;
+                        if (isJs) {
+            // 1. Compile JSX/TSX first so that any newly injected imports are present before regex parsing
+            if (['jsx', 'tsx'].includes(file.ext)) {
+                try {
+                    const res = Babel.transform(file.content, { 
+                        presets: [
+                            ['env', { modules: false }], 
+                            ['react', { runtime: 'automatic' }]
+                        ], 
+                        filename: fullPath 
                     });
-
-                    if (['jsx', 'tsx'].includes(file.ext)) {
-                        try {
-                            const res = Babel.transform(file.content, { presets: [['env', { modules: false }], 'react'], filename: fullPath });
-                            file.content = res.code;
-                        } catch (e) { throw new Error(`Babel Error in ${fullPath}: ${e.message}`); }
-                    }
+                    file.content = res.code;
+                } catch (e) { 
+                    throw new Error(`Babel Error in ${fullPath}: ${e.message}`); 
                 }
+            }
+
+            // 2. Perform import replacement on the final JavaScript output
+            file.content = file.content.replace(/(import|export)([^;\n]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
+                // 1. Keep absolute URLs as is
+                if (importPath.startsWith('http')) return match;
+                
+                // 2. Handle Local Files
+                // Only rewrite if it looks like a file path (has an extension or is a directory jump)
+                if (importPath.startsWith('.') && (importPath.includes('/') || importPath.includes('.'))) {
+                    const resolvedFull = resolvePath(fullPath, importPath);
+                    if (resolvedFull.startsWith(effectiveRoot)) return `${keyword}${mid}${q1}${resolvedFull.substring(effectiveRoot.length)}${q2}`;
+                    return match;
+                }
+
+                // 3. Handle Bare Specifiers (NPM Packages)
+                // If it's in our manual map (react/react-dom), the browser will handle it via importmap.
+                // Otherwise, redirect to esm.sh for auto-resolution.
+                if (importMap.imports[importPath]) return match;
+                
+                // Avoid rewriting internal virtual paths that might have been registered without extensions
+                if (Object.keys(importMap.imports).some(k => k === importPath || k === './' + importPath)) return match;
+
+                return `${keyword}${mid}${q1}https://esm.sh/${importPath}${q2}`;
+            });
+        }
 
                 if (file.ext === 'css') {
                     const cleanCss = file.content.replace(/`/g, '\\`').replace(/\\/g, '\\\\');
