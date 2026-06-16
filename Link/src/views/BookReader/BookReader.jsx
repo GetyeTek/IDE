@@ -223,7 +223,7 @@ const BookReader = ({ book, onClose }) => {
     }, []);
 
     // 6. Context Menu Logic (Zero-Latency Tracking)
-    // 7. Context Menu Logic (Debounce-Based Tracking)
+    // 7. Context Menu Logic (500ms Solid Debounce Tracking)
     useEffect(() => {
         let debounceTimer;
 
@@ -235,62 +235,57 @@ const BookReader = ({ book, onClose }) => {
                 try {
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
-                    // Ignore empty or invalid rects
                     if (rect.width === 0 && rect.height === 0) return;
                     
                     const menuWidth = 280; 
-                    const menuHeight = 100; // Approximate height of the custom menu
+                    const menuHeight = 100;
                     
-                    // Horizontally center the menu over the selection
                     let x = rect.left + (rect.width / 2) - (menuWidth / 2);
-                    
-                    // Attempt to position cleanly above the selection
                     let y = rect.top - menuHeight - 15; 
                     
-                    // Constrain horizontally to the screen bounds
                     x = Math.max(10, Math.min(x, window.innerWidth - menuWidth - 10));
                     
-                    // Y-Axis Flip: If placing it above pushes it off the top of the screen,
-                    // render it below the selection instead.
                     if (y < 50) {
                         y = rect.bottom + 15;
                     }
                     
                     setContextMenu({ x, y, text: selection.toString() });
                 } catch(e) {}
-            } else {
-                setContextMenu(null);
             }
         };
 
         const handleSelectionChange = () => {
-            // Instantly hide the menu while the user is actively dragging the teardrop handles
+            // Instantly hide the menu while dragging.
+            // Using a callback ensures we don't trigger unnecessary React re-renders if it's already null.
             setContextMenu(prev => prev !== null ? null : prev);
+            
             clearTimeout(debounceTimer);
             
-            // Wait 250ms. If no new selectionchange fires, the user has stopped dragging.
-            debounceTimer = setTimeout(checkSelection, 250);
+            // 500ms is the sweet spot for mobile. Because OS teardrops swallow touch events, 
+            // we must wait exactly half a second of complete stillness to guarantee you stopped dragging.
+            debounceTimer = setTimeout(checkSelection, 500);
         };
 
-        // Ensure menu vanishes if the user scrolls or pans the page
-        const handleScrollOrTouch = () => {
+        const handleScrollOrTouch = (e) => {
+            // Do not dismiss if the user is actually tapping the custom context menu itself
+            if (e && e.target && e.target.closest && e.target.closest('.reader-ctx-menu')) return;
             setContextMenu(prev => prev !== null ? null : prev);
         };
 
         document.addEventListener('selectionchange', handleSelectionChange);
+        document.addEventListener('touchstart', handleScrollOrTouch, { passive: true });
         
         const viewport = viewportRef.current;
         if (viewport) {
             viewport.addEventListener('scroll', handleScrollOrTouch, { passive: true });
-            viewport.addEventListener('touchmove', handleScrollOrTouch, { passive: true });
         }
 
         return () => { 
             clearTimeout(debounceTimer); 
             document.removeEventListener('selectionchange', handleSelectionChange); 
+            document.removeEventListener('touchstart', handleScrollOrTouch);
             if (viewport) {
                 viewport.removeEventListener('scroll', handleScrollOrTouch);
-                viewport.removeEventListener('touchmove', handleScrollOrTouch);
             }
         };
     }, []);
