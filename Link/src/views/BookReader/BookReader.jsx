@@ -68,26 +68,43 @@ const BookReader = ({ book, onClose }) => {
     }, [loading, pages]);
 
     useEffect(() => {
+        let debounceTimer;
         const handleSelection = () => {
-            if (input.current.isDragging || Math.abs(velocity.current.x) > 0.5 || Math.abs(velocity.current.y) > 0.5) return;
-            const selection = window.getSelection();
-            if (selection && selection.toString().trim().length > 0) {
-                try {
-                    const range = selection.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    if (rect.width === 0) return;
-                    setContextMenu({
-                        x: Math.max(10, rect.left + (rect.width / 2) - 140),
-                        y: Math.max(50, rect.top - 80),
-                        text: selection.toString()
-                    });
-                } catch(e) {}
-            } else {
-                setContextMenu(null);
-            }
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                if (input.current.isDragging || Math.abs(velocity.current.x) > 0.5 || Math.abs(velocity.current.y) > 0.5) return;
+                
+                const selection = window.getSelection();
+                if (selection && selection.toString().trim().length > 0) {
+                    try {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        
+                        // Ignore invalid selection ranges
+                        if (rect.width === 0 && rect.height === 0) return;
+                        
+                        const menuWidth = 280;
+                        const menuHeight = 100;
+                        let x = rect.left + (rect.width / 2) - (menuWidth / 2);
+                        let y = rect.top - menuHeight;
+                        
+                        // Keep menu inside viewport boundaries
+                        x = Math.max(10, Math.min(x, window.innerWidth - menuWidth - 10));
+                        y = Math.max(50, y);
+                        
+                        setContextMenu({ x, y, text: selection.toString() });
+                    } catch(e) {}
+                } else {
+                    setContextMenu(null);
+                }
+            }, 150); // Wait for drag selection to settle
         };
+        
         document.addEventListener('selectionchange', handleSelection);
-        return () => document.removeEventListener('selectionchange', handleSelection);
+        return () => {
+            clearTimeout(debounceTimer);
+            document.removeEventListener('selectionchange', handleSelection);
+        };
     }, []);
 
     const applyConstraints = () => {
@@ -258,7 +275,12 @@ const BookReader = ({ book, onClose }) => {
             </div>
 
             {contextMenu && (
-                <div className="reader-ctx-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+                <div 
+                    className="reader-ctx-menu" 
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                >
                     <div className="ctx-primary" onClick={() => handleMenuAction('ask_miron')}>
                         <i className="fa-solid fa-wand-magic-sparkles"></i> <span>Ask Miron</span>
                     </div>
