@@ -4,6 +4,33 @@ import './BookReader.css';
 
 const CONFIG = { friction: 0.93, velocityMult: 1.5, maxZoom: 4.0 };
 
+// Helper to translate patcher styling logic into a valid React style object
+const resolveStyles = (item) => {
+    const rawStyle = item.style || {};
+    const resolved = { ...rawStyle };
+
+    // Align properties mapping
+    if (rawStyle.align) {
+        resolved.textAlign = rawStyle.align;
+        if (rawStyle.align === 'center') {
+            resolved.marginLeft = 'auto';
+            resolved.marginRight = 'auto';
+        } else if (rawStyle.align === 'right') {
+            resolved.marginLeft = 'auto';
+            resolved.marginRight = '0';
+        }
+    }
+
+    // Custom toggle formatting helpers used in Patcher's applyStyles
+    if (rawStyle.bold) resolved.fontWeight = 'bold';
+    if (rawStyle.italic) resolved.fontStyle = 'italic';
+    if (rawStyle.underline) resolved.textDecoration = 'underline';
+    if (rawStyle.transform) resolved.textTransform = rawStyle.transform;
+    if (rawStyle.size) resolved.fontSize = rawStyle.size;
+
+    return resolved;
+};
+
 const BookReader = ({ book, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [pages, setPages] = useState([]);
@@ -17,13 +44,11 @@ const BookReader = ({ book, onClose }) => {
     const requestRef = useRef(null);
     const pageCountRef = useRef(null);
     
-    // Engine State
     const state = useRef({ x: 0, y: 0, scale: 1 });
     const velocity = useRef({ x: 0, y: 0 });
     const minScaleLimit = useRef(1.0);
-    const baseCanvasWidth = 800;
+    const baseCanvasWidth = 794; // Aligned with standard A4 base (patcher: 794px)
     
-    // Input State
     const input = useRef({
         isDragging: false,
         startX: 0, startY: 0,
@@ -34,23 +59,19 @@ const BookReader = ({ book, onClose }) => {
         touchStartTime: 0
     });
 
-    // 1. Fetch Structured Native Pages
     useEffect(() => {
         const fetchPages = async () => {
-            console.log("[READER] Fetching JSON architecture for Book ID:", book.id);
             try {
                 setLoading(true);
                 const data = await invokeBookReader({ action: 'get_book_pages', book_id: book.id });
-                
                 if (data.pages && data.pages.length > 0) {
                     setPages(data.pages);
                 } else {
-                    // Fallback to placeholder if DB doesn't have it yet
                     setPages([
                         { id: 'mock-1', page_key: 'page-1', content_json: [
                             { type: 'title-page', main: book.title || "Untitled Document", sub: "Rendered via JSON Engine" },
                             { type: 'spacer', height: '100px'},
-                            { type: 'paragraph', body: "This document is missing structured JSON data in the database. Please compile it using the Patcher Tool."}
+                            { type: 'paragraph', body: "This document is missing structured JSON data. Please compile it using the Patcher Tool."}
                         ]}
                     ]);
                 }
@@ -60,85 +81,230 @@ const BookReader = ({ book, onClose }) => {
                 setLoading(false);
             }
         };
-
         if (book?.id) fetchPages();
     }, [book]);
 
-    // 2. Initial Scaling
     useEffect(() => {
         if (!loading && pages.length > 0) {
             const vw = window.innerWidth;
-            // Calculate scale to fit width. Add a tiny margin.
             const scale = (vw - 20) / baseCanvasWidth;
             minScaleLimit.current = Math.min(scale, 1);
             state.current.scale = minScaleLimit.current;
             state.current.x = (vw - (baseCanvasWidth * state.current.scale)) / 2;
-            state.current.y = 20; // top margin
+            state.current.y = 20;
         }
     }, [loading, pages]);
 
-    // 3. Layout Router (JSON -> JSX)
     const formatText = (text) => {
         if (!text) return null;
         return <span dangerouslySetInnerHTML={{__html: text.replace(/\^\{(.*?)\}/g, '<sup>$1</sup>').replace(/_\{(.*?)\}/g, '<sub>$1</sub>')}} />;
     };
 
     const renderBlock = (block, idx) => {
-        const style = block.style || {};
-        
+        const style = resolveStyles(block);
+        const bulletCharMap = { 'arrow': '', 'diamond': '', 'check': '', 'dot': '', 'star': '', 'default': '•' };
+
+        // AI Explore trigger button helper
+        const renderAIExtension = (block) => {
+            if (block.ai_ready) {
+                return <button className="ai-btn-inline" onClick={() => alert("Exploring with AI...")}>✨ AI Explore</button>;
+            }
+            return null;
+        };
+
         switch(block.type) {
-            case 'paragraph': return <p key={idx} className="univ-p-block" style={style}>{formatText(block.body)}</p>;
-            case 'header': return <h2 key={idx} className="univ-h-block" style={style}>{formatText(block.body)}</h2>;
-            case 'spacer': return <div key={idx} style={{ height: block.height || '20px', flexGrow: block.flex || 0 }} />;
+            // --- UNIVERSAL BLOCKS ---
+            case 'paragraph': 
+                return <p key={idx} className="univ-p-block" style={style}>{formatText(block.body)}{renderAIExtension(block)}</p>;
             
-            // Logic specific
-            case 'logic-header': return <div key={idx} className="logic-header" style={style} />;
-            case 'logic-footer': return (
-                <div key={idx} className="logic-footer" style={style}>
-                    <span>{formatText(block.authors)}</span><span>Page {block.page}</span>
-                </div>
-            );
-            case 'chapter-title': return (
-                <div key={idx} style={style}>
-                    <span className="logic-chapter-num">CHAPTER {block.number}</span>
-                    <span className="logic-chapter-title">{formatText(block.title)}</span>
-                </div>
-            );
-            case 'title-page': return (
-                <div key={idx} className="logic-title-container" style={style}>
-                    <div className="logic-title-main">{formatText(block.main)}</div>
-                    {block.sub && <div style={{fontSize:'18px'}}>{formatText(block.sub)}</div>}
-                </div>
-            );
-            case 'logic-activity': return (
-                <div key={idx} className={block.variant === 'nobox' ? 'logic-activity-nobox' : 'logic-activity-box'} style={style}>
-                    <span className="logic-activity-label">{formatText(block.label)} </span>
-                    <span>{formatText(block.body)}</span>
-                    {block.ai_ready && <button className="ai-btn-inline">✨ AI Explore</button>}
-                </div>
-            );
-            case 'logic-argument': return (
-                <div key={idx} className="logic-argument-block" style={style}>
-                    {(block.premises || []).map((p, pIdx) => <div key={pIdx} className="logic-argument-premise">{formatText(p)}</div>)}
-                    <div className="logic-argument-line" />
-                    <div className="logic-argument-conclusion">{formatText(block.conclusion)}</div>
-                </div>
-            );
-            case 'bullet-list': return (
-                <div key={idx} className="logic-bullet-list" style={style}>
-                    {(block.items || []).map((txt, bIdx) => (
-                        <div key={bIdx} className="logic-bullet-item">
-                            <div className="logic-bullet-char">•</div>
-                            <div>{formatText(txt)}</div>
+            case 'header': 
+                return <h2 key={idx} className="univ-h-block" style={style}>{formatText(block.body)}{renderAIExtension(block)}</h2>;
+            
+            case 'spacer': 
+                return <div key={idx} style={{ height: block.height || '20px', flexGrow: block.flex || 0, ...style }} />;
+            
+            case 'graphic':
+                return (
+                    <div key={idx} className="univ-graphic-container" style={style}>
+                        {block.svgCode ? (
+                            <div dangerouslySetInnerHTML={{ __html: block.svgCode }} />
+                        ) : (
+                            <img src={block.url} alt={block.caption || ""} />
+                        )}
+                        {block.caption && <div className="univ-graphic-caption">{formatText(block.caption)}</div>}
+                        {renderAIExtension(block)}
+                    </div>
+                );
+
+            case 'grid':
+                return (
+                    <div key={idx} className="univ-grid" style={{ gridTemplateColumns: `repeat(${block.columns || 3}, 1fr)`, ...style }}>
+                        {(block.items || []).map((val, gridIdx) => (
+                            <div key={gridIdx} className="univ-grid-item">{formatText(val)}</div>
+                        ))}
+                        {renderAIExtension(block)}
+                    </div>
+                );
+
+            case 'table':
+                return (
+                    <table key={idx} className={`univ-table ${block.tableClass || ''}`} style={style}>
+                        <tbody>
+                            {(block.rows || []).map((row, rowIdx) => (
+                                <tr key={rowIdx}>
+                                    {row.map((cell, cellIdx) => {
+                                        const isHeader = (rowIdx === 0 && block.headerStyle);
+                                        const CellTag = isHeader ? 'th' : 'td';
+                                        const cellContent = typeof cell === 'object' ? cell.text : cell;
+                                        const cellStyle = typeof cell === 'object' ? {
+                                            backgroundColor: cell.bg || undefined,
+                                            textAlign: cell.align || undefined
+                                        } : {};
+
+                                        return (
+                                            <CellTag 
+                                                key={cellIdx} 
+                                                colSpan={cell.colSpan || undefined}
+                                                rowSpan={cell.rowSpan || undefined}
+                                                style={cellStyle}
+                                            >
+                                                {formatText(cellContent)}
+                                            </CellTag>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                );
+
+            case 'footer':
+                return <div key={idx} className="univ-footer" style={style}>{formatText(block.val || block.page)}</div>;
+
+            // --- LOGIC SPECIFIC BLOCKS ---
+            case 'logic-header': 
+                return <div key={idx} className="logic-header" style={style} />;
+            
+            case 'logic-footer': 
+                return (
+                    <div key={idx} className="logic-footer" style={style}>
+                        <span>{formatText(block.authors)}</span><span>Page {block.page}</span>
+                    </div>
+                );
+            
+            case 'chapter-title': 
+                return (
+                    <div key={idx} style={style}>
+                        <span className="logic-chapter-num">CHAPTER {block.number}</span>
+                        <span className="logic-chapter-title">{formatText(block.title)}</span>
+                    </div>
+                );
+            
+            case 'title-page': 
+                return (
+                    <div key={idx} className="logic-title-container" style={style}>
+                        <div className="logic-title-main">{formatText(block.main)}</div>
+                        {block.sub && <div className="logic-title-sub">{formatText(block.sub)}</div>}
+                        {block.contributors && (
+                            <div className="logic-contributors">
+                                {formatText(block.contributors)}
+                            </div>
+                        )}
+                    </div>
+                );
+
+            case 'logic-toc':
+                return (
+                    <div key={idx} className="logic-toc-container" style={style}>
+                        {(block.entries || []).map((entry, entryIdx) => (
+                            <div key={entryIdx} className={`logic-toc-entry logic-toc-level-${entry.level || 0}`}>
+                                <span className="logic-toc-text">{formatText(entry.text)}</span>
+                                <span className="logic-toc-dots"></span>
+                                <span className="logic-toc-page">{entry.page || ''}</span>
+                            </div>
+                        ))}
+                    </div>
+                );
+
+            case 'bullet-list': 
+                return (
+                    <div key={idx} className="logic-bullet-list" style={style}>
+                        {(block.items || []).map((txt, bIdx) => (
+                            <div key={bIdx} className="logic-bullet-item">
+                                <div className="logic-bullet-char">{bulletCharMap[block.bullet] || bulletCharMap['default']}</div>
+                                <div>{formatText(txt)}</div>
+                            </div>
+                        ))}
+                        {renderAIExtension(block)}
+                    </div>
+                );
+
+            case 'logic-formula':
+                return (
+                    <div key={idx} className="logic-formula-box" style={style}>
+                        {formatText(block.body)}
+                        {renderAIExtension(block)}
+                    </div>
+                );
+
+            case 'logic-activity': 
+                return (
+                    <div key={idx} className={block.variant === 'nobox' || block.noBox ? 'logic-activity-nobox' : 'logic-activity-box'} style={style}>
+                        <span className="logic-activity-label">{formatText(block.label)} </span>
+                        <span>{formatText(block.body)}</span>
+                        {renderAIExtension(block)}
+                    </div>
+                );
+            
+            case 'logic-argument': 
+                return (
+                    <div key={idx} className="logic-argument-block" style={style}>
+                        {(block.premises || []).map((p, pIdx) => <div key={pIdx} className="logic-argument-premise">{formatText(p)}</div>)}
+                        <div className="logic-argument-line" />
+                        <div className="logic-argument-conclusion">{formatText(block.conclusion)}</div>
+                        {renderAIExtension(block)}
+                    </div>
+                );
+
+            case 'logic-self-check':
+                return (
+                    <div key={idx} className="logic-self-check" style={style}>
+                        <div style={{ marginBottom: '10px' }}>
+                            <b>{block.number}.</b> {formatText(block.question)}
                         </div>
-                    ))}
-                </div>
-            );
-            default: return <div key={idx} style={{color:'red', fontSize:'10px'}}>Unsupported block: {block.type}</div>;
+                        {[...Array(block.lines || 2)].map((_, lineIdx) => (
+                            <div key={lineIdx} className="logic-exercise-line"></div>
+                        ))}
+                    </div>
+                );
+
+            case 'logic-quote':
+                return (
+                    <div key={idx} className="logic-quote-block" style={style}>
+                        {formatText(block.body)}
+                    </div>
+                );
+
+            case 'logic-note':
+                return (
+                    <div key={idx} className={block.variant === 'nobox' || block.noBox ? 'logic-note-nobox' : 'logic-note-box'} style={style}>
+                        <span className="logic-note-label">Note:</span>
+                        <div style={{ display: 'inline', fontStyle: 'italic' }}>{formatText(block.body)}</div>
+                    </div>
+                );
+
+            case 'logic-example':
+                return (
+                    <div key={idx} style={style}>
+                        <span className="logic-example-label">{formatText(block.label) || 'Example'}:</span> {formatText(block.body) || ''}
+                    </div>
+                );
+
+            default: 
+                return <div key={idx} style={{color:'red', fontSize:'10px'}}>Unsupported block: {block.type}</div>;
         }
     };
 
-    // 4. Native Selection Listener
     useEffect(() => {
         const handleSelection = () => {
             const selection = window.getSelection();
@@ -146,11 +312,9 @@ const BookReader = ({ book, onClose }) => {
                 try {
                     const range = selection.getRangeAt(0);
                     const rect = range.getBoundingClientRect();
-                    // Don't show if hidden
                     if (rect.width === 0) return;
-                    
                     setContextMenu({
-                        x: Math.max(10, rect.left + (rect.width / 2) - 140), // center menu above
+                        x: Math.max(10, rect.left + (rect.width / 2) - 140),
                         y: Math.max(50, rect.top - 80),
                         text: selection.toString()
                     });
@@ -159,46 +323,34 @@ const BookReader = ({ book, onClose }) => {
                 setContextMenu(null);
             }
         };
-
         document.addEventListener('selectionchange', handleSelection);
         return () => document.removeEventListener('selectionchange', handleSelection);
     }, []);
 
-    // 5. Physics Engine & Bounding Constraints
     const applyConstraints = () => {
         if (!layerRef.current) return;
         const vw = window.innerWidth;
         const vh = window.innerHeight;
-
         const s = state.current;
         const v = velocity.current;
-
-        // Extract native dimensions independent of active transform scaling
         const rect = layerRef.current.getBoundingClientRect();
         const contentWidth = rect.width / s.scale;
         const contentHeight = rect.height / s.scale;
-
         const visualW = contentWidth * s.scale;
         const visualH = contentHeight * s.scale;
 
-        // HORIZONTAL BOUNDS (X)
         if (visualW < vw) {
-            // If page is narrower than screen, lock it centered
             s.x = (vw - visualW) / 2;
             v.x = 0;
         } else {
-            // Pin boundaries to edges
             if (s.x > 0) { s.x = 0; v.x = 0; }
             if (s.x < vw - visualW) { s.x = vw - visualW; v.x = 0; }
         }
 
-        // VERTICAL BOUNDS (Y)
         if (visualH < vh) {
-            // If total height is shorter than viewport, center it
             s.y = (vh - visualH) / 2;
             v.y = 0;
         } else {
-            // Pin boundaries to edges
             if (s.y > 0) { s.y = 0; v.y = 0; }
             if (s.y < vh - visualH) { s.y = vh - visualH; v.y = 0; }
         }
@@ -214,23 +366,17 @@ const BookReader = ({ book, onClose }) => {
                 state.current.y += v.y;
             }
         }
-
-        // Apply edge-containment constraints before rendering
         applyConstraints();
-
         if (layerRef.current) {
             const { x, y, scale } = state.current;
             layerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
         }
-
-        // Accurate dynamic page count calculation
         if (pageCountRef.current && layerRef.current && pages.length > 0) {
             const unscaledY = Math.abs(state.current.y) / state.current.scale;
-            const approxPageHeight = 1190; // Page canvas (1130px) + Gap (60px)
+            const approxPageHeight = 1183; // Adjusted (1123px height + 60px padding/margins)
             const current = Math.max(1, Math.floor((unscaledY + 200) / approxPageHeight) + 1);
             pageCountRef.current.innerText = `${Math.min(current, pages.length)} / ${pages.length}`;
         }
-
         requestRef.current = requestAnimationFrame(loop);
     };
 
@@ -241,10 +387,7 @@ const BookReader = ({ book, onClose }) => {
 
         const onTouchStart = (e) => {
             if (e.target.closest('#ui-layer') || e.target.closest('.fab-container') || e.target.closest('.reader-ctx-menu')) return;
-            
-            // Allow native selection if user is interacting with text
             if (window.getSelection().toString().length > 0) return;
-            
             velocity.current = { x: 0, y: 0 };
             input.current.touchStartTime = Date.now();
 
@@ -267,15 +410,13 @@ const BookReader = ({ book, onClose }) => {
 
         const onTouchMove = (e) => {
             if (e.target.closest('#ui-layer') || e.target.closest('.reader-ctx-menu')) return;
-            if (window.getSelection().toString().length > 0) return; // Don't disrupt selection
-            
-            e.preventDefault(); // Stop native page scrolling so we can pan canvas
+            if (window.getSelection().toString().length > 0) return;
+            e.preventDefault();
 
             if (input.current.isDragging && e.touches.length === 1) {
                 const x = e.touches[0].clientX;
                 const y = e.touches[0].clientY;
                 const dt = Date.now() - input.current.lastTime;
-                
                 state.current.x = x - input.current.startX;
                 state.current.y = y - input.current.startY;
 
@@ -283,32 +424,26 @@ const BookReader = ({ book, onClose }) => {
                     velocity.current.x = (x - input.current.lastX) * CONFIG.velocityMult;
                     velocity.current.y = (y - input.current.lastY) * CONFIG.velocityMult;
                 }
-                
                 input.current.lastX = x;
                 input.current.lastY = y;
                 input.current.lastTime = Date.now();
-            } 
-            else if (e.touches.length === 2) {
+            } else if (e.touches.length === 2) {
                 const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                 const cx = (e.touches[0].pageX + e.touches[1].pageX) / 2;
                 const cy = (e.touches[0].pageY + e.touches[1].pageY) / 2;
-                
                 const ratio = dist / input.current.initialPinchDist;
                 let newScale = input.current.initialScale * ratio;
                 newScale = Math.max(minScaleLimit.current, Math.min(newScale, CONFIG.maxZoom));
 
                 const contentX = (cx - state.current.x) / state.current.scale;
                 const contentY = (cy - state.current.y) / state.current.scale;
-
                 state.current.x = cx - (contentX * newScale);
                 state.current.y = cy - (contentY * newScale);
                 state.current.scale = newScale;
             }
         };
 
-        const onTouchEnd = (e) => {
-            input.current.isDragging = false;
-        };
+        const onTouchEnd = () => { input.current.isDragging = false; };
 
         viewport.addEventListener('touchstart', onTouchStart, { passive: false });
         viewport.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -331,7 +466,7 @@ const BookReader = ({ book, onClose }) => {
     const handleMenuAction = (action) => {
         if (action === 'ask_miron') alert("Sending to AI: " + contextMenu.text.substring(0, 40));
         if (action === 'copy') navigator.clipboard.writeText(contextMenu.text);
-        window.getSelection().removeAllRanges(); // Clear selection
+        window.getSelection().removeAllRanges();
         setContextMenu(null);
     };
 
@@ -351,7 +486,6 @@ const BookReader = ({ book, onClose }) => {
                 {loading && <div className="loading-spinner">Calibrating Knowledge Engine...</div>}
             </div>
 
-            {/* CONTEXT MENU */}
             {contextMenu && (
                 <div className="reader-ctx-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
                     <div className="ctx-primary" onClick={() => handleMenuAction('ask_miron')}>
@@ -365,7 +499,6 @@ const BookReader = ({ book, onClose }) => {
                 </div>
             )}
 
-            {/* FAB */}
             <div id="main-fab" className={`fab-container ${isUiVisible ? 'active' : ''}`}>
                 <div className="fab-options">
                     <div className="fab-mini" onClick={toggleTheme}>
@@ -377,7 +510,6 @@ const BookReader = ({ book, onClose }) => {
                 </div>
             </div>
 
-            {/* UI LAYER */}
             <div id="ui-layer" className={isUiVisible ? '' : 'hidden'}>
                 <div className="ui-bar reader-header">
                     <div className="header-left">
