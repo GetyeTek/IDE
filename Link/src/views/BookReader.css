@@ -146,3 +146,180 @@
 .loading-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-color); font-size: 1.2rem; font-family: 'Poppins', sans-serif; font-weight: bold;}
 .icon-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #ccc; }
 .reader-svg { width: 22px; height: 22px; fill: currentColor; }
+
+/* --- ALIGNED PAGE VIEWPORT --- */
+.page-canvas {
+    background-color: var(--page-bg);
+    color: var(--text-color);
+    width: 794px; /* Matches patcher tool exactly */
+    min-height: 1123px; /* Standard A4 paper scaling */
+    padding: 60px 70px 40px 70px;
+    box-sizing: border-box;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    font-family: 'Times New Roman', Times, 'Nyala', 'Kefa', 'Abyssinica SIL', serif;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* --- UNIVERSAL EXTENDED BLOCK TYPES --- */
+.univ-graphic-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 15px 0;
+}
+.univ-graphic-caption {
+    font-size: 13px;
+    font-style: italic;
+    margin-top: 10px;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+.univ-graphic-container img, .univ-graphic-container svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.univ-grid {
+    display: grid;
+    width: 100%;
+    gap: 12px 15px;
+    margin: 15px 0;
+    font-size: 15px;
+    line-height: 1.4;
+}
+.univ-grid-item {
+    text-align: left;
+}
+
+.univ-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 14px;
+    color: var(--text-color);
+}
+.univ-table th, .univ-table td {
+    border: 1px solid var(--border);
+    padding: 6px;
+    text-align: left;
+}
+.univ-table th {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: bold;
+}
+
+.univ-footer {
+    margin-top: auto;
+    padding-top: 20px;
+    height: 40px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+}
+
+/* --- RECONCILED LOGIC BLOCKS --- */
+.logic-example-label {
+    font-weight: bold;
+    text-decoration: underline;
+    font-size: 16px;
+    display: inline-block;
+    margin-bottom: 8px;
+}
+
+.logic-title-sub {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 40px;
+}
+
+.logic-contributors {
+    text-align: left;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 2;
+    margin-top: 40px;
+    width: 100%;
+    padding-left: 10%;
+}
+
+.logic-toc-container {
+    width: 100%;
+    margin: 20px 0;
+}
+.logic-toc-entry {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 10px;
+    font-size: 15px;
+}
+.logic-toc-text {
+    flex-shrink: 0;
+}
+.logic-toc-dots {
+    flex-grow: 1;
+    border-bottom: 2px dotted var(--text-color);
+    margin: 0 8px;
+    position: relative;
+    top: -3px;
+    opacity: 0.5;
+}
+.logic-toc-page {
+    flex-shrink: 0;
+}
+.logic-toc-level-1 { padding-left: 20px; }
+.logic-toc-level-2 { padding-left: 40px; }
+
+.logic-formula-box {
+    border: 1.5px solid var(--border);
+    padding: 12px 25px;
+    margin: 25px auto;
+    text-align: center;
+    font-weight: bold;
+    font-style: italic;
+    width: fit-content;
+    max-width: 90%;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.logic-self-check {
+    margin-bottom: 15px;
+}
+.logic-exercise-line {
+    border-bottom: 1px solid var(--border);
+    margin: 18px 0;
+    height: 1px;
+    width: 100%;
+    opacity: 0.5;
+}
+
+.logic-quote-block {
+    margin: 20px 40px;
+    text-align: justify;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.logic-note-box {
+    border: 1.5px solid var(--border);
+    padding: 10px 20px;
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+}
+.logic-note-nobox {
+    padding: 5px 0;
+    margin: 15px 0;
+    line-height: 1.5;
+}
+.logic-note-label {
+    font-weight: bold;
+    text-decoration: underline;
+    margin-right: 20px;
+    font-size: 17px;
+}
