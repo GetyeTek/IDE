@@ -239,14 +239,28 @@ const BookReader = ({ book, onClose }) => {
                     
                     const menuWidth = 280; 
                     const menuHeight = 100;
+                    const verticalGap = 35; // Generous clearance to keep teardrop bubbles completely uncovered
                     
+                    // Center the menu horizontally over the selection box
                     let x = rect.left + (rect.width / 2) - (menuWidth / 2);
-                    let y = rect.top - menuHeight - 15; 
+                    let y = rect.top - menuHeight - verticalGap; 
                     
+                    // Constrain horizontally to viewport boundaries
                     x = Math.max(10, Math.min(x, window.innerWidth - menuWidth - 10));
                     
-                    if (y < 50) {
-                        y = rect.bottom + 15;
+                    // SMART VERTICAL COLLISION DETECTOR
+                    if (rect.height > window.innerHeight - 150) {
+                        // Case A: Page-spanning selection. Center the menu vertically on screen
+                        // so it is always reachable and doesn't get pushed into off-screen voids.
+                        y = (window.innerHeight - menuHeight) / 2;
+                    } else if (y < 60) {
+                        // Case B: Selection is too close to the top. Flip menu to render BELOW selection.
+                        y = rect.bottom + verticalGap;
+                        
+                        // Failsafe: If flipping below also pushes it off the bottom of the screen, center it
+                        if (y + menuHeight > window.innerHeight - 20) {
+                            y = (window.innerHeight - menuHeight) / 2;
+                        }
                     }
                     
                     setContextMenu({ x, y, text: selection.toString() });
