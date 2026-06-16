@@ -1,0 +1,45 @@
+.logic-header { border-top: 3.5px solid var(--border); height: 10px; margin-bottom: 40px; position: relative; }
+.logic-header::after { content: ''; position: absolute; right: 40px; bottom: 10px; width: 3.5px; height: 40px; background: var(--border); }
+.logic-footer { border-top: 2px dotted var(--accent); margin-top: auto; padding-top: 12px; display: flex; justify-content: space-between; font-size: 14px; font-style: italic; }
+
+.logic-chapter-num { font-size: 22px; font-weight: bold; display: block; text-align: center; margin-bottom: 5px; font-family: 'Poppins', sans-serif; }
+.logic-chapter-title { font-size: 26px; font-weight: bold; display: block; text-align: center; text-transform: uppercase; margin-bottom: 30px; font-family: 'Poppins', sans-serif; }
+
+.logic-activity-box { border: 1px solid var(--border); padding: 15px 25px; margin: 20px 0; font-style: italic; line-height: 1.5; background: rgba(0,0,0,0.02); }
+.logic-activity-nobox { padding: 5px 0; margin: 15px 0; font-style: italic; line-height: 1.5; }
+.logic-activity-label { font-weight: bold; font-style: normal; margin-right: 10px; color: var(--accent); }
+
+.logic-argument-block { margin: 20px auto; width: fit-content; min-width: 250px; text-align: left; line-height: 1.6; display: flex; flex-direction: column; align-items: flex-start; }
+.logic-argument-premise { width: 100%; padding: 0 10px; box-sizing: border-box; }
+.logic-argument-line { border-top: 1px solid var(--text-color); margin: 4px 0; width: 100%; }
+.logic-argument-conclusion { width: 100%; padding: 0 10px; box-sizing: border-box; }
+
+.logic-title-container { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 40px 0; text-align: center; font-family: 'Poppins', sans-serif; }
+.logic-title-main { font-size: 24px; font-weight: bold; margin-bottom: 20px; line-height: 1.6; color: var(--accent); }
+
+.logic-bullet-list { display: flex; flex-direction: column; gap: 8px; margin: 15px 0; padding-left: 25px; }
+.logic-bullet-item { display: flex; gap: 12px; align-items: flex-start; text-align: justify; line-height: 1.5; font-size: 15.5px; }
+.logic-bullet-char { font-family: sans-serif; font-size: 16px; flex-shrink: 0; color: var(--accent); }
+
+.logic-example-label { font-weight: bold; text-decoration: underline; font-size: 16px; display: inline-block; margin-bottom: 8px; }
+.logic-title-sub { font-size: 18px; font-weight: bold; margin-bottom: 40px; }
+.logic-contributors { text-align: left; font-size: 16px; font-weight: bold; line-height: 2; margin-top: 40px; width: 100%; padding-left: 10%; }
+
+.logic-toc-container { width: 100%; margin: 20px 0; }
+.logic-toc-entry { display: flex; align-items: baseline; margin-bottom: 10px; font-size: 15px; }
+.logic-toc-text { flex-shrink: 0; }
+.logic-toc-dots { flex-grow: 1; border-bottom: 2px dotted var(--text-color); margin: 0 8px; position: relative; top: -3px; opacity: 0.5; }
+.logic-toc-page { flex-shrink: 0; }
+.logic-toc-level-1 { padding-left: 20px; }
+.logic-toc-level-2 { padding-left: 40px; }
+
+.logic-formula-box { border: 1.5px solid var(--border); padding: 12px 25px; margin: 25px auto; text-align: center; font-weight: bold; font-style: italic; width: fit-content; max-width: 90%; background: rgba(255, 255, 255, 0.02); }
+
+.logic-self-check { margin-bottom: 15px; }
+.logic-exercise-line { border-bottom: 1px solid var(--border); margin: 18px 0; height: 1px; width: 100%; opacity: 0.5; }
+
+.logic-quote-block { margin: 20px 40px; text-align: justify; font-size: 14px; line-height: 1.6; }
+
+.logic-note-box { border: 1.5px solid var(--border); padding: 10px 20px; margin: 20px 0; display: flex; align-items: center; }
+.logic-note-nobox { padding: 5px 0; margin: 15px 0; line-height: 1.5; }
+.logic-note-label { font-weight: bold; text-decoration: underline; margin-right: 20px; font-size: 17px; }
