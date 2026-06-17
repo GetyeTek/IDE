@@ -1,9 +1,48 @@
 /* --- CORE LAYOUT --- */
 .reader-root { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; background-color: var(--bg-color, #0d0d0d); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; transition: background-color 0.3s ease; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
-.theme-light { --bg-color: #e0e0e0; --page-bg: #ffffff; --text-color: #000000; --accent: #007bff; --border: #cccccc; }
-.theme-dark { --bg-color: #0d0d0d; --page-bg: #1a1a1a; --text-color: #d0d0d0; --accent: #42d7b8; --border: #333333; }
-.theme-sepia { --bg-color: #d4c4a8; --page-bg: #f4ecd8; --text-color: #5b4636; --accent: #8a6a4b; --border: #d3c4b1; }
+.theme-light { 
+    --bg-color: #e0e0e0; 
+    --page-bg: #ffffff; 
+    --text-color: #000000; 
+    --accent: #007bff; 
+    --border: #cccccc;
+    
+    /* Theme-aware Context Menu variables */
+    --ctx-bg: rgba(255, 255, 255, 0.94);
+    --ctx-border: rgba(0, 0, 0, 0.08);
+    --ctx-drag: rgba(0, 0, 0, 0.3);
+    --ctx-btn-bg: rgba(0, 0, 0, 0.04);
+    --ctx-btn-text: #2c2c2c;
+}
+.theme-dark { 
+    --bg-color: #0d0d0d; 
+    --page-bg: #1a1a1a; 
+    --text-color: #d0d0d0; 
+    --accent: #42d7b8; 
+    --border: #333333;
+    
+    /* Theme-aware Context Menu variables */
+    --ctx-bg: rgba(22, 22, 22, 0.96);
+    --ctx-border: rgba(255, 255, 255, 0.08);
+    --ctx-drag: rgba(255, 255, 255, 0.4);
+    --ctx-btn-bg: rgba(255, 255, 255, 0.05);
+    --ctx-btn-text: #a0a0a0;
+}
+.theme-sepia { 
+    --bg-color: #d4c4a8; 
+    --page-bg: #f4ecd8; 
+    --text-color: #5b4636; 
+    --accent: #8a6a4b; 
+    --border: #d3c4b1;
+    
+    /* Theme-aware Context Menu variables */
+    --ctx-bg: rgba(244, 236, 216, 0.96);
+    --ctx-border: rgba(91, 70, 54, 0.15);
+    --ctx-drag: rgba(91, 70, 54, 0.45);
+    --ctx-btn-bg: rgba(91, 70, 54, 0.06);
+    --ctx-btn-text: #5b4636;
+}
 
 #viewport { 
     width: 100%; 
@@ -87,17 +126,19 @@
     position: absolute; 
     z-index: 2500; 
     width: 280px; 
-    background: rgba(30, 30, 30, 0.98); 
+    background: var(--ctx-bg); 
     backdrop-filter: blur(20px); 
-    border: 1px solid rgba(255, 255, 255, 0.1); 
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--ctx-border); 
     border-radius: 20px; 
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+    box-shadow: 0 15px 45px rgba(0,0,0,0.25); 
     display: flex; 
     flex-direction: column; 
     gap: 8px; 
     padding: 10px; 
     transform-origin: bottom center; 
     animation: ctxPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    transition: background 0.3s ease, border-color 0.3s ease;
     
     /* Critically prevents selection from bleeding into the menu */
     user-select: none !important;
@@ -122,12 +163,12 @@
 }
 
 .ctx-drag-bar {
-    width: 44px;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.7); /* Brighter for absolute visibility */
+    width: 68px; /* High-fidelity wider profile */
+    height: 6px; /* Slightly thicker presence */
+    background: var(--ctx-drag);
     border-radius: 10px;
     flex-shrink: 0; /* Prevents the browser from collapsing the empty div */
-    box-shadow: 0 1px 4px rgba(0,0,0,0.5); /* Separates it from the background */
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.05), 0 1px 2px rgba(0,0,0,0.1);
     transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
 }
 
@@ -142,7 +183,19 @@
 .ctx-primary { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, var(--accent), #2e5a52); color: #050505; padding: 12px 16px; border-radius: 14px; cursor: pointer; font-family: 'Poppins', sans-serif;}
 .ctx-primary span { font-weight: 600; font-size: 0.95rem; }
 .ctx-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-family: 'Poppins', sans-serif;}
-.ctx-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 10px 0; cursor: pointer; color: #a0a0a0; }
+.ctx-btn { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 6px; 
+    background: var(--ctx-btn-bg); 
+    border-radius: 12px; 
+    padding: 10px 0; 
+    cursor: pointer; 
+    color: var(--ctx-btn-text);
+    transition: background 0.2s ease, color 0.2s ease;
+}
 .ctx-btn span { font-size: 0.65rem; font-weight: 500; }
 
 .loading-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-color); font-size: 1.2rem; font-family: 'Poppins', sans-serif; font-weight: bold;}
