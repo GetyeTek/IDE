@@ -141,10 +141,20 @@ serve(async (req) => {
         const errorMsg = err.message || JSON.stringify(err);
         console.error(`[Task ${task.id}] Failed: ${errorMsg}`);
         
-        await updateTaskStatus(supabase, task.id, "failed", errorMsg);
+        const isTransient = err.status === 500 || err.status === 503;
 
-        if (apiKeyRecord && (err.status === 429 || errorMsg.includes("429"))) {
-          await cooldownKey(supabase, apiKeyRecord.id, 5);
+        if (isTransient) {
+          await updateTaskStatus(supabase, task.id, "pending", `Transient upstream error (${err.status}): ${errorMsg}`);
+        } else {
+          await updateTaskStatus(supabase, task.id, "failed", errorMsg);
+        }
+
+        if (apiKeyRecord) {
+          if (err.status === 429 || errorMsg.includes("429")) {
+            await cooldownKey(supabase, apiKeyRecord.id, 5);
+          } else if (isTransient) {
+            await cooldownKey(supabase, apiKeyRecord.id, 2);
+          }
         }
       }
     });
