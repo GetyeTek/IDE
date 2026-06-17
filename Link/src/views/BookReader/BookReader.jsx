@@ -445,8 +445,10 @@ const BookReader = ({ book, onClose }) => {
         return text.join(' ').replace(/<[^>]+>/g, '').trim(); 
     };
 
-    const handleAIExplore = (pageContent, targetIdx) => {
+    const handleAIExplore = (pageIdx, targetIdx) => {
+        const pageContent = pages[pageIdx].content_json || [];
         const collectedBlocks = [];
+        let topReached = targetIdx;
         
         // 1. Anchor: Include the block that was actually tapped
         collectedBlocks.push(pageContent[targetIdx]);
@@ -455,6 +457,7 @@ const BookReader = ({ book, onClose }) => {
         for (let i = targetIdx - 1; i >= 0; i--) {
             if (pageContent[i].ai_ready) break;
             collectedBlocks.unshift(pageContent[i]);
+            topReached = i;
         }
         
         // 3. Climb DOWN: Grab related content until we hit another AI tag or page bottom
@@ -464,12 +467,28 @@ const BookReader = ({ book, onClose }) => {
         }
         
         // 4. Synthesize the context
-        const combinedText = collectedBlocks
+        let combinedText = collectedBlocks
             .map(extractTextFromBlock)
             .filter(t => t.length > 0)
             .join('\n\n');
+
+        // 5. Cross-page Tail Check
+        // If we climbed all the way to the top of THIS page, check the bottom of the PREVIOUS page
+        if (topReached === 0 && pageIdx > 0) {
+            const prevPageContent = pages[pageIdx - 1].content_json || [];
+            if (prevPageContent.length > 0) {
+                const lastBlockOfPrevPage = prevPageContent[prevPageContent.length - 1];
+                const lastBlockText = extractTextFromBlock(lastBlockOfPrevPage).trim();
+                
+                // If text exists and DOES NOT end with terminal punctuation (. ! ?)
+                // We prepend it, as the current page is clearly continuing that exact sentence
+                if (lastBlockText && !/[.!?]['"]?$/.test(lastBlockText)) {
+                    combinedText = lastBlockText + ' ' + combinedText;
+                }
+            }
+        }
             
-        // 5. Open Mini Miron with the accumulated context
+        // 6. Open Mini Miron with the unified context
         setMiniMironText(combinedText);
     };
 
@@ -483,13 +502,13 @@ const BookReader = ({ book, onClose }) => {
             >
                 <div id="scroll-container" ref={scrollContainerRef}>
                     <div id="book-layer" ref={layerRef}>
-                        {pages.map((page) => (
+                        {pages.map((page, pageIdx) => (
                             <div key={page.id} className="page-wrapper">
                                 <div className="page-canvas">
                                     {page.manual_flag && <div className="manual-flag">{page.manual_flag}</div>}
                                     {(page.content_json || []).map((block, idx) => {
                                         const blockActions = {
-                                            onAIExplore: () => handleAIExplore(page.content_json, idx)
+                                            onAIExplore: () => handleAIExplore(pageIdx, idx)
                                         };
                                         return renderBookBlock(block, idx, blockActions);
                                     })}
