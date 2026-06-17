@@ -123,11 +123,22 @@
 }
 
 .ctx-drag-pill {
-    width: 36px;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 2px;
-    transition: background-color 0.2s, box-shadow 0.2s;
+    width: 46px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 99px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ctx-drag-pill i {
+    font-size: 7px;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.5px;
+    transition: color 0.2s;
 }
 
 .ctx-drag-handle:active {
@@ -135,8 +146,13 @@
 }
 
 .ctx-drag-handle:active .ctx-drag-pill {
-    background-color: var(--accent-teal);
-    box-shadow: 0 0 10px var(--accent-teal);
+    background-color: rgba(66, 215, 184, 0.12);
+    border-color: rgba(66, 215, 184, 0.4);
+    box-shadow: 0 0 12px rgba(66, 215, 184, 0.2);
+}
+
+.ctx-drag-handle:active .ctx-drag-pill i {
+    color: var(--accent-teal);
 }
 @keyframes ctxPop { from { opacity: 0; transform: scale(0.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
