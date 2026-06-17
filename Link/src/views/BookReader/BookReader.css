@@ -123,20 +123,20 @@
 }
 
 .ctx-drag-pill {
-    width: 46px;
-    height: 10px;
-    background: rgba(255, 255, 255, 0.08);
+    width: 52px;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.12);
     border-radius: 99px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .ctx-drag-pill i {
-    font-size: 7px;
-    color: rgba(255, 255, 255, 0.35);
+    font-size: 11px; /* 60% larger for high visual visibility */
+    color: rgba(255, 255, 255, 0.6); /* Brighter, more friendly affordance */
     letter-spacing: 0.5px;
     transition: color 0.2s;
 }
