@@ -14,7 +14,6 @@ const BRANCH = "main";
 const TABLES = [
   "tele_analysis",
   "conduit_logs",
-  "flat_source_metadata",
   "processed_words",
 ];
 
