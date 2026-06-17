@@ -446,6 +446,8 @@ const BookReader = ({ book, onClose }) => {
     };
 
     const handleAIExplore = (pageIdx, targetIdx) => {
+        console.group(`🧠 [AI Context Analyzer] Page ${pageIdx + 1} | Target Block ${targetIdx}`);
+        
         const pageContent = pages[pageIdx].content_json || [];
         const collectedBlocks = [];
         let topReached = targetIdx;
@@ -459,12 +461,16 @@ const BookReader = ({ book, onClose }) => {
             collectedBlocks.unshift(pageContent[i]);
             topReached = i;
         }
+        console.log(`[Climb UP] Reached block index: ${topReached}`);
         
         // 3. Climb DOWN: Grab related content until we hit another AI tag or page bottom
+        let bottomReached = targetIdx;
         for (let i = targetIdx + 1; i < pageContent.length; i++) {
             if (pageContent[i].ai_ready) break;
             collectedBlocks.push(pageContent[i]);
+            bottomReached = i;
         }
+        console.log(`[Climb DOWN] Reached block index: ${bottomReached}`);
         
         // 4. Synthesize the context
         let combinedText = collectedBlocks
@@ -473,20 +479,40 @@ const BookReader = ({ book, onClose }) => {
             .join('\n\n');
 
         // 5. Cross-page Tail Check
-        // If we climbed all the way to the top of THIS page, check the bottom of the PREVIOUS page
         if (topReached === 0 && pageIdx > 0) {
+            console.log(`[Boundary Event] Hit top of Page ${pageIdx + 1}. Analyzing Page ${pageIdx}...`);
             const prevPageContent = pages[pageIdx - 1].content_json || [];
-            if (prevPageContent.length > 0) {
-                const lastBlockOfPrevPage = prevPageContent[prevPageContent.length - 1];
-                const lastBlockText = extractTextFromBlock(lastBlockOfPrevPage).trim();
-                
-                // If text exists and DOES NOT end with terminal punctuation (. ! ?)
-                // We prepend it, as the current page is clearly continuing that exact sentence
-                if (lastBlockText && !/[.!?]['"]?$/.test(lastBlockText)) {
-                    combinedText = lastBlockText + ' ' + combinedText;
+            
+            // Loop backwards on the previous page to skip empty footers/spacers
+            let lastRealText = '';
+            for (let j = prevPageContent.length - 1; j >= 0; j--) {
+                const tempText = extractTextFromBlock(prevPageContent[j]).trim();
+                if (tempText) {
+                    lastRealText = tempText;
+                    console.log(`[Boundary Data] Found actual text at block ${j} of previous page.`);
+                    break;
                 }
             }
+
+            if (lastRealText) {
+                // Heuristic check: does it end without a terminal punctuation mark?
+                const hasTerminalPunctuation = /[.!?]['"]?$/.test(lastRealText);
+                console.log(`[Punctuation Check] String: "...${lastRealText.slice(-15)}"`);
+                console.log(`[Punctuation Check] Has terminal punctuation? ${hasTerminalPunctuation}`);
+                
+                if (!hasTerminalPunctuation) {
+                    console.log(`[Action] Sentence is fractured! Stitching previous paragraph to current context.`);
+                    combinedText = lastRealText + ' ' + combinedText;
+                } else {
+                    console.log(`[Action] Sentence is whole. No cross-page stitching required.`);
+                }
+            } else {
+                console.log(`[Boundary Data] Previous page contained no viable text blocks.`);
+            }
         }
+        
+        console.log(`[Final Output] ${combinedText.substring(0, 100)}...`);
+        console.groupEnd();
             
         // 6. Open Mini Miron with the unified context
         setMiniMironText(combinedText);
