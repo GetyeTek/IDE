@@ -14,6 +14,7 @@ const BookReader = ({ book, onClose }) => {
     const scrollContainerRef = useRef(null);
     const layerRef = useRef(null);
     const pageCountRef = useRef(null);
+    const menuRef = useRef(null);
     
     const baseCanvasWidth = 794; 
     const currentScale = useRef(1.0);
@@ -304,6 +305,54 @@ const BookReader = ({ book, onClose }) => {
         };
     }, []);
 
+    // 8. Zero-Latency Hardware Accelerated Dragging
+    const handleDragStart = (e) => {
+        const isTouch = e.type === 'touchstart';
+        const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+        const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+        
+        if (!menuRef.current) return;
+        
+        const rect = menuRef.current.getBoundingClientRect();
+        
+        const startX = clientX;
+        const startY = clientY;
+        const startLeft = rect.left;
+        const startTop = rect.top;
+
+        const onDragMove = (moveEvt) => {
+            const moveTouch = moveEvt.type === 'touchmove';
+            const moveX = moveTouch ? moveEvt.touches[0].clientX : moveEvt.clientX;
+            const moveY = moveTouch ? moveEvt.touches[0].clientY : moveEvt.clientY;
+            
+            const dx = moveX - startX;
+            const dy = moveY - startY;
+            
+            if (menuRef.current) {
+                // Instantly update layout positions directly in the DOM for maximum speed
+                menuRef.current.style.left = `${startLeft + dx}px`;
+                menuRef.current.style.top = `${startTop + dy}px`;
+            }
+            
+            if (moveEvt.cancelable) moveEvt.preventDefault();
+            moveEvt.stopPropagation();
+        };
+
+        const onDragEnd = () => {
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            document.removeEventListener('touchmove', onDragMove);
+            document.removeEventListener('touchend', onDragEnd);
+        };
+
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend', onDragEnd);
+        
+        e.stopPropagation();
+    };
+
     const toggleTheme = () => {
         const themes = ['dark', 'sepia', 'light'];
         setCurrentTheme(themes[(themes.indexOf(currentTheme) + 1) % themes.length]);
@@ -346,10 +395,18 @@ const BookReader = ({ book, onClose }) => {
             {contextMenu && (
                 <div 
                     className="reader-ctx-menu" 
+                    ref={menuRef}
                     style={{ left: contextMenu.x, top: contextMenu.y }}
                     onMouseDown={(e) => e.preventDefault()}
                     onTouchStart={(e) => e.stopPropagation()}
                 >
+                    <div 
+                        className="ctx-drag-handle"
+                        onMouseDown={handleDragStart}
+                        onTouchStart={handleDragStart}
+                    >
+                        <div className="ctx-drag-pill"></div>
+                    </div>
                     <div className="ctx-primary" onClick={() => handleMenuAction('ask_miron')}>
                         <i className="fa-solid fa-wand-magic-sparkles"></i> <span>Ask Miron</span>
                     </div>
