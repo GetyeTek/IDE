@@ -373,6 +373,7 @@ const BookReader = ({ book, onClose }) => {
     };
 
     const handleMenuAction = (action) => {
+        if (!contextMenu) return; // Prevent crashes if selection clears milliseconds before tap
         if (action === 'ask_miron') {
             setMiniMironText(contextMenu.text);
             window.getSelection()?.removeAllRanges();
