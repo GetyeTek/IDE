@@ -246,8 +246,8 @@ const BookReader = ({ book, onClose }) => {
                     if (rect.width === 0 && rect.height === 0) return;
                     
                     const menuWidth = 280; 
-                    const menuHeight = 100;
-                    const verticalGap = 35; // Generous clearance to keep teardrop bubbles completely uncovered
+                    const menuHeight = 140; // Updated to account for the taller, overhauled UI
+                    const verticalGap = 65; // High clearance to prevent overlapping OS teardrops/selection handles
                     
                     // Center the menu horizontally over the selection box
                     let x = rect.left + (rect.width / 2) - (menuWidth / 2);
