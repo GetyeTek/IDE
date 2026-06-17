@@ -521,14 +521,24 @@ const BookReader = ({ book, onClose }) => {
                         onTouchStart={handleDragStart}
                     >
                         <div className="ctx-drag-pill">
-                            <i className="fa-solid fa-grip-lines"></i>
+                            <i className="fa-solid fa-grip"></i>
                         </div>
                     </div>
-                    <div className="ctx-primary" onClick={() => handleMenuAction('ask_miron')}>
+                    <div 
+                        className="ctx-primary" 
+                        onMouseDown={(e) => { e.preventDefault(); handleMenuAction('ask_miron'); }}
+                        onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); handleMenuAction('ask_miron'); }}
+                    >
                         <i className="fa-solid fa-wand-magic-sparkles"></i> <span>Ask Miron</span>
                     </div>
                     <div className="ctx-grid" style={{marginTop: '8px'}}>
-                        <div className="ctx-btn" onClick={() => handleMenuAction('copy')}><i className="fa-regular fa-copy"></i><span>Copy</span></div>
+                        <div 
+                            className="ctx-btn" 
+                            onMouseDown={(e) => { e.preventDefault(); handleMenuAction('copy'); }}
+                            onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); handleMenuAction('copy'); }}
+                        >
+                            <i className="fa-regular fa-copy"></i><span>Copy</span>
+                        </div>
                         <div className="ctx-btn"><i className="fa-solid fa-highlighter"></i><span>Highlight</span></div>
                         <div className="ctx-btn"><i className="fa-solid fa-share-nodes"></i><span>Share</span></div>
                     </div>
