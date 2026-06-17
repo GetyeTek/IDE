@@ -8,11 +8,22 @@ import Connect from './views/Connect.jsx';
 import Profile from './views/Profile.jsx';
 
 import ActivityHub from './views/ActivityHub.jsx';
+import MironChat from './views/MironChat.jsx';
 
 const App = () => {
   console.log("App Component Rendering...");
   const [activeTab, setActiveTab] = useState('home');
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [mironContext, setMironContext] = useState(null); // null means closed, object holds selection context
+
+  useEffect(() => {
+    const handleGlobalMironRequest = (e) => {
+      const text = e.detail?.text || null;
+      setMironContext({ text });
+    };
+    window.addEventListener('open-full-miron-chat', handleGlobalMironRequest);
+    return () => window.removeEventListener('open-full-miron-chat', handleGlobalMironRequest);
+  }, []);
   
   // Maps tab IDs to their index for the mobile indicator animation
   const tabIndex = {
@@ -40,6 +51,12 @@ const App = () => {
         {renderContent()}
       </main>
       {isActivityOpen && <ActivityHub onClose={() => setIsActivityOpen(false)} />}
+      {mironContext && (
+        <MironChat 
+          initialContext={mironContext.text} 
+          onClose={() => setMironContext(null)} 
+        />
+      )}
 
       <footer className="navigation-magic">
         <nav>
