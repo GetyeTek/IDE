@@ -58,7 +58,7 @@ Deno.serve(async () => {
     const offset = progress?.last_offset ?? 0;
 
     // ⚡ SMALL BATCH NOW (key fix)
-    const limit = 100;
+    const limit = 10;
 
     const { data, error } = await supabase
       .from(table)
