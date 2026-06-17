@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import MironChat from './MironChat.jsx';
 import UserChat from './UserChat.jsx';
 
 const Connect = ({ onOpenActivity }) => {
     const [activeView, setActiveView] = useState('messages'); // 'messages' or 'for-you'
-    const [isMironOpen, setIsMironOpen] = useState(false);
     const [activeUser, setActiveUser] = useState(null);
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
@@ -80,7 +78,7 @@ const Connect = ({ onOpenActivity }) => {
                     style={{ overflowY: 'auto', height: '100%' }}
                 >
                     <div className="messages-list">
-                        <div className="messages-list-item miron-chat-card" onClick={() => setIsMironOpen(true)}>
+                        <div className="messages-list-item miron-chat-card" onClick={() => window.dispatchEvent(new CustomEvent('open-full-miron-chat'))}>
                             <div className="miron-avatar-orb">
                                 <span className="material-symbols-outlined">auto_awesome</span>
                             </div>
@@ -130,7 +128,6 @@ const Connect = ({ onOpenActivity }) => {
                     </div>
                 </div>
             </div>
-            {isMironOpen && <MironChat onClose={() => setIsMironOpen(false)} />}
             {activeUser && <UserChat user={activeUser} onClose={() => setActiveUser(null)} />}
         </div>
     );
