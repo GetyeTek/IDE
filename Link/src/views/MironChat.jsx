@@ -1,15 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './MironChat.css';
 
-const MironChat = ({ onClose }) => {
-    const [messages, setMessages] = useState([
-        {
-            id: 1,
-            side: 'miron',
-            text: "Welcome back, Alex. I've been tracing your recent cognitive progress. The patterns in your work on Thermodynamics are showing remarkable symmetry. How shall we expand your horizon today?",
-            thought: "Synchronizing with Alex's neural path..."
+const MironChat = ({ onClose, initialContext }) => {
+    const [messages, setMessages] = useState(() => {
+        const base = [
+            {
+                id: 1,
+                side: 'miron',
+                text: "Welcome back, Alex. I've been tracing your recent cognitive progress. The patterns in your work on Thermodynamics are showing remarkable symmetry. How shall we expand your horizon today?",
+                thought: "Synchronizing with Alex's neural path..."
+            }
+        ];
+        
+        // If opened with literature context, pre-populate the thread elegantly
+        if (initialContext) {
+            base.push({
+                id: 2,
+                side: 'user',
+                text: `Regarding this passage: "${initialContext}"`
+            });
+            base.push({
+                id: 3,
+                side: 'miron',
+                thought: "Analyzing literature node...",
+                text: "Ah, yes! This relation contains a deep thermodynamic constraint. Let's dissect the mathematical properties and see how they correlate with your current curriculum."
+            });
         }
-    ]);
+        return base;
+    });
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const flowRef = useRef(null);
