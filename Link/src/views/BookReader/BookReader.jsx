@@ -521,9 +521,7 @@ const BookReader = ({ book, onClose }) => {
                         onMouseDown={handleDragStart}
                         onTouchStart={handleDragStart}
                     >
-                        <div className="ctx-drag-pill">
-                            <i className="fa-solid fa-grip"></i>
-                        </div>
+                        <div className="ctx-drag-bar"></div>
                     </div>
                     <div 
                         className="ctx-primary" 
