@@ -305,13 +305,20 @@ const BookReader = ({ book, onClose }) => {
         };
     }, []);
 
-    // 8. Zero-Latency Hardware Accelerated Dragging
+    // 8. Zero-Latency Hardware Accelerated Dragging (With Tactile Feedback)
     const handleDragStart = (e) => {
         const isTouch = e.type === 'touchstart';
         const clientX = isTouch ? e.touches[0].clientX : e.clientX;
         const clientY = isTouch ? e.touches[0].clientY : e.clientY;
         
         if (!menuRef.current) return;
+
+        // Progressive Enhancement: Micro-haptic tick on touch devices
+        if (navigator.vibrate) {
+            try {
+                navigator.vibrate(12); // High-fidelity taptic "tick"
+            } catch (err) {}
+        }
         
         const rect = menuRef.current.getBoundingClientRect();
         
@@ -405,7 +412,9 @@ const BookReader = ({ book, onClose }) => {
                         onMouseDown={handleDragStart}
                         onTouchStart={handleDragStart}
                     >
-                        <div className="ctx-drag-pill"></div>
+                        <div className="ctx-drag-pill">
+                            <i className="fa-solid fa-grip-lines"></i>
+                        </div>
                     </div>
                     <div className="ctx-primary" onClick={() => handleMenuAction('ask_miron')}>
                         <i className="fa-solid fa-wand-magic-sparkles"></i> <span>Ask Miron</span>
