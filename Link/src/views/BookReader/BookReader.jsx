@@ -429,8 +429,48 @@ const BookReader = ({ book, onClose }) => {
         setMiniMironText(null); // Close the mini overlay
     };
 
-    const readerActions = {
-        onAIExplore: () => alert("Exploring with AI...")
+    const extractTextFromBlock = (b) => {
+        let text = [];
+        if (b.main) text.push(b.main);
+        if (b.sub) text.push(b.sub);
+        if (b.title) text.push(b.title);
+        if (b.body) text.push(b.body);
+        if (b.text) text.push(b.text);
+        if (b.items && Array.isArray(b.items)) text.push(b.items.join(' '));
+        if (b.premises) text.push(b.premises.join(' '));
+        if (b.conclusion) text.push(b.conclusion);
+        if (b.question) text.push(b.question);
+        
+        // Combine and strip any basic HTML tags (like <sup>) for pure text context
+        return text.join(' ').replace(/<[^>]+>/g, '').trim(); 
+    };
+
+    const handleAIExplore = (pageContent, targetIdx) => {
+        const collectedBlocks = [];
+        
+        // 1. Anchor: Include the block that was actually tapped
+        collectedBlocks.push(pageContent[targetIdx]);
+        
+        // 2. Climb UP: Grab related content until we hit another AI tag or page top
+        for (let i = targetIdx - 1; i >= 0; i--) {
+            if (pageContent[i].ai_ready) break;
+            collectedBlocks.unshift(pageContent[i]);
+        }
+        
+        // 3. Climb DOWN: Grab related content until we hit another AI tag or page bottom
+        for (let i = targetIdx + 1; i < pageContent.length; i++) {
+            if (pageContent[i].ai_ready) break;
+            collectedBlocks.push(pageContent[i]);
+        }
+        
+        // 4. Synthesize the context
+        const combinedText = collectedBlocks
+            .map(extractTextFromBlock)
+            .filter(t => t.length > 0)
+            .join('\n\n');
+            
+        // 5. Open Mini Miron with the accumulated context
+        setMiniMironText(combinedText);
     };
 
     return (
@@ -447,7 +487,12 @@ const BookReader = ({ book, onClose }) => {
                             <div key={page.id} className="page-wrapper">
                                 <div className="page-canvas">
                                     {page.manual_flag && <div className="manual-flag">{page.manual_flag}</div>}
-                                    {(page.content_json || []).map((block, idx) => renderBookBlock(block, idx, readerActions))}
+                                    {(page.content_json || []).map((block, idx) => {
+                                        const blockActions = {
+                                            onAIExplore: () => handleAIExplore(page.content_json, idx)
+                                        };
+                                        return renderBookBlock(block, idx, blockActions);
+                                    })}
                                 </div>
                             </div>
                         ))}
