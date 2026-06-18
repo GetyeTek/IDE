@@ -218,47 +218,18 @@ async function processChunkWithGemini(supabaseClient: any, chunk: any[], formatt
 // ROUND-ROBIN KEY LEASING ENGINE
 // ==========================================
 async function leaseApiKey(supabaseClient: any): Promise<any> {
-  const { data: keys, error } = await supabaseClient
-    .from("api_keys")
-    .select("id, api_key, cooldown_until, last_used_at")
-    .eq("service", "gemini")
-    .eq("is_active", true);
+  // Call the atomic database function to securely lock an available key
+  const { data, error } = await supabaseClient.rpc("lease_gemini_api_key");
 
-  if (error || !keys || keys.length === 0) {
-    throw new Error("No active Gemini API keys found in the database.");
+  if (error) {
+    throw new Error(`RPC Error fetching API key: ${error.message}`);
+  }
+  
+  if (!data || data.length === 0) {
+    throw new Error("No active Gemini API keys available (all may be cooling down or in use).");
   }
 
-  // Filter out any key cooling down
-  const activeKeys = keys.filter((k) => {
-    if (!k.cooldown_until) return true;
-    try {
-      const cooldownTime = new Date(k.cooldown_until).getTime();
-      return isNaN(cooldownTime) || cooldownTime <= Date.now();
-    } catch {
-      return true;
-    }
-  });
-
-  if (activeKeys.length === 0) {
-    throw new Error("All active Gemini API keys are currently in a cooldown period.");
-  }
-
-  // Sort keys (least recently used key first)
-  activeKeys.sort((a, b) => {
-    const timeA = a.last_used_at ? new Date(a.last_used_at).getTime() : 0;
-    const timeB = b.last_used_at ? new Date(b.last_used_at).getTime() : 0;
-    return timeA - timeB;
-  });
-
-  const selectedKey = activeKeys[0];
-
-  // Instantly lock and update lease timestamp
-  await supabaseClient
-    .from("api_keys")
-    .update({ last_used_at: new Date().toISOString() })
-    .eq("id", selectedKey.id);
-
-  return selectedKey;
+  return data[0];
 }
 
 async function applyKeyCooldown(supabaseClient: any, keyId: any): Promise<void> {
@@ -288,11 +259,12 @@ You are an expert mapping system. Your role is to map multi-choice exam question
 
 CRITICAL DIRECTIVES:
 1. The textbook JSON is structured as an array of pages. Each page has a "page_key" and a "content" array of blocks. The narrative textbook text to match against is stored inside the "body" key of these blocks.
-2. Validate whether each question matches a section, concept, rule, definition, or paragraph inside the "body" of these blocks. Ignore layout blocks (like spacers or headers with no "body" property) during your matching evaluation.
-3. If the question matches, set "is_valid": true. You MUST retrieve the correct "page_key", the specific "content_index" (the integer 'index' value of the block inside that page), and output a "snippet" containing the matching textbook context from the "body" key.
-4. If the question cannot be found anywhere in the book, or is completely unrelated, invalid, or corrupted, set "is_valid": false and write a detailed "reason".
-5. Do NOT guess, interpolate, or invent data. The "content_index" must match the precise pre-injected 'index' value of the block on that page.
-6. You must process each question strictly and map each output back to its pre-provided UUID "question_id".
+2. Validate whether the knowledge required to answer each question exists in the textbook. If you encounter a question containing specific real-world scenarios or examples NOT found in the text, DO NOT immediately reject it. Instead, deduce and generalize: find the page and block that explains the underlying concept, rule, or definition needed to answer it.
+3. If the core concept exists, set "is_valid": true. You MUST retrieve the correct "page_key", the specific "content_index" (the integer 'index' value of the block inside that page), and output a "snippet" containing the matching theoretical textbook context from the "body" key.
+4. If the underlying concept is completely unrelated, genuinely missing from the book, or the question covers an entirely different topic, set "is_valid": false and write a detailed "reason". Do not force a match if the foundational concept isn't there.
+5. Ignore layout blocks (like spacers or headers with no "body" property) during your matching evaluation.
+6. Do NOT guess, interpolate, or invent index numbers. The "content_index" must match the precise pre-injected 'index' integer of the correct block on that page.
+7. You must process each question strictly and map each output back to its pre-provided UUID "question_id".
 
 OUTPUT FORMAT REQUIREMENTS:
 Return ONLY a valid, single JSON object carrying the mapped values. Do NOT wrap the JSON inside markdown code fence blocks like \`\`\`json. Match the following structure exactly:
