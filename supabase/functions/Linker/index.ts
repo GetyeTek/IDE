@@ -45,11 +45,23 @@ serve(async (req) => {
 
     // Append sequential index tracking onto each content block of the page
     const formattedPages = pages.map((page) => {
-      const content = page.content_json?.content || [];
-      const indexedContent = content.map((item: any, idx: number) => ({
-        ...item,
-        index: idx, // Injected mapping anchor
-      }));
+      // Safely handle raw array extraction
+      const content = Array.isArray(page.content_json) ? page.content_json : [];
+      
+      const indexedContent = content.map((item: any, idx: number) => {
+        // Construct a clean item to preserve tokens while keeping the EXACT index position.
+        // This ensures the Gemini response perfectly aligns with the original DB array.
+        const cleanedItem: any = { 
+          index: idx 
+        };
+        
+        // Pass only the textual payload required for mapping context
+        if (item.type) cleanedItem.type = item.type;
+        if (item.body) cleanedItem.body = item.body;
+        
+        return cleanedItem;
+      });
+
       return {
         page_key: page.page_key,
         content: indexedContent,
@@ -275,11 +287,12 @@ async function callGeminiApi(apiKey: string, chunk: any[], formattedPages: any[]
 You are an expert mapping system. Your role is to map multi-choice exam questions back to their exact source pages and content blocks inside a textbook.
 
 CRITICAL DIRECTIVES:
-1. Validate whether each question matches a section, concept, rule, definition, or paragraph inside the textbook JSON pages provided.
-2. If the question matches, set "is_valid": true. You MUST retrieve the correct "page_key", the specific "content_index" (the integer 'index' value of the block inside that page), and output a "snippet" containing the matching textbook context.
-3. If the question cannot be found anywhere in the book, or is completely unrelated, invalid, or corrupted, set "is_valid": false and write a detailed "reason".
-4. Do NOT guess, interpolate, or invent data. The "content_index" must match the precise pre-injected 'index' value of the block on that page.
-5. You must process each question strictly and map each output back to its pre-provided UUID "question_id".
+1. The textbook JSON is structured as an array of pages. Each page has a "page_key" and a "content" array of blocks. The narrative textbook text to match against is stored inside the "body" key of these blocks.
+2. Validate whether each question matches a section, concept, rule, definition, or paragraph inside the "body" of these blocks. Ignore layout blocks (like spacers or headers with no "body" property) during your matching evaluation.
+3. If the question matches, set "is_valid": true. You MUST retrieve the correct "page_key", the specific "content_index" (the integer 'index' value of the block inside that page), and output a "snippet" containing the matching textbook context from the "body" key.
+4. If the question cannot be found anywhere in the book, or is completely unrelated, invalid, or corrupted, set "is_valid": false and write a detailed "reason".
+5. Do NOT guess, interpolate, or invent data. The "content_index" must match the precise pre-injected 'index' value of the block on that page.
+6. You must process each question strictly and map each output back to its pre-provided UUID "question_id".
 
 OUTPUT FORMAT REQUIREMENTS:
 Return ONLY a valid, single JSON object carrying the mapped values. Do NOT wrap the JSON inside markdown code fence blocks like \`\`\`json. Match the following structure exactly:
