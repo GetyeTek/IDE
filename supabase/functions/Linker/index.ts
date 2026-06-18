@@ -77,7 +77,9 @@ serve(async (req) => {
       .select(`
         id,
         text,
+        question_type,
         options,
+        matching_data,
         section_id,
         sections!inner (
           id,
@@ -248,11 +250,25 @@ async function applyKeyCooldown(supabaseClient: any, keyId: any): Promise<void> 
 async function callGeminiApi(apiKey: string, chunk: any[], formattedPages: any[]): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
-  const promptQuestions = chunk.map((q) => ({
-    question_id: q.id,
-    text: q.text,
-    options: q.options || [],
-  }));
+  const promptQuestions = chunk.map((q) => {
+    // Construct a rich payload so Gemini sees all question elements,
+    // handling both standard multiple choice and complex matching grids.
+    const payload: any = {
+      question_id: q.id,
+      question_type: q.question_type,
+      text: q.text,
+    };
+    
+    if (q.options && Object.keys(q.options).length > 0) {
+      payload.options = q.options;
+    }
+    
+    if (q.matching_data && Object.keys(q.matching_data).length > 0) {
+      payload.matching_data = q.matching_data;
+    }
+
+    return payload;
+  });
 
   const systemInstructions = `
 You are an expert mapping system. Your role is to map exam questions (including multiple choice, true/false, matching, short answer, or any other format) back to their exact source pages and content blocks inside a textbook.
