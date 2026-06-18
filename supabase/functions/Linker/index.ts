@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // ==========================================
 const TARGET_BOOK_ID = "38953d3b-7740-4e97-9634-66434e53f024";
 const TARGET_COURSE_ID = "d7719a06-b6c4-4bf2-8d81-a0c99a52461b";
-const GEMINI_MODEL = "gemini-1.5-flash"; 
+const GEMINI_MODEL = "gemini-3.1-flash-lite-preview"; 
 
 const BATCH_SIZE = 10;           // Number of parallel requests/threads
 const QUESTIONS_PER_BATCH = 5;   // Questions mapped per request (Total: 50 questions per run)
