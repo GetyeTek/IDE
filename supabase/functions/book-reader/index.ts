@@ -56,7 +56,7 @@ serve(async (req) => {
       if (error) throw error;
 
       const universityBooks = universities.map(uni => ({
-        id: uni.id, title: uni.name, cover_url: null 
+        id: uni.id, name: uni.name, title: uni.name, cover_url: null 
       }));
       return new Response(JSON.stringify({ universities: universityBooks }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -83,10 +83,16 @@ serve(async (req) => {
     if (action === "get_exam_questions") {
       const { exam_id } = body;
       const [sectionsResp, metaResp] = await Promise.all([
-        supabase.from('sections').select('*, questions (*)').eq('exam_id', exam_id).order('section_order', { ascending: true }),
+        supabase.from('sections')
+          .select('*, questions (*)')
+          .eq('exam_id', exam_id)
+          .order('section_order', { ascending: true })
+          .order('question_order', { foreignTable: 'questions', ascending: true }),
         supabase.from('exams').select('courses(name, code)').eq('id', exam_id).single()
       ]);
+      
       if (sectionsResp.error) throw sectionsResp.error;
+      if (metaResp.error && metaResp.error.code !== 'PGRST116') throw metaResp.error;
       
       return new Response(JSON.stringify({
         sections: sectionsResp.data,
