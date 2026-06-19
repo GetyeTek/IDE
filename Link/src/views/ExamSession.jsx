@@ -209,30 +209,40 @@ const ExamSession = ({ exam, onClose }) => {
                                 )}
 
                                                         {hints[q.id]?.open && (
-                            <div className="explanation-wrapper">
+                            <div className="rag-insight-container">
                                 {hints[q.id].loading ? (
-                                    <div className="hint-loader"><i className="fas fa-circle-notch fa-spin"></i> Extracting physical archival record...</div>
+                                    <div className="hint-loader"><i className="fas fa-circle-notch fa-spin"></i> Locating document source...</div>
                                 ) : hints[q.id].data?.found ? (
-                                    <div className="tactile-paper-container">
-                                        <div className="paper-content">
-                                            <div className="paper-header">
-                                                <span className="paper-stamp">Archival Snippet</span>
-                                                <span className="paper-source">{hints[q.id].data.book_title} • Pg. {hints[q.id].data.page_number}</span>
+                                    <>
+                                        <div className="document-snapshot">
+                                            <div className="snapshot-topbar">
+                                                <span><i className="fas fa-file-pdf"></i> {hints[q.id].data.book_title}</span>
+                                                <span>Page {hints[q.id].data.page_number}</span>
                                             </div>
-                                            <div className="paper-body">
+                                            <div className="snapshot-content">
                                                 {hints[q.id].data.block ? renderBookBlock(hints[q.id].data.block, 0, {}) : <p>{hints[q.id].data.snippet}</p>}
                                             </div>
-                                            <div className="paper-actions">
-                                                <button className="btn-paper-close" onClick={() => toggleHint(q.id)}>Close Snippet</button>
-                                                <button className="btn-paper-open" onClick={() => setActiveReferenceBook(hints[q.id].data)}>
-                                                    Open Book <i className="fas fa-book-open"></i>
-                                                </button>
+                                        </div>
+                                        
+                                        <div className="ai-explanation-box">
+                                            <div className="ai-exp-header">
+                                                <i className="fas fa-sparkles"></i> Miron Synthesis
+                                            </div>
+                                            <div className="ai-exp-body">
+                                                <p>This is where the AI-generated explanation will be wired up. Miron will synthesize the textbook snapshot above to clarify why a certain choice is correct, directly addressing common misconceptions in this topic.</p>
                                             </div>
                                         </div>
-                                    </div>
+
+                                        <div className="insight-actions">
+                                            <button className="btn-insight-close" onClick={() => toggleHint(q.id)}>Close</button>
+                                            <button className="btn-insight-book" onClick={() => setActiveReferenceBook(hints[q.id].data)}>
+                                                Show in Book <i className="fas fa-external-link-alt" style={{marginLeft: '4px'}}></i>
+                                            </button>
+                                        </div>
+                                    </>
                                 ) : (
                                     <div className="exp-not-found">
-                                        <i className="fas fa-link-slash"></i> No archival mapping found. Request AI synthesis instead.
+                                        <i className="fas fa-link-slash"></i> No direct textbook source mapped for this question.
                                     </div>
                                 )}
                             </div>
