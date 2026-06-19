@@ -146,7 +146,7 @@ const ExamSession = ({ exam, onClose }) => {
                                     </div>
                                 </div>
                                 <div className="q-text">{q.text}</div>
-                                {q.question_type === 'true_false' ? (
+                                {(q.question_type && q.question_type.toLowerCase() === 'true_false') ? (
                                     <div className="tf-pad-container">
                                         <div className="tf-wrapper">
                                             <input 
@@ -177,7 +177,7 @@ const ExamSession = ({ exam, onClose }) => {
                                             </label>
                                         </div>
                                     </div>
-                                ) : q.question_type === 'matching' ? (
+                                ) : ((q.question_type && q.question_type.toLowerCase() === 'matching') || q.matching_data) ? (
                                     <div className={`interactive-match-container ${(q.matching_data?.right_column?.some(r => (r.text || r).length > 45) || q.matching_data?.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
                                         <div className="match-col match-left">
                                             {q.matching_data?.left_column?.map((item, idx) => {
