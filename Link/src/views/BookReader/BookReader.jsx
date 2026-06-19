@@ -751,7 +751,7 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
             </div>
             <div className="bpq-body">
                 <div className="bpq-text">{q.text}</div>
-                {q.question_type === 'true_false' ? (
+                {(q.question_type && q.question_type.toLowerCase() === 'true_false') ? (
                     <div className="bpq-tf-pad">
                         <label className={`bpq-tf-btn ${ans === 'True' || ans?.text === 'True' ? 'active-true' : ''}`}>
                             <input type="radio" hidden onChange={() => setAnswers({...answers, [q.id]: 'True'})} />
@@ -762,7 +762,7 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
                             <i className="fa-solid fa-xmark"></i> FALSE
                         </label>
                     </div>
-                ) : q.question_type === 'matching' ? (
+                ) : ((q.question_type && q.question_type.toLowerCase() === 'matching') || q.matching_data) ? (
                     <div className={`interactive-match-container ${(q.matching_data?.right_column?.some(r => (r.text || r).length > 45) || q.matching_data?.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
                         <div className="match-col match-left">
                             {q.matching_data?.left_column?.map((item, idx) => {
