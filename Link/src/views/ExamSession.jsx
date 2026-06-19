@@ -113,35 +113,68 @@ const ExamSession = ({ exam, onClose }) => {
                             </div>
                         </div>
                         <div className="q-text">{q.text}</div>
-                        <div className={`options-cluster ${q.options?.some(o => (o.text || o).length > 45) ? 'vertical-layout' : ''}`}>
-                            {q.options?.map((opt, idx) => (
-                                <div className="opt-wrapper" key={idx}>
+                        {q.question_type === 'true_false' ? (
+                            <div className="tf-pad-container">
+                                <div className="tf-wrapper">
                                     <input 
                                         type="radio" 
                                         name={`q-${q.id}`} 
-                                        id={`q-${q.id}-${idx}`} 
+                                        id={`q-${q.id}-true`} 
                                         hidden 
-                                        checked={answers[q.id] === opt}
-                                        onChange={() => handleSelect(q.id, opt)}
+                                        checked={answers[q.id] === 'True' || answers[q.id]?.text === 'True'}
+                                        onChange={() => handleSelect(q.id, q.options?.find(o => (o.text || o) === 'True') || 'True')}
                                     />
-                                    <label htmlFor={`q-${q.id}-${idx}`} className="opt-btn">
-                                        <div className="opt-indicator"></div>
-                                        <span>{opt.text || opt}</span>
+                                    <label htmlFor={`q-${q.id}-true`} className="tf-btn is-true">
+                                        <i className="fa-solid fa-check"></i>
+                                        <span>TRUE</span>
                                     </label>
                                 </div>
-                            ))}
-
-                            {(q.question_type === 'matching' || q.matching_data) && (
-                                <div className="q-matching-container">
-                                    <div className="q-match-column q-column-a">
-                                        {q.matching_data?.left_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
-                                    </div>
-                                    <div className="q-match-column q-column-b">
-                                        {q.matching_data?.right_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
-                                    </div>
+                                <div className="tf-wrapper">
+                                    <input 
+                                        type="radio" 
+                                        name={`q-${q.id}`} 
+                                        id={`q-${q.id}-false`} 
+                                        hidden 
+                                        checked={answers[q.id] === 'False' || answers[q.id]?.text === 'False'}
+                                        onChange={() => handleSelect(q.id, q.options?.find(o => (o.text || o) === 'False') || 'False')}
+                                    />
+                                    <label htmlFor={`q-${q.id}-false`} className="tf-btn is-false">
+                                        <i className="fa-solid fa-xmark"></i>
+                                        <span>FALSE</span>
+                                    </label>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        ) : (
+                            <div className={`options-cluster ${q.options?.some(o => (o.text || o).length > 45) ? 'vertical-layout' : ''}`}>
+                                {q.options?.map((opt, idx) => (
+                                    <div className="opt-wrapper" key={idx}>
+                                        <input 
+                                            type="radio" 
+                                            name={`q-${q.id}`} 
+                                            id={`q-${q.id}-${idx}`} 
+                                            hidden 
+                                            checked={answers[q.id] === opt}
+                                            onChange={() => handleSelect(q.id, opt)}
+                                        />
+                                        <label htmlFor={`q-${q.id}-${idx}`} className="opt-btn">
+                                            <div className="opt-indicator"></div>
+                                            <span>{opt.text || opt}</span>
+                                        </label>
+                                    </div>
+                                ))}
+
+                                {(q.question_type === 'matching' || q.matching_data) && (
+                                    <div className="q-matching-container">
+                                        <div className="q-match-column q-column-a">
+                                            {q.matching_data?.left_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
+                                        </div>
+                                        <div className="q-match-column q-column-b">
+                                            {q.matching_data?.right_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </section>
                 ))}
                 </div>
