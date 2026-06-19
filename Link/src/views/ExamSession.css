@@ -152,10 +152,13 @@
     box-shadow: 0 0 10px rgba(177, 211, 75, 0.4);
 }
 
-/* --- TACTILE ARCHIVAL RIP (HINT UI) --- */
-.explanation-wrapper {
-    margin-top: 24px;
-    animation: expandPad 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+/* --- DOCUMENT SNAPSHOT (HINT UI) --- */
+.rag-insight-container {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: expandPad 0.4s ease-out;
 }
 
 @keyframes expandPad {
@@ -163,139 +166,114 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
-.tactile-paper-container {
-    position: relative;
-    background-color: #f4ebd8;
-    background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
-    border-radius: 4px 4px 12px 12px;
-    box-shadow: 0 25px 50px rgba(0,0,0,0.6), inset 0 0 60px rgba(139, 115, 85, 0.15);
-    color: #2c2c2c;
+.document-snapshot {
+    background: #ffffff;
+    border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    color: #1a1a1a;
     
     /* Variables for Registry engine */
     --page-bg: transparent;
-    --text-color: #2c2c2c;
-    --border: rgba(139, 115, 85, 0.3);
-    --accent: #8b2222;
+    --text-color: #1a1a1a;
+    --border: #e0e0e0;
+    --accent: #42d7b8;
 }
 
-/* Jagged Top Tear Effect */
-.tactile-paper-container::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 12px;
-    background-image: 
-      linear-gradient(135deg, rgba(0,0,0,0.04) 25%, transparent 25%), 
-      linear-gradient(-135deg, rgba(0,0,0,0.04) 25%, transparent 25%);
-    background-size: 16px 16px;
-    background-position: top center;
-    background-repeat: repeat-x;
-    z-index: 5;
-    transform: rotate(180deg);
-}
-
-.paper-content {
-    padding: 30px 20px 20px 50px;
-    position: relative;
-}
-
-/* Notebook red margin line */
-.paper-content::before {
-    content: '';
-    position: absolute;
-    top: 0; bottom: 0; left: 35px;
-    width: 2px;
-    background-color: rgba(220, 50, 50, 0.3);
-}
-
-.paper-header {
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid rgba(139, 115, 85, 0.2);
-    padding-bottom: 12px; margin-bottom: 20px;
-}
-
-.paper-stamp {
-    font-family: 'Cinzel', serif;
-    color: #8b2222;
+.snapshot-topbar {
+    background: #f4f4f5;
+    padding: 8px 16px;
     font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    border: 2px solid #8b2222;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transform: rotate(-2deg);
-    opacity: 0.85;
+    color: #555;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e4e4e7;
+    font-family: 'Poppins', sans-serif;
 }
 
-.paper-source {
-    font-family: 'Roboto Mono', monospace;
-    font-size: 0.75rem;
-    color: #666;
+.snapshot-topbar i {
+    color: #ef4444; /* PDF Red icon for authentic feel */
+    margin-right: 6px;
 }
 
-.paper-body {
+.snapshot-content {
+    padding: 24px;
     font-family: 'Times New Roman', Times, 'Nyala', serif;
     font-size: 1.15rem;
     line-height: 1.6;
-    color: #1a1a1a;
 }
 
-/* Specific resets for block engine overrides inside the vintage container */
-.paper-body .univ-p-block,
-.paper-body .univ-h-block,
-.paper-body .logic-bullet-list,
-.paper-body .logic-argument-block {
+.snapshot-content .univ-p-block,
+.snapshot-content .univ-h-block,
+.snapshot-content .logic-bullet-list,
+.snapshot-content .logic-argument-block {
     margin: 0;
     color: #1a1a1a;
 }
 
-.paper-actions {
+.ai-explanation-box {
+    background: rgba(66, 215, 184, 0.06);
+    border-left: 3px solid var(--accent-teal);
+    border-radius: 0 8px 8px 0;
+    padding: 16px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.ai-exp-header {
+    color: var(--accent-teal);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ai-exp-body {
+    font-size: 0.9rem;
+    color: #e0e0e0;
+    line-height: 1.5;
+}
+
+.insight-actions {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
-    padding-top: 20px;
-    margin-top: 20px;
-    border-top: 1px dashed rgba(139, 115, 85, 0.3);
+    margin-top: 4px;
 }
 
-.btn-paper-close {
-    background: transparent;
-    color: #555;
-    border: 1px solid #aaa;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-paper-close:hover {
-    background: rgba(0,0,0,0.05);
-}
-
-.btn-paper-open {
-    background: #2c2c2c;
-    color: #f4ebd8;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
+.btn-insight-book, .btn-insight-close {
+    padding: 10px 18px;
+    border-radius: 8px;
     font-family: 'Poppins', sans-serif;
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    display: flex; align-items: center; gap: 8px;
     transition: all 0.2s;
+    border: none;
 }
 
-.btn-paper-open:hover { 
-    background: #000; 
+.btn-insight-book {
+    background: var(--accent-teal);
+    color: #050505;
+}
+
+.btn-insight-book:hover { 
     transform: translateY(-2px); 
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 6px 15px rgba(66, 215, 184, 0.2); 
+}
+
+.btn-insight-close {
+    background: rgba(255, 255, 255, 0.05);
+    color: #e0e0e0;
+}
+
+.btn-insight-close:hover { 
+    background: rgba(255, 255, 255, 0.1); 
 }
 
 .hint-loader {
