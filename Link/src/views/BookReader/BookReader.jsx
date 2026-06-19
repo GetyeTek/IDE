@@ -62,7 +62,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
             }
         };
         if (book?.id) fetchPages();
-    }, [book]);
+    }, [book?.id]);
 
     // 2. Initial Setup & Adapting to Screen Size
     useEffect(() => {
