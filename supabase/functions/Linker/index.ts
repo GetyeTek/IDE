@@ -69,61 +69,24 @@ serve(async (req) => {
     });
 
     // ==========================================
-    // 2. RETRIEVE UNPROCESSED QUESTIONS
+    // 2. RETRIEVE UNPROCESSED QUESTIONS (VIA RPC)
     // ==========================================
-    // Pull active questions tied to this course
-    const { data: allQuestions, error: qError } = await supabase
-      .from("questions")
-      .select(`
-        id,
-        text,
-        question_type,
-        options,
-        matching_data,
-        section_id,
-        sections!inner (
-          id,
-          exam_id,
-          exams!inner (
-            id,
-            course_id
-          )
-        )
-      `)
-      .eq("sections.exams.course_id", TARGET_COURSE_ID);
+    // Call the database-level function to bypass Supabase's 1,000 row API limit
+    const limit = BATCH_SIZE * QUESTIONS_PER_BATCH;
+    const { data: questionsToProcess, error: qError } = await supabase.rpc("get_pending_questions_for_mapping", {
+      p_course_id: TARGET_COURSE_ID,
+      p_book_id: TARGET_BOOK_ID,
+      p_limit: limit
+    });
 
     if (qError) throw qError;
-    if (!allQuestions || allQuestions.length === 0) {
-      return new Response(JSON.stringify({ message: "No questions found for this course." }), {
+    
+    if (!questionsToProcess || questionsToProcess.length === 0) {
+      return new Response(JSON.stringify({ message: "All questions are already successfully mapped or no questions found." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Identify which questions have already been completed or are locked in mapping run
-    const { data: existingMappings, error: mError } = await supabase
-      .from("question_book_mappings")
-      .select("question_id, status")
-      .eq("book_id", TARGET_BOOK_ID);
-
-    if (mError) throw mError;
-
-    const lockedQuestionIds = new Set(
-      existingMappings
-        ?.filter((m) => m.status === "completed" || m.status === "processing")
-        .map((m) => m.question_id) || []
-    );
-
-    // Filter down to strictly pending/unmapped questions
-    const pendingQuestions = allQuestions.filter((q) => !lockedQuestionIds.has(q.id));
-
-    if (pendingQuestions.length === 0) {
-      return new Response(JSON.stringify({ message: "All questions are already successfully mapped." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Restrict processing batch limits
-    const questionsToProcess = pendingQuestions.slice(0, BATCH_SIZE * QUESTIONS_PER_BATCH);
     console.log(`[QUEUE] Processing queue loaded: ${questionsToProcess.length} pending questions.`);
 
     // ==========================================
