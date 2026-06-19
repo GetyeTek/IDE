@@ -93,6 +93,26 @@
     background: rgba(66, 215, 184, 0.4) !important;
     color: inherit !important;
 }
+
+/* --- DEEP LINK HIGHLIGHTING --- */
+@keyframes highlightFlash {
+    0% { background-color: rgba(66, 215, 184, 0); box-shadow: 0 0 0px rgba(66,215,184,0); }
+    15% { background-color: rgba(66, 215, 184, 0.3); box-shadow: 0 0 25px rgba(66,215,184,0.4); transform: scale(1.02); border-radius: 8px; }
+    85% { background-color: rgba(66, 215, 184, 0.3); box-shadow: 0 0 25px rgba(66,215,184,0.4); transform: scale(1.02); border-radius: 8px; }
+    100% { background-color: rgba(66, 215, 184, 0); box-shadow: 0 0 0px rgba(66,215,184,0); transform: scale(1); border-radius: 8px; }
+}
+
+.highlight-block-anim {
+    animation: highlightFlash 3.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    position: relative;
+    z-index: 10;
+}
+
+.block-target-wrapper {
+    transition: all 0.3s;
+    padding: 6px;
+    margin: -6px; /* Offset padding so it doesn't disrupt native book layout */
+}
 .page-canvas *::-moz-selection {
     background: rgba(66, 215, 184, 0.4) !important;
     color: inherit !important;
