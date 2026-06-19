@@ -27,7 +27,7 @@ CATEGORIES:
 - fill: Fill in the blanks
 - ma: Matching
 - sa: Short Answer
-- wo: Mathematical Workout / Long Form
+- wo: Workout / Long Form / Code (Any question requiring a long written answer, math steps, or code)
 
 OUTPUT JSON:
 { 
@@ -58,9 +58,12 @@ STRICT TTS RULES:
 2. STEALTH & SPEED:
    - For 'mc' (Multiple Choice): Provide the letter AND the full text of the option. Example: "Answer is B, Photosynthesis".
    - For 'tf', 'fill', 'ma', 'sa': Provide ONLY the answer. Example: "Answer is True". No explanations.
-3. WORKOUT MODE ('wo'):
-   - Provide a 'steps' array where each step is a short instruction the student can follow while writing.
-   - Format: "First, write down the formula...", "Next, substitute three for x...", "The result is five."
+3. WORKOUT MODE ('wo') - STRICT RULE:
+   - Treat ANY long-form answer, math derivation, essay outline, or code as 'wo'.
+   - DO NOT explain how to solve it. Get straight to what the student must write.
+   - Break the entire answer into a logical sequence of short instructions to be written down.
+   - Phrase each step as an explicit writing instruction. 
+   - Example: "Step 1: Write x equals y plus 2.", "Step 2: Write print hello world."
 4. NO MARKDOWN: Never use bold, italics, or LaTeX.
 
 JSON SCHEMA:
