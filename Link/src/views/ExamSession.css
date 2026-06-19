@@ -139,7 +139,112 @@
 .q-actions { display: flex; gap: 15px; }
 .q-actions button { background: none; border: none; color: #707070; font-size: 0.9rem; cursor: pointer; }
 .q-actions button.active { color: #ffab40; }
-.q-actions button.hint { color: var(--cyber-gold); }
+.q-actions button.hint { color: var(--cyber-gold); transition: all 0.3s; }
+.q-actions button.hint.active-hint {
+    color: #fff;
+    background: var(--cyber-gold);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 10px rgba(177, 211, 75, 0.4);
+}
+
+/* --- EXPLANATION CONTAINER --- */
+.explanation-wrapper {
+    margin-top: 24px;
+    animation: expandPad 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes expandPad {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.explanation-container {
+    border-radius: 16px;
+    background: #ffffff;
+    color: #1a1a1a;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    
+    /* Injecting light-theme variables for Registry component override */
+    --page-bg: #ffffff;
+    --text-color: #1a1a1a;
+    --border: #e0e0e0;
+    --accent: #42d7b8;
+}
+
+.exp-header {
+    padding: 16px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eaeaea;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: 'Poppins', sans-serif;
+}
+
+.exp-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.exp-badge {
+    background: rgba(66, 215, 184, 0.15);
+    color: #2e9b84;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.exp-source {
+    font-size: 0.85rem;
+    color: #555;
+    font-weight: 500;
+}
+
+.exp-body {
+    padding: 24px;
+    font-family: 'Times New Roman', Times, 'Nyala', serif;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+/* Specific resets for block engine overrides inside the white container */
+.exp-body .univ-p-block,
+.exp-body .univ-h-block,
+.exp-body .logic-bullet-list,
+.exp-body .logic-argument-block {
+    margin: 0;
+    color: #1a1a1a;
+}
+
+.hint-loader {
+    padding: 20px;
+    color: var(--cyber-gold);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.exp-not-found {
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 0.9rem;
+    text-align: center;
+}
 
 .q-text {
     font-family: 'Newsreader', serif;
