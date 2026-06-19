@@ -737,6 +737,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
 const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
     const [qIndex, setQIndex] = useState(0);
     const [answers, setAnswers] = useState({});
+    const [activeMatch, setActiveMatch] = useState({});
     
     if (!questions || questions.length === 0) return null;
     const q = questions[qIndex];
@@ -760,6 +761,49 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
                             <input type="radio" hidden onChange={() => setAnswers({...answers, [q.id]: 'False'})} />
                             <i className="fa-solid fa-xmark"></i> FALSE
                         </label>
+                    </div>
+                ) : q.question_type === 'matching' ? (
+                    <div className={`interactive-match-container ${(q.matching_data?.right_column?.some(r => (r.text || r).length > 45) || q.matching_data?.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
+                        <div className="match-col match-left">
+                            {q.matching_data?.left_column?.map((item, idx) => {
+                                const qAnswers = ans || {};
+                                const currentActive = activeMatch[q.id];
+                                const isPaired = qAnswers[idx] !== undefined;
+                                const isActive = currentActive === idx;
+                                const isDisabled = currentActive !== undefined && currentActive !== idx;
+                                
+                                return (
+                                    <div key={idx} className={`match-item-left ${isActive ? 'is-active' : ''} ${isPaired ? 'is-paired' : ''} ${isDisabled ? 'is-disabled' : ''}`} onClick={() => setActiveMatch(prev => ({ ...prev, [q.id]: isActive ? undefined : idx }))}>
+                                        <span className="match-index">{idx + 1}.</span>
+                                        <span className="match-text">{item.text || item}</span>
+                                        {isPaired && <span className="match-badge">{String.fromCharCode(65 + qAnswers[idx])}</span>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className={`match-col match-right ${activeMatch[q.id] !== undefined ? 'is-listening' : ''}`}>
+                            {q.matching_data?.right_column?.map((item, idx) => {
+                                const qAnswers = ans || {};
+                                const currentActive = activeMatch[q.id];
+                                const usedByLeftIdx = Object.keys(qAnswers).find(k => qAnswers[k] === idx);
+                                const isUsed = usedByLeftIdx !== undefined;
+
+                                return (
+                                    <div key={idx} className={`match-item-right ${isUsed ? 'is-used' : ''}`} onClick={() => {
+                                        if (currentActive !== undefined) {
+                                            const newAnswers = { ...qAnswers };
+                                            if (isUsed) delete newAnswers[usedByLeftIdx];
+                                            newAnswers[currentActive] = idx;
+                                            setAnswers({...answers, [q.id]: newAnswers});
+                                            setActiveMatch(prev => ({ ...prev, [q.id]: undefined }));
+                                        }
+                                    }}>
+                                        <span className="match-letter">{String.fromCharCode(65 + idx)}.</span>
+                                        <span className="match-text">{item.text || item}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 ) : (
                     <div className="bpq-mc-pad">
