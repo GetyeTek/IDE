@@ -3,7 +3,7 @@ import { invokeBookReader } from '../../config/api.js';
 import './BookReader.css';
 import { renderBookBlock } from './subjects/Registry.jsx';
 
-const BookReader = ({ book, onClose }) => {
+const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexOverride }) => {
     const [loading, setLoading] = useState(true);
     const [pages, setPages] = useState([]);
     const [isUiVisible, setIsUiVisible] = useState(true);
@@ -519,8 +519,24 @@ const BookReader = ({ book, onClose }) => {
         setMiniMironText(combinedText);
     };
 
+    // Target Scrolling & Highlighting
+    useEffect(() => {
+        if (!loading && pages.length > 0 && targetPageNumber !== undefined) {
+            const timer = setTimeout(() => {
+                const targetId = `page-${targetPageNumber}-block-${targetBlockIndex}`;
+                const targetEl = document.getElementById(targetId);
+                if (targetEl && viewportRef.current) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    targetEl.classList.add('highlight-block-anim');
+                    setTimeout(() => targetEl.classList.remove('highlight-block-anim'), 4000);
+                }
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+    }, [loading, pages, targetPageNumber, targetBlockIndex]);
+
     return (
-        <div className={`reader-root theme-${currentTheme}`}>
+        <div className={`reader-root theme-${currentTheme}`} style={zIndexOverride ? { zIndex: zIndexOverride } : {}}>
             <div 
                 id="viewport" 
                 ref={viewportRef} 
@@ -537,7 +553,11 @@ const BookReader = ({ book, onClose }) => {
                                         const blockActions = {
                                             onAIExplore: () => handleAIExplore(pageIdx, idx)
                                         };
-                                        return renderBookBlock(block, idx, blockActions);
+                                        return (
+                                            <div key={idx} id={`page-${page.page_number}-block-${idx}`} className="block-target-wrapper">
+                                                {renderBookBlock(block, idx, blockActions)}
+                                            </div>
+                                        );
                                     })}
                                 </div>
                             </div>
