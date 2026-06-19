@@ -114,6 +114,9 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         found: true,
         book_title: mapping.books?.title || "Course Material",
+        book_id: mapping.book_id,
+        content_index: mapping.content_index,
+        page_key: mapping.page_key,
         page_number: pageData.page_number,
         block: block,
         snippet: mapping.snippet
