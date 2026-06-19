@@ -9,6 +9,8 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
     const [isUiVisible, setIsUiVisible] = useState(true);
     const [currentTheme, setCurrentTheme] = useState('dark');
     const [contextMenu, setContextMenu] = useState(null);
+    const [mappedQuestions, setMappedQuestions] = useState({});
+    const [activeExplanations, setActiveExplanations] = useState({});
     
     const viewportRef = useRef(null);
     const scrollContainerRef = useRef(null);
@@ -55,6 +57,18 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                         { type: 'paragraph', body: "This document is missing structured JSON data."}
                     ]}]);
                 }
+                
+                // Fetch injected RAG questions for this book
+                const qData = await invokeBookReader({ action: 'get_book_mapped_questions', book_id: book.id });
+                if (qData.questions) {
+                    const grouped = {};
+                    qData.questions.forEach(q => {
+                        if (!grouped[q.page_key]) grouped[q.page_key] = [];
+                        grouped[q.page_key].push(q);
+                    });
+                    setMappedQuestions(grouped);
+                }
+
             } catch (error) {
                 console.error("Error loading JSON pages:", error);
             } finally {
@@ -553,13 +567,48 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                                         const blockActions = {
                                             onAIExplore: () => handleAIExplore(pageIdx, idx)
                                         };
+                                        const expKey = `${page.page_key}_${idx}`;
                                         return (
-                                            <div key={idx} id={`page-${page.page_number}-block-${idx}`} className="block-target-wrapper">
-                                                {renderBookBlock(block, idx, blockActions)}
-                                            </div>
+                                            <React.Fragment key={idx}>
+                                                <div id={`page-${page.page_number}-block-${idx}`} className="block-target-wrapper">
+                                                    {renderBookBlock(block, idx, blockActions)}
+                                                </div>
+                                                {activeExplanations[expKey] && (
+                                                    <div className="inline-book-explanation">
+                                                        <div className="inline-exp-header">
+                                                            <span><i className="fas fa-sparkles"></i> Miron Synthesis</span>
+                                                            <button onClick={() => setActiveExplanations(p => ({...p, [expKey]: false}))}>
+                                                                <i className="fas fa-times"></i>
+                                                            </button>
+                                                        </div>
+                                                        <div className="inline-exp-body">
+                                                            <p>This is where the AI-generated explanation will be wired up. Miron will synthesize the textbook snapshot above to clarify why a certain choice is correct, directly addressing common misconceptions in this topic.</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </div>
+                                {mappedQuestions[page.page_key] && (
+                                    <PageQuestionsBlock 
+                                        questions={mappedQuestions[page.page_key]} 
+                                        pageNumber={page.page_number}
+                                        pageKey={page.page_key}
+                                        onExplain={(contentIndex) => {
+                                            const key = `${page.page_key}_${contentIndex}`;
+                                            setActiveExplanations(prev => ({ ...prev, [key]: true }));
+                                            setTimeout(() => {
+                                                const el = document.getElementById(`page-${page.page_number}-block-${contentIndex}`);
+                                                if (el) {
+                                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                    el.classList.add('highlight-block-anim');
+                                                    setTimeout(() => el.classList.remove('highlight-block-anim'), 4000);
+                                                }
+                                            }, 100);
+                                        }}
+                                    />
+                                )}
                             </div>
                         ))}
                     </div>
@@ -678,6 +727,68 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                     <div className="icon-btn"><i className="fa-solid fa-list"></i></div>
                     <span style={{flex: 1, textAlign: 'center', fontFamily: 'monospace', color: '#888'}} ref={pageCountRef}>1 / {pages.length || '--'}</span>
                     <div className="icon-btn"><i className="fa-solid fa-bookmark"></i></div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- INLINE BOOK QUESTIONS COMPONENT ---
+const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
+    const [qIndex, setQIndex] = useState(0);
+    const [answers, setAnswers] = useState({});
+    
+    if (!questions || questions.length === 0) return null;
+    const q = questions[qIndex];
+    const ans = answers[q.id];
+
+    return (
+        <div className="bpq-container">
+            <div className="bpq-header">
+                <div className="bpq-title"><i className="fas fa-clipboard-check"></i> Knowledge Check</div>
+                <div className="bpq-counter">{qIndex + 1} of {questions.length}</div>
+            </div>
+            <div className="bpq-body">
+                <div className="bpq-text">{q.text}</div>
+                {q.question_type === 'true_false' ? (
+                    <div className="bpq-tf-pad">
+                        <label className={`bpq-tf-btn ${ans === 'True' || ans?.text === 'True' ? 'active-true' : ''}`}>
+                            <input type="radio" hidden onChange={() => setAnswers({...answers, [q.id]: 'True'})} />
+                            <i className="fa-solid fa-check"></i> TRUE
+                        </label>
+                        <label className={`bpq-tf-btn ${ans === 'False' || ans?.text === 'False' ? 'active-false' : ''}`}>
+                            <input type="radio" hidden onChange={() => setAnswers({...answers, [q.id]: 'False'})} />
+                            <i className="fa-solid fa-xmark"></i> FALSE
+                        </label>
+                    </div>
+                ) : (
+                    <div className="bpq-mc-pad">
+                        {q.options?.map((opt, i) => {
+                            const isSelected = ans === opt || ans?.text === opt?.text;
+                            return (
+                                <label key={i} className={`bpq-mc-btn ${isSelected ? 'active' : ''}`}>
+                                    <input type="radio" hidden onChange={() => setAnswers({...answers, [q.id]: opt})} />
+                                    <div className="bpq-mc-indicator"></div> <span>{opt.text || opt}</span>
+                                </label>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+            <div className="bpq-footer">
+                <div className="bpq-nav">
+                    <button disabled={qIndex === 0} onClick={() => setQIndex(qIndex - 1)}><i className="fas fa-chevron-left"></i></button>
+                    <button disabled={qIndex === questions.length - 1} onClick={() => setQIndex(qIndex + 1)}><i className="fas fa-chevron-right"></i></button>
+                </div>
+                <div className="bpq-actions">
+                    <button className="bpq-btn-explain" onClick={() => onExplain(q.content_index)}>
+                        <i className="fas fa-sparkles"></i> Explain
+                    </button>
+                    {q.exam_meta && (
+                        <button className="bpq-btn-goto" onClick={() => window.dispatchEvent(new CustomEvent('open-exam-from-book', { detail: { exam: q.exam_meta } }))}>
+                            Go To Exam <i className="fas fa-arrow-right"></i>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
