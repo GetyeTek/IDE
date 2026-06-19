@@ -248,15 +248,15 @@
 }
 .tf-wrapper input:checked + .tf-btn.is-true i { transform: scale(1.15); }
 
-/* False Button Specifics */
-.tf-btn.is-false { color: #888; }
-.tf-wrapper input:checked + .tf-btn.is-false {
-    background: rgba(255, 95, 95, 0.1);
-    border-color: #ff5f5f;
-    color: #ff5f5f;
-    box-shadow: 0 10px 30px rgba(255, 95, 95, 0.15);
-}
-.tf-wrapper input:checked + .tf-btn.is-false i { transform: scale(1.15); }
+    /* False Button Specifics */
+    .tf-btn.is-false { color: #888; }
+    .tf-wrapper input:checked + .tf-btn.is-false {
+        background: rgba(66, 215, 184, 0.1);
+        border-color: var(--accent-teal);
+        color: var(--accent-teal);
+        box-shadow: 0 10px 30px rgba(66, 215, 184, 0.15);
+    }
+    .tf-wrapper input:checked + .tf-btn.is-false i { transform: scale(1.15); }
 
 /* --- FOOTER --- */
 .session-footer {
