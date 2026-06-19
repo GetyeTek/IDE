@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { invokeBookReader } from '../config/api.js';
 import { renderBookBlock } from './BookReader/subjects/Registry.jsx';
+import BookReader from './BookReader/BookReader.jsx';
 import './ExamSession.css';
 
 const ExamSession = ({ exam, onClose }) => {
     const [timeLeft, setTimeLeft] = useState(exam.time_allowed_minutes * 60 || 3600);
+    const [activeReferenceBook, setActiveReferenceBook] = useState(null);
     const [answers, setAnswers] = useState({});
     const [flagged, setFlagged] = useState({});
     const [sections, setSections] = useState([]);
@@ -206,29 +208,35 @@ const ExamSession = ({ exam, onClose }) => {
                                     </div>
                                 )}
 
-                                {hints[q.id]?.open && (
-                                    <div className="explanation-wrapper">
-                                        {hints[q.id].loading ? (
-                                            <div className="hint-loader"><i className="fas fa-circle-notch fa-spin"></i> Retrieving mapped text...</div>
-                                        ) : hints[q.id].data?.found ? (
-                                            <div className="explanation-container">
-                                                <div className="exp-header">
-                                                    <div className="exp-header-left">
-                                                        <span className="exp-badge">Text Mapping</span>
-                                                        <span className="exp-source">{hints[q.id].data.book_title} • Page {hints[q.id].data.page_number}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="exp-body">
-                                                    {hints[q.id].data.block ? renderBookBlock(hints[q.id].data.block, 0, {}) : <p>{hints[q.id].data.snippet}</p>}
-                                                </div>
+                                                        {hints[q.id]?.open && (
+                            <div className="explanation-wrapper">
+                                {hints[q.id].loading ? (
+                                    <div className="hint-loader"><i className="fas fa-circle-notch fa-spin"></i> Extracting physical archival record...</div>
+                                ) : hints[q.id].data?.found ? (
+                                    <div className="tactile-paper-container">
+                                        <div className="paper-content">
+                                            <div className="paper-header">
+                                                <span className="paper-stamp">Archival Snippet</span>
+                                                <span className="paper-source">{hints[q.id].data.book_title} • Pg. {hints[q.id].data.page_number}</span>
                                             </div>
-                                        ) : (
-                                            <div className="exp-not-found">
-                                                <i className="fas fa-link-slash"></i> No direct book mapping found. Try an AI query.
+                                            <div className="paper-body">
+                                                {hints[q.id].data.block ? renderBookBlock(hints[q.id].data.block, 0, {}) : <p>{hints[q.id].data.snippet}</p>}
                                             </div>
-                                        )}
+                                            <div className="paper-actions">
+                                                <button className="btn-paper-close" onClick={() => toggleHint(q.id)}>Close Snippet</button>
+                                                <button className="btn-paper-open" onClick={() => setActiveReferenceBook(hints[q.id].data)}>
+                                                    Open Book <i className="fas fa-book-open"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="exp-not-found">
+                                        <i className="fas fa-link-slash"></i> No archival mapping found. Request AI synthesis instead.
                                     </div>
                                 )}
+                            </div>
+                        )}
                             </section>
                         ))}
                     </div>
@@ -248,6 +256,16 @@ const ExamSession = ({ exam, onClose }) => {
                 </div>
                 <button className="finish-exam-btn" onClick={onClose}>Finish Exam</button>
             </footer>
+            
+            {activeReferenceBook && (
+                <BookReader 
+                    book={{ id: activeReferenceBook.book_id, title: activeReferenceBook.book_title }} 
+                    onClose={() => setActiveReferenceBook(null)}
+                    targetPageNumber={activeReferenceBook.page_number}
+                    targetBlockIndex={activeReferenceBook.content_index}
+                    zIndexOverride={3500}
+                />
+            )}
         </div>
     );
 };
