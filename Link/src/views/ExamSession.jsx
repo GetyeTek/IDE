@@ -11,6 +11,7 @@ const ExamSession = ({ exam, onClose }) => {
     const [flagged, setFlagged] = useState({});
     const [sections, setSections] = useState([]);
     const [hints, setHints] = useState({});
+    const [activeMatch, setActiveMatch] = useState({});
     const [loading, setLoading] = useState(true);
 
     const [examMeta, setExamMeta] = useState({ name: exam.course_name, code: exam.course_code });
@@ -176,6 +177,49 @@ const ExamSession = ({ exam, onClose }) => {
                                             </label>
                                         </div>
                                     </div>
+                                ) : q.question_type === 'matching' ? (
+                                    <div className={`interactive-match-container ${(q.matching_data?.right_column?.some(r => (r.text || r).length > 45) || q.matching_data?.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
+                                        <div className="match-col match-left">
+                                            {q.matching_data?.left_column?.map((item, idx) => {
+                                                const qAnswers = answers[q.id] || {};
+                                                const currentActive = activeMatch[q.id];
+                                                const isPaired = qAnswers[idx] !== undefined;
+                                                const isActive = currentActive === idx;
+                                                const isDisabled = currentActive !== undefined && currentActive !== idx;
+                                                
+                                                return (
+                                                    <div key={idx} className={`match-item-left ${isActive ? 'is-active' : ''} ${isPaired ? 'is-paired' : ''} ${isDisabled ? 'is-disabled' : ''}`} onClick={() => setActiveMatch(prev => ({ ...prev, [q.id]: isActive ? undefined : idx }))}>
+                                                        <span className="match-index">{idx + 1}.</span>
+                                                        <span className="match-text">{item.text || item}</span>
+                                                        {isPaired && <span className="match-badge">{String.fromCharCode(65 + qAnswers[idx])}</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className={`match-col match-right ${activeMatch[q.id] !== undefined ? 'is-listening' : ''}`}>
+                                            {q.matching_data?.right_column?.map((item, idx) => {
+                                                const qAnswers = answers[q.id] || {};
+                                                const currentActive = activeMatch[q.id];
+                                                const usedByLeftIdx = Object.keys(qAnswers).find(k => qAnswers[k] === idx);
+                                                const isUsed = usedByLeftIdx !== undefined;
+
+                                                return (
+                                                    <div key={idx} className={`match-item-right ${isUsed ? 'is-used' : ''}`} onClick={() => {
+                                                        if (currentActive !== undefined) {
+                                                            const newAnswers = { ...qAnswers };
+                                                            if (isUsed) delete newAnswers[usedByLeftIdx];
+                                                            newAnswers[currentActive] = idx;
+                                                            handleSelect(q.id, newAnswers);
+                                                            setActiveMatch(prev => ({ ...prev, [q.id]: undefined }));
+                                                        }
+                                                    }}>
+                                                        <span className="match-letter">{String.fromCharCode(65 + idx)}.</span>
+                                                        <span className="match-text">{item.text || item}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 ) : (
                                     <div className={`options-cluster ${q.options?.some(o => (o.text || o).length > 45) ? 'vertical-layout' : ''}`}>
                                         {q.options?.map((opt, idx) => (
@@ -194,17 +238,6 @@ const ExamSession = ({ exam, onClose }) => {
                                                 </label>
                                             </div>
                                         ))}
-
-                                        {(q.question_type === 'matching' || q.matching_data) && (
-                                            <div className="q-matching-container">
-                                                <div className="q-match-column q-column-a">
-                                                    {q.matching_data?.left_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
-                                                </div>
-                                                <div className="q-match-column q-column-b">
-                                                    {q.matching_data?.right_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
 
