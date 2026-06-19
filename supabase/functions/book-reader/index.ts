@@ -79,6 +79,53 @@ serve(async (req) => {
       return new Response(JSON.stringify({ exams: mappedExams }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // 7. GET BOOK MAPPED QUESTIONS
+    if (action === "get_book_mapped_questions") {
+      const { book_id } = body;
+      const { data, error } = await supabase
+        .from('question_book_mappings')
+        .select(`
+          question_id,
+          page_key,
+          content_index,
+          questions (
+            id, text, options, question_type, matching_data,
+            sections (
+              exams (
+                id, time_allowed_minutes, courses ( name, code )
+              )
+            )
+          )
+        `)
+        .eq('book_id', book_id)
+        .eq('is_valid', true);
+
+      if (error) throw error;
+
+      // Flatten the deep relation into a clean client payload
+      const mapped = data.map(d => {
+        const q = d.questions;
+        const examData = q?.sections?.exams;
+        return {
+          id: q?.id,
+          text: q?.text,
+          options: q?.options,
+          question_type: q?.question_type,
+          matching_data: q?.matching_data,
+          page_key: d.page_key,
+          content_index: d.content_index,
+          exam_meta: examData ? {
+            id: examData.id,
+            time_allowed_minutes: examData.time_allowed_minutes,
+            course_name: examData.courses?.name,
+            course_code: examData.courses?.code
+          } : null
+        };
+      }).filter(q => q.id); // Ensure no orphans
+
+      return new Response(JSON.stringify({ questions: mapped }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // 6. QUESTION HINT (RAG / MAPPING LOOKUP)
     if (action === "get_question_hint") {
       const { question_id } = body;
