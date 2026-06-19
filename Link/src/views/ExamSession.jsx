@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invokeBookReader } from '../config/api.js';
+import { renderBookBlock } from './BookReader/subjects/Registry.jsx';
 import './ExamSession.css';
 
 const ExamSession = ({ exam, onClose }) => {
@@ -7,6 +8,7 @@ const ExamSession = ({ exam, onClose }) => {
     const [answers, setAnswers] = useState({});
     const [flagged, setFlagged] = useState({});
     const [sections, setSections] = useState([]);
+    const [hints, setHints] = useState({});
     const [loading, setLoading] = useState(true);
 
     const [examMeta, setExamMeta] = useState({ name: exam.course_name, code: exam.course_code });
@@ -51,6 +53,29 @@ const ExamSession = ({ exam, onClose }) => {
         const el = document.getElementById(`q-box-${id}`);
         if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    };
+
+    const toggleHint = async (qId) => {
+        setHints(prev => {
+            const current = prev[qId];
+            // If already loaded or loading, just toggle visibility
+            if (current?.data || current?.loading) {
+                return { ...prev, [qId]: { ...current, open: !current.open } };
+            }
+            // Start loading state
+            return { ...prev, [qId]: { loading: true, open: true, data: null } };
+        });
+
+        // Fire API request if not cached
+        if (!hints[qId]?.data && !hints[qId]?.loading) {
+            try {
+                const res = await invokeBookReader({ action: 'get_question_hint', question_id: qId });
+                setHints(prev => ({ ...prev, [qId]: { loading: false, open: prev[qId].open, data: res } }));
+            } catch (err) {
+                console.error("Hint mapping lookup failed:", err);
+                setHints(prev => ({ ...prev, [qId]: { loading: false, open: prev[qId].open, data: { found: false } } }));
+            }
         }
     };
 
@@ -103,7 +128,12 @@ const ExamSession = ({ exam, onClose }) => {
                         <div className="q-meta">
                             <span className="q-label">Question {idx + 1}</span>
                             <div className="q-actions">
-                                <button className="hint"><i className="fas fa-wand-magic-sparkles"></i></button>
+                                <button 
+                                    className={`hint ${hints[q.id]?.open ? 'active-hint' : ''}`} 
+                                    onClick={() => toggleHint(q.id)}
+                                >
+                                    <i className="fas fa-wand-magic-sparkles"></i>
+                                </button>
                                 <button 
                                     className={flagged[q.id] ? 'active' : ''} 
                                     onClick={() => toggleFlag(q.id)}
@@ -169,8 +199,32 @@ const ExamSession = ({ exam, onClose }) => {
                                             {q.matching_data?.left_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
                                         </div>
                                         <div className="q-match-column q-column-b">
-                                            {q.matching_data?.right_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
+                                    <div className="q-match-column q-column-b">
+                                        {q.matching_data?.right_column?.map((item, i) => <div key={i} className="q-match-item">{item.text || item}</div>)}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {hints[q.id]?.open && (
+                            <div className="explanation-wrapper">
+                                {hints[q.id].loading ? (
+                                    <div className="hint-loader"><i className="fas fa-circle-notch fa-spin"></i> Retrieving mapped text...</div>
+                                ) : hints[q.id].data?.found ? (
+                                    <div className="explanation-container">
+                                        <div className="exp-header">
+                                            <div className="exp-header-left">
+                                                <span className="exp-badge">Text Mapping</span>
+                                                <span className="exp-source">{hints[q.id].data.book_title} • Page {hints[q.id].data.page_number}</span>
+                                            </div>
                                         </div>
+                                        <div className="exp-body">
+                                            {hints[q.id].data.block ? renderBookBlock(hints[q.id].data.block, 0, {}) : <p>{hints[q.id].data.snippet}</p>}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="exp-not-found">
+                                        <i className="fas fa-link-slash"></i> No direct book mapping found. Try an AI query.
                                     </div>
                                 )}
                             </div>
