@@ -80,7 +80,7 @@
     padding: 40px 0; 
 }
 
-.page-wrapper { width: 100%; display: flex; justify-content: center; position: relative; }
+.page-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; position: relative; }
 .page-canvas { background-color: var(--page-bg); color: var(--text-color); width: 794px; min-height: 1123px; padding: 60px 70px 40px 70px; box-sizing: border-box; box-shadow: 0 10px 40px rgba(0,0,0,0.5); font-family: 'Times New Roman', Times, 'Nyala', 'Kefa', 'Abyssinica SIL', serif; display: flex; flex-direction: column; flex-shrink: 0; transition: background-color 0.3s ease, color 0.3s ease; contain: content; /* Isolates layout calculations, entirely preventing the 'Void' glitch */ }
 .page-canvas * { 
     user-select: text !important; 
@@ -113,6 +113,151 @@
     padding: 6px;
     margin: -6px; /* Offset padding so it doesn't disrupt native book layout */
 }
+
+/* --- INLINE EXPLANATION (RIPPED SPLIT) --- */
+.inline-book-explanation {
+    margin: 20px 0;
+    padding: 0;
+    background: rgba(66, 215, 184, 0.04);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    animation: splitPage 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+}
+
+.inline-book-explanation::before, .inline-book-explanation::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 3px;
+    background-image: repeating-linear-gradient(90deg, transparent, transparent 5px, var(--accent) 5px, var(--accent) 10px);
+    opacity: 0.5;
+}
+.inline-book-explanation::before { top: 0; }
+.inline-book-explanation::after { bottom: 0; }
+
+@keyframes splitPage {
+    from { opacity: 0; transform: scaleY(0); transform-origin: top; max-height: 0; }
+    to { opacity: 1; transform: scaleY(1); transform-origin: top; max-height: 500px; }
+}
+
+.inline-exp-header {
+    background: rgba(66, 215, 184, 0.1);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.85rem;
+    font-family: 'Poppins', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.inline-exp-header button {
+    background: none; border: none; color: inherit; font-size: 1.2rem; cursor: pointer;
+    transition: transform 0.2s;
+}
+.inline-exp-header button:hover { transform: scale(1.1); }
+
+.inline-exp-body {
+    padding: 20px 24px;
+    font-size: 1rem;
+    font-family: 'Poppins', sans-serif;
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+/* --- BOOK PAGE QUESTIONS CARD --- */
+.bpq-container {
+    width: 794px; /* Match page width */
+    background: var(--ctx-bg);
+    border: 1px solid var(--ctx-border);
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Poppins', sans-serif;
+}
+
+.bpq-header {
+    background: rgba(0,0,0,0.05);
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--ctx-border);
+}
+
+.bpq-title {
+    font-weight: 700; color: var(--accent);
+    display: flex; align-items: center; gap: 8px; font-size: 0.9rem;
+    text-transform: uppercase; letter-spacing: 1px;
+}
+
+.bpq-counter {
+    font-size: 0.8rem; font-weight: 600; color: var(--text-color); opacity: 0.6;
+}
+
+.bpq-body {
+    padding: 24px 30px;
+    display: flex; flex-direction: column; gap: 20px;
+}
+
+.bpq-text {
+    font-family: 'Newsreader', serif;
+    font-size: 1.25rem;
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
+/* Answer Pads */
+.bpq-tf-pad { display: flex; gap: 16px; }
+.bpq-tf-btn {
+    flex: 1; padding: 20px; border-radius: 12px;
+    border: 2px solid var(--ctx-border);
+    background: var(--ctx-btn-bg); color: var(--text-color);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    cursor: pointer; transition: all 0.2s; font-weight: 700; font-size: 1.1rem;
+}
+.bpq-tf-btn i { font-size: 1.8rem; opacity: 0.6; transition: transform 0.2s; }
+.bpq-tf-btn.active-true { border-color: var(--accent); background: rgba(66, 215, 184, 0.1); color: var(--accent); }
+.bpq-tf-btn.active-true i { opacity: 1; transform: scale(1.1); }
+.bpq-tf-btn.active-false { border-color: #ff5f5f; background: rgba(255, 95, 95, 0.1); color: #ff5f5f; }
+.bpq-tf-btn.active-false i { opacity: 1; transform: scale(1.1); }
+
+.bpq-mc-pad { display: flex; flex-direction: column; gap: 12px; }
+.bpq-mc-btn {
+    padding: 14px 20px; border-radius: 12px; border: 1px solid var(--ctx-border);
+    background: var(--ctx-btn-bg); color: var(--text-color);
+    display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s;
+}
+.bpq-mc-indicator {
+    width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--text-color); opacity: 0.4;
+}
+.bpq-mc-btn.active { border-color: var(--accent); background: rgba(66, 215, 184, 0.05); }
+.bpq-mc-btn.active .bpq-mc-indicator { border-color: var(--accent); background: var(--accent); opacity: 1; box-shadow: 0 0 8px var(--accent); }
+
+.bpq-footer {
+    padding: 16px 20px; border-top: 1px solid var(--ctx-border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+
+.bpq-nav { display: flex; gap: 8px; }
+.bpq-nav button {
+    width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--ctx-border);
+    background: var(--ctx-btn-bg); color: var(--text-color); cursor: pointer;
+}
+.bpq-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.bpq-actions { display: flex; gap: 12px; }
+.bpq-btn-explain, .bpq-btn-goto {
+    padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none;
+    display: flex; align-items: center; gap: 8px; transition: transform 0.2s;
+}
+.bpq-btn-explain { background: var(--ctx-btn-bg); color: var(--accent); border: 1px solid var(--accent); }
+.bpq-btn-goto { background: var(--text-color); color: var(--page-bg); }
+.bpq-actions button:hover { transform: translateY(-2px); }
 .page-canvas *::-moz-selection {
     background: rgba(66, 215, 184, 0.4) !important;
     color: inherit !important;
