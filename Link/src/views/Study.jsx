@@ -4,11 +4,11 @@ import BookReader from './BookReader/BookReader.jsx';
 import BookShelf from '../components/books/BookShelf.jsx';
 import BookCard from '../components/books/BookCard.jsx';
 import ExamPavilion from './ExamPavilion.jsx';
-
-
+import ExamSession from './ExamSession.jsx';
 
 const Study = ({ onOpenActivity }) => {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+    const [activeExamFromBook, setActiveExamFromBook] = useState(null);
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
     const [activeBook, setActiveBook] = useState(null);
     const [books, setBooks] = useState([]);
@@ -73,6 +73,13 @@ const Study = ({ onOpenActivity }) => {
 
         updateWave();
         return () => cancelAnimationFrame(animationFrameId);
+    }, []);
+
+    // Global listener for opening ExamSession directly from BookReader inline questions
+    useEffect(() => {
+        const handleOpenExam = (e) => setActiveExamFromBook(e.detail.exam);
+        window.addEventListener('open-exam-from-book', handleOpenExam);
+        return () => window.removeEventListener('open-exam-from-book', handleOpenExam);
     }, []);
 
     return (
@@ -211,6 +218,7 @@ const Study = ({ onOpenActivity }) => {
             </div>
             {activeBook && <BookReader book={activeBook} onClose={() => setActiveBook(null)} />}
             {selectedUniversity && <ExamPavilion university={selectedUniversity} onClose={() => setSelectedUniversity(null)} />}
+            {activeExamFromBook && <ExamSession exam={activeExamFromBook} onClose={() => setActiveExamFromBook(null)} />}
         </div>
     );
 };
