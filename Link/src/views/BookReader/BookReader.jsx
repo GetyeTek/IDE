@@ -430,6 +430,7 @@ const BookReader = ({ book, onClose }) => {
     };
 
     const extractTextFromBlock = (b) => {
+        if (!b) return '';
         let text = [];
         if (b.main) text.push(b.main);
         if (b.sub) text.push(b.sub);
