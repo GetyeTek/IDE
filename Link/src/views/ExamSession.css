@@ -152,10 +152,10 @@
     box-shadow: 0 0 10px rgba(177, 211, 75, 0.4);
 }
 
-/* --- EXPLANATION CONTAINER --- */
+/* --- TACTILE ARCHIVAL RIP (HINT UI) --- */
 .explanation-wrapper {
     margin-top: 24px;
-    animation: expandPad 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: expandPad 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @keyframes expandPad {
@@ -163,67 +163,139 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
-.explanation-container {
-    border-radius: 16px;
-    background: #ffffff;
-    color: #1a1a1a;
+.tactile-paper-container {
+    position: relative;
+    background-color: #f4ebd8;
+    background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+    border-radius: 4px 4px 12px 12px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.6), inset 0 0 60px rgba(139, 115, 85, 0.15);
+    color: #2c2c2c;
     overflow: hidden;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
     
-    /* Injecting light-theme variables for Registry component override */
-    --page-bg: #ffffff;
-    --text-color: #1a1a1a;
-    --border: #e0e0e0;
-    --accent: #42d7b8;
+    /* Variables for Registry engine */
+    --page-bg: transparent;
+    --text-color: #2c2c2c;
+    --border: rgba(139, 115, 85, 0.3);
+    --accent: #8b2222;
 }
 
-.exp-header {
-    padding: 16px 20px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #eaeaea;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-family: 'Poppins', sans-serif;
+/* Jagged Top Tear Effect */
+.tactile-paper-container::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 12px;
+    background-image: 
+      linear-gradient(135deg, rgba(0,0,0,0.04) 25%, transparent 25%), 
+      linear-gradient(-135deg, rgba(0,0,0,0.04) 25%, transparent 25%);
+    background-size: 16px 16px;
+    background-position: top center;
+    background-repeat: repeat-x;
+    z-index: 5;
+    transform: rotate(180deg);
 }
 
-.exp-header-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.paper-content {
+    padding: 30px 20px 20px 50px;
+    position: relative;
 }
 
-.exp-badge {
-    background: rgba(66, 215, 184, 0.15);
-    color: #2e9b84;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 0.7rem;
+/* Notebook red margin line */
+.paper-content::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; left: 35px;
+    width: 2px;
+    background-color: rgba(220, 50, 50, 0.3);
+}
+
+.paper-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid rgba(139, 115, 85, 0.2);
+    padding-bottom: 12px; margin-bottom: 20px;
+}
+
+.paper-stamp {
+    font-family: 'Cinzel', serif;
+    color: #8b2222;
+    font-size: 0.75rem;
     font-weight: 700;
-    letter-spacing: 1px;
     text-transform: uppercase;
+    letter-spacing: 2px;
+    border: 2px solid #8b2222;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transform: rotate(-2deg);
+    opacity: 0.85;
 }
 
-.exp-source {
-    font-size: 0.85rem;
-    color: #555;
-    font-weight: 500;
+.paper-source {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.75rem;
+    color: #666;
 }
 
-.exp-body {
-    padding: 24px;
+.paper-body {
     font-family: 'Times New Roman', Times, 'Nyala', serif;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     line-height: 1.6;
+    color: #1a1a1a;
 }
 
-/* Specific resets for block engine overrides inside the white container */
-.exp-body .univ-p-block,
-.exp-body .univ-h-block,
-.exp-body .logic-bullet-list,
-.exp-body .logic-argument-block {
+/* Specific resets for block engine overrides inside the vintage container */
+.paper-body .univ-p-block,
+.paper-body .univ-h-block,
+.paper-body .logic-bullet-list,
+.paper-body .logic-argument-block {
     margin: 0;
     color: #1a1a1a;
+}
+
+.paper-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 20px;
+    margin-top: 20px;
+    border-top: 1px dashed rgba(139, 115, 85, 0.3);
+}
+
+.btn-paper-close {
+    background: transparent;
+    color: #555;
+    border: 1px solid #aaa;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-paper-close:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.btn-paper-open {
+    background: #2c2c2c;
+    color: #f4ebd8;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    display: flex; align-items: center; gap: 8px;
+    transition: all 0.2s;
+}
+
+.btn-paper-open:hover { 
+    background: #000; 
+    transform: translateY(-2px); 
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3);
 }
 
 .hint-loader {
