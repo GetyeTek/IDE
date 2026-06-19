@@ -79,6 +79,47 @@ serve(async (req) => {
       return new Response(JSON.stringify({ exams: mappedExams }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // 6. QUESTION HINT (RAG / MAPPING LOOKUP)
+    if (action === "get_question_hint") {
+      const { question_id } = body;
+      
+      const { data: mapping, error: mapErr } = await supabase
+        .from('question_book_mappings')
+        .select(`book_id, page_key, content_index, snippet, books(title)`)
+        .eq('question_id', question_id)
+        .eq('is_valid', true)
+        .single();
+        
+      if (mapErr) {
+        if (mapErr.code === 'PGRST116') {
+          return new Response(JSON.stringify({ found: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        throw mapErr;
+      }
+
+      const { data: pageData, error: pageErr } = await supabase
+        .from('book_pages')
+        .select('content_json, page_number')
+        .eq('book_id', mapping.book_id)
+        .eq('page_key', mapping.page_key)
+        .single();
+
+      if (pageErr) throw pageErr;
+
+      let block = null;
+      if (pageData.content_json && Array.isArray(pageData.content_json)) {
+        block = pageData.content_json[mapping.content_index];
+      }
+
+      return new Response(JSON.stringify({
+        found: true,
+        book_title: mapping.books?.title || "Course Material",
+        page_number: pageData.page_number,
+        block: block,
+        snippet: mapping.snippet
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // 5. LEGACY EXAM QUESTIONS
     if (action === "get_exam_questions") {
       const { exam_id } = body;
