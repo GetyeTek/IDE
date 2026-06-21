@@ -10123,14 +10123,11 @@ async function downloadArtifact(runId) {
 
     function handleKeyImportInput(el) {
         const raw = el.value;
-        if (!raw.includes('AIza') && !raw.includes('AIza')) {
-            // Guard: check if text has either format
-            const hasCxp = /AIza[a-zA-Z0-9_-]+/i.test(raw);
-            if (!hasCxp) return;
-        }
+        // Guard: check if text has either format before heavy regex parsing
+        if (!raw.includes('AIza') && !raw.includes('AQ.Ab8')) return;
 
-        // Sequential pattern matching for both OpenAI/Gemini formats
-        const matches = raw.match(/AIza[a-zA-Z0-9_-]{35}|AQ\.Ab8[a-zA-Z0-9._-]{55}/g);
+        // Sequential pattern matching utilizing flexible bounds to prevent trailing mergers
+        const matches = raw.match(/AIza[a-zA-Z0-9_-]{33,37}|AQ\.Ab8[a-zA-Z0-9._-]{45,65}/g);
         if (matches) {
             const uniqueKeys = [...new Set(matches)];
             const structured = uniqueKeys.join('\n');
@@ -10146,8 +10143,8 @@ async function downloadArtifact(runId) {
         const rawText = document.getElementById('key-import-area').value;
         if (!rawText) return;
 
-        // Final safety extraction pass utilizing strict bounds to prevent trailing mergers
-        const keys = (rawText.match(/AIza[a-zA-Z0-9_-]{35}|AQ\.Ab8[a-zA-Z0-9._-]{55}/g) || [])
+        // Final safety extraction pass utilizing flexible bounds to prevent trailing mergers
+        const keys = (rawText.match(/AIza[a-zA-Z0-9_-]{33,37}|AQ\.Ab8[a-zA-Z0-9._-]{45,65}/g) || [])
             .map(k => k.trim());
 
         if (keys.length === 0) return showGlobalToast("No valid keys to import", true);
