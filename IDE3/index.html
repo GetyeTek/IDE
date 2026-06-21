@@ -1267,11 +1267,15 @@
 
             <div class="ai-section-title">Developer Tools</div>
             <div class="card" style="margin-bottom: 20px;">
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px;">
+                    <span style="font-size:13px;">📁 Enable Folder Navigation</span>
+                    <input type="checkbox" id="setting-folder-view" onchange="toggleFolderView(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
+                </label>
                 <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
                     <span style="font-size:13px;">🛠 Enable Eruda Console</span>
                     <input type="checkbox" id="setting-enable-eruda" onchange="toggleEruda(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
                 </label>
-                <p style="font-size:10px; color:#666; margin-top:8px;">Turn on the floating developer console. Requires app reload to fully apply or remove.</p>
+                <p style="font-size:10px; color:#666; margin-top:8px;">Turn on the floating developer console or change file context navigation styles. Eruda requires app reload to fully apply.</p>
             </div>
 
             <div class="ai-section-title">Advanced Actions</div>
@@ -1932,6 +1936,7 @@
         omitHeaders: localStorage.getItem('conduit_omitHeaders') === 'true',
         previewFetchMode: initialRepoConfig.previewFetchMode || 'single',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
+        folderView: localStorage.getItem('conduit_folder_view') === 'true',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
         consoleHalf: localStorage.getItem('conduit_console_half') === 'true',
         ghToken: localStorage.getItem('conduit_gh_token') || '',
@@ -1955,6 +1960,7 @@
     let sqlHistoryIndex = -1;
     let workflowPage = 1;
     let currentFilterTab = null;
+    let currentFolderPath = "";
     let currentEditingJobId = null;
     let storageCurrentBucket = null;
     let storageCurrentPath = [];
@@ -3215,7 +3221,8 @@
         // Save AI Config
         localStorage.setItem('conduit_ai_config', JSON.stringify(window.aiConfig));
 
-        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, efDeploymentMode, floatingConsole, consoleHalf, projectType, omitHeaders, previewFetchMode, ghToken, ghUser, ghOrg };
+        CONFIG = { funcUrl, repoName, projectPath, autoFix, autoSanity, showPreview, isOrg, wasmValidation, folderView: CONFIG.folderView, efDeploymentMode, floatingConsole, consoleHalf, projectType, omitHeaders, previewFetchMode, ghToken, ghUser, ghOrg };
+        currentFolderPath = projectPath || "";
         
         applyPreviewTabVisibility(); 
         initFloatingHUD();
@@ -6458,7 +6465,83 @@ async function downloadArtifact(runId) {
         return date.toLocaleDateString();
     }
 
-    function renderFileList(files) {
+    function createFileItemElement(file, pinned) {
+        const div = document.createElement('div');
+        div.className = 'file-item';
+        const isPinned = pinned.includes(file.path);
+        
+        let fileName = file.path.split('/').pop();
+        if (file.path.includes('supabase/functions/') && fileName === 'index.ts') {
+            const segments = file.path.split('/');
+            if (segments.length >= 2) fileName = `λ ${segments[segments.length - 2]}`;
+        }
+
+        const fileSize = formatBytes(file.size);
+        const updated = timeAgo(file.last_updated);
+        const isChecked = window.fileSelectionState[file.path];
+        const checkedAttr = isChecked ? 'checked' : '';
+        const index = window.repoFiles.indexOf(file);
+
+        div.innerHTML = `
+            <div class="v-info" onclick="openFileViewer('${file.path}')" style="cursor:pointer; flex:1; min-width: 0; padding-right: 10px;">
+                <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 13px;">
+                    ${isPinned ? '<span class="file-pinned-marker">📌</span>' : ''}
+                    ${fileName}
+                </strong>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+                    <span style="color:var(--text-muted); font-size:10px; font-family:'JetBrains Mono';">${fileSize}</span>
+                    <span style="color:#444;">•</span>
+                    <span style="color:var(--text-muted); font-size:10px;">${updated}</span>
+                </div>
+                <small style="opacity:0.5; font-size:9px; display:block; margin-top:2px;">${file.path}</small>
+            </div>
+            <div class="flex-gap" style="align-items:center;">
+                <div style="position:relative">
+                    <button class="menu-btn" onclick="event.stopPropagation(); toggleFileMenu(${index})">⋮</button>
+                    <div id="file-menu-${index}" class="menu-dropdown">
+                        <div class="menu-item" onclick="togglePin('${file.path}')">${isPinned ? '📍 Unpin' : '📌 Pin to Top'}</div>
+                        <div class="menu-item" onclick="openRenameModal('${file.path}')">✎ Rename</div>
+                        <div class="menu-item" style="color:var(--ai-accent)" onclick="runDeepScan('${file.path}')">🧬 Deep Scan</div>
+                        <div class="menu-item" onclick="downloadSingleFile('${file.path}', this)">⬇ Download</div>
+                        <div class="menu-item danger" onclick="stageDeleteFile('${file.path}')">🗑 Delete</div>
+                    </div>
+                </div>
+                <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="window.fileSelectionState[this.value] = this.checked; updateChatContextIndicator(); syncSelectAllState();" style="accent-color:var(--primary)">
+            </div>`;
+        return div;
+    }
+
+    function buildBreadcrumbs(basePath) {
+        let displayPath = basePath;
+        if (CONFIG.projectPath && displayPath.startsWith(CONFIG.projectPath)) {
+            displayPath = displayPath.substring(CONFIG.projectPath.length);
+        }
+        let segments = displayPath.split('/').filter(Boolean);
+        let html = `<div class="breadcrumb-nav" style="display:flex; align-items:center; gap:8px; padding: 12px; background: #0a0a0c; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; white-space:nowrap; margin-bottom: 10px;">`;
+        
+        let rootTarget = CONFIG.projectPath || "";
+        html += `<button onclick="navigateToFolder('${rootTarget}')" class="icon-btn" style="padding:4px 8px; border:none; background:rgba(59, 130, 246, 0.1); color:var(--primary); font-weight:bold; border-radius: 6px;">🏠 Root</button>`;
+        
+        let accumulatedPath = CONFIG.projectPath || "";
+        segments.forEach((seg, idx) => {
+            accumulatedPath += seg + '/';
+            html += `<span style="color:#444">/</span>`;
+            if (idx === segments.length - 1) {
+                html += `<span style="color:#eee; font-size:12px; font-weight:600;">${seg}</span>`;
+            } else {
+                html += `<button onclick="navigateToFolder('${accumulatedPath}')" class="icon-btn" style="padding:4px; border:none; background:transparent;">${seg}</button>`;
+            }
+        });
+        html += `</div>`;
+        return html;
+    }
+
+    function navigateToFolder(path) {
+        currentFolderPath = path;
+        renderFileList(window.repoFiles);
+    }
+
+    function renderFileList(files, forceQuery = null) {
         const container = document.getElementById('file-list-container');
         container.innerHTML = '';
         if (!files || files.length === 0) {
@@ -6466,7 +6549,6 @@ async function downloadArtifact(runId) {
             return;
         }
 
-        // 1. Ensure selection state is initialized globally
         window.fileSelectionState = window.fileSelectionState || {};
         files.forEach(f => {
             if (window.fileSelectionState[f.path] === undefined) {
@@ -6476,71 +6558,98 @@ async function downloadArtifact(runId) {
         });
 
         const pinned = JSON.parse(localStorage.getItem('conduit_pinned_files') || '[]');
-        
-        // Sort: Pinned first, then by existing list order
-        const sortedFiles = [...files].sort((a, b) => {
-            const aPinned = pinned.includes(a.path);
-            const bPinned = pinned.includes(b.path);
-            if (aPinned && !bPinned) return -1;
-            if (!aPinned && bPinned) return 1;
-            return 0;
-        });
-        
-        sortedFiles.forEach((file, index) => {
-            const div = document.createElement('div');
-            div.className = 'file-item';
-            const isPinned = pinned.includes(file.path);
+        const searchInput = document.getElementById('file-search-input');
+        const query = forceQuery !== null ? forceQuery : (searchInput ? searchInput.value.toLowerCase() : "");
+
+        const isFolderMode = CONFIG.folderView && !query;
+
+        if (isFolderMode) {
+            let base = currentFolderPath;
+            if (!base && CONFIG.projectPath) base = CONFIG.projectPath;
+            if (base && !base.endsWith('/')) base += '/';
             
-            let fileName = file.path.split('/').pop();
-            if (file.path.includes('supabase/functions/') && fileName === 'index.ts') {
-                const segments = file.path.split('/');
-                if (segments.length >= 2) fileName = `λ ${segments[segments.length - 2]}`;
+            const currentLevelFolders = new Set();
+            const currentLevelFiles = [];
+
+            files.forEach(f => {
+                if (f.path.startsWith(base)) {
+                    const relative = f.path.substring(base.length);
+                    const slashIndex = relative.indexOf('/');
+                    if (slashIndex !== -1) {
+                        currentLevelFolders.add(relative.substring(0, slashIndex));
+                    } else {
+                        currentLevelFiles.push(f);
+                    }
+                }
+            });
+
+            container.innerHTML += buildBreadcrumbs(base);
+
+            Array.from(currentLevelFolders).sort().forEach(folderName => {
+                const fullFolderPath = base + folderName + '/';
+                const div = document.createElement('div');
+                div.className = 'file-item folder-item';
+                div.style.cssText = 'cursor:pointer; background: rgba(59, 130, 246, 0.03); border-left: 3px solid var(--primary); padding: 12px; margin-bottom: 4px; border-radius: 4px; transition: background 0.2s;';
+                div.onmouseover = () => div.style.background = 'rgba(59, 130, 246, 0.08)';
+                div.onmouseout = () => div.style.background = 'rgba(59, 130, 246, 0.03)';
+                div.onclick = () => navigateToFolder(fullFolderPath);
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:12px; flex:1;">
+                        <span style="font-size:18px;">📁</span>
+                        <div><strong style="font-size:13px; color:#60a5fa;">${folderName}</strong></div>
+                    </div>
+                    <span style="color:#666; font-size: 16px;">›</span>
+                `;
+                container.appendChild(div);
+            });
+
+            const sortedFiles = [...currentLevelFiles].sort((a, b) => {
+                const aPinned = pinned.includes(a.path);
+                const bPinned = pinned.includes(b.path);
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+                return 0;
+            });
+
+            sortedFiles.forEach(file => {
+                container.appendChild(createFileItemElement(file, pinned));
+            });
+
+            if (currentLevelFolders.size === 0 && currentLevelFiles.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'padding:20px; text-align:center; color:#666;';
+                empty.innerText = 'Folder is empty.';
+                container.appendChild(empty);
             }
 
-            const fileSize = formatBytes(file.size);
-            const updated = timeAgo(file.last_updated);
-            
-            // 2. Read selection from global state
-            const isChecked = window.fileSelectionState[file.path];
-            const checkedAttr = isChecked ? 'checked' : '';
-
-            div.innerHTML = `
-                <div class="v-info" onclick="openFileViewer('${file.path}')" style="cursor:pointer; flex:1; min-width: 0; padding-right: 10px;">
-                    <strong style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 13px;">
-                        ${isPinned ? '<span class="file-pinned-marker">📌</span>' : ''}
-                        ${fileName}
-                    </strong>
-                    <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
-                        <span style="color:var(--text-muted); font-size:10px; font-family:'JetBrains Mono';">${fileSize}</span>
-                        <span style="color:#444;">•</span>
-                        <span style="color:var(--text-muted); font-size:10px;">${updated}</span>
-                    </div>
-                    <small style="opacity:0.5; font-size:9px; display:block; margin-top:2px;">${file.path}</small>
-                </div>
-                <div class="flex-gap" style="align-items:center;">
-                    <div style="position:relative">
-                        <button class="menu-btn" onclick="event.stopPropagation(); toggleFileMenu(${index})">⋮</button>
-                        <div id="file-menu-${index}" class="menu-dropdown">
-                            <div class="menu-item" onclick="togglePin('${file.path}')">${isPinned ? '📍 Unpin' : '📌 Pin to Top'}</div>
-                            <div class="menu-item" onclick="openRenameModal('${file.path}')">✎ Rename</div>
-                            <div class="menu-item" style="color:var(--ai-accent)" onclick="runDeepScan('${file.path}')">🧬 Deep Scan</div>
-                            <div class="menu-item" onclick="downloadSingleFile('${file.path}', this)">⬇ Download</div>
-                            <div class="menu-item danger" onclick="stageDeleteFile('${file.path}')">🗑 Delete</div>
-                        </div>
-                    </div>
-                    <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="window.fileSelectionState[this.value] = this.checked; updateChatContextIndicator(); syncSelectAllState();" style="accent-color:var(--primary)">
-                </div>`;
-            container.appendChild(div);
-        });
-
-        // 3. Re-apply any active search filter after rendering
-        const searchInput = document.getElementById('file-search-input');
-        if (searchInput && searchInput.value) {
-            filterFiles(searchInput.value);
         } else {
-            updateChatContextIndicator();
-            setTimeout(syncSelectAllState, 50);
+            const sortedFiles = [...files].sort((a, b) => {
+                const aPinned = pinned.includes(a.path);
+                const bPinned = pinned.includes(b.path);
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+                return 0;
+            });
+            
+            sortedFiles.forEach(file => {
+                container.appendChild(createFileItemElement(file, pinned));
+            });
+
+            if (query) {
+                const items = container.querySelectorAll('.file-item');
+                items.forEach(item => {
+                    if (item.classList.contains('folder-item')) return;
+                    const nameEl = item.querySelector('.v-info strong');
+                    const pathEl = item.querySelector('.v-info small');
+                    const text = (nameEl ? nameEl.innerText : '').toLowerCase();
+                    const path = (pathEl ? pathEl.innerText : '').toLowerCase();
+                    item.style.display = text.includes(query) || path.includes(query) ? 'flex' : 'none';
+                });
+            }
         }
+
+        updateChatContextIndicator();
+        setTimeout(syncSelectAllState, 50);
     }
 
     async function openFileViewer(path) {
@@ -7050,21 +7159,25 @@ async function downloadArtifact(runId) {
         if (!window.repoFiles) return;
         const query = (q || '').toLowerCase();
         
-        const items = document.querySelectorAll('#file-list-container .file-item');
-        items.forEach(item => {
-            const nameEl = item.querySelector('.v-info strong');
-            const pathEl = item.querySelector('.v-info small');
-            const text = (nameEl ? nameEl.innerText : '').toLowerCase();
-            const path = (pathEl ? pathEl.innerText : '').toLowerCase();
-            
-            if (text.includes(query) || path.includes(query)) {
-                item.style.display = 'flex';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-        
-        syncSelectAllState();
+        if (CONFIG.folderView) {
+            renderFileList(window.repoFiles, query);
+        } else {
+            const items = document.querySelectorAll('#file-list-container .file-item');
+            items.forEach(item => {
+                if (item.classList.contains('folder-item')) return;
+                const nameEl = item.querySelector('.v-info strong');
+                const pathEl = item.querySelector('.v-info small');
+                const text = (nameEl ? nameEl.innerText : '').toLowerCase();
+                const path = (pathEl ? pathEl.innerText : '').toLowerCase();
+                
+                if (text.includes(query) || path.includes(query)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            syncSelectAllState();
+        }
     }
 
     function loadVersion(i) {
@@ -7773,11 +7886,19 @@ async function downloadArtifact(runId) {
         }
     }
 
+    function toggleFolderView(enabled) {
+        localStorage.setItem('conduit_folder_view', enabled ? 'true' : 'false');
+        CONFIG.folderView = enabled;
+        currentFolderPath = CONFIG.projectPath || "";
+        renderFileList(window.repoFiles);
+    }
+
     function openRepoSettings() {
         document.getElementById('repo-settings-overlay').classList.add('active');
         document.getElementById('def-backend-a').value = localStorage.getItem('conduit_backend_a') || '';
         document.getElementById('def-backend-b').value = localStorage.getItem('conduit_backend_b') || '';
         document.getElementById('setting-enable-eruda').checked = localStorage.getItem('conduit_enable_eruda') === 'true';
+        document.getElementById('setting-folder-view').checked = CONFIG.folderView;
         toggleFab(false);
     }
 
