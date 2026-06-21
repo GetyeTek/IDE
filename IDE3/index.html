@@ -1494,7 +1494,7 @@
             <h2 class="text-blue-400 font-bold uppercase tracking-widest text-sm">Smart Key Importer</h2>
             <button onclick="executeKeyImport()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold text-xs uppercase">Done</button>
         </div>
-        <p class="text-slate-500 text-[10px] mb-4 uppercase">Paste raw content here. We will automatically detect and extract all Gemini keys starting with 'AIza'.</p>
+        <p class="text-slate-500 text-[10px] mb-4 uppercase">Paste raw content here. We will automatically detect and extract all Gemini keys starting with 'AIza' or 'AQ.Ab8'.</p>
         <textarea id="key-import-area" 
                   class="flex-1 w-full bg-black border border-slate-800 rounded-xl p-4 text-blue-100 font-mono text-xs focus:border-blue-500 outline-none" 
                   oninput="handleKeyImportInput(this)"
@@ -10123,11 +10123,14 @@ async function downloadArtifact(runId) {
 
     function handleKeyImportInput(el) {
         const raw = el.value;
-        if (!raw.includes('AIza')) return;
+        if (!raw.includes('AIza') && !raw.includes('AIza')) {
+            // Guard: check if text has either format
+            const hasCxp = /AIza[a-zA-Z0-9_-]+/i.test(raw);
+            if (!hasCxp) return;
+        }
 
-        // IMPROVED REGEX: Look for AIza... but stop before the next AIza or whitespace
-        // Using a length constraint (30-50 chars) to prevent greedy merging
-        const matches = raw.match(/AIza[a-zA-Z0-9_-]{30,50}/g);
+        // Sequential pattern matching for both OpenAI/Gemini formats
+        const matches = raw.match(/AIza[a-zA-Z0-9_-]{35}|AQ\.Ab8[a-zA-Z0-9._-]{55}/g);
         if (matches) {
             const uniqueKeys = [...new Set(matches)];
             const structured = uniqueKeys.join('\n');
@@ -10143,10 +10146,9 @@ async function downloadArtifact(runId) {
         const rawText = document.getElementById('key-import-area').value;
         if (!rawText) return;
 
-        // Final safety extraction pass to prevent merged keys in SQL
-        const keys = (rawText.match(/AIza[a-zA-Z0-9_-]{30,50}/g) || [])
-            .map(k => k.trim())
-            .filter(k => k.length > 30);
+        // Final safety extraction pass utilizing strict bounds to prevent trailing mergers
+        const keys = (rawText.match(/AIza[a-zA-Z0-9_-]{35}|AQ\.Ab8[a-zA-Z0-9._-]{55}/g) || [])
+            .map(k => k.trim());
 
         if (keys.length === 0) return showGlobalToast("No valid keys to import", true);
 
