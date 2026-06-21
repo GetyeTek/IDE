@@ -705,83 +705,39 @@
         <div id="tab-settings" class="tab-content">
             <div class="header">
                 Settings
-    function openRepoSettings() {
-        document.getElementById('repo-settings-overlay').classList.add('active');
-        document.getElementById('setting-enable-eruda').checked = localStorage.getItem('conduit_enable_eruda') === 'true';
-        document.getElementById('setting-folder-view').checked = CONFIG.folderView;
-        renderBackendManager();
-        toggleFab(false);
-    }
-
-    function renderBackendSelector() {
-        const sel = document.getElementById('backend-selector');
-        if (!sel) return;
-        sel.innerHTML = backends.map(b => `<option value="${b.id}" ${b.id === activeBackendId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('');
-        
-        const active = backends.find(b => b.id === activeBackendId);
-        const urlInput = document.getElementById('setting-func-url');
-        if (urlInput) urlInput.value = active ? active.url : '';
-    }
-
-    function switchBackend(id) {
-        activeBackendId = id;
-        saveBackendsCore();
-        const active = backends.find(b => b.id === activeBackendId);
-        CONFIG.funcUrl = active ? active.url : '';
-        document.getElementById('setting-func-url').value = CONFIG.funcUrl;
-        showGlobalToast("Switched to: " + active.name);
-    }
-
-    function updateActiveBackendUrl(url) {
-        const active = backends.find(b => b.id === activeBackendId);
-        if (active) {
-            active.url = url;
-            CONFIG.funcUrl = url;
-            saveBackendsCore();
-        }
-    }
-
-    function renderBackendManager() {
-        const list = document.getElementById('backend-manager-list');
-        if (!list) return;
-        list.innerHTML = backends.map(b => `
-            <div class="card" style="margin-bottom:0; padding:12px; display:flex; flex-direction:column; gap:8px; border-color:${b.id === activeBackendId ? 'var(--primary)' : 'var(--border)'}">
-                <div class="flex-between">
-                    <input type="text" class="input-field" style="padding:6px 8px; font-size:12px; height:auto; background:rgba(255,255,255,0.03); width:60%; margin:0;" value="${escapeHtml(b.name)}" onchange="updateBackendObj('${b.id}', 'name', this.value)" placeholder="Env Name">
-                    <button class="menu-btn danger" style="padding:4px 8px;" onclick="deleteBackendObj('${b.id}')">🗑</button>
-                </div>
-                <input type="text" class="input-field" style="padding:6px 8px; font-size:11px; height:auto; color:var(--text-muted); margin:0;" value="${escapeHtml(b.url)}" onchange="updateBackendObj('${b.id}', 'url', this.value)" placeholder="https://...">
+                <button class="menu-btn" onclick="openRepoSettings()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+                </button>
             </div>
-        `).join('');
-    }
-
-    function addBackend() {
-        backends.push({ id: 'b_' + Date.now(), name: 'New Environment', url: '' });
-        saveBackendsCore();
-        renderBackendManager();
-        renderBackendSelector();
-    }
-
-    function updateBackendObj(id, field, val) {
-        const b = backends.find(x => x.id === id);
-        if (b) {
-            b[field] = val;
-            if (id === activeBackendId && field === 'url') CONFIG.funcUrl = val;
-            saveBackendsCore();
-            renderBackendSelector();
-        }
-    }
-
-    function deleteBackendObj(id) {
-        if (backends.length <= 1) return alert("Must keep at least one backend environment.");
-        if (confirm("Delete this backend environment?")) {
-            backends = backends.filter(x => x.id !== id);
-            if (activeBackendId === id) activeBackendId = backends[0].id;
-            saveBackendsCore();
-            renderBackendManager();
-            renderBackendSelector();
-        }
-    }
+            <div class="card">
+                <div class="input-group">
+                    <div class="flex-between" style="margin-bottom:6px;">
+                        <label class="input-label" style="margin:0">Active Backend Environment</label>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <select id="backend-selector" class="input-field" style="margin-bottom:0; appearance:auto; flex:1;" onchange="switchBackend(this.value)"></select>
+                        <button class="icon-btn" style="padding: 0 12px; background: var(--primary-dim); color: var(--primary); border-color: var(--primary);" onclick="switchTab('tab-settings', null); openRepoSettings();" title="Manage Environments">⚙️</button>
+                    </div>
+                    <input type="text" id="setting-func-url" class="input-field" placeholder="https://...supabase.co/functions/v1/ide-brain" onchange="updateActiveBackendUrl(this.value)">
+                </div>
+                <div class="input-group">
+                    <label class="input-label" style="color:var(--ai-accent)">GitHub PAT (Direct Bridge - Egress Saver)</label>
+                    <input type="password" id="setting-gh-token" class="input-field" placeholder="ghp_xxxx...">
+                </div>
+                <div class="flex-gap">
+                    <div class="input-group" style="flex:1">
+                        <label class="input-label">GH Username</label>
+                        <input type="text" id="setting-gh-user" class="input-field" placeholder="GetyeTek">
+                    </div>
+                    <div class="input-group" style="flex:1">
+                        <label class="input-label">GH Org Name</label>
+                        <input type="text" id="setting-gh-org" class="input-field" placeholder="MasterEmpire">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <div class="flex-between" style="margin-bottom: 6px;">
+                        <label class="input-label" style="margin:0">GitHub Repo Name</label>
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
                             <span style="font-size:10px; color:var(--text-muted); font-weight:bold;">ORG MODE</span>
                             <input type="checkbox" id="setting-is-org" style="accent-color:var(--ai-accent); transform:scale(0.9);">
                         </label>
@@ -7970,10 +7926,9 @@ async function downloadArtifact(runId) {
 
     function openRepoSettings() {
         document.getElementById('repo-settings-overlay').classList.add('active');
-        document.getElementById('def-backend-a').value = localStorage.getItem('conduit_backend_a') || '';
-        document.getElementById('def-backend-b').value = localStorage.getItem('conduit_backend_b') || '';
         document.getElementById('setting-enable-eruda').checked = localStorage.getItem('conduit_enable_eruda') === 'true';
         document.getElementById('setting-folder-view').checked = CONFIG.folderView;
+        renderBackendManager();
         toggleFab(false);
     }
 
@@ -7986,33 +7941,74 @@ async function downloadArtifact(runId) {
         }
     }
 
-    function switchActiveBackendSlot(slot) {
-        const url = localStorage.getItem('conduit_backend_' + slot);
-        if (!url) {
-            showGlobalToast("Slot " + slot.toUpperCase() + " is empty. Define it in Management menu.", true);
-            return;
-        }
-        document.getElementById('setting-func-url').value = url;
-        localStorage.setItem('conduit_active_backend_slot', slot);
-        updateBackendToggleUI(slot);
-        showGlobalToast("Switched to Backend " + slot.toUpperCase());
+    function renderBackendSelector() {
+        const sel = document.getElementById('backend-selector');
+        if (!sel) return;
+        sel.innerHTML = backends.map(b => `<option value="${b.id}" ${b.id === activeBackendId ? 'selected' : ''}>${escapeHtml(b.name)}</option>`).join('');
+        
+        const active = backends.find(b => b.id === activeBackendId);
+        const urlInput = document.getElementById('setting-func-url');
+        if (urlInput) urlInput.value = active ? active.url : '';
     }
 
-    function updateBackendToggleUI(activeSlot) {
-        const slot = activeSlot || localStorage.getItem('conduit_active_backend_slot') || 'a';
-        const btnA = document.getElementById('active-slot-a');
-        const btnB = document.getElementById('active-slot-b');
-        
-        if (!btnA || !btnB) return;
+    function switchBackend(id) {
+        activeBackendId = id;
+        saveBackendsCore();
+        const active = backends.find(b => b.id === activeBackendId);
+        CONFIG.funcUrl = active ? active.url : '';
+        document.getElementById('setting-func-url').value = CONFIG.funcUrl;
+        showGlobalToast("Switched to: " + active.name);
+    }
 
-        [btnA, btnB].forEach(b => {
-            b.style.background = 'transparent';
-            b.style.color = 'var(--text-muted)';
-        });
+    function updateActiveBackendUrl(url) {
+        const active = backends.find(b => b.id === activeBackendId);
+        if (active) {
+            active.url = url;
+            CONFIG.funcUrl = url;
+            saveBackendsCore();
+        }
+    }
 
-        const activeBtn = slot === 'a' ? btnA : btnB;
-        activeBtn.style.background = 'var(--primary)';
-        activeBtn.style.color = 'white';
+    function renderBackendManager() {
+        const list = document.getElementById('backend-manager-list');
+        if (!list) return;
+        list.innerHTML = backends.map(b => `
+            <div class="card" style="margin-bottom:0; padding:12px; display:flex; flex-direction:column; gap:8px; border-color:${b.id === activeBackendId ? 'var(--primary)' : 'var(--border)'}">
+                <div class="flex-between">
+                    <input type="text" class="input-field" style="padding:6px 8px; font-size:12px; height:auto; background:rgba(255,255,255,0.03); width:60%; margin:0;" value="${escapeHtml(b.name)}" onchange="updateBackendObj('${b.id}', 'name', this.value)" placeholder="Env Name">
+                    <button class="menu-btn danger" style="padding:4px 8px;" onclick="deleteBackendObj('${b.id}')">🗑</button>
+                </div>
+                <input type="text" class="input-field" style="padding:6px 8px; font-size:11px; height:auto; color:var(--text-muted); margin:0;" value="${escapeHtml(b.url)}" onchange="updateBackendObj('${b.id}', 'url', this.value)" placeholder="https://...">
+            </div>
+        `).join('');
+    }
+
+    function addBackend() {
+        backends.push({ id: 'b_' + Date.now(), name: 'New Environment', url: '' });
+        saveBackendsCore();
+        renderBackendManager();
+        renderBackendSelector();
+    }
+
+    function updateBackendObj(id, field, val) {
+        const b = backends.find(x => x.id === id);
+        if (b) {
+            b[field] = val;
+            if (id === activeBackendId && field === 'url') CONFIG.funcUrl = val;
+            saveBackendsCore();
+            renderBackendSelector();
+        }
+    }
+
+    function deleteBackendObj(id) {
+        if (backends.length <= 1) return alert("Must keep at least one backend environment.");
+        if (confirm("Delete this backend environment?")) {
+            backends = backends.filter(x => x.id !== id);
+            if (activeBackendId === id) activeBackendId = backends[0].id;
+            saveBackendsCore();
+            renderBackendManager();
+            renderBackendSelector();
+        }
     }
 
     function closeRepoSettings() {
