@@ -16,7 +16,7 @@
     <link href="https://cdn.jsdelivr.net/npm/ace-diff@2.1.0/dist/ace-diff.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-    <script>eruda.init();</script>
+    <script>if (localStorage.getItem('conduit_enable_eruda') === 'true') eruda.init();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <style>
@@ -1265,6 +1265,15 @@
                 <p style="font-size:10px; color:#666;">Define your URLs here, then use the A/B toggle on the main Settings tab to switch active targets.</p>
             </div>
 
+            <div class="ai-section-title">Developer Tools</div>
+            <div class="card" style="margin-bottom: 20px;">
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                    <span style="font-size:13px;">🛠 Enable Eruda Console</span>
+                    <input type="checkbox" id="setting-enable-eruda" onchange="toggleEruda(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
+                </label>
+                <p style="font-size:10px; color:#666; margin-top:8px;">Turn on the floating developer console. Requires app reload to fully apply or remove.</p>
+            </div>
+
             <div class="ai-section-title">Advanced Actions</div>
             <div class="card" style="padding: 0; overflow: hidden;">
                 <div class="history-item" onclick="initRepoMigration()">
@@ -1480,6 +1489,10 @@
                     <div class="bg-red-900/10 border border-red-900/20 p-3 rounded-2xl">
                         <span class="text-red-600 text-[9px] uppercase font-bold tracking-widest">Banned (403)</span>
                         <div id="count-banned-keys" class="text-xl font-mono mt-1 text-red-400">0</div>
+                    </div>
+                    <div class="bg-purple-900/10 border border-purple-900/20 p-3 rounded-2xl">
+                        <span class="text-purple-600 text-[9px] uppercase font-bold tracking-widest">Unavailable (503)</span>
+                        <div id="count-503-keys" class="text-xl font-mono mt-1 text-purple-400">0</div>
                     </div>
                 </div>
                 
@@ -7764,7 +7777,17 @@ async function downloadArtifact(runId) {
         document.getElementById('repo-settings-overlay').classList.add('active');
         document.getElementById('def-backend-a').value = localStorage.getItem('conduit_backend_a') || '';
         document.getElementById('def-backend-b').value = localStorage.getItem('conduit_backend_b') || '';
+        document.getElementById('setting-enable-eruda').checked = localStorage.getItem('conduit_enable_eruda') === 'true';
         toggleFab(false);
+    }
+
+    function toggleEruda(enabled) {
+        localStorage.setItem('conduit_enable_eruda', enabled ? 'true' : 'false');
+        if (enabled && typeof eruda !== 'undefined') {
+            eruda.init();
+        } else if (!enabled && typeof eruda !== 'undefined') {
+            try { eruda.destroy(); } catch(e) {}
+        }
     }
 
     function switchActiveBackendSlot(slot) {
@@ -10117,8 +10140,10 @@ async function downloadArtifact(runId) {
 
     function openKeyImporter() {
         document.getElementById('key-importer-overlay').style.display = 'flex';
-        document.getElementById('key-import-area').value = '';
-        document.getElementById('key-import-area').focus();
+        const area = document.getElementById('key-import-area');
+        area.value = '';
+        area.dataset.keyCount = '0';
+        area.focus();
     }
 
     function handleKeyImportInput(el) {
@@ -10132,9 +10157,14 @@ async function downloadArtifact(runId) {
             const uniqueKeys = [...new Set(matches)];
             const structured = uniqueKeys.join('\n');
             
+            const prevCount = parseInt(el.dataset.keyCount || '0', 10);
+            if (uniqueKeys.length > 0 && uniqueKeys.length !== prevCount) {
+                showGlobalToast(`✨ Detected ${uniqueKeys.length} keys`);
+                el.dataset.keyCount = uniqueKeys.length;
+            }
+            
             if (el.value !== structured) {
                 el.value = structured;
-                showGlobalToast(`✨ Detected ${uniqueKeys.length} keys`);
             }
         }
     }
@@ -10257,12 +10287,14 @@ async function downloadArtifact(runId) {
         const validLabel = document.getElementById('count-valid-keys');
         const exhaustedLabel = document.getElementById('count-exhausted-keys');
         const bannedLabel = document.getElementById('count-banned-keys');
+        const unavailLabel = document.getElementById('count-503-keys');
         
         validLabel.innerText = '0';
         exhaustedLabel.innerText = '0';
         bannedLabel.innerText = '0';
+        if (unavailLabel) unavailLabel.innerText = '0';
         
-        let validCount = 0, exhaustedCount = 0, bannedCount = 0;
+        let validCount = 0, exhaustedCount = 0, bannedCount = 0, unavailCount = 0;
 
         // Concurrent run
         const promises = activeKeysToTest.map(async (keyData, idx) => {
@@ -10282,6 +10314,9 @@ async function downloadArtifact(runId) {
             } else if (s == 403 || s === "PERMISSION_DENIED" || m.includes("not found") || m.includes("revoked")) {
                 bannedCount++;
                 bannedLabel.innerText = bannedCount;
+            } else if (s == 503 || s === "UNAVAILABLE") {
+                unavailCount++;
+                if (unavailLabel) unavailLabel.innerText = unavailCount;
             }
         });
 
