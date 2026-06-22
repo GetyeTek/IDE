@@ -2270,6 +2270,11 @@
         return BINARY_EXTENSIONS.includes(ext);
     };
 
+    function getSelectedFilePaths() {
+        if (!window.repoFiles || !window.fileSelectionState) return [];
+        return window.repoFiles.map(f => f.path).filter(p => window.fileSelectionState[p]);
+    }
+
     /**
      * Converts a JSON operations array back into CXP XML Markup.
      */
@@ -3430,7 +3435,7 @@
             return;
         }
 
-        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked'));
+        const checked = getSelectedFilePaths();
         
         if (checked.length === 0) {
             bar.innerHTML = '<span style="font-size:10px; color:#444; padding:4px;">No files attached</span>';
@@ -3438,10 +3443,10 @@
         }
 
         // Show first 5 files as pills
-        checked.slice(0, 5).forEach(cb => {
+        checked.slice(0, 5).forEach(path => {
             const pill = document.createElement('div');
             pill.className = 'context-pill';
-            pill.innerHTML = `<span>📄 ${cb.value.split('/').pop()}</span>`;
+            pill.innerHTML = `<span>📄 ${path.split('/').pop()}</span>`;
             bar.appendChild(pill);
         });
 
@@ -3560,9 +3565,8 @@
                 });
                 window.SURGICAL_DEBUG_DATA = null;
             } else {
-                const checkedBoxes = document.querySelectorAll('#file-list-container .file-check:checked');
-                for (const cb of Array.from(checkedBoxes)) {
-                    const path = cb.value;
+                const checkedPaths = getSelectedFilePaths();
+                for (const path of checkedPaths) {
                     let currentContent = "";
                     if (window.CURRENT_FILE_CACHE && window.CURRENT_FILE_CACHE[path]) {
                         currentContent = window.CURRENT_FILE_CACHE[path].content;
@@ -3895,7 +3899,7 @@
         let filesToScan = [];
         if (target === true) {
             // Scan Selected
-            filesToScan = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
+            filesToScan = getSelectedFilePaths();
         } else if (typeof target === 'string') {
             // Scan Single
             filesToScan = [target];
@@ -7076,10 +7080,10 @@ async function downloadArtifact(runId) {
     }
 
     function stageDeleteSelectedFiles() {
-        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked'));
+        const checked = getSelectedFilePaths();
         if (checked.length && confirm(`Delete ${checked.length} files?`)) {
-            document.getElementById('json-input').value = JSON.stringify(checked.map(c => ({
-                file_path: c.value,
+            document.getElementById('json-input').value = JSON.stringify(checked.map(path => ({
+                file_path: path,
                 action: "delete_file"
             })), null, 2);
             saveState();
@@ -7440,8 +7444,8 @@ async function downloadArtifact(runId) {
     let exportController = null;
 
     function openExportModal() {
-        const total = document.querySelectorAll('#file-list-container .file-check').length;
-        const selected = document.querySelectorAll('#file-list-container .file-check:checked').length;
+        const total = window.repoFiles ? window.repoFiles.length : 0;
+        const selected = getSelectedFilePaths().length;
         const statusEl = document.getElementById('export-status');
         
         statusEl.innerText = `Selected ${selected}/${total} files. Choose format:`;
@@ -7761,7 +7765,7 @@ async function downloadArtifact(runId) {
     let repoSelectorIsOrg = false;
 
     function openSendModal() {
-        const checked = document.querySelectorAll('#file-list-container .file-check:checked');
+        const checked = getSelectedFilePaths();
         if (checked.length === 0) return showGlobalToast("Select files to send first", true);
         
         repoSelectorMode = 'send';
@@ -7865,7 +7869,7 @@ async function downloadArtifact(runId) {
     }
 
     async function executeSendFiles(targetRepo, targetIsOrg) {
-        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
+        const checked = getSelectedFilePaths();
         let targetDir = document.getElementById('repo-target-path').value.trim();
         if (targetDir && !targetDir.endsWith('/')) targetDir += '/';
 
@@ -8626,9 +8630,7 @@ async function downloadArtifact(runId) {
     }
 
     async function copySelectedFiles() {
-        const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked'))
-            .map(c => c.value)
-            .filter(path => !isBinaryFile(path));
+        const checked = getSelectedFilePaths().filter(path => !isBinaryFile(path));
 
         if (checked.length === 0) return showGlobalToast("No textual files selected", true);
         if (!CONFIG.ghToken) return alert("Direct Bridge requires a GitHub Token in Settings to bypass Supabase egress.");
@@ -8700,7 +8702,7 @@ async function downloadArtifact(runId) {
     }
 
     async function processExport(type) {
-        let checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked')).map(c => c.value);
+        let checked = getSelectedFilePaths();
         const statusEl = document.getElementById('export-status');
         
         if (checked.length === 0) return alert("No files selected.");
