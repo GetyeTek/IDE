@@ -2264,6 +2264,12 @@
 
     // --- CORE UTILS ---
     
+    const BINARY_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'mp4', 'mov', 'webm', 'zip', 'pdf', 'woff', 'woff2', 'ttf', 'otf', 'exe', 'apk'];
+    const isBinaryFile = (path) => {
+        const ext = path.split('.').pop().toLowerCase();
+        return BINARY_EXTENSIONS.includes(ext);
+    };
+
     /**
      * Converts a JSON operations array back into CXP XML Markup.
      */
@@ -6583,7 +6589,7 @@ async function downloadArtifact(runId) {
         window.fileSelectionState = window.fileSelectionState || {};
         files.forEach(f => {
             if (window.fileSelectionState[f.path] === undefined) {
-                const isExcluded = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/');
+                const isExcluded = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/') || isBinaryFile(f.path);
                 window.fileSelectionState[f.path] = !isExcluded;
             }
         });
@@ -8620,13 +8626,9 @@ async function downloadArtifact(runId) {
     }
 
     async function copySelectedFiles() {
-        const binaryExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'mp4', 'mov', 'webm', 'zip', 'pdf', 'woff', 'woff2', 'ttf', 'otf', 'exe', 'apk'];
         const checked = Array.from(document.querySelectorAll('#file-list-container .file-check:checked'))
             .map(c => c.value)
-            .filter(path => {
-                const ext = path.split('.').pop().toLowerCase();
-                return !binaryExtensions.includes(ext);
-            });
+            .filter(path => !isBinaryFile(path));
 
         if (checked.length === 0) return showGlobalToast("No textual files selected", true);
         if (!CONFIG.ghToken) return alert("Direct Bridge requires a GitHub Token in Settings to bypass Supabase egress.");
@@ -8705,11 +8707,7 @@ async function downloadArtifact(runId) {
 
         // Parity with Global Copy: Filter binaries for TXT mode
         if (type === 'txt') {
-            const binaryExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'mp4', 'mov', 'webm', 'zip', 'pdf', 'woff', 'woff2', 'ttf', 'otf', 'exe', 'apk'];
-            checked = checked.filter(path => {
-                const ext = path.split('.').pop().toLowerCase();
-                return !binaryExtensions.includes(ext);
-            });
+            checked = checked.filter(path => !isBinaryFile(path));
             if (checked.length === 0) return alert("No textual files found in selection to merge.");
         }
 
