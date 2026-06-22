@@ -6547,7 +6547,7 @@ async function downloadArtifact(runId) {
                         <div class="menu-item danger" onclick="stageDeleteFile('${file.path}')">🗑 Delete</div>
                     </div>
                 </div>
-                <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} onchange="window.fileSelectionState[this.value] = this.checked; updateChatContextIndicator(); syncSelectAllState();" style="accent-color:var(--primary)">
+                <input type="checkbox" class="file-check" value="${file.path}" ${checkedAttr} autocomplete="off" onchange="window.fileSelectionState[this.value] = this.checked; sessionStorage.setItem('conduit_file_selection', JSON.stringify(window.fileSelectionState)); updateChatContextIndicator(); syncSelectAllState();" style="accent-color:var(--primary)">
             </div>`;
         return div;
     }
@@ -6590,13 +6590,21 @@ async function downloadArtifact(runId) {
             return;
         }
 
-        window.fileSelectionState = window.fileSelectionState || {};
+        if (!window.fileSelectionState) {
+            try {
+                window.fileSelectionState = JSON.parse(sessionStorage.getItem('conduit_file_selection')) || {};
+            } catch(e) { window.fileSelectionState = {}; }
+        }
+        
+        let stateChanged = false;
         files.forEach(f => {
             if (window.fileSelectionState[f.path] === undefined) {
                 const isExcluded = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/') || isBinaryFile(f.path);
                 window.fileSelectionState[f.path] = !isExcluded;
+                stateChanged = true;
             }
         });
+        if (stateChanged) sessionStorage.setItem('conduit_file_selection', JSON.stringify(window.fileSelectionState));
 
         const pinned = JSON.parse(localStorage.getItem('conduit_pinned_files') || '[]');
         const searchInput = document.getElementById('file-search-input');
@@ -7100,6 +7108,7 @@ async function downloadArtifact(runId) {
                 window.fileSelectionState[cb.value] = s.checked;
             }
         });
+        sessionStorage.setItem('conduit_file_selection', JSON.stringify(window.fileSelectionState));
         updateChatContextIndicator();
         syncSelectAllState();
     }
