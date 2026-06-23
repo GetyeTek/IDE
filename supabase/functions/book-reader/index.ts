@@ -32,19 +32,22 @@ serve(async (req) => {
       return new Response(JSON.stringify({ books }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 2. GET STRUCTURED JSON PAGES
+    // 2. GET STRUCTURED JSON PAGES & TOC
     if (action === "get_book_pages") {
       const { book_id } = body;
-      console.log(`[FETCH] Loading native pages for book ID: ${book_id}`);
+      console.log(`[FETCH] Loading native pages and TOC for book ID: ${book_id}`);
 
-      const { data: pages, error } = await supabase
-        .from('book_pages')
-        .select('*')
-        .eq('book_id', book_id)
-        .order('page_number', { ascending: true });
+      const [pagesResp, bookResp] = await Promise.all([
+        supabase.from('book_pages').select('*').eq('book_id', book_id).order('page_number', { ascending: true }),
+        supabase.from('books').select('toc').eq('id', book_id).single()
+      ]);
 
-      if (error) throw error;
-      return new Response(JSON.stringify({ pages }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (pagesResp.error) throw pagesResp.error;
+      
+      return new Response(JSON.stringify({ 
+        pages: pagesResp.data, 
+        toc: bookResp.data?.toc || [] 
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // 3. LEGACY LIST UNIVERSITIES
