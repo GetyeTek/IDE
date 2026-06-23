@@ -61,6 +61,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
     const [tocData, setTocData] = useState([]);
     const [isTocOpen, setIsTocOpen] = useState(false);
     const [isJumpMode, setIsJumpMode] = useState(false);
+    const [pageOffset, setPageOffset] = useState(0);
     const [jumpInput, setJumpInput] = useState('');
     const scrubberRef = useRef(null);
     
@@ -104,6 +105,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 if (data.pages && data.pages.length > 0) {
                     setPages(data.pages);
                     if (data.toc) setTocData(data.toc);
+                    if (data.page_offset) setPageOffset(data.page_offset);
                 } else {
                     setPages([{ id: 'mock-1', page_key: 'page-1', content_json: [
                         { type: 'title-page', main: book.title || "Untitled Document", sub: "Rendered via JSON Engine" },
@@ -735,7 +737,15 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 <div className="toc-content">
                     {tocData && tocData.length > 0 ? (
                         tocData.map((node, i) => (
-                            <TOCNode key={i} node={node} onNavigate={jumpToPage} closeToc={() => setIsTocOpen(false)} />
+                            <TOCNode 
+                                key={i} 
+                                node={node} 
+                                onNavigate={(tocPage) => {
+                                    const targetIndex = Math.max(1, tocPage - pageOffset);
+                                    jumpToPage(targetIndex);
+                                }} 
+                                closeToc={() => setIsTocOpen(false)} 
+                            />
                         ))
                     ) : (
                         <div className="toc-empty">No Table of Contents available.</div>
