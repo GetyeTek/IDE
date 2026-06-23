@@ -3,6 +3,7 @@ import { invokeBookReader } from '../../config/api.js';
 import './BookReader.css';
 import { renderBookBlock } from './subjects/Registry.jsx';
 import BookLoader from '../../components/ui/BookLoader.jsx';
+import ReportModal from '../../components/ui/ReportModal.jsx';
 
 const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexOverride }) => {
     const [loading, setLoading] = useState(true);
@@ -13,6 +14,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
     const [mappedQuestions, setMappedQuestions] = useState({});
     const [activeExplanations, setActiveExplanations] = useState({});
     const [layoutReady, setLayoutReady] = useState(false);
+    const [reportQuestionId, setReportQuestionId] = useState(null);
     
     // Scrubber & Jump States
     const [isJumpMode, setIsJumpMode] = useState(false);
@@ -663,6 +665,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                                                 }
                                             }, 100);
                                         }}
+                                        onReport={(qId) => setReportQuestionId(qId)}
                                     />
                                 )}
                             </div>
@@ -675,6 +678,14 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                     </div>
                 )}
             </div>
+
+            {reportQuestionId && (
+                <ReportModal 
+                    questionId={reportQuestionId} 
+                    source="book" 
+                    onClose={() => setReportQuestionId(null)} 
+                />
+            )}
 
             {/* --- MINI MIRON OVERLAY --- */}
             {miniMironText && (
@@ -868,7 +879,7 @@ const getNormalizedMatchingData = (q) => {
     return { left_column: [], right_column: [] };
 };
 
-const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
+const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain, onReport }) => {
     const [qIndex, setQIndex] = useState(0);
     const [answers, setAnswers] = useState({});
     const [activeMatch, setActiveMatch] = useState({});
@@ -967,6 +978,9 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
                     <button disabled={qIndex === questions.length - 1} onClick={() => setQIndex(qIndex + 1)}><i className="fas fa-chevron-right"></i></button>
                 </div>
                 <div className="bpq-actions">
+                    <button className="bpq-btn-report" onClick={() => onReport(q.id)} title="Report an issue">
+                        <i className="fas fa-triangle-exclamation"></i>
+                    </button>
                     <button className="bpq-btn-explain" onClick={() => onExplain(q.content_index)}>
                         <i className="fas fa-sparkles"></i> Explain
                     </button>
