@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { invokeMiron } from '../config/api.js';
 import './MironChat.css';
 
 const MironChat = ({ onClose, initialContext }) => {
@@ -46,24 +47,55 @@ const MironChat = ({ onClose, initialContext }) => {
         }
     }, [messages, isTyping]);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!input.trim()) return;
 
-        const userMsg = { id: Date.now(), side: 'user', text: input };
+        const promptText = input.trim();
+        const userMsg = { id: Date.now(), side: 'user', text: promptText };
+        
+        // Save current history before adding new message
+        const currentHistory = [...messages];
+        
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setIsTyping(true);
 
-        setTimeout(() => {
-            setIsTyping(false);
-            const randomThought = mironThoughts[Math.floor(Math.random() * mironThoughts.length)];
+        try {
+            const data = await invokeMiron({
+                prompt: promptText,
+                history: currentHistory,
+                context: initialContext
+            });
+
+            // If Miron used tools, map them to the thought bubble
+            const thoughtText = data.thoughts && data.thoughts.length > 0 
+                ? data.thoughts.join(" | ") 
+                : "Synthesizing response...";
+
             setMessages(prev => [...prev, {
                 id: Date.now() + 1,
                 side: 'miron',
-                thought: randomThought,
-                text: "I see exactly what you mean. Let's delve into the elegance of that thought and trace where the variables lead us."
+                thought: thoughtText,
+                text: data.response
             }]);
-        }, 2000);
+
+            // Handle UI Commands
+            if (data.ui_command && data.ui_command.action === 'open_page') {
+                // In a real scenario, this would dispatch an event the BookReader listens for
+                console.log("Miron instructed UI to open page:", data.ui_command);
+            }
+
+        } catch (error) {
+            console.error("Miron Communication Error:", error);
+            setMessages(prev => [...prev, {
+                id: Date.now() + 1,
+                side: 'miron',
+                thought: "Connection unstable...",
+                text: "My cognitive link to the mainframe encountered an anomaly. Please try asking again."
+            }]);
+        } finally {
+            setIsTyping(false);
+        }
     };
 
     return (
