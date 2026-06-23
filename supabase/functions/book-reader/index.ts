@@ -192,6 +192,19 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // 8. SUBMIT REPORT
+    if (action === "submit_report") {
+      const { question_id, source, report_text } = body;
+      if (!question_id || !source) throw new Error("Missing required fields for reporting");
+
+      const { error } = await supabase
+        .from('question_reports')
+        .insert([{ question_id, source, report_text }]);
+
+      if (error) throw error;
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     throw new Error(`Unknown action: ${action}`);
   } catch (error) {
     console.error(`[FATAL] ${error.message}`);
