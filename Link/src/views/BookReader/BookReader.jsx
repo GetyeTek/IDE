@@ -5,6 +5,47 @@ import { renderBookBlock } from './subjects/Registry.jsx';
 import BookLoader from '../../components/ui/BookLoader.jsx';
 import ReportModal from '../../components/ui/ReportModal.jsx';
 
+// --- RECURSIVE TOC NODE COMPONENT ---
+const TOCNode = ({ node, depth = 0, onNavigate, closeToc }) => {
+    const [expanded, setExpanded] = useState(false);
+    const hasChildren = node.children && node.children.length > 0;
+    
+    const handleItemClick = (e) => {
+        e.stopPropagation();
+        if (node.page) {
+            onNavigate(node.page);
+            closeToc();
+        } else if (hasChildren) {
+            setExpanded(!expanded);
+        }
+    };
+    
+    return (
+        <div className="toc-node-wrapper">
+            <div 
+                className={`toc-item depth-${depth} ${hasChildren ? 'has-children' : ''}`} 
+                onClick={handleItemClick}
+                style={{ paddingLeft: `${depth * 15 + 20}px` }}
+            >
+                <span className="toc-node-title">{node.title}</span>
+                {node.page && <span className="toc-page-num">{node.page}</span>}
+                {hasChildren && (
+                    <button className="toc-expand-btn" onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}>
+                        <i className={`fas fa-chevron-${expanded ? 'down' : 'right'}`}></i>
+                    </button>
+                )}
+            </div>
+            {hasChildren && expanded && (
+                <div className="toc-children-group">
+                    {node.children.map((child, i) => (
+                        <TOCNode key={i} node={child} depth={depth + 1} onNavigate={onNavigate} closeToc={closeToc} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexOverride }) => {
     const [loading, setLoading] = useState(true);
     const [pages, setPages] = useState([]);
@@ -16,7 +57,10 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
     const [layoutReady, setLayoutReady] = useState(false);
     const [reportQuestionId, setReportQuestionId] = useState(null);
     
-    // Scrubber & Jump States
+    // TOC & Scrubber States
+    const [tocData, setTocData] = useState([]);
+    const [isTocOpen, setIsTocOpen] = useState(false);
+    const [isJumpMode, setIsJumpMode] = useState(false);
     const [isJumpMode, setIsJumpMode] = useState(false);
     const [jumpInput, setJumpInput] = useState('');
     const scrubberRef = useRef(null);
@@ -60,6 +104,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 const data = await invokeBookReader({ action: 'get_book_pages', book_id: book.id });
                 if (data.pages && data.pages.length > 0) {
                     setPages(data.pages);
+                    if (data.toc) setTocData(data.toc);
                 } else {
                     setPages([{ id: 'mock-1', page_key: 'page-1', content_json: [
                         { type: 'title-page', main: book.title || "Untitled Document", sub: "Rendered via JSON Engine" },
@@ -679,6 +724,26 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 )}
             </div>
 
+            {/* --- TOC DRAWER --- */}
+            {isTocOpen && <div className="toc-backdrop" onClick={() => setIsTocOpen(false)}></div>}
+            <div className={`toc-drawer ${isTocOpen ? 'open' : ''}`} onTouchStart={e => e.stopPropagation()}>
+                <div className="toc-header">
+                    <h3><i className="fas fa-list"></i> Contents</h3>
+                    <button className="icon-btn" style={{color: 'inherit'}} onClick={() => setIsTocOpen(false)}>
+                        <i className="fas fa-times"></i>
+                    </button>
+                </div>
+                <div className="toc-content">
+                    {tocData && tocData.length > 0 ? (
+                        tocData.map((node, i) => (
+                            <TOCNode key={i} node={node} onNavigate={jumpToPage} closeToc={() => setIsTocOpen(false)} />
+                        ))
+                    ) : (
+                        <div className="toc-empty">No Table of Contents available.</div>
+                    )}
+                </div>
+            </div>
+
             {reportQuestionId && (
                 <ReportModal 
                     questionId={reportQuestionId} 
@@ -686,6 +751,9 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                     onClose={() => setReportQuestionId(null)} 
                 />
             )}
+        </div>
+    );
+};
 
             {/* --- MINI MIRON OVERLAY --- */}
             {miniMironText && (
@@ -795,7 +863,9 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 </div>
 
                 <div className="ui-bar reader-footer">
-                    <div className="icon-btn" title="Table of Contents"><i className="fa-solid fa-list"></i></div>
+                    <div className="icon-btn" title="Table of Contents" onClick={() => setIsTocOpen(!isTocOpen)}>
+                        <i className="fa-solid fa-list"></i>
+                    </div>
                     
                     <div className="scrubber-wrapper">
                         <input 
