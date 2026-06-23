@@ -259,8 +259,9 @@
     padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none;
     display: flex; align-items: center; gap: 8px; transition: transform 0.2s;
 }
-.bpq-btn-explain { background: var(--ctx-btn-bg); color: var(--accent); border: 1px solid var(--accent); }
-.bpq-btn-goto { background: var(--text-color); color: var(--page-bg); }
+.bpq-btn-report { background: rgba(255, 95, 95, 0.05); color: #ff5f5f; border: 1px solid rgba(255, 95, 95, 0.2); padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: transform 0.2s; }
+.bpq-btn-explain { background: var(--ctx-btn-bg); color: var(--accent); border: 1px solid var(--accent); padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s; }
+.bpq-btn-goto { background: var(--text-color); color: var(--page-bg); padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: none; display: flex; align-items: center; gap: 8px; transition: transform 0.2s; }
 .bpq-actions button:hover { transform: translateY(-2px); }
 .page-canvas *::-moz-selection {
     background: rgba(66, 215, 184, 0.4) !important;
