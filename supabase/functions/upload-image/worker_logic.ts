@@ -43,8 +43,11 @@ CONFIDENCE SCORE RULES:
 `;
 
 const SOLVER_PROMPT_TEMPLATE = (friendlyText: string) => `
-EXAM SOLVER (PHONETIC TTS MODE).
+EXAM SOLVER (PHONETIC TTS MODE) WITH REFERENCE BOOK.
 You are an expert tutor providing answers for a student to listen to and write down.
+
+REFERENCE BOOK:
+You are provided with a PDF document ("Anthropology.pdf"). Use this book as your primary source of truth to answer the questions. If a question cannot be answered using the provided book (i.e. the topic is outside the scope of the textbook), answer it generally using your expert tutor knowledge.
 
 INPUT QUESTIONS:
 ${friendlyText}
@@ -227,6 +230,18 @@ async function callGeminiApi(supabase: any, _ignoredModel: string, prompt: strin
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   console.log(`[${REQUEST_ID}] [CLIENT] Supabase client initialized.`);
 
+  // --- PDF INGESTION ---
+  let pdfB64: string | null = null;
+  try {
+    console.log(`[${REQUEST_ID}] [PDF_INIT] Attempting to read Anthropology.pdf from root...`);
+    const pdfData = await Deno.readFile("./Anthropology.pdf");
+    pdfB64 = encodeBase64(pdfData);
+    console.log(`[${REQUEST_ID}] [PDF_SUCCESS] Successfully loaded Anthropology.pdf. Size: ${pdfData.byteLength} bytes.`);
+  } catch (pdfErr: any) {
+    console.warn(`[${REQUEST_ID}] [PDF_WARN] Could not load Anthropology.pdf:`, pdfErr.message);
+    console.warn(`[${REQUEST_ID}] [PDF_WARN] Proceeding with general knowledge solver fallback.`);
+  }
+
   let paths = [];
   try {
     paths = JSON.parse(IMAGE_PATHS_RAW);
@@ -310,7 +325,16 @@ async function callGeminiApi(supabase: any, _ignoredModel: string, prompt: strin
     const friendlyText = formatTranscriptionForAI(ocrJson, REQUEST_ID);
     
     console.log(`[${REQUEST_ID}] [SOLVER_STAGE] Requesting solutions from AI model: ${bestWorld.model}...`);
-    const solutionRaw = await callGeminiApi(supabase, bestWorld.model, SOLVER_PROMPT_TEMPLATE(friendlyText), undefined, REQUEST_ID);
+    
+    const solverParts: any[] = [];
+    if (pdfB64) {
+      solverParts.push({
+        inline_data: { mime_type: "application/pdf", data: pdfB64 }
+      });
+    }
+    solverParts.push({ text: SOLVER_PROMPT_TEMPLATE(friendlyText) });
+
+    const solutionRaw = await callGeminiApi(supabase, bestWorld.model, null, solverParts, REQUEST_ID);
     
     console.log(`[${REQUEST_ID}] [SOLVER_STAGE] Parsing solver response...`);
     const solutionJson = JSON.parse(extractJson(solutionRaw));
