@@ -25,3 +25,19 @@ export const invokeBookReader = async (payload, signal = null) => {
     
     return response.json();
 };
+
+export const MIRON_ENDPOINT = 'https://ryaxynjczfwqyqvpmorl.supabase.co/functions/v1/miron-athena';
+
+export const invokeMiron = async (payload) => {
+    const response = await fetch(MIRON_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Miron Error: ${response.status} ${response.statusText}`);
+    }
+    
+    return response.json();
+};
