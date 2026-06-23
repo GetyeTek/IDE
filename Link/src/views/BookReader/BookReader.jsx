@@ -735,30 +735,16 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
 
 // --- INLINE BOOK QUESTIONS COMPONENT ---
 const getNormalizedMatchingData = (q) => {
-    console.group(`🔍 [Matching Normalizer] Question: ${q.id}`);
-    console.log("1. Raw Question Object:", q);
-    console.log("2. Raw q.matching_data:", q.matching_data);
-    console.log("3. Raw q.options:", q.options, "| Type:", typeof q.options);
-
-    let opts = q.options;
-    
-    if (typeof opts === 'string') {
-        try {
-            opts = JSON.parse(opts);
-            console.log("⚙️ Parsed stringified options into array:", opts);
-        } catch(e) {
-            console.log("⚠️ Failed to parse options string as JSON:", e);
-        }
-    }
-
     if (q.matching_data && q.matching_data.left_column && q.matching_data.left_column.length > 0) {
-        console.log("✅ Using existing structured matching_data");
-        console.groupEnd();
         return q.matching_data;
     }
 
+    let opts = q.options;
+    if (typeof opts === 'string') {
+        try { opts = JSON.parse(opts); } catch(e) {}
+    }
+
     if (opts && Array.isArray(opts) && opts.length > 0) {
-        console.log("🛠️ Attempting to normalize from options array...");
         const getStr = (arr, prefix) => {
             const found = arr.find(o => {
                 const text = typeof o === 'string' ? o : (o?.text || '');
@@ -770,39 +756,27 @@ const getNormalizedMatchingData = (q) => {
         const leftStr = getStr(opts, 'Column A');
         const rightStr = getStr(opts, 'Column B');
         
-        console.log("4. Extracted Left String:", leftStr);
-        console.log("5. Extracted Right String:", rightStr);
-        
         if (leftStr && rightStr) {
             const parseStr = (str, prefix, splitRegex) => {
                 const prefixMatch = new RegExp(`.*${prefix}:?`, 'i');
                 const cleaned = str.replace(prefixMatch, '').trim();
                 const parts = cleaned.split(splitRegex);
-                console.log(`🧩 Splitting generated parts:`, parts);
                 
                 const items = [];
                 for (let i = 1; i < parts.length; i += 2) {
                     let item = (parts[i+1] || '').trim();
-                    if (item.endsWith(',')) item = item.slice(0, -1).trim();
-                    items.push(item);
+                    item = item.replace(/[,;]+$/, '').trim();
+                    if (item) items.push(item);
                 }
                 return items;
             };
             
-            const left_column = parseStr(leftStr, 'Column A', /(\b\d+\.\s+)/);
-            const right_column = parseStr(rightStr, 'Column B', /(\b[A-Z]\.\s+)/);
-            
-            console.log("✅ Normalized Successfully:", { left_column, right_column });
-            console.groupEnd();
-            return { left_column, right_column };
-        } else {
-            console.log("❌ Left or Right string missing from options.");
+            return {
+                left_column: parseStr(leftStr, 'Column A', /(\b\d+\.\s*)/),
+                right_column: parseStr(rightStr, 'Column B', /(\b[A-Z]\.\s*)/)
+            };
         }
-    } else {
-        console.log("❌ Options array is empty or invalid.");
     }
-    
-    console.groupEnd();
     return { left_column: [], right_column: [] };
 };
 
@@ -814,7 +788,12 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
     if (!questions || questions.length === 0) return null;
     const q = questions[qIndex];
     const ans = answers[q.id];
-    const matchData = getNormalizedMatchingData(q);
+    
+    const isMatching = (q.question_type && q.question_type.toLowerCase() === 'matching') || 
+                       q.matching_data || 
+                       (Array.isArray(q.options) && q.options.some(o => typeof o === 'string' && o.includes('Column A')));
+    
+    const matchData = isMatching ? getNormalizedMatchingData(q) : null;
 
     return (
         <div className="bpq-container">
@@ -835,7 +814,7 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
                             <i className="fa-solid fa-xmark"></i> FALSE
                         </label>
                     </div>
-                ) : ((q.question_type && q.question_type.toLowerCase() === 'matching') || matchData.left_column?.length > 0) ? (
+                ) : (matchData && matchData.left_column?.length > 0) ? (
                     <div className={`interactive-match-container ${(matchData.right_column?.some(r => (r.text || r).length > 45) || matchData.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
                         <div className="match-col match-left">
                             {matchData.left_column?.map((item, idx) => {
