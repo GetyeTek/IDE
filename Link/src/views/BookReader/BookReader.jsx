@@ -61,7 +61,6 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
     const [tocData, setTocData] = useState([]);
     const [isTocOpen, setIsTocOpen] = useState(false);
     const [isJumpMode, setIsJumpMode] = useState(false);
-    const [isJumpMode, setIsJumpMode] = useState(false);
     const [jumpInput, setJumpInput] = useState('');
     const scrubberRef = useRef(null);
     
@@ -751,9 +750,6 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                     onClose={() => setReportQuestionId(null)} 
                 />
             )}
-        </div>
-    );
-};
 
             {/* --- MINI MIRON OVERLAY --- */}
             {miniMironText && (
