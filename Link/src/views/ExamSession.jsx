@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { invokeBookReader } from '../config/api.js';
 import { renderBookBlock } from './BookReader/subjects/Registry.jsx';
 import BookReader from './BookReader/BookReader.jsx';
+import ReportModal from '../components/ui/ReportModal.jsx';
 import './ExamSession.css';
 
 const getNormalizedMatchingData = (q) => {
@@ -61,6 +62,7 @@ const ExamSession = ({ exam, onClose }) => {
     const [hints, setHints] = useState({});
     const [activeMatch, setActiveMatch] = useState({});
     const [loading, setLoading] = useState(true);
+    const [reportQuestionId, setReportQuestionId] = useState(null);
 
     const [examMeta, setExamMeta] = useState({ name: exam.course_name, code: exam.course_code });
 
@@ -187,6 +189,13 @@ const ExamSession = ({ exam, onClose }) => {
                                 <div className="q-meta">
                                     <span className="q-label">Question {idx + 1}</span>
                                     <div className="q-actions">
+                                        <button 
+                                            className="report-btn" 
+                                            onClick={() => setReportQuestionId(q.id)}
+                                            title="Report an issue"
+                                        >
+                                            <i className="fas fa-triangle-exclamation"></i>
+                                        </button>
                                         <button 
                                             className={`hint ${hints[q.id]?.open ? 'active-hint' : ''}`} 
                                             onClick={() => toggleHint(q.id)}
@@ -364,6 +373,14 @@ const ExamSession = ({ exam, onClose }) => {
                     targetPageNumber={activeReferenceBook.page_number}
                     targetBlockIndex={activeReferenceBook.content_index}
                     zIndexOverride={3500}
+                />
+            )}
+
+            {reportQuestionId && (
+                <ReportModal 
+                    questionId={reportQuestionId} 
+                    source="exam" 
+                    onClose={() => setReportQuestionId(null)} 
                 />
             )}
         </div>
