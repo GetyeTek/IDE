@@ -11,7 +11,9 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
     const [contextMenu, setContextMenu] = useState(null);
     const [mappedQuestions, setMappedQuestions] = useState({});
     const [activeExplanations, setActiveExplanations] = useState({});
+    const [layoutReady, setLayoutReady] = useState(false);
     
+    const savePosTimer = useRef(null);
     const viewportRef = useRef(null);
     const scrollContainerRef = useRef(null);
     const layerRef = useRef(null);
@@ -97,12 +99,22 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 layerRef.current.style.transform = `scale(${currentScale.current})`;
 
                 if (viewportRef.current) {
-                    viewportRef.current.scrollTop = 0;
+                    if (targetPageNumber === undefined) {
+                        const savedPos = localStorage.getItem(`linkup_read_pos_${book.id}`);
+                        if (savedPos) {
+                            viewportRef.current.scrollTop = parseFloat(savedPos) * currentScale.current;
+                        } else {
+                            viewportRef.current.scrollTop = 0;
+                        }
+                    }
                     viewportRef.current.scrollLeft = 0;
                 }
+                
+                // Slight delay ensures the browser paints the scale/scroll changes BEFORE making it visible
+                setTimeout(() => setLayoutReady(true), 50);
             });
         }
-    }, [loading, pages]);
+    }, [loading, pages, targetPageNumber, book.id]);
 
     // 3. Smart ResizeObserver (Debounced to prevent layout thrashing)
     useEffect(() => {
@@ -139,6 +151,12 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                     lastDisplayPage.current = displayPage;
                     pageCountRef.current.innerText = `${displayPage} / ${pages.length}`;
                 }
+                
+                clearTimeout(savePosTimer.current);
+                savePosTimer.current = setTimeout(() => {
+                    localStorage.setItem(`linkup_read_pos_${book.id}`, unscaledY);
+                }, 500);
+
                 scrollTicking = false;
             });
             scrollTicking = true;
@@ -557,7 +575,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 onScroll={handleScroll}
                 onContextMenu={(e) => e.preventDefault()} /* Kills native right-click/long-press menu on Android/Desktop */
             >
-                <div id="scroll-container" ref={scrollContainerRef}>
+                <div id="scroll-container" ref={scrollContainerRef} style={{ opacity: layoutReady ? 1 : 0, transition: 'opacity 0.3s ease' }}>
                     <div id="book-layer" ref={layerRef}>
                         {pages.map((page, pageIdx) => (
                             <div key={page.id} className="page-wrapper">
@@ -568,9 +586,10 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                                             onAIExplore: () => handleAIExplore(pageIdx, idx)
                                         };
                                         const expKey = `${page.page_key}_${idx}`;
+                                        const isFooter = block.type === 'footer' || block.type === 'logic-footer';
                                         return (
                                             <React.Fragment key={idx}>
-                                                <div id={`page-${page.page_number}-block-${idx}`} className="block-target-wrapper">
+                                                <div id={`page-${page.page_number}-block-${idx}`} className={`block-target-wrapper ${isFooter ? 'is-footer-wrapper' : ''}`}>
                                                     {renderBookBlock(block, idx, blockActions)}
                                                 </div>
                                                 {activeExplanations[expKey] && (
@@ -613,7 +632,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                         ))}
                     </div>
                 </div>
-                {loading && <div className="loading-spinner">Calibrating Knowledge Engine...</div>}
+                {(!layoutReady) && <div className="loading-spinner">Calibrating Knowledge Engine...</div>}
             </div>
 
             {/* --- MINI MIRON OVERLAY --- */}
