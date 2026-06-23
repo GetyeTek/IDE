@@ -70,6 +70,7 @@
 }
 
 #book-layer { 
+    position: relative; /* Serves as the precise anchor for offsetTop jump calculations */
     width: 794px; /* Fixed standard width for precise scale math */
     transform-origin: 0 0; 
     display: flex; 
