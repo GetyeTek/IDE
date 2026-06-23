@@ -4,6 +4,44 @@ import { renderBookBlock } from './BookReader/subjects/Registry.jsx';
 import BookReader from './BookReader/BookReader.jsx';
 import './ExamSession.css';
 
+const getNormalizedMatchingData = (q) => {
+    if (q.matching_data && q.matching_data.left_column && q.matching_data.left_column.length > 0) {
+        return q.matching_data;
+    }
+    if (q.options && Array.isArray(q.options) && q.options.length > 0) {
+        const getStr = (arr, prefix) => {
+            const found = arr.find(o => {
+                const text = typeof o === 'string' ? o : o.text;
+                return typeof text === 'string' && text.startsWith(prefix);
+            });
+            return typeof found === 'string' ? found : found?.text;
+        };
+        
+        const leftStr = getStr(q.options, 'Column A:');
+        const rightStr = getStr(q.options, 'Column B:');
+        
+        if (leftStr && rightStr) {
+            const parseStr = (str, prefix, splitRegex) => {
+                const cleaned = str.replace(prefix, '').trim();
+                const parts = cleaned.split(splitRegex);
+                const items = [];
+                for (let i = 1; i < parts.length; i += 2) {
+                    let item = (parts[i+1] || '').trim();
+                    if (item.endsWith(',')) item = item.slice(0, -1).trim();
+                    items.push(item);
+                }
+                return items;
+            };
+            
+            return {
+                left_column: parseStr(leftStr, 'Column A:', /(\b\d+\.\s+)/),
+                right_column: parseStr(rightStr, 'Column B:', /(\b[A-Z]\.\s+)/)
+            };
+        }
+    }
+    return { left_column: [], right_column: [] };
+};
+
 const ExamSession = ({ exam, onClose }) => {
     const [timeLeft, setTimeLeft] = useState(exam.time_allowed_minutes * 60 || 3600);
     const [activeReferenceBook, setActiveReferenceBook] = useState(null);
@@ -126,7 +164,9 @@ const ExamSession = ({ exam, onClose }) => {
                             <h3 style={{color: 'var(--accent-teal)'}}>{section.title}</h3>
                             <p style={{fontSize: '0.8rem', opacity: 0.6}}>{section.instructions}</p>
                         </div>
-                        {section.questions.map((q, idx) => (
+                        {section.questions.map((q, idx) => {
+                            const matchData = getNormalizedMatchingData(q);
+                            return (
                             <section className="q-row" key={q.id} id={`q-box-${q.id}`}>
                                 <div className="q-meta">
                                     <span className="q-label">Question {idx + 1}</span>
@@ -177,10 +217,10 @@ const ExamSession = ({ exam, onClose }) => {
                                             </label>
                                         </div>
                                     </div>
-                                ) : ((q.question_type && q.question_type.toLowerCase() === 'matching') || q.matching_data) ? (
-                                    <div className={`interactive-match-container ${(q.matching_data?.right_column?.some(r => (r.text || r).length > 45) || q.matching_data?.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
+                                ) : ((q.question_type && q.question_type.toLowerCase() === 'matching') || matchData.left_column?.length > 0) ? (
+                                    <div className={`interactive-match-container ${(matchData.right_column?.some(r => (r.text || r).length > 45) || matchData.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
                                         <div className="match-col match-left">
-                                            {q.matching_data?.left_column?.map((item, idx) => {
+                                            {matchData.left_column?.map((item, idx) => {
                                                 const qAnswers = answers[q.id] || {};
                                                 const currentActive = activeMatch[q.id];
                                                 const isPaired = qAnswers[idx] !== undefined;
@@ -197,7 +237,7 @@ const ExamSession = ({ exam, onClose }) => {
                                             })}
                                         </div>
                                         <div className={`match-col match-right ${activeMatch[q.id] !== undefined ? 'is-listening' : ''}`}>
-                                            {q.matching_data?.right_column?.map((item, idx) => {
+                                            {matchData.right_column?.map((item, idx) => {
                                                 const qAnswers = answers[q.id] || {};
                                                 const currentActive = activeMatch[q.id];
                                                 const usedByLeftIdx = Object.keys(qAnswers).find(k => qAnswers[k] === idx);
@@ -281,7 +321,8 @@ const ExamSession = ({ exam, onClose }) => {
                             </div>
                         )}
                             </section>
-                        ))}
+                            );
+                        })}
                     </div>
                 ))}
             </main>
