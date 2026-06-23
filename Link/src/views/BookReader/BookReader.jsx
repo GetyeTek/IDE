@@ -14,6 +14,11 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
     const [activeExplanations, setActiveExplanations] = useState({});
     const [layoutReady, setLayoutReady] = useState(false);
     
+    // Scrubber & Jump States
+    const [isJumpMode, setIsJumpMode] = useState(false);
+    const [jumpInput, setJumpInput] = useState('');
+    const scrubberRef = useRef(null);
+    
     const savePosTimer = useRef(null);
     const viewportRef = useRef(null);
     const scrollContainerRef = useRef(null);
@@ -150,7 +155,16 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 
                 if (lastDisplayPage.current !== displayPage) {
                     lastDisplayPage.current = displayPage;
-                    pageCountRef.current.innerText = `${displayPage} / ${pages.length}`;
+                    if (pageCountRef.current && !isJumpMode) {
+                        pageCountRef.current.innerText = displayPage;
+                    }
+                    
+                    // Hardware-accelerated scrubber visual update
+                    if (scrubberRef.current) {
+                        scrubberRef.current.value = displayPage;
+                        const percent = pages.length > 1 ? ((displayPage - 1) / (pages.length - 1)) * 100 : 0;
+                        scrubberRef.current.style.setProperty('--scrubber-fill', `${percent}%`);
+                    }
                 }
                 
                 clearTimeout(savePosTimer.current);
@@ -162,6 +176,28 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
             });
             scrollTicking = true;
         }
+    };
+
+    // Jump Math & Scrubber Handlers
+    const jumpToPage = (pageNum) => {
+        if (!viewportRef.current || pages.length === 0) return;
+        const target = Math.max(1, Math.min(parseInt(pageNum) || 1, pages.length));
+        const approxPageHeight = 1183;
+        const targetY = (target - 1) * approxPageHeight * currentScale.current;
+        viewportRef.current.scrollTo({ top: targetY, behavior: 'auto' });
+        setIsJumpMode(false);
+    };
+
+    const handleScrubberChange = (e) => {
+        jumpToPage(e.target.value);
+    };
+
+    const handleScrubberInput = (e) => {
+        // Immediate visual update while dragging (zero latency)
+        const val = e.target.value;
+        const percent = pages.length > 1 ? ((val - 1) / (pages.length - 1)) * 100 : 0;
+        e.target.style.setProperty('--scrubber-fill', `${percent}%`);
+        if (pageCountRef.current) pageCountRef.current.innerText = val;
     };
 
     // 5. DOM-Readless Pinch Physics
@@ -748,9 +784,37 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 </div>
 
                 <div className="ui-bar reader-footer">
-                    <div className="icon-btn"><i className="fa-solid fa-list"></i></div>
-                    <span style={{flex: 1, textAlign: 'center', fontFamily: 'monospace', color: '#888'}} ref={pageCountRef}>1 / {pages.length || '--'}</span>
-                    <div className="icon-btn"><i className="fa-solid fa-bookmark"></i></div>
+                    <div className="icon-btn" title="Table of Contents"><i className="fa-solid fa-list"></i></div>
+                    
+                    <div className="scrubber-wrapper">
+                        <input 
+                            type="range" 
+                            min="1" 
+                            max={pages.length || 1} 
+                            defaultValue="1" 
+                            ref={scrubberRef}
+                            className="page-scrubber"
+                            onChange={handleScrubberChange}
+                            onInput={handleScrubberInput}
+                        />
+                    </div>
+
+                    {isJumpMode ? (
+                        <form className="jump-form" onSubmit={(e) => { e.preventDefault(); jumpToPage(jumpInput); }}>
+                            <input 
+                                type="number" 
+                                autoFocus 
+                                min="1" max={pages.length || 1} 
+                                value={jumpInput} 
+                                onChange={e => setJumpInput(e.target.value)} 
+                                onBlur={() => setIsJumpMode(false)}
+                            />
+                        </form>
+                    ) : (
+                        <div className="page-counter-btn" onClick={() => { setIsJumpMode(true); setJumpInput(lastDisplayPage.current); }}>
+                            <span ref={pageCountRef}>{lastDisplayPage.current || 1}</span> <span className="counter-divider">/ {pages.length || '--'}</span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
