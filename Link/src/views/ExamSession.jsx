@@ -5,25 +5,53 @@ import BookReader from './BookReader/BookReader.jsx';
 import './ExamSession.css';
 
 const getNormalizedMatchingData = (q) => {
+    console.group(`🔍 [Matching Normalizer] Question: ${q.id}`);
+    console.log("1. Raw Question Object:", q);
+    console.log("2. Raw q.matching_data:", q.matching_data);
+    console.log("3. Raw q.options:", q.options, "| Type:", typeof q.options);
+
+    let opts = q.options;
+    
+    // Auto-parse if the backend sent a double-stringified JSON array
+    if (typeof opts === 'string') {
+        try {
+            opts = JSON.parse(opts);
+            console.log("⚙️ Parsed stringified options into array:", opts);
+        } catch(e) {
+            console.log("⚠️ Failed to parse options string as JSON:", e);
+        }
+    }
+
     if (q.matching_data && q.matching_data.left_column && q.matching_data.left_column.length > 0) {
+        console.log("✅ Using existing structured matching_data");
+        console.groupEnd();
         return q.matching_data;
     }
-    if (q.options && Array.isArray(q.options) && q.options.length > 0) {
+
+    if (opts && Array.isArray(opts) && opts.length > 0) {
+        console.log("🛠️ Attempting to normalize from options array...");
         const getStr = (arr, prefix) => {
             const found = arr.find(o => {
-                const text = typeof o === 'string' ? o : o.text;
-                return typeof text === 'string' && text.startsWith(prefix);
+                const text = typeof o === 'string' ? o : (o?.text || '');
+                return typeof text === 'string' && text.includes(prefix);
             });
             return typeof found === 'string' ? found : found?.text;
         };
         
-        const leftStr = getStr(q.options, 'Column A:');
-        const rightStr = getStr(q.options, 'Column B:');
+        const leftStr = getStr(opts, 'Column A');
+        const rightStr = getStr(opts, 'Column B');
+        
+        console.log("4. Extracted Left String:", leftStr);
+        console.log("5. Extracted Right String:", rightStr);
         
         if (leftStr && rightStr) {
             const parseStr = (str, prefix, splitRegex) => {
-                const cleaned = str.replace(prefix, '').trim();
+                // Ensure we clean out the prefix cleanly even if there are weird spaces
+                const prefixMatch = new RegExp(`.*${prefix}:?`, 'i');
+                const cleaned = str.replace(prefixMatch, '').trim();
                 const parts = cleaned.split(splitRegex);
+                console.log(`🧩 Splitting generated parts:`, parts);
+                
                 const items = [];
                 for (let i = 1; i < parts.length; i += 2) {
                     let item = (parts[i+1] || '').trim();
@@ -33,12 +61,20 @@ const getNormalizedMatchingData = (q) => {
                 return items;
             };
             
-            return {
-                left_column: parseStr(leftStr, 'Column A:', /(\b\d+\.\s+)/),
-                right_column: parseStr(rightStr, 'Column B:', /(\b[A-Z]\.\s+)/)
-            };
+            const left_column = parseStr(leftStr, 'Column A', /(\b\d+\.\s+)/);
+            const right_column = parseStr(rightStr, 'Column B', /(\b[A-Z]\.\s+)/);
+            
+            console.log("✅ Normalized Successfully:", { left_column, right_column });
+            console.groupEnd();
+            return { left_column, right_column };
+        } else {
+            console.log("❌ Left or Right string missing from options.");
         }
+    } else {
+        console.log("❌ Options array is empty or invalid.");
     }
+    
+    console.groupEnd();
     return { left_column: [], right_column: [] };
 };
 
