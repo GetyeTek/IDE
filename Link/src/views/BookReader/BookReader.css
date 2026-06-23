@@ -114,6 +114,11 @@
     margin: -6px; /* Offset padding so it doesn't disrupt native book layout */
 }
 
+.block-target-wrapper.is-footer-wrapper {
+    margin-top: auto !important;
+    width: 100%;
+}
+
 /* --- INLINE EXPLANATION (RIPPED SPLIT) --- */
 .inline-book-explanation {
     margin: 20px 0;
