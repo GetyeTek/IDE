@@ -189,31 +189,14 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
         return () => ro.disconnect();
     }, [loading]);
 
-    // 4. Track page numbers (Native Scroll)
+    // 4. Position Recovery Debouncer (Native Scroll)
     let scrollTicking = false;
     const handleScroll = () => {
-        if (!pageCountRef.current || pages.length === 0 || !viewportRef.current) return;
+        if (pages.length === 0 || !viewportRef.current) return;
         
         if (!scrollTicking) {
             window.requestAnimationFrame(() => {
                 const unscaledY = viewportRef.current.scrollTop / currentScale.current;
-                const approxPageHeight = 1183;
-                const current = Math.max(1, Math.floor((unscaledY + 200) / approxPageHeight) + 1);
-                const displayPage = Math.min(current, pages.length);
-                
-                if (lastDisplayPage.current !== displayPage) {
-                    lastDisplayPage.current = displayPage;
-                    if (pageCountRef.current && !isJumpMode) {
-                        pageCountRef.current.innerText = displayPage;
-                    }
-                    
-                    // Hardware-accelerated scrubber visual update
-                    if (scrubberRef.current) {
-                        scrubberRef.current.value = displayPage;
-                        const percent = pages.length > 1 ? ((displayPage - 1) / (pages.length - 1)) * 100 : 0;
-                        scrubberRef.current.style.setProperty('--scrubber-fill', `${percent}%`);
-                    }
-                }
                 
                 clearTimeout(savePosTimer.current);
                 savePosTimer.current = setTimeout(() => {
@@ -225,6 +208,41 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
             scrollTicking = true;
         }
     };
+
+    // 4b. Dynamic Page Tracking (Intersection Observer)
+    useEffect(() => {
+        if (loading || pages.length === 0 || !viewportRef.current) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const pageNum = parseInt(entry.target.getAttribute('data-page-number'));
+                    if (pageNum && lastDisplayPage.current !== pageNum) {
+                        lastDisplayPage.current = pageNum;
+                        
+                        if (pageCountRef.current && !isJumpMode) {
+                            pageCountRef.current.innerText = pageNum;
+                        }
+                        
+                        if (scrubberRef.current) {
+                            scrubberRef.current.value = pageNum;
+                            const percent = pages.length > 1 ? ((pageNum - 1) / (pages.length - 1)) * 100 : 0;
+                            scrubberRef.current.style.setProperty('--scrubber-fill', `${percent}%`);
+                        }
+                    }
+                }
+            });
+        }, {
+            root: viewportRef.current,
+            rootMargin: "-15% 0px -45% 0px", // Trigger when the top of the page enters focal view
+            threshold: 0.1
+        });
+
+        const targets = viewportRef.current.querySelectorAll('.page-wrapper');
+        targets.forEach(t => observer.observe(t));
+
+        return () => observer.disconnect();
+    }, [loading, pages, isJumpMode]);
 
     // Jump Math & Scrubber Handlers
     const jumpToPage = (pageNum) => {
@@ -663,7 +681,7 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                 <div id="scroll-container" ref={scrollContainerRef} style={{ opacity: layoutReady ? 1 : 0, transition: 'opacity 0.3s ease' }}>
                     <div id="book-layer" ref={layerRef}>
                         {pages.map((page, pageIdx) => (
-                            <div key={page.id} className="page-wrapper">
+                            <div key={page.id} className="page-wrapper" data-page-number={page.page_number}>
                                 <div className="page-canvas">
                                     {page.manual_flag && <div className="manual-flag">{page.manual_flag}</div>}
                                     {(page.content_json || []).map((block, idx) => {
