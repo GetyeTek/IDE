@@ -893,12 +893,12 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
                 <div className="bpq-text">{q.text}</div>
                 {(q.question_type && q.question_type.toLowerCase() === 'true_false') ? (
                     <div className="bpq-tf-pad">
-                        <label className={`bpq-tf-btn ${ans === 'True' || ans?.text === 'True' ? 'active-true' : ''}`}>
-                            <input type="radio" hidden onChange={() => setAnswers({...answers, [q.id]: 'True'})} />
+                        <label className={`bpq-tf-btn ${ans === 'True' || ans?.text === 'True' ? 'active-true' : ''}`} style={{ pointerEvents: ans ? 'none' : 'auto', opacity: ans && ans !== 'True' && ans?.text !== 'True' ? 0.5 : 1 }}>
+                            <input type="radio" hidden disabled={!!ans} onChange={() => !ans && setAnswers({...answers, [q.id]: 'True'})} />
                             <i className="fa-solid fa-check"></i> TRUE
                         </label>
-                        <label className={`bpq-tf-btn ${ans === 'False' || ans?.text === 'False' ? 'active-false' : ''}`}>
-                            <input type="radio" hidden onChange={() => setAnswers({...answers, [q.id]: 'False'})} />
+                        <label className={`bpq-tf-btn ${ans === 'False' || ans?.text === 'False' ? 'active-false' : ''}`} style={{ pointerEvents: ans ? 'none' : 'auto', opacity: ans && ans !== 'False' && ans?.text !== 'False' ? 0.5 : 1 }}>
+                            <input type="radio" hidden disabled={!!ans} onChange={() => !ans && setAnswers({...answers, [q.id]: 'False'})} />
                             <i className="fa-solid fa-xmark"></i> FALSE
                         </label>
                     </div>
@@ -948,11 +948,13 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
                 ) : (
                     <div className="bpq-mc-pad">
                         {q.options?.map((opt, i) => {
-                            const isSelected = ans === opt || ans?.text === opt?.text;
+                            const optText = opt.text || opt;
+                            const ansText = ans?.text || ans;
+                            const isSelected = ansText !== undefined && ansText === optText;
                             return (
-                                <label key={i} className={`bpq-mc-btn ${isSelected ? 'active' : ''}`}>
-                                    <input type="radio" hidden onChange={() => setAnswers({...answers, [q.id]: opt})} />
-                                    <div className="bpq-mc-indicator"></div> <span>{opt.text || opt}</span>
+                                <label key={i} className={`bpq-mc-btn ${isSelected ? 'active' : ''}`} style={{ pointerEvents: ans ? 'none' : 'auto', opacity: ans && !isSelected ? 0.5 : 1 }}>
+                                    <input type="radio" hidden disabled={!!ans} onChange={() => !ans && setAnswers({...answers, [q.id]: opt})} />
+                                    <div className="bpq-mc-indicator"></div> <span>{optText}</span>
                                 </label>
                             );
                         })}
