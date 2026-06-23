@@ -248,9 +248,20 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
     const jumpToPage = (pageNum) => {
         if (!viewportRef.current || pages.length === 0) return;
         const target = Math.max(1, Math.min(parseInt(pageNum) || 1, pages.length));
-        const approxPageHeight = 1183;
-        const targetY = (target - 1) * approxPageHeight * currentScale.current;
-        viewportRef.current.scrollTo({ top: targetY, behavior: 'auto' });
+        
+        // Find the exact physical DOM element of the target page
+        const pageNode = viewportRef.current.querySelector(`.page-wrapper[data-page-number="${target}"]`);
+        
+        if (pageNode) {
+            // Read the hardware-accurate unscaled Y coordinate, multiply by the viewport scale
+            const targetY = pageNode.offsetTop * currentScale.current;
+            viewportRef.current.scrollTo({ top: targetY, behavior: 'auto' });
+        } else {
+            // Failsafe in case the DOM query fails
+            const approxPageHeight = 1183;
+            const targetY = (target - 1) * approxPageHeight * currentScale.current;
+            viewportRef.current.scrollTo({ top: targetY, behavior: 'auto' });
+        }
         setIsJumpMode(false);
     };
 
