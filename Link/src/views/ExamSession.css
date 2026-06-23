@@ -139,6 +139,8 @@
 .q-actions { display: flex; gap: 15px; }
 .q-actions button { background: none; border: none; color: #707070; font-size: 0.9rem; cursor: pointer; }
 .q-actions button.active { color: #ffab40; }
+.q-actions button.report-btn { transition: color 0.3s; }
+.q-actions button.report-btn:hover { color: #ff5f5f; }
 .q-actions button.hint { color: var(--cyber-gold); transition: all 0.3s; }
 .q-actions button.hint.active-hint {
     color: #fff;
