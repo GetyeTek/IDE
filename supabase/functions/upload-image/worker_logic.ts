@@ -105,6 +105,8 @@ function formatTranscriptionForAI(transcription: any, requestId: string): string
 }
 
 async function getGeminiKey(supabase: any, requestId: string) {
+  console.log(`[${requestId}] [DEBUG_KEY_FETCH] Querying api_keys table... SUPABASE_URL: ${SUPABASE_URL}`);
+  
   const { data, error } = await supabase.from('api_keys')
     .select('id, api_key')
     .eq('service', 'gemini')
@@ -114,7 +116,47 @@ async function getGeminiKey(supabase: any, requestId: string) {
     .limit(1)
     .single();
 
-  if (error || !data) throw new Error("No available Gemini keys (all may be on cooldown or inactive)");
+  if (error || !data) {
+    console.error(`[${requestId}] [DEBUG_KEY_FAIL] getGeminiKey failed!`);
+    
+    if (error) {
+      console.error(`[${requestId}] [DEBUG_KEY_FAIL] Supabase Database Error Details:`, {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+    } else {
+      console.log(`[${requestId}] [DEBUG_KEY_FAIL] Query succeeded but returned 0 active/non-cooldown keys.`);
+    }
+
+    // High-fidelity Diagnostic Health Check
+    try {
+      console.log(`[${requestId}] [DIAGNOSTIC] Running safety audit on 'api_keys' table...`);
+      const { data: allKeys, error: diagError } = await supabase
+        .from('api_keys')
+        .select('id, service, is_active, cooldown_until, last_used_at');
+
+      if (diagError) {
+        console.error(`[${requestId}] [DIAGNOSTIC_FAIL] Could not query api_keys table for diagnostics:`, {
+          message: diagError.message,
+          code: diagError.code,
+          details: diagError.details,
+          hint: diagError.hint
+        });
+      } else if (allKeys) {
+        console.log(`[${requestId}] [DIAGNOSTIC_SUCCESS] Found ${allKeys.length} total raw keys in table:`);
+        allKeys.forEach((k: any, idx: number) => {
+          console.log(`[${requestId}] [DIAGNOSTIC] Key #${idx + 1} -> ID: ${k.id} | Service: ${k.service} | Active: ${k.is_active} | Cooldown Until: ${k.cooldown_until} | Last Used At: ${k.last_used_at}`);
+        });
+      }
+    } catch (diagException: any) {
+      console.error(`[${requestId}] [DIAGNOSTIC_CRASH] Diagnostic query threw unexpected crash:`, diagException?.message || diagException);
+    }
+
+    throw new Error(`No available Gemini keys (all may be on cooldown or inactive) for project URL: ${SUPABASE_URL}`);
+  }
+
   await supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', data.id);
   return { id: data.id, key: data.api_key };
 }
