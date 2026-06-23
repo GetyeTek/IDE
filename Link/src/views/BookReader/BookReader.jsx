@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { invokeBookReader } from '../../config/api.js';
 import './BookReader.css';
 import { renderBookBlock } from './subjects/Registry.jsx';
+import BookLoader from '../../components/ui/BookLoader.jsx';
 
 const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexOverride }) => {
     const [loading, setLoading] = useState(true);
@@ -632,7 +633,11 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
                         ))}
                     </div>
                 </div>
-                {(!layoutReady) && <div className="loading-spinner">Calibrating Knowledge Engine...</div>}
+                {(!layoutReady) && (
+                    <div className="loading-spinner">
+                        <BookLoader />
+                    </div>
+                )}
             </div>
 
             {/* --- MINI MIRON OVERLAY --- */}
