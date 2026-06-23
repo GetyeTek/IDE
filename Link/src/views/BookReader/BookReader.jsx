@@ -734,6 +734,44 @@ const BookReader = ({ book, onClose, targetPageNumber, targetBlockIndex, zIndexO
 };
 
 // --- INLINE BOOK QUESTIONS COMPONENT ---
+const getNormalizedMatchingData = (q) => {
+    if (q.matching_data && q.matching_data.left_column && q.matching_data.left_column.length > 0) {
+        return q.matching_data;
+    }
+    if (q.options && Array.isArray(q.options) && q.options.length > 0) {
+        const getStr = (arr, prefix) => {
+            const found = arr.find(o => {
+                const text = typeof o === 'string' ? o : o.text;
+                return typeof text === 'string' && text.startsWith(prefix);
+            });
+            return typeof found === 'string' ? found : found?.text;
+        };
+        
+        const leftStr = getStr(q.options, 'Column A:');
+        const rightStr = getStr(q.options, 'Column B:');
+        
+        if (leftStr && rightStr) {
+            const parseStr = (str, prefix, splitRegex) => {
+                const cleaned = str.replace(prefix, '').trim();
+                const parts = cleaned.split(splitRegex);
+                const items = [];
+                for (let i = 1; i < parts.length; i += 2) {
+                    let item = (parts[i+1] || '').trim();
+                    if (item.endsWith(',')) item = item.slice(0, -1).trim();
+                    items.push(item);
+                }
+                return items;
+            };
+            
+            return {
+                left_column: parseStr(leftStr, 'Column A:', /(\b\d+\.\s+)/),
+                right_column: parseStr(rightStr, 'Column B:', /(\b[A-Z]\.\s+)/)
+            };
+        }
+    }
+    return { left_column: [], right_column: [] };
+};
+
 const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
     const [qIndex, setQIndex] = useState(0);
     const [answers, setAnswers] = useState({});
@@ -742,6 +780,7 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
     if (!questions || questions.length === 0) return null;
     const q = questions[qIndex];
     const ans = answers[q.id];
+    const matchData = getNormalizedMatchingData(q);
 
     return (
         <div className="bpq-container">
@@ -762,10 +801,10 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
                             <i className="fa-solid fa-xmark"></i> FALSE
                         </label>
                     </div>
-                ) : ((q.question_type && q.question_type.toLowerCase() === 'matching') || q.matching_data) ? (
-                    <div className={`interactive-match-container ${(q.matching_data?.right_column?.some(r => (r.text || r).length > 45) || q.matching_data?.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
+                ) : ((q.question_type && q.question_type.toLowerCase() === 'matching') || matchData.left_column?.length > 0) ? (
+                    <div className={`interactive-match-container ${(matchData.right_column?.some(r => (r.text || r).length > 45) || matchData.left_column?.some(l => (l.text || l).length > 45)) ? 'vertical-match' : ''}`}>
                         <div className="match-col match-left">
-                            {q.matching_data?.left_column?.map((item, idx) => {
+                            {matchData.left_column?.map((item, idx) => {
                                 const qAnswers = ans || {};
                                 const currentActive = activeMatch[q.id];
                                 const isPaired = qAnswers[idx] !== undefined;
@@ -782,7 +821,7 @@ const PageQuestionsBlock = ({ questions, pageNumber, pageKey, onExplain }) => {
                             })}
                         </div>
                         <div className={`match-col match-right ${activeMatch[q.id] !== undefined ? 'is-listening' : ''}`}>
-                            {q.matching_data?.right_column?.map((item, idx) => {
+                            {matchData.right_column?.map((item, idx) => {
                                 const qAnswers = ans || {};
                                 const currentActive = activeMatch[q.id];
                                 const usedByLeftIdx = Object.keys(qAnswers).find(k => qAnswers[k] === idx);
