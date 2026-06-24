@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from './config/supabaseClient.js';
+import Auth from './views/Auth.jsx';
 
 // Placeholder imports for views we will create in the next session
 import Home from './views/Home.jsx';
@@ -12,7 +14,24 @@ import MironChat from './views/MironChat.jsx';
 
 const App = () => {
   console.log("App Component Rendering...");
+  const [session, setSession] = useState(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
+
+  useEffect(() => {
+    // 1. Check active session on load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setIsCheckingAuth(false);
+    });
+
+    // 2. Listen for login/logout events in realtime
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [mironContext, setMironContext] = useState(null); // null means closed, object holds selection context
 
@@ -44,6 +63,21 @@ const App = () => {
       default: return <Home onOpenActivity={() => setIsActivityOpen(true)} />;
     }
   };
+
+  // The Minimalist Auth Gate Loader
+  if (isCheckingAuth) {
+    return (
+      <div style={{ height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0c0c0c', color: '#42d7b8', flexDirection: 'column', gap: '1rem' }}>
+        <i className="fas fa-circle-notch fa-spin" style={{ fontSize: '2rem' }}></i>
+        <div style={{ fontFamily: 'Roboto Mono, monospace', fontSize: '0.9rem', letterSpacing: '2px' }}>INITIALIZING LINKUP</div>
+      </div>
+    );
+  }
+
+  // The Auth Gateway Interceptor
+  if (!session) {
+    return <Auth />;
+  }
 
   return (
     <div className="app-container">
