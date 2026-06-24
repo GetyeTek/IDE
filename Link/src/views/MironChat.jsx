@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import ReactMarkdown from 'https://esm.sh/react-markdown@9';
+import { marked } from 'https://esm.sh/marked';
 import { invokeMiron } from '../config/api.js';
 import { renderBookBlock } from './BookReader/subjects/Registry.jsx';
 import './MironChat.css';
@@ -124,31 +124,36 @@ const MironChat = ({ onClose, initialContext }) => {
                             <span className="miron-thought">{m.thought}</span>
                         )}
                         <div className="athena-bubble">
-                            {(!m.snapshots || m.snapshots.length === 0) ? (
-                                <ReactMarkdown>{m.text}</ReactMarkdown>
-                            ) : (
-                                m.text.split(/(\[SNAPSHOT_\d+\])/g).map((part, idx) => {
-                                    const snapMatch = part.match(/\[SNAPSHOT_(\d+)\]/);
-                                    if (snapMatch) {
-                                        const snapId = parseInt(snapMatch[1], 10);
-                                        const snap = m.snapshots.find(s => s.id === snapId);
-                                        if (!snap) return <span key={idx} style={{color:'red'}}>[Snapshot Error]</span>;
-                                        
-                                        return (
-                                            <div key={idx} className="inline-chat-snapshot">
-                                                <div className="snapshot-topbar">
-                                                    <span><i className="fas fa-file-pdf"></i> {snap.book_title || snap.course_code}</span>
-                                                    <span>Page {snap.page_number}</span>
-                                                </div>
-                                                <div className="snapshot-content">
-                                                    {snap.blocks.map((b, i) => renderBookBlock(b, i, {}))}
-                                                </div>
+                            {m.text.split(/(\[SNAPSHOT_\d+\])/g).map((part, idx) => {
+                                const snapMatch = part.match(/\[SNAPSHOT_(\d+)\]/);
+                                if (snapMatch) {
+                                    const snapId = parseInt(snapMatch[1], 10);
+                                    const snap = m.snapshots?.find(s => s.id === snapId);
+                                    if (!snap) return null;
+                                    
+                                    return (
+                                        <div key={idx} className="inline-chat-snapshot">
+                                            <div className="snapshot-topbar">
+                                                <span><i className="fas fa-file-pdf"></i> {snap.book_title || snap.course_code}</span>
+                                                <span>Page {snap.page_number}</span>
                                             </div>
-                                        );
-                                    }
-                                    return part.trim() ? <ReactMarkdown key={idx}>{part}</ReactMarkdown> : null;
-                                })
-                            )}
+                                            <div className="snapshot-content">
+                                                {snap.blocks.map((b, i) => renderBookBlock(b, i, {}))}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                
+                                // Render Markdown Text safely via Marked.js
+                                if (!part.trim()) return null;
+                                return (
+                                    <div 
+                                        key={idx} 
+                                        className="miron-markdown-chunk"
+                                        dangerouslySetInnerHTML={{ __html: marked.parse(part) }} 
+                                    />
+                                );
+                            })}
                         </div>
                     </div>
                 ))}
