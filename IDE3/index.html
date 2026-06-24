@@ -8130,9 +8130,17 @@ async function downloadArtifact(runId) {
     function closeBucketManager() {
         document.getElementById('bucket-manager-overlay').classList.remove('active');
         toggleFab(true);
+        
+        // Hard wipe state to prevent ghosting on reopen
         storageCurrentBucket = null;
         storageCurrentPath = [];
-        // Ensure footer is hidden for next open
+        storageObjects = [];
+        const container = document.getElementById('storage-content');
+        if (container) {
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:#444;">Closing session...</div>';
+            container.onscroll = null;
+        }
+        
         const footer = document.getElementById('storage-footer');
         if (footer) footer.style.display = 'none';
     }
@@ -8162,10 +8170,14 @@ async function downloadArtifact(runId) {
         // Reset state and listeners to prevent navigation bugs
         storageCurrentBucket = null;
         storageCurrentPath = [];
+        storageObjects = []; // Wipe cached objects immediately
+        
         const container = document.getElementById('storage-content');
         container.onscroll = null; 
+        container.scrollTop = 0; // Reset scroll position
 
-        container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Scanning Buckets...</div>';
+        // Immediate visual feedback
+        container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent); animation:pulse 1.5s infinite;">Scanning Buckets...</div>';
         document.getElementById('storage-title').innerText = "Storage Buckets";
         document.getElementById('storage-breadcrumbs').style.display = 'none';
         document.getElementById('storage-controls').style.display = 'none';
@@ -8222,7 +8234,12 @@ async function downloadArtifact(runId) {
             storageOffset = 0;
             storageHasMore = true;
             storageObjects = [];
-            container.innerHTML = '<div style="padding:40px; text-align:center; color:var(--ai-accent);">Reading Objects...</div>';
+            container.scrollTop = 0; // Instant scroll reset
+            // Use a specific "Entering" loader so user knows navigation is happening
+            container.innerHTML = `<div style="padding:40px; text-align:center;">
+                <div style="color:var(--ai-accent); font-size:12px; margin-bottom:10px;">Entering ${storageCurrentPath[storageCurrentPath.length-1] || storageCurrentBucket}...</div>
+                <div style="font-size:10px; color:#444;">Fetching storage metadata</div>
+            </div>`;
         } else {
             const loader = document.createElement('div');
             loader.id = 'storage-scroll-loader';
@@ -8329,6 +8346,10 @@ async function downloadArtifact(runId) {
     }
 
     function navigateToStorageDepth(index) {
+        // Instant visual feedback for breadcrumb navigation
+        const container = document.getElementById('storage-content');
+        if (container) container.innerHTML = '<div style="padding:40px; text-align:center; color:#666;">Navigating back...</div>';
+        
         storageCurrentPath = storageCurrentPath.slice(0, index + 1);
         fetchStorageObjects();
     }
