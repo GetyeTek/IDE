@@ -24,9 +24,14 @@
                     if (!iframe) {
                         iframe = document.createElement('iframe');
                         iframe.id = 'conduit-popout-iframe';
-                        iframe.style.width = '100vw';
-                        iframe.style.height = '100vh';
+                        // Bulletproof Fullscreen Iframe Styling
+                        iframe.style.position = 'absolute';
+                        iframe.style.top = '0';
+                        iframe.style.left = '0';
+                        iframe.style.width = '100%';
+                        iframe.style.height = '100dvh';
                         iframe.style.border = 'none';
+                        iframe.style.display = 'block';
                         iframe.sandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups";
                         document.body.innerHTML = '';
                         document.body.appendChild(iframe);
