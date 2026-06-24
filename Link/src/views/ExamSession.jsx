@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ReactMarkdown from 'https://esm.sh/react-markdown@9';
+import { marked } from 'https://esm.sh/marked';
 import { invokeBookReader } from '../config/api.js';
 import { renderBookBlock } from './BookReader/subjects/Registry.jsx';
 import BookReader from './BookReader/BookReader.jsx';
@@ -327,9 +327,11 @@ const ExamSession = ({ exam, onClose }) => {
                                             <div className="ai-exp-header">
                                                 <i className="fas fa-sparkles"></i> Miron Synthesis
                                             </div>
-                                            <div className="ai-exp-body">
-    <ReactMarkdown>{hints[q.id].data?.explanation || "Miron is synthesizing the textbook snapshot above to clarify why this choice is correct..."}</ReactMarkdown>
-</div>
+                                                                                    <div className="ai-exp-body" 
+                                             dangerouslySetInnerHTML={{ 
+                                                __html: marked.parse(hints[q.id].data?.explanation || "Miron is synthesizing the textbook snapshot above to clarify why this choice is correct...") 
+                                             }} 
+                                        />
                                         </div>
 
                                         <div className="insight-actions">
