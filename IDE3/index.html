@@ -7,21 +7,18 @@
             const params = new URLSearchParams(window.location.search);
             if (params.has('conduit_preview')) {
                 window.IS_CONDUIT_PREVIEW = true;
-                // Hide default UI initially
                 document.documentElement.style.display = 'none';
                 
                 const channel = new BroadcastChannel('conduit_speedster_sync');
                 
                 const loadPreview = (payload) => {
-                    if (!payload) return;
                     window.IS_LOADING_PREVIEW = true;
-                    
-                    // Force visibility and normalize body for iframe injection
                     document.documentElement.style.display = 'block';
                     document.body.style.margin = '0';
                     document.body.style.padding = '0';
                     document.body.style.overflow = 'hidden';
-                    document.body.style.background = '#fff';
+                    // Use dark background to prevent blinding white flash before app CSS loads
+                    document.body.style.background = '#050505'; 
                     
                     let iframe = document.getElementById('conduit-popout-iframe');
                     if (!iframe) {
@@ -35,23 +32,39 @@
                         document.body.appendChild(iframe);
                     }
                     
-                    // Priority 1: Cross-window Blob URL sharing (preserves importMaps perfectly)
                     if (window.opener && window.opener.PREVIEW_BLOB_URL) {
-                        iframe.src = window.opener.PREVIEW_BLOB_URL;
-                    } else if (payload.html) {
-                        // Fallback (fails on blob imports, but works for pure inline HTML)
+                        if (iframe.src !== window.opener.PREVIEW_BLOB_URL) {
+                            iframe.src = window.opener.PREVIEW_BLOB_URL;
+                        }
+                    } else if (payload && payload.html) {
                         iframe.srcdoc = payload.html;
                     }
                 };
 
                 channel.onmessage = (e) => {
                     if (e.data.type === 'REFRESH_PREVIEW') {
-                        loadPreview(e.data.payload);
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', () => loadPreview(e.data.payload));
+                        } else {
+                            loadPreview(e.data.payload);
+                        }
                     }
                 };
 
-                // Trigger request to Master IDE
-                channel.postMessage({ type: 'REQUEST_INITIAL_STATE' });
+                const init = () => {
+                    if (window.opener && window.opener.PREVIEW_BLOB_URL) {
+                        // Instant mount: Bypass the IPC round-trip to prevent a 500ms re-bundle delay
+                        loadPreview(null);
+                    } else {
+                        channel.postMessage({ type: 'REQUEST_INITIAL_STATE' });
+                    }
+                };
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', init);
+                } else {
+                    init();
+                }
 
                 // Fallback UI if Master IDE is unresponsive
                 setTimeout(() => {
