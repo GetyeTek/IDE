@@ -292,6 +292,14 @@ serve(async (req) => {
               allMatches.sort((a: any, b: any) => b.score - a.score);
               const topMatches = allMatches.slice(0, 5).map((m: any) => m.metadata);
               
+              // [SURGICAL LOG] Pinecone Results Diagnostic
+              console.log(`\n--- [PIPELINE DIAGNOSTIC: PINECONE] ---`);
+              console.log(`Query: "${args.optimized_query}"`);
+              console.log(`Total Chunks Gathered: ${allMatches.length}`);
+              console.log(`Top Match Score: ${allMatches[0]?.score}`);
+              console.log(`Top Match Source: ${allMatches[0]?.metadata?.book_title} (Page ${allMatches[0]?.metadata?.page_number})`);
+              console.log(`---------------------------------------\n`);
+
               toolResult = { status: "success", matches: topMatches };
             }
             else if (name === "get_book_toc") {
@@ -363,6 +371,17 @@ serve(async (req) => {
         });
 
         const toolResponses = await Promise.all(toolExecutionPromises);
+
+        // [SURGICAL LOG] Pipeline Feed Verification
+        console.log(`\n--- [PIPELINE DIAGNOSTIC: FEEDBACK] ---`);
+        toolResponses.forEach(r => {
+            const size = JSON.stringify(r.content).length;
+            console.log(`Tool "${r.name}" output successfully mapped to history. Payload Size: ${size} chars.`);
+            if (r.name === 'search_textbook_material' && r.content.matches) {
+                executedTools.push(`Successfully fed ${r.content.matches.length} semantic chunks to Miron's reasoning engine.`);
+            }
+        });
+        console.log(`---------------------------------------\n`);
 
         // Push Miron's request and our Tool Responses into the history to keep the loop going
         messages.push(candidate.content);
