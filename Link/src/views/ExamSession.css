@@ -207,17 +207,18 @@
 }
 
 .snapshot-content {
-    padding: 20px 24px;
+    padding: 15px 18px; /* Maximizing horizontal real-estate */
     font-family: 'Times New Roman', Times, 'Nyala', 'Abyssinica SIL', serif;
-    font-size: 0.85rem; /* Scaled down for that high-density look */
-    line-height: 1.5;
+    font-size: 0.75rem; /* Ultra-dense scholar mode */
+    line-height: 1.35; /* Tight academic spacing */
     background-color: #ffffff !important;
     background-image: linear-gradient(#ffffff, #ffffff) !important;
     color: #1a1a1a !important;
     -webkit-text-fill-color: #1a1a1a !important;
-    text-align: justify; /* Real textbook justification */
+    text-align: justify;
     hyphens: auto;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em; /* Tighter character tracking */
+    word-spacing: -0.05em;
 }
 
 /* Hard-override Registry blocks to inherit the bypass */
@@ -226,7 +227,7 @@
     -webkit-text-fill-color: inherit !important;
 }
 
-/* Hard-override Registry blocks for compact snapshot rendering */
+/* Hard-override Registry blocks for Ultra-Dense rendering */
 .snapshot-content .univ-p-block, 
 .snapshot-content .univ-h-block,
 .snapshot-content .logic-chapter-num,
@@ -236,18 +237,21 @@
 .snapshot-content .logic-argument-conclusion {
     color: #1a1a1a !important;
     -webkit-text-fill-color: #1a1a1a !important;
-    margin-bottom: 8px !important; /* Tighten vertical gaps */
-    font-size: 1em !important; /* Inherit the 0.85rem from parent */
+    margin-bottom: 4px !important; /* Minimalist vertical gaps */
+    font-size: 1em !important;
+    line-height: inherit !important;
 }
 
 .snapshot-content .univ-h-block {
-    font-size: 1.1em !important;
-    margin-top: 5px !important;
+    font-size: 1.05em !important;
+    margin-top: 4px !important;
+    margin-bottom: 2px !important;
 }
 
 .snapshot-content .logic-argument-block {
-    margin: 10px auto !important;
-    font-size: 0.95em !important;
+    margin: 6px auto !important;
+    font-size: 1em !important;
+    gap: 0 !important;
 }
 
 .snapshot-content .univ-p-block,
