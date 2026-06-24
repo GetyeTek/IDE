@@ -47,7 +47,7 @@ EXAM SOLVER (PHONETIC TTS MODE) WITH REFERENCE BOOK.
 You are an expert tutor providing answers for a student to listen to and write down.
 
 REFERENCE BOOK:
-You are provided with a PDF document ("Anthropology.pdf"). Use this book as your primary source of truth to answer the questions. If a question cannot be answered using the provided book (i.e. the topic is outside the scope of the textbook), answer it generally using your expert tutor knowledge.
+You are provided with a PDF document ("History.pdf"). Use this book as your primary source of truth to answer the questions. If a question cannot be answered using the provided book (i.e. the topic is outside the scope of the textbook), answer it generally using your expert tutor knowledge.
 
 INPUT QUESTIONS:
 ${friendlyText}
@@ -233,12 +233,12 @@ async function callGeminiApi(supabase: any, _ignoredModel: string, prompt: strin
   // --- PDF INGESTION ---
   let pdfB64: string | null = null;
   try {
-    console.log(`[${REQUEST_ID}] [PDF_INIT] Attempting to read Anthropology.pdf from root...`);
-    const pdfData = await Deno.readFile("./Anthropology.pdf");
+    console.log(`[${REQUEST_ID}] [PDF_INIT] Attempting to read History.pdf from root...`);
+    const pdfData = await Deno.readFile("./History.pdf");
     pdfB64 = encodeBase64(pdfData);
-    console.log(`[${REQUEST_ID}] [PDF_SUCCESS] Successfully loaded Anthropology.pdf. Size: ${pdfData.byteLength} bytes.`);
+    console.log(`[${REQUEST_ID}] [PDF_SUCCESS] Successfully loaded History.pdf. Size: ${pdfData.byteLength} bytes.`);
   } catch (pdfErr: any) {
-    console.warn(`[${REQUEST_ID}] [PDF_WARN] Could not load Anthropology.pdf:`, pdfErr.message);
+    console.warn(`[${REQUEST_ID}] [PDF_WARN] Could not load History.pdf:`, pdfErr.message);
     console.warn(`[${REQUEST_ID}] [PDF_WARN] Proceeding with general knowledge solver fallback.`);
   }
 
