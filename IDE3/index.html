@@ -4304,65 +4304,139 @@
         iframe.replaceWith(loaderIframe);
         iframe = loaderIframe;
 
-        // Cleanup old Blob URLs to prevent severe memory leaks
-        if (window.ACTIVE_BLOB_URLS && window.ACTIVE_BLOB_URLS.length > 0) {
-            window.ACTIVE_BLOB_URLS.forEach(url => URL.revokeObjectURL(url));
+        // Wipe cache if we are time-traveling to an old commit
+        if (sha && window.CURRENT_FILE_CACHE) {
+            Object.values(window.CURRENT_FILE_CACHE).forEach(f => f.blobUrl && URL.revokeObjectURL(f.blobUrl));
+            window.CURRENT_FILE_CACHE = {}; 
         }
-        window.ACTIVE_BLOB_URLS = [];
-
-        const fileCache = {}; window.CURRENT_FILE_CACHE = fileCache;
+        
+        if (!window.CURRENT_FILE_CACHE) window.CURRENT_FILE_CACHE = {};
+        const fileCache = window.CURRENT_FILE_CACHE;
 
         try {
             const isSingle = CONFIG.previewFetchMode === 'single';
-            let files = {};
+            let files = {}; // Holds ONLY the dirty files to be updated this cycle
 
             if (CONFIG.ghToken) {
-                // [DIRECT GH BRIDGE] Bypass Supabase Egress
+                // [SPEEDSTER GH BRIDGE]
                 const ref = sha || 'conduit-dev';
                 if (isSingle) {
                     const targetPath = effectiveRoot + "index.html";
                     const data = await githubRequest(`/contents/${targetPath}?ref=${ref}`);
                     if (data.content) files[targetPath] = { content: data.content, sha: data.sha, size: data.size };
                 } else {
-                    // Full Bundle Fetch from GH API
                     const treeData = await githubRequest(`/git/trees/${ref}?recursive=1`);
                     const blobs = (treeData.tree || []).filter(f => f.type === "blob" && (!effectiveRoot || f.path.startsWith(effectiveRoot)));
                     
-                    showGlobalToast(`[GH Bridge] Bundling ${blobs.length} files...`);
+                    const toFetch = [];
+                    const currentPaths = blobs.map(b => b.path);
                     
-                    // Parallel Content Fetching
-                    const BATCH_SIZE = 12;
-                    for (let i = 0; i < blobs.length; i += BATCH_SIZE) {
-                        const batch = blobs.slice(i, i + BATCH_SIZE);
-                        const results = await Promise.all(batch.map(async (b) => {
-                             try {
-                                 const data = await githubRequest(`/contents/${b.path}?ref=${ref}`);
-                                 return { path: b.path, content: data.content, sha: data.sha, size: data.size };
-                             } catch (e) { return null; }
-                        }));
-                        results.forEach(r => { if(r) files[r.path] = r; });
+                    // 1. Identify missing or modified files (Delta Check)
+                    blobs.forEach(b => {
+                        const cached = fileCache[b.path];
+                        if (!cached || cached.sha !== b.sha) toFetch.push(b);
+                    });
+
+                    // 2. Memory Cleanup: Remove deleted files from RAM
+                    Object.keys(fileCache).forEach(p => {
+                        if (p.startsWith(effectiveRoot) && !currentPaths.includes(p)) {
+                            if (fileCache[p].blobUrl) URL.revokeObjectURL(fileCache[p].blobUrl);
+                            delete fileCache[p];
+                        }
+                    });
+
+                    if (toFetch.length > 0) {
+                        showGlobalToast(`[Speedster] Syncing ${toFetch.length} updated files...`);
+                        
+                        const BATCH_SIZE = 12;
+                        for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
+                            const batch = toFetch.slice(i, i + BATCH_SIZE);
+                            const results = await Promise.all(batch.map(async (b) => {
+                                 try {
+                                     const data = await githubRequest(`/contents/${b.path}?ref=${ref}`);
+                                     return { path: b.path, content: data.content, sha: data.sha, size: data.size };
+                                 } catch (e) { return null; }
+                            }));
+                            results.forEach(r => { if(r) files[r.path] = r; });
+                        }
+                    } else {
+                        console.log("[Speedster] No changes detected. Virtual Cache is active.");
                     }
                 }
             } else {
-                // [LEGACY] Fetch via Supabase
-                const bundleRes = await fetch(CONFIG.funcUrl, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ action: 'fetch_project_bundle', project_path: effectiveRoot, ref_sha: sha, single_file: isSingle })
-                });
-                const bundleData = await bundleRes.json();
-                files = bundleData.files || {};
+                // [LEGACY SUPABASE SPEEDSTER]
+                if (isSingle) {
+                    const targetPath = effectiveRoot + "index.html";
+                    const bundleRes = await fetch(CONFIG.funcUrl, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: apiBody({ action: 'preview_file', file_path: targetPath, ref_sha: sha })
+                    });
+                    const data = await bundleRes.json();
+                    if (data.content) files[targetPath] = { content: data.content, sha: data.sha || 'single' };
+                } else {
+                    const treeRes = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch' }) });
+                    const treeData = await treeRes.json();
+                    const blobs = (treeData.files || []).filter(f => !effectiveRoot || f.path.startsWith(effectiveRoot));
+                    
+                    const toFetch = [];
+                    const currentPaths = blobs.map(b => b.path);
+                    
+                    blobs.forEach(b => {
+                        const cached = fileCache[b.path];
+                        if (!cached || cached.sha !== b.sha) toFetch.push(b.path);
+                    });
+
+                    Object.keys(fileCache).forEach(p => {
+                        if (p.startsWith(effectiveRoot) && !currentPaths.includes(p)) {
+                            if (fileCache[p].blobUrl) URL.revokeObjectURL(fileCache[p].blobUrl);
+                            delete fileCache[p];
+                        }
+                    });
+
+                    if (toFetch.length > 0) {
+                        if (toFetch.length > 20 || !treeData.files) {
+                            showGlobalToast(`[Speedster] Syncing ${toFetch.length} files (Bulk Mode)...`);
+                            const bundleRes = await fetch(CONFIG.funcUrl, {
+                                method: 'POST', headers: {'Content-Type': 'application/json'},
+                                body: apiBody({ action: 'fetch_project_bundle', project_path: effectiveRoot, ref_sha: sha, single_file: isSingle })
+                            });
+                            const bundleData = await bundleRes.json();
+                            files = bundleData.files || {};
+                        } else {
+                            showGlobalToast(`[Speedster] Syncing ${toFetch.length} files (Surgical Mode)...`);
+                            const BATCH_SIZE = 8;
+                            for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
+                                const batch = toFetch.slice(i, i + BATCH_SIZE);
+                                const results = await Promise.all(batch.map(async (p) => {
+                                    try {
+                                        const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'preview_file', file_path: p, ref_sha: sha }) });
+                                        const data = await res.json();
+                                        return { path: p, content: data.content, sha: data.sha || 'unknown' };
+                                    } catch(e) { return null; }
+                                }));
+                                results.forEach(r => { if(r) files[r.path] = r; });
+                            }
+                        }
+                    }
+                }
             }
             
-            if (Object.keys(files).length === 0) throw new Error(`No files found in scope: ${effectiveRoot}`);
+            if (Object.keys(files).length === 0 && Object.keys(fileCache).length === 0) {
+                throw new Error(`No files found in scope: ${effectiveRoot}`);
+            }
 
             const binaryExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'woff', 'woff2', 'ttf', 'webp'];
             for (const path in files) {
                 const f = files[path];
                 const ext = path.split('.').pop().toLowerCase();
                 const isBinary = binaryExts.includes(ext);
+                
+                // Revoke old blob to prevent memory leak on update
+                if (fileCache[path] && fileCache[path].blobUrl) URL.revokeObjectURL(fileCache[path].blobUrl);
+
                 fileCache[path] = {
                     content: isBinary ? base64ToUint8Array(f.content) : b64DecodeUnicode(f.content),
-                    ext, isBinary, sha: f.sha
+                    ext, isBinary, sha: f.sha, needsProcessing: true
                 };
             }
 
@@ -4402,61 +4476,57 @@
 
                 const file = fileCache[fullPath];
                 const virtualPath = fullPath.startsWith(effectiveRoot) ? fullPath.substring(effectiveRoot.length) : fullPath;
-                const isJs = ['js', 'mjs', 'ts', 'jsx', 'tsx'].includes(file.ext);
-
-                        if (isJs) {
-            // 1. Compile JSX/TSX first so that any newly injected imports are present before regex parsing
-            if (['jsx', 'tsx'].includes(file.ext)) {
-                try {
-                    const res = Babel.transform(file.content, { 
-                        presets: [
-                            ['env', { modules: false }], 
-                            ['react', { runtime: 'automatic' }]
-                        ], 
-                        filename: fullPath 
-                    });
-                    file.content = res.code;
-                } catch (e) { 
-                    throw new Error(`Babel Error in ${fullPath}: ${e.message}`); 
-                }
-            }
-
-            // 2. Perform import replacement on the final JavaScript output
-            file.content = file.content.replace(/(import|export)([^;\n]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
-                // 1. Keep absolute URLs as is
-                if (importPath.startsWith('http')) return match;
                 
-                // 2. Handle Local Files
-                // Only rewrite if it looks like a file path (has an extension or is a directory jump)
-                if (importPath.startsWith('.') && (importPath.includes('/') || importPath.includes('.'))) {
-                    const resolvedFull = resolvePath(fullPath, importPath);
-                    if (resolvedFull.startsWith(effectiveRoot)) return `${keyword}${mid}${q1}${resolvedFull.substring(effectiveRoot.length)}${q2}`;
-                    return match;
+                if (file.needsProcessing) {
+                    const isJs = ['js', 'mjs', 'ts', 'jsx', 'tsx'].includes(file.ext);
+
+                    if (isJs) {
+                        // 1. Compile JSX/TSX first so that any newly injected imports are present before regex parsing
+                        if (['jsx', 'tsx'].includes(file.ext)) {
+                            try {
+                                const res = Babel.transform(file.content, { 
+                                    presets: [
+                                        ['env', { modules: false }], 
+                                        ['react', { runtime: 'automatic' }]
+                                    ], 
+                                    filename: fullPath 
+                                });
+                                file.content = res.code;
+                            } catch (e) { 
+                                throw new Error(`Babel Error in ${fullPath}: ${e.message}`); 
+                            }
+                        }
+
+                        // 2. Perform import replacement on the final JavaScript output
+                        file.content = file.content.replace(/(import|export)([^;\n]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
+                            if (importPath.startsWith('http')) return match;
+                            
+                            if (importPath.startsWith('.') && (importPath.includes('/') || importPath.includes('.'))) {
+                                const resolvedFull = resolvePath(fullPath, importPath);
+                                if (resolvedFull.startsWith(effectiveRoot)) return `${keyword}${mid}${q1}${resolvedFull.substring(effectiveRoot.length)}${q2}`;
+                                return match;
+                            }
+
+                            if (importMap.imports[importPath]) return match;
+                            if (Object.keys(importMap.imports).some(k => k === importPath || k === './' + importPath)) return match;
+
+                            return `${keyword}${mid}${q1}https://esm.sh/${importPath}${q2}`;
+                        });
+                    }
+
+                    if (file.ext === 'css') {
+                        const cleanCss = file.content.replace(/`/g, '\\`').replace(/\\/g, '\\\\');
+                        file.content = `const s = document.createElement('style'); s.textContent = \`${cleanCss}\`; document.head.appendChild(s);`;
+                        file.ext = 'js';
+                    }
+
+                    const mimeMap = { 'js': 'text/javascript', 'jsx': 'text/javascript', 'ts': 'text/javascript', 'tsx': 'text/javascript', 'html': 'text/html', 'css': 'text/css', 'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'svg': 'image/svg+xml' };
+                    const mime = mimeMap[file.ext] || 'application/octet-stream';
+                    const blob = new Blob([file.content], { type: mime });
+                    file.blobUrl = URL.createObjectURL(blob);
+                    
+                    file.needsProcessing = false;
                 }
-
-                // 3. Handle Bare Specifiers (NPM Packages)
-                // If it's in our manual map (react/react-dom), the browser will handle it via importmap.
-                // Otherwise, redirect to esm.sh for auto-resolution.
-                if (importMap.imports[importPath]) return match;
-                
-                // Avoid rewriting internal virtual paths that might have been registered without extensions
-                if (Object.keys(importMap.imports).some(k => k === importPath || k === './' + importPath)) return match;
-
-                return `${keyword}${mid}${q1}https://esm.sh/${importPath}${q2}`;
-            });
-        }
-
-                if (file.ext === 'css') {
-                    const cleanCss = file.content.replace(/`/g, '\\`').replace(/\\/g, '\\\\');
-                    file.content = `const s = document.createElement('style'); s.textContent = \`${cleanCss}\`; document.head.appendChild(s);`;
-                    file.ext = 'js';
-                }
-
-                const mimeMap = { 'js': 'text/javascript', 'jsx': 'text/javascript', 'ts': 'text/javascript', 'tsx': 'text/javascript', 'html': 'text/html', 'css': 'text/css', 'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'svg': 'image/svg+xml' };
-                const mime = mimeMap[file.ext] || 'application/octet-stream';
-                const blob = new Blob([file.content], { type: mime });
-                file.blobUrl = URL.createObjectURL(blob);
-                window.ACTIVE_BLOB_URLS.push(file.blobUrl);
                 
                 // Register exact path
                 importMap.imports[virtualPath] = file.blobUrl;
