@@ -1845,8 +1845,9 @@
                 
                 <div class="flex-gap" style="align-items:center; flex-shrink:0;">
                     <div id="storage-controls" style="display:none; align-items:center; gap:5px;">
+                        <button class="icon-btn" onclick="fetchStorageObjects(false, true)" title="Refresh Folder" style="color:var(--ai-accent);">↻</button>
                         <button id="btn-storage-search-toggle" class="icon-btn" onclick="toggleStorageSearch(true)" title="Search">🔍</button>
-                        <select id="storage-sort-by" style="height:30px; width:70px;" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects()">
+                        <select id="storage-sort-by" style="height:30px; width:70px;" class="bg-white/5 border border-white/10 rounded text-[9px] text-slate-400 p-1 outline-none" onchange="fetchStorageObjects(false, true)">
                             <option value="name">Name</option>
                             <option value="size">Size</option>
                             <option value="created_at">Created</option>
@@ -2000,6 +2001,7 @@
     let storageHasMore = true;
     let storageSearchQuery = '';
     let storageSortOrder = 'asc';
+    let storageCache = {}; // Global cache for storage metadata
     let chatUseSystemPrompt = false;
     let activeCustomPrompt = null;
     let customPrompts = JSON.parse(localStorage.getItem('conduit_custom_prompts') || '[]');
@@ -8224,20 +8226,39 @@ async function downloadArtifact(runId) {
         fetchStorageObjects();
     }
 
-    async function fetchStorageObjects(isAppend = false) {
+    async function fetchStorageObjects(isAppend = false, forceRefresh = false) {
         if (isPerformingAction) return;
         const container = document.getElementById('storage-content');
         const bread = document.getElementById('storage-breadcrumbs');
         const sortBy = document.getElementById('storage-sort-by')?.value || 'name';
         
+        const pathString = storageCurrentPath.join('/');
+        const cacheKey = `${storageCurrentBucket}:${pathString}:${sortBy}:${storageSortOrder}`;
+
         if (!isAppend) {
             storageOffset = 0;
             storageHasMore = true;
+            container.scrollTop = 0;
+
+            // SMART CACHE CHECK
+            if (!forceRefresh && storageCache[cacheKey]) {
+                console.log("⚡ [Storage] Cache Hit:", cacheKey);
+                storageObjects = [...storageCache[cacheKey]];
+                renderStorageList();
+                // Update UI headers anyway
+                document.getElementById('storage-title').innerText = storageCurrentBucket;
+                bread.style.display = 'block';
+                bread.innerHTML = `<span onclick="fetchBuckets()" style="cursor:pointer; color:var(--primary);">buckets</span> / ` + 
+                    storageCurrentPath.map((p, i) => `<span onclick="navigateToStorageDepth(${i})" style="cursor:pointer; color:var(--primary);">${p}</span>`).join(' / ');
+                document.getElementById('storage-controls').style.display = 'flex';
+                document.getElementById('btn-storage-upload').style.display = 'block';
+                document.getElementById('storage-footer').style.display = 'flex';
+                return;
+            }
+
             storageObjects = [];
-            container.scrollTop = 0; // Instant scroll reset
-            // Use a specific "Entering" loader so user knows navigation is happening
             container.innerHTML = `<div style="padding:40px; text-align:center;">
-                <div style="color:var(--ai-accent); font-size:12px; margin-bottom:10px;">Entering ${storageCurrentPath[storageCurrentPath.length-1] || storageCurrentBucket}...</div>
+                <div style="color:var(--ai-accent); font-size:12px; margin-bottom:10px;">${forceRefresh ? 'Refreshing' : 'Entering'} ${storageCurrentPath[storageCurrentPath.length-1] || storageCurrentBucket}...</div>
                 <div style="font-size:10px; color:#444;">Fetching storage metadata</div>
             </div>`;
         } else {
@@ -8281,6 +8302,9 @@ async function downloadArtifact(runId) {
             storageObjects = isAppend ? storageObjects.concat(fetched) : fetched;
             storageOffset += 100;
             storageHasMore = fetched.length === 100;
+
+            // Update Cache for non-paged initial load
+            if (!isAppend) storageCache[cacheKey] = [...storageObjects];
 
             renderStorageList();
             
@@ -8401,7 +8425,9 @@ async function downloadArtifact(runId) {
                 const data = await res.json();
                 if(data.error) throw new Error(data.error);
                 showGlobalToast("✅ Uploaded Successfully");
-                fetchStorageObjects();
+                // Invalidate cache for current directory
+                storageCache = {}; 
+                fetchStorageObjects(false, true);
             } catch(err) { showGlobalToast(err.message, true); }
         };
         reader.readAsDataURL(file);
@@ -8523,7 +8549,9 @@ async function downloadArtifact(runId) {
             const data = await res.json();
             if(data.error) throw new Error(data.error);
             showGlobalToast("✅ Deleted");
-            fetchStorageObjects();
+            // Invalidate cache for current directory
+            storageCache = {};
+            fetchStorageObjects(false, true);
         } catch(err) { showGlobalToast(err.message, true); }
     }
 
