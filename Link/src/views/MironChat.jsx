@@ -150,9 +150,6 @@ const MironChat = ({ onClose, initialContext }) => {
         setInput('');
     };
 
-        // Logic moved to sendMessage wrapper
-    };
-
     return (
         <div className="miron-chat-overlay">
             <div className="athena-bg"></div>
