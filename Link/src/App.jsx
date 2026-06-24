@@ -19,6 +19,27 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('home');
 
   useEffect(() => {
+    // 0. Conduit IDE OAuth Interceptor
+    // The App iframe cannot see the parent window's hash automatically.
+    // We manually extract the OAuth token from the parent's URL so login succeeds.
+    try {
+      if (window.IS_CONDUIT_PREVIEW && window.parent && window.parent.location.hash.includes('access_token')) {
+        const hashParams = new URLSearchParams(window.parent.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (accessToken && refreshToken) {
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          // Clean the URL so we don't process it twice
+          window.parent.history.replaceState(null, '', window.parent.location.pathname + window.parent.location.search);
+        }
+      }
+    } catch (e) {
+      console.warn("Conduit OAuth Interceptor: Could not read parent hash", e);
+    }
+
     // 1. Check active session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
