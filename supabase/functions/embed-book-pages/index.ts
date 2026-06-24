@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Config Constants
-const GEMINI_MODEL = "text-embedding-004";
+const GEMINI_MODEL = "gemini-embedding-001";
 const CHUNK_MAX_SIZE = 1000;
 const CHUNK_OVERLAP = 200;
 const DIMENSIONS = 768;
