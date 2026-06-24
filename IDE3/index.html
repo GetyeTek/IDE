@@ -3375,8 +3375,9 @@
             const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch' }) });
             const data = await res.json();
             const allFiles = data.files || [];
+            // Expand filter to include the entire supabase tree, not just functions/
             window.repoFiles = CONFIG.projectPath 
-                ? allFiles.filter(f => f.path.startsWith(CONFIG.projectPath) || f.path.startsWith('supabase/functions/')) 
+                ? allFiles.filter(f => f.path.startsWith(CONFIG.projectPath) || f.path.startsWith('supabase/')) 
                 : allFiles;
             renderFileList(window.repoFiles);
         } catch (e) {
@@ -6645,23 +6646,33 @@ async function downloadArtifact(runId) {
             const currentLevelFolders = new Set();
             const currentLevelFiles = [];
 
-            // If we are at the designated project root, manually inject "supabase" 
-            // if it exists anywhere in the repo so we can navigate to it.
-            const isAtRoot = (base === (CONFIG.projectPath || ""));
-            if (isAtRoot) {
-                if (files.some(f => f.path.startsWith('supabase/'))) {
+            // Detect if we are looking at the 'System Root' or the 'Project Root'
+            const isProjectRoot = (base === (CONFIG.projectPath || ""));
+            const isSystemRoot = base === "" || base === "/";
+            
+            if (isProjectRoot || isSystemRoot) {
+                if (files.some(f => f.path.startsWith('supabase/')) && !base.startsWith('supabase/')) {
                     currentLevelFolders.add('supabase');
                 }
             }
 
+            // SUPABASE SPECIAL HANDLING: "Dump" logic
+            const isInsideSupabase = base.startsWith('supabase/');
+
             files.forEach(f => {
                 if (f.path.startsWith(base)) {
-                    const relative = f.path.substring(base.length);
-                    const slashIndex = relative.indexOf('/');
-                    if (slashIndex !== -1) {
-                        currentLevelFolders.add(relative.substring(0, slashIndex));
-                    } else {
+                    if (isInsideSupabase) {
+                        // Global dump for supabase contents: ignore subfolders, just list files
                         currentLevelFiles.push(f);
+                    } else {
+                        // Standard directory drill-down for project files
+                        const relative = f.path.substring(base.length);
+                        const slashIndex = relative.indexOf('/');
+                        if (slashIndex !== -1) {
+                            currentLevelFolders.add(relative.substring(0, slashIndex));
+                        } else {
+                            currentLevelFiles.push(f);
+                        }
                     }
                 }
             });
