@@ -169,35 +169,40 @@
 }
 
 .document-snapshot {
-    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: linear-gradient(#ffffff, #ffffff) !important; /* Force Dark Bypass */
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 15px 40px rgba(0,0,0,0.4);
     color: #1a1a1a !important;
-    color-scheme: light !important; /* The Silver Bullet: Forces browser to render as Light */
+    -webkit-text-fill-color: #1a1a1a !important; /* Force Dark Bypass */
+    color-scheme: light only !important; 
     
     /* Variables for Registry engine */
-    --page-bg: #ffffff;
+    --page-bg: transparent;
     --text-color: #1a1a1a;
     --border: #e0e0e0;
     --accent: #30bda6;
 }
 
 .snapshot-topbar {
-    background: #f4f4f5;
+    background-color: #f4f4f5 !important;
+    background-image: linear-gradient(#f4f4f5, #f4f4f5) !important; /* Force Dark Bypass */
     padding: 8px 16px;
     font-size: 0.75rem;
-    color: #555;
+    color: #555 !important;
+    -webkit-text-fill-color: #555 !important; /* Force Dark Bypass */
     font-weight: 600;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid #e4e4e7;
+    border-bottom: 1px solid #e4e4e7 !important;
     font-family: 'Poppins', sans-serif;
 }
 
 .snapshot-topbar i {
-    color: #ef4444; /* PDF Red icon for authentic feel */
+    color: #ef4444 !important;
+    -webkit-text-fill-color: #ef4444 !important;
     margin-right: 6px;
 }
 
@@ -206,8 +211,16 @@
     font-family: 'Times New Roman', Times, 'Nyala', serif;
     font-size: 1.15rem;
     line-height: 1.6;
-    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: linear-gradient(#ffffff, #ffffff) !important; /* Force Dark Bypass */
     color: #1a1a1a !important;
+    -webkit-text-fill-color: #1a1a1a !important; /* Force Dark Bypass */
+}
+
+/* Hard-override Registry blocks to inherit the bypass */
+.snapshot-content * {
+    color: inherit !important;
+    -webkit-text-fill-color: inherit !important;
 }
 
 /* Hard-override Registry blocks when they appear inside a snapshot */
