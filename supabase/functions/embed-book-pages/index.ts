@@ -12,6 +12,10 @@ const CHUNK_MAX_SIZE = 1000;
 const CHUNK_OVERLAP = 200;
 const DIMENSIONS = 768;
 
+// Hardcoded Testing Defaults
+const DEFAULT_BOOK_ID = "38953d3b-7740-4e97-9634-66434e53f024";
+const DEFAULT_BATCH_SIZE = 50;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -19,10 +23,18 @@ serve(async (req) => {
   console.log(`[START] Embedding Pipeline Triggered at ${new Date().toISOString()}`);
   console.log("=======================================================\n");
 
+  let book_id = DEFAULT_BOOK_ID;
+  let batch_size = DEFAULT_BATCH_SIZE;
+
   try {
     const body = await req.json();
-    const { book_id, batch_size = 50 } = body;
+    if (body.book_id) book_id = body.book_id;
+    if (body.batch_size !== undefined) batch_size = body.batch_size;
+  } catch (e) {
+    console.log(`[TEST RUN] No request payload parsed or GET request received. Defaulting to Book: ${book_id} | Batch Size: ${batch_size}`);
+  }
 
+  try {
     if (!book_id) {
       console.error("[FATAL ERROR] Missing required parameter: 'book_id'");
       return new Response(JSON.stringify({ error: "Missing book_id" }), { status: 400, headers: corsHeaders });
