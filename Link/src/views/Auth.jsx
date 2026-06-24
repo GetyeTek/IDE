@@ -13,13 +13,20 @@ const Auth = () => {
     const handleGoogleAuth = async () => {
         try {
             setError(null);
-            const { error } = await supabase.auth.signInWithOAuth({
+            const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: window.location.origin,
+                    skipBrowserRedirect: true // Bypass iframe restrictions
                 }
             });
             if (error) throw error;
+            
+            // Open Google OAuth in a new tab to escape the IDE iframe. 
+            // Supabase will automatically sync the session back to the IDE once logged in!
+            if (data?.url) {
+                window.open(data.url, '_blank');
+            }
         } catch (err) {
             setError(err.message);
         }
