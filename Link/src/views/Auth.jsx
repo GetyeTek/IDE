@@ -13,17 +13,29 @@ const Auth = () => {
     const handleGoogleAuth = async () => {
         try {
             setError(null);
+            
+            // Dynamically construct the redirect URL to target the App Preview, not the IDE editor
+            let targetRedirect = window.location.origin;
+            try {
+                if (window.IS_CONDUIT_PREVIEW && window.parent) {
+                    const parentUrl = new URL(window.parent.location.href);
+                    parentUrl.searchParams.set('conduit_preview', 'true');
+                    targetRedirect = parentUrl.toString();
+                }
+            } catch (e) {
+                targetRedirect = window.location.origin + '/?conduit_preview=true';
+            }
+
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin,
+                    redirectTo: targetRedirect,
                     skipBrowserRedirect: true // Bypass iframe restrictions
                 }
             });
             if (error) throw error;
             
-            // Open Google OAuth in a new tab to escape the IDE iframe. 
-            // Supabase will automatically sync the session back to the IDE once logged in!
+            // Open Google OAuth in a new tab. Once authorized, it redirects back to the target URL.
             if (data?.url) {
                 window.open(data.url, '_blank');
             }
