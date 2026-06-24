@@ -207,14 +207,17 @@
 }
 
 .snapshot-content {
-    padding: 24px;
-    font-family: 'Times New Roman', Times, 'Nyala', serif;
-    font-size: 1.15rem;
-    line-height: 1.6;
+    padding: 20px 24px;
+    font-family: 'Times New Roman', Times, 'Nyala', 'Abyssinica SIL', serif;
+    font-size: 0.85rem; /* Scaled down for that high-density look */
+    line-height: 1.5;
     background-color: #ffffff !important;
-    background-image: linear-gradient(#ffffff, #ffffff) !important; /* Force Dark Bypass */
+    background-image: linear-gradient(#ffffff, #ffffff) !important;
     color: #1a1a1a !important;
-    -webkit-text-fill-color: #1a1a1a !important; /* Force Dark Bypass */
+    -webkit-text-fill-color: #1a1a1a !important;
+    text-align: justify; /* Real textbook justification */
+    hyphens: auto;
+    letter-spacing: -0.01em;
 }
 
 /* Hard-override Registry blocks to inherit the bypass */
@@ -223,7 +226,7 @@
     -webkit-text-fill-color: inherit !important;
 }
 
-/* Hard-override Registry blocks when they appear inside a snapshot */
+/* Hard-override Registry blocks for compact snapshot rendering */
 .snapshot-content .univ-p-block, 
 .snapshot-content .univ-h-block,
 .snapshot-content .logic-chapter-num,
@@ -232,6 +235,19 @@
 .snapshot-content .logic-argument-premise,
 .snapshot-content .logic-argument-conclusion {
     color: #1a1a1a !important;
+    -webkit-text-fill-color: #1a1a1a !important;
+    margin-bottom: 8px !important; /* Tighten vertical gaps */
+    font-size: 1em !important; /* Inherit the 0.85rem from parent */
+}
+
+.snapshot-content .univ-h-block {
+    font-size: 1.1em !important;
+    margin-top: 5px !important;
+}
+
+.snapshot-content .logic-argument-block {
+    margin: 10px auto !important;
+    font-size: 0.95em !important;
 }
 
 .snapshot-content .univ-p-block,
