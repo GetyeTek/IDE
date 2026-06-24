@@ -158,6 +158,139 @@
     color: #aaa;
 }
 
+/* --- INTERACTIVE CHAT QUIZ STYLES --- */
+.miron-quiz-card {
+    margin: 20px -1.2rem;
+    background: #0d0d0d;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e0e0e0;
+    font-family: 'Poppins', sans-serif;
+}
+
+.mq-header {
+    padding: 12px 1.2rem;
+    background: rgba(66, 215, 184, 0.05);
+    border-bottom: 1px solid rgba(66, 215, 184, 0.2);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--accent-teal);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.mq-body {
+    padding: 20px 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.mq-q-text {
+    font-family: 'Newsreader', serif;
+    font-size: 1.1rem;
+    line-height: 1.4;
+    margin-bottom: 16px;
+    color: #fff;
+}
+
+.mq-q-num {
+    color: var(--accent-teal);
+    font-weight: 700;
+}
+
+.mq-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mq-opt-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #d0d0d0;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    width: 100%;
+}
+
+.mq-opt-ind {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2px solid #888;
+    flex-shrink: 0;
+}
+
+.mq-opt-btn.active {
+    background: rgba(66, 215, 184, 0.1);
+    border-color: var(--accent-teal);
+    color: #fff;
+}
+
+.mq-opt-btn.active .mq-opt-ind {
+    border-color: var(--accent-teal);
+    background: var(--accent-teal);
+    box-shadow: 0 0 8px var(--accent-teal);
+}
+
+.mq-tf-pad {
+    display: flex;
+    gap: 12px;
+}
+
+.mq-tf-btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    color: #888;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mq-tf-btn.active-true, .mq-tf-btn.active-false {
+    background: rgba(66, 215, 184, 0.15);
+    border-color: var(--accent-teal);
+    color: var(--accent-teal);
+    box-shadow: 0 0 15px rgba(66, 215, 184, 0.1);
+}
+
+.mq-submit-btn {
+    margin-top: 10px;
+    background: var(--accent-teal);
+    color: #050505;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.mq-submit-btn:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: #888;
+    cursor: not-allowed;
+}
+
 /* --- DYNAMIC SNAPSHOT INJECTION STYLES --- */
 .inline-chat-snapshot {
     margin: 20px -1.2rem; /* Negative margin to bleed to the absolute edge */
