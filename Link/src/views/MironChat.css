@@ -158,6 +158,91 @@
     color: #aaa;
 }
 
+/* --- DYNAMIC SNAPSHOT INJECTION STYLES --- */
+.inline-chat-snapshot {
+    margin: 15px 0;
+    background-color: #ffffff !important;
+    background-image: linear-gradient(#ffffff, #ffffff) !important; /* Force Dark Bypass */
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    color: #1a1a1a !important;
+    -webkit-text-fill-color: #1a1a1a !important; /* Force Dark Bypass */
+    color-scheme: light only !important; 
+    
+    /* Variables for Registry engine */
+    --page-bg: transparent;
+    --text-color: #1a1a1a;
+    --border: #e0e0e0;
+    --accent: #30bda6;
+}
+
+.inline-chat-snapshot .snapshot-topbar {
+    background-color: #f4f4f5 !important;
+    background-image: linear-gradient(#f4f4f5, #f4f4f5) !important;
+    padding: 8px 16px;
+    font-size: 0.75rem;
+    color: #555 !important;
+    -webkit-text-fill-color: #555 !important;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e4e4e7 !important;
+    font-family: 'Poppins', sans-serif;
+}
+
+.inline-chat-snapshot .snapshot-topbar i {
+    color: #ef4444 !important;
+    -webkit-text-fill-color: #ef4444 !important;
+    margin-right: 6px;
+}
+
+.inline-chat-snapshot .snapshot-content {
+    padding: 15px 18px; /* High Density Horizontal */
+    font-family: 'Times New Roman', Times, 'Nyala', 'Abyssinica SIL', serif;
+    font-size: 0.75rem; /* Ultra-dense scholar mode */
+    line-height: 1.35;
+    background-color: #ffffff !important;
+    background-image: linear-gradient(#ffffff, #ffffff) !important;
+    color: #1a1a1a !important;
+    -webkit-text-fill-color: #1a1a1a !important;
+    text-align: justify;
+    hyphens: auto;
+    letter-spacing: -0.02em;
+    word-spacing: -0.05em;
+}
+
+.inline-chat-snapshot .snapshot-content * {
+    color: inherit !important;
+    -webkit-text-fill-color: inherit !important;
+}
+
+/* Hard-override Registry blocks to match ultra-dense spec */
+.inline-chat-snapshot .snapshot-content .univ-p-block, 
+.inline-chat-snapshot .snapshot-content .univ-h-block,
+.inline-chat-snapshot .snapshot-content .logic-chapter-num,
+.inline-chat-snapshot .snapshot-content .logic-chapter-title,
+.inline-chat-snapshot .snapshot-content .logic-bullet-item,
+.inline-chat-snapshot .snapshot-content .logic-argument-premise,
+.inline-chat-snapshot .snapshot-content .logic-argument-conclusion {
+    margin-bottom: 4px !important;
+    font-size: 1em !important;
+    line-height: inherit !important;
+}
+
+.inline-chat-snapshot .snapshot-content .univ-h-block {
+    font-size: 1.05em !important;
+    margin-top: 4px !important;
+    margin-bottom: 2px !important;
+}
+
+.inline-chat-snapshot .snapshot-content .logic-argument-block {
+    margin: 6px auto !important;
+    font-size: 1em !important;
+    gap: 0 !important;
+}
+
 .chat-node.miron .athena-bubble {
     background: rgba(25, 25, 25, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.05);
