@@ -129,6 +129,35 @@
     letter-spacing: 0.2px;
 }
 
+/* Markdown Element Styling */
+.athena-bubble p { margin-bottom: 12px; }
+.athena-bubble p:last-child { margin-bottom: 0; }
+.athena-bubble strong { color: var(--accent-teal); font-weight: 600; }
+.athena-bubble ul, .athena-bubble ol { margin: 10px 0 10px 20px; }
+.athena-bubble li { margin-bottom: 6px; }
+.athena-bubble code { 
+    background: rgba(255,255,255,0.1); 
+    padding: 2px 6px; 
+    border-radius: 4px; 
+    font-family: 'Roboto Mono', monospace; 
+    font-size: 0.85em; 
+}
+.athena-bubble pre {
+    background: #000;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 10px 0;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.athena-bubble blockquote {
+    border-left: 3px solid var(--accent-teal);
+    padding-left: 15px;
+    margin: 10px 0;
+    font-style: italic;
+    color: #aaa;
+}
+
 .chat-node.miron .athena-bubble {
     background: rgba(25, 25, 25, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.05);
