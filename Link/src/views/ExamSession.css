@@ -405,6 +405,10 @@
     color: #e0e0e0;
     line-height: 1.5;
 }
+.ai-exp-body p { margin-bottom: 10px; }
+.ai-exp-body p:last-child { margin-bottom: 0; }
+.ai-exp-body strong { color: var(--accent-teal); }
+.ai-exp-body ul { margin-left: 18px; margin-top: 8px; }
 
 .insight-actions {
     display: flex;
