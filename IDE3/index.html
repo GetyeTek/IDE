@@ -7,16 +7,41 @@
             const params = new URLSearchParams(window.location.search);
             if (params.has('conduit_preview')) {
                 window.IS_CONDUIT_PREVIEW = true;
+                // Hide default UI initially
                 document.documentElement.style.display = 'none';
                 
                 const channel = new BroadcastChannel('conduit_speedster_sync');
                 
                 const loadPreview = (payload) => {
-                    if (!payload || !payload.html) return;
+                    if (!payload) return;
                     window.IS_LOADING_PREVIEW = true;
-                    document.open();
-                    document.write(payload.html);
-                    document.close();
+                    
+                    // Force visibility and normalize body for iframe injection
+                    document.documentElement.style.display = 'block';
+                    document.body.style.margin = '0';
+                    document.body.style.padding = '0';
+                    document.body.style.overflow = 'hidden';
+                    document.body.style.background = '#fff';
+                    
+                    let iframe = document.getElementById('conduit-popout-iframe');
+                    if (!iframe) {
+                        iframe = document.createElement('iframe');
+                        iframe.id = 'conduit-popout-iframe';
+                        iframe.style.width = '100vw';
+                        iframe.style.height = '100vh';
+                        iframe.style.border = 'none';
+                        iframe.sandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups";
+                        document.body.innerHTML = '';
+                        document.body.appendChild(iframe);
+                    }
+                    
+                    // Priority 1: Cross-window Blob URL sharing (preserves importMaps perfectly)
+                    if (window.opener && window.opener.PREVIEW_BLOB_URL) {
+                        iframe.src = window.opener.PREVIEW_BLOB_URL;
+                    } else if (payload.html) {
+                        // Fallback (fails on blob imports, but works for pure inline HTML)
+                        iframe.srcdoc = payload.html;
+                    }
                 };
 
                 channel.onmessage = (e) => {
