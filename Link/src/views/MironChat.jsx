@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'https://esm.sh/react-markdown@9';
 import { invokeMiron } from '../config/api.js';
+import { renderBookBlock } from './BookReader/subjects/Registry.jsx';
 import './MironChat.css';
 
 const MironChat = ({ onClose, initialContext }) => {
@@ -77,7 +78,8 @@ const MironChat = ({ onClose, initialContext }) => {
                 id: Date.now() + 1,
                 side: 'miron',
                 thought: thoughtText,
-                text: data.response
+                text: data.response,
+                snapshots: data.snapshots
             }]);
 
             // Handle UI Commands
@@ -117,13 +119,37 @@ const MironChat = ({ onClose, initialContext }) => {
 
             <main className="athena-flow" ref={flowRef}>
                 {messages.map(m => (
-                    <div key={m.id} className={`chat-node ${m.side}`}>
+                                        <div key={m.id} className={`chat-node ${m.side}`}>
                         {m.side === 'miron' && m.thought && (
                             <span className="miron-thought">{m.thought}</span>
                         )}
                         <div className="athena-bubble">
-    <ReactMarkdown>{m.text}</ReactMarkdown>
-</div>
+                            {(!m.snapshots || m.snapshots.length === 0) ? (
+                                <ReactMarkdown>{m.text}</ReactMarkdown>
+                            ) : (
+                                m.text.split(/(\[SNAPSHOT_\d+\])/g).map((part, idx) => {
+                                    const snapMatch = part.match(/\[SNAPSHOT_(\d+)\]/);
+                                    if (snapMatch) {
+                                        const snapId = parseInt(snapMatch[1], 10);
+                                        const snap = m.snapshots.find(s => s.id === snapId);
+                                        if (!snap) return <span key={idx} style={{color:'red'}}>[Snapshot Error]</span>;
+                                        
+                                        return (
+                                            <div key={idx} className="inline-chat-snapshot">
+                                                <div className="snapshot-topbar">
+                                                    <span><i className="fas fa-file-pdf"></i> {snap.book_title || snap.course_code}</span>
+                                                    <span>Page {snap.page_number}</span>
+                                                </div>
+                                                <div className="snapshot-content">
+                                                    {snap.blocks.map((b, i) => renderBookBlock(b, i, {}))}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    return part.trim() ? <ReactMarkdown key={idx}>{part}</ReactMarkdown> : null;
+                                })
+                            )}
+                        </div>
                     </div>
                 ))}
                 
