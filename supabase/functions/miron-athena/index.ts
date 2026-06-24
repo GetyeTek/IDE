@@ -256,24 +256,26 @@ serve(async (req) => {
           try {
             if (name === "search_textbook_material") {
               if (!PINECONE_API_KEY || !PINECONE_HOST) throw new Error("Pinecone secrets missing.");
-              executedTools.push(`Vector search executed for: "${args.optimized_query}"`);
               
               const queryVector = await generateEmbedding(args.optimized_query);
               const cleanHost = PINECONE_HOST.replace(/\/$/, '').replace(/^https?:\/\//, '');
 
               let targetNamespaces: string[] = [];
               if (args.course_code) {
-                const { data } = await supabase.from('books').select('id').ilike('title', `%${args.course_code}%`).limit(1);
-                if (data && data.length > 0) targetNamespaces.push(data[0].id);
+                // EXACT MATCH via NEW course_code column
+                const { data } = await supabase.from('books').select('id').eq('course_code', args.course_code.toUpperCase().trim()).single();
+                if (data) {
+                    targetNamespaces.push(data.id);
+                    executedTools.push(`Targeted vector search: ${args.course_code}`);
+                }
               }
 
-              // If no specific course was targeted or found, search ALL active books (Scatter-Gather)
               if (targetNamespaces.length === 0) {
                 const { data } = await supabase.from('books').select('id');
                 if (data) targetNamespaces = data.map(b => b.id);
+                executedTools.push(`Global vector search across all books`);
               }
 
-              // Query namespaces in parallel
               const searchPromises = targetNamespaces.map(async (namespace) => {
                 const res = await fetch(`https://${cleanHost}/query`, {
                   method: 'POST',
@@ -287,28 +289,41 @@ serve(async (req) => {
 
               const resultsArray = await Promise.all(searchPromises);
               const allMatches = resultsArray.flat();
-              
-              // Sort gathered results globally by score
               allMatches.sort((a: any, b: any) => b.score - a.score);
-              const topMatches = allMatches.slice(0, 5).map((m: any) => m.metadata);
+              const topFive = allMatches.slice(0, 5);
               
-              // [SURGICAL LOG] Pinecone Results Diagnostic
+              // [PIPELINE DEBUG] Detailed Pinecone Inspector
               console.log(`\n--- [PIPELINE DIAGNOSTIC: PINECONE] ---`);
               console.log(`Query: "${args.optimized_query}"`);
-              console.log(`Total Chunks Gathered: ${allMatches.length}`);
-              console.log(`Top Match Score: ${allMatches[0]?.score}`);
-              console.log(`Top Match Source: ${allMatches[0]?.metadata?.book_title} (Page ${allMatches[0]?.metadata?.page_number})`);
+              topFive.forEach((m, i) => {
+                console.log(`Result ${i+1} [Score: ${m.score.toFixed(4)}] [Source: ${m.metadata.book_title} P.${m.metadata.page_number}]`);
+                console.log(`Snippet: "${m.metadata.text_snippet.substring(0, 150)}..."`);
+              });
               console.log(`---------------------------------------\n`);
 
-              toolResult = { status: "success", matches: topMatches };
+              toolResult = { status: "success", matches: topFive.map(m => m.metadata) };
             }
             else if (name === "get_book_toc") {
-              executedTools.push(`Consulted syllabus for "${args.query}"`);
-              const { data } = await supabase.from('books').select('id, title, toc').ilike('title', `%${args.query}%`).limit(1);
-              if (data && data.length > 0) {
-                toolResult = { status: "success", book_id: data[0].id, title: data[0].title, toc: data[0].toc || "No TOC available." };
+              const code = args.query.toUpperCase().trim();
+              executedTools.push(`Consulting TOC for: ${code}`);
+              
+              const { data, error } = await supabase.from('books')
+                .select('id, title, toc')
+                .eq('course_code', code)
+                .single();
+
+              if (data) {
+                const tocString = JSON.stringify(data.toc);
+                console.log(`\n--- [PIPELINE DIAGNOSTIC: TOC] ---`);
+                console.log(`Book: ${data.title} (${code})`);
+                console.log(`TOC Size: ${tocString.length} chars`);
+                console.log(`TOC Snippet: ${tocString.substring(0, 200)}...`);
+                console.log(`----------------------------------\n`);
+                
+                toolResult = { status: "success", book_id: data.id, title: data.title, toc: data.toc };
               } else {
-                toolResult = { status: "error", message: "Book not found in catalog." };
+                console.warn(`[TOC ERROR] No book found for code: ${code}`);
+                toolResult = { status: "error", message: `Book with course code ${code} not found.` };
               }
             } 
             else if (name === "read_book_section") {
