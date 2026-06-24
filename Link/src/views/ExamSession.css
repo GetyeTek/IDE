@@ -169,17 +169,18 @@
 }
 
 .document-snapshot {
-    background: #ffffff;
-    border-radius: 8px;
+    background: #ffffff !important;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    color: #1a1a1a;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+    color: #1a1a1a !important;
+    color-scheme: light !important; /* The Silver Bullet: Forces browser to render as Light */
     
     /* Variables for Registry engine */
-    --page-bg: transparent;
+    --page-bg: #ffffff;
     --text-color: #1a1a1a;
     --border: #e0e0e0;
-    --accent: #42d7b8;
+    --accent: #30bda6;
 }
 
 .snapshot-topbar {
@@ -205,6 +206,19 @@
     font-family: 'Times New Roman', Times, 'Nyala', serif;
     font-size: 1.15rem;
     line-height: 1.6;
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+}
+
+/* Hard-override Registry blocks when they appear inside a snapshot */
+.snapshot-content .univ-p-block, 
+.snapshot-content .univ-h-block,
+.snapshot-content .logic-chapter-num,
+.snapshot-content .logic-chapter-title,
+.snapshot-content .logic-bullet-item,
+.snapshot-content .logic-argument-premise,
+.snapshot-content .logic-argument-conclusion {
+    color: #1a1a1a !important;
 }
 
 .snapshot-content .univ-p-block,
