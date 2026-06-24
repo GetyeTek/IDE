@@ -8450,11 +8450,25 @@ async function downloadArtifact(runId) {
                 }
             };
 
-            const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'];
-            const textExts = ['txt', 'js', 'ts', 'json', 'html', 'css', 'md', 'log'];
+            const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico'];
+            const videoExts = ['mp4', 'webm', 'ogg', 'mov'];
+            const audioExts = ['mp3', 'wav', 'aac', 'm4a', 'flac'];
+            const textExts = ['txt', 'js', 'ts', 'json', 'html', 'css', 'md', 'log', 'yml', 'yaml', 'toml'];
 
             if (imageExts.includes(ext)) {
                 content.innerHTML = `<img src="${data.url}" style="max-width:100%; max-height:100%; object-fit:contain;">`;
+            } else if (videoExts.includes(ext)) {
+                content.innerHTML = `<video src="${data.url}" controls autoplay style="max-width:100%; max-height:100%; border-radius:8px; box-shadow:0 10px 40px rgba(0,0,0,0.5);"></video>`;
+            } else if (audioExts.includes(ext)) {
+                content.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:30px; width:100%;">
+                        <div style="font-size:80px; filter: drop-shadow(0 0 20px var(--ai-accent));">🎵</div>
+                        <audio src="${data.url}" controls autoplay style="width:80%; max-width:400px;"></audio>
+                        <div style="text-align:center;">
+                            <div style="color:#eee; font-size:14px; font-weight:bold; margin-bottom:4px;">${escapeHtml(name)}</div>
+                            <div style="color:#666; font-size:10px; font-family:monospace;">AUDIO STREAM READY</div>
+                        </div>
+                    </div>`;
             } else if (textExts.includes(ext)) {
                 const textRes = await fetch(data.url);
                 const text = await textRes.text();
