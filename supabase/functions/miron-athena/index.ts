@@ -49,7 +49,12 @@ When a user asks an academic question, you MUST execute a dual-retrieval strateg
 After executing BOTH tools simultaneously, evaluate the results:
 - If "search_textbook_material" returns highly relevant snippets, synthesize your answer immediately and explicitly cite the book and page number provided in the metadata.
 - If the semantic snippets are insufficient, use the TOC you retrieved to identify the exact chapter/section title where the answer likely resides, and call "read_book_section" to read the entire chunk.
-- If the user's message is a simple greeting or non-academic, do not call any tools.`;
+- If the user's message is a simple greeting or non-academic, do not call any tools.
+
+VISUAL SNAPSHOT CAPABILITY:
+If you are explaining a specific paragraph, formula, or concept and you believe the student would benefit from seeing the EXACT textbook material visually, call the "render_book_snapshot" tool.
+- The tool will retrieve the visual UI data and return a placeholder tag to you (e.g., [SNAPSHOT_0]).
+- You MUST insert this exact tag directly into your final response wherever you want the textbook snapshot to appear (e.g., "As you can see in the textbook here:\n\n[SNAPSHOT_0]\n\nThis proves the premise...").`;
 
 // Define the Tools (Function Calling)
 const toolsDefinition = {
@@ -99,6 +104,19 @@ const toolsDefinition = {
           page_number: { type: "INTEGER" }
         },
         required: ["book_id", "page_number"]
+      }
+    },
+    {
+      name: "render_book_snapshot",
+      description: "Render a visual snapshot of a textbook page or specific block directly inside the chat UI.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          course_code: { type: "STRING", description: "The course code (e.g., 'PHYS 1011')" },
+          page_number: { type: "INTEGER", description: "The page number to snapshot" },
+          block_index: { type: "INTEGER", description: "Optional. The specific block index on the page. Leave empty to snapshot the whole page." }
+        },
+        required: ["course_code", "page_number"]
       }
     }
   ]
@@ -236,6 +254,7 @@ serve(async (req) => {
     let isToolCall = true;
     let loopCount = 0;
     let finalText = "";
+    let inlineSnapshots: any[] = [];
 
     // 4. The Agentic Loop with Parallel Execution
     while (isToolCall && loopCount < 5) {
@@ -378,6 +397,43 @@ serve(async (req) => {
               uiCommand = { action: 'open_page', book_id: args.book_id, page_number: args.page_number };
               toolResult = { status: "success", message: "User is being navigated to the page." };
             }
+            else if (name === "render_book_snapshot") {
+              executedTools.push(`Prepared visual snapshot for ${args.course_code}, Page ${args.page_number}`);
+              const { data: book } = await supabase.from('books').select('id, title').eq('course_code', args.course_code.toUpperCase().trim()).single();
+              
+              if (book) {
+                const { data: page } = await supabase.from('book_pages')
+                  .select('content_json')
+                  .eq('book_id', book.id)
+                  .eq('page_number', args.page_number)
+                  .single();
+                  
+                if (page && page.content_json) {
+                  let blocksToRender = page.content_json;
+                  if (args.block_index !== undefined && args.block_index !== null) {
+                    blocksToRender = [page.content_json[args.block_index]].filter(Boolean);
+                  }
+                  
+                  const snapId = inlineSnapshots.length;
+                  inlineSnapshots.push({
+                    id: snapId,
+                    course_code: args.course_code,
+                    book_title: book.title,
+                    page_number: args.page_number,
+                    blocks: blocksToRender
+                  });
+                  
+                  toolResult = {
+                    status: "success",
+                    instruction: `Snapshot ready. You MUST insert the exact text [SNAPSHOT_${snapId}] in your final response where you want it to appear.`
+                  };
+                } else {
+                  toolResult = { status: "error", message: "Page content not found." };
+                }
+              } else {
+                toolResult = { status: "error", message: "Course code not found." };
+              }
+            }
           } catch (e) {
             toolResult = { status: "error", message: e.message };
           }
@@ -425,7 +481,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       response: finalText,
       thoughts: executedTools,
-      ui_command: uiCommand
+      ui_command: uiCommand,
+      snapshots: inlineSnapshots
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {
