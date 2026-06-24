@@ -1,6 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        // --- PREVIEW BOOTSTRAPPER (MUST RUN BEFORE IDE) ---
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('conduit_preview')) {
+                window.IS_CONDUIT_PREVIEW_MODE = true;
+                // Block the rest of the IDE from rendering
+                document.documentElement.style.display = 'none';
+                
+                const channel = new BroadcastChannel('conduit_speedster_sync');
+                
+                const loadPreview = (payload) => {
+                    if (!payload || !payload.html) return;
+                    document.open();
+                    document.write(payload.html);
+                    document.close();
+                };
+
+                channel.onmessage = (e) => {
+                    if (e.data.type === 'REFRESH_PREVIEW') {
+                        loadPreview(e.data.payload);
+                    }
+                };
+
+                // Request initial state from Master IDE tab
+                window.onload = () => {
+                    channel.postMessage({ type: 'REQUEST_INITIAL_STATE' });
+                    // If no response in 2s, assume stale or standalone
+                    setTimeout(() => {
+                        if (document.documentElement.style.display === 'none') {
+                            document.documentElement.style.display = 'block';
+                            document.body.innerHTML = '<div style="padding:40px; text-align:center; font-family:sans-serif; color:#666;">Waiting for IDE to sync...<br><br><button onclick="location.reload()" style="padding:10px 20px; border-radius:8px; border:1px solid #ccc; background:white; cursor:pointer;">Retry</button></div>';
+                        }
+                    }, 2000);
+                };
+                
+                // Stop further script execution for IDE
+                window.stop(); 
+            }
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Conduit IDE v7.0 (Healer Test)</title>
@@ -4267,8 +4308,15 @@
     }
 
     let isBundlingInProgress = false;
+    const speedsterChannel = new BroadcastChannel('conduit_speedster_sync');
 
-    async function bundleAndPreview(index) {
+    speedsterChannel.onmessage = (e) => {
+        if (e.data.type === 'REQUEST_INITIAL_STATE') {
+            bundleAndPreview(null, true); // Trigger a silent sync
+        }
+    };
+
+    async function bundleAndPreview(index, isSilentSync = false) {
         if (CONFIG.projectType === 'native') return;
         if(!CONFIG.funcUrl) {
             console.error('Bundler Error: No function URL configured');
@@ -4941,7 +4989,21 @@
             finalIframe.src = window.PREVIEW_BLOB_URL;
             document.getElementById('preview-frame').replaceWith(finalIframe);
 
-            if(window.POPOUT_REF && !window.POPOUT_REF.closed) window.POPOUT_REF.location.replace(window.PREVIEW_BLOB_URL);
+            // Sync with Mirror Tabs
+            speedsterChannel.postMessage({ 
+                type: 'REFRESH_PREVIEW', 
+                payload: { html: finalHtml, sha: sha } 
+            });
+
+            if (isSilentSync) return;
+
+            if(window.POPOUT_REF && !window.POPOUT_REF.closed) {
+                // If it's already on our mirror path, the postMessage above handles it.
+                // If it's not, we force it there.
+                if (!window.POPOUT_REF.location.search.includes('conduit_preview')) {
+                    window.POPOUT_REF.location.href = window.location.origin + window.location.pathname + '?conduit_preview=true';
+                }
+            }
             document.getElementById('preview-url-display').innerText = sha ? 'Viewing: ' + entry.title : 'Viewing: Live Dev (' + CONFIG.repoName + ')';
             document.getElementById('browser-url').value = '';
         } catch(e) {
@@ -4991,8 +5053,9 @@
     }
 
     function openPopOut() {
-        if(window.PREVIEW_BLOB_URL) window.POPOUT_REF = window.open(window.PREVIEW_BLOB_URL, '_blank');
-        else alert("Please build the preview first.");
+        const mirrorUrl = window.location.origin + window.location.pathname + '?conduit_preview=true';
+        window.POPOUT_REF = window.open(mirrorUrl, '_blank');
+        // The mirror tab will request initial state via BroadcastChannel once it loads
     }
 
 // --- CHAT SESSION MANAGEMENT ---
