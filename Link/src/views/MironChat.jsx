@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'https://esm.sh/react-markdown@9';
 import { invokeMiron } from '../config/api.js';
 import './MironChat.css';
 
@@ -121,8 +122,8 @@ const MironChat = ({ onClose, initialContext }) => {
                             <span className="miron-thought">{m.thought}</span>
                         )}
                         <div className="athena-bubble">
-                            {m.text}
-                        </div>
+    <ReactMarkdown>{m.text}</ReactMarkdown>
+</div>
                     </div>
                 ))}
                 
