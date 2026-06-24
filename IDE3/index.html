@@ -6,7 +6,7 @@
         (function() {
             const params = new URLSearchParams(window.location.search);
             if (params.has('conduit_preview')) {
-                window.IS_CONDUIT_PREVIEW_MODE = true;
+                window.IS_CONDUIT_PREVIEW = true;
                 document.documentElement.style.display = 'none';
                 
                 const channel = new BroadcastChannel('conduit_speedster_sync');
@@ -25,12 +25,12 @@
                     }
                 };
 
-                // Trigger request IMMEDIATELY before stop() kills the event loop
+                // Trigger request to Master IDE
                 channel.postMessage({ type: 'REQUEST_INITIAL_STATE' });
 
                 // Fallback UI if Master IDE is unresponsive
                 setTimeout(() => {
-                    if (!window.IS_LOADING_PREVIEW && document.documentElement.style.display === 'none') {
+                    if (!window.IS_LOADING_PREVIEW) {
                         document.documentElement.style.display = 'block';
                         document.body.innerHTML = `
                             <div style="padding:40px; text-align:center; font-family:sans-serif; background:#050505; color:#a1a1aa; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
@@ -41,8 +41,6 @@
                             </div>`;
                     }
                 }, 3000);
-                
-                window.stop(); 
             }
         })();
     </script>
