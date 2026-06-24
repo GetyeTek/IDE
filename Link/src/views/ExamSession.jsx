@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'https://esm.sh/react-markdown@9';
 import { invokeBookReader } from '../config/api.js';
 import { renderBookBlock } from './BookReader/subjects/Registry.jsx';
 import BookReader from './BookReader/BookReader.jsx';
@@ -327,8 +328,8 @@ const ExamSession = ({ exam, onClose }) => {
                                                 <i className="fas fa-sparkles"></i> Miron Synthesis
                                             </div>
                                             <div className="ai-exp-body">
-                                                <p>This is where the AI-generated explanation will be wired up. Miron will synthesize the textbook snapshot above to clarify why a certain choice is correct, directly addressing common misconceptions in this topic.</p>
-                                            </div>
+    <ReactMarkdown>{hints[q.id].data?.explanation || "Miron is synthesizing the textbook snapshot above to clarify why this choice is correct..."}</ReactMarkdown>
+</div>
                                         </div>
 
                                         <div className="insight-actions">
