@@ -54,7 +54,13 @@ After executing BOTH tools simultaneously, evaluate the results:
 VISUAL SNAPSHOT CAPABILITY:
 If you are explaining a specific paragraph, formula, or concept and you believe the student would benefit from seeing the EXACT textbook material visually, call the "render_book_snapshot" tool.
 - The tool will retrieve the visual UI data and return a placeholder tag to you (e.g., [SNAPSHOT_0]).
-- You MUST insert this exact tag directly into your final response wherever you want the textbook snapshot to appear (e.g., "As you can see in the textbook here:\n\n[SNAPSHOT_0]\n\nThis proves the premise...").`;
+- You MUST insert this exact tag directly into your final response wherever you want the textbook snapshot to appear.
+
+INTERACTIVE QUIZ CAPABILITY (TUTOR MODE):
+If you want to test the student's knowledge on the topic you just explained, call the "render_quiz" tool.
+- You can pull real exam questions from the database by specifying the course code and section title, OR you can generate "custom" questions yourself.
+- The tool will return a placeholder tag (e.g., [QUIZ_0]). Insert this tag in your response where you want the UI to render.
+- The user will interact with the UI, click "Submit", and their answers will automatically be sent back to you as a new message. You should then evaluate their answers and provide feedback.`;
 
 // Define the Tools (Function Calling)
 const toolsDefinition = {
@@ -117,6 +123,33 @@ const toolsDefinition = {
           block_index: { type: "INTEGER", description: "Optional. The specific block index on the page. Leave empty to snapshot the whole page." }
         },
         required: ["course_code", "page_number"]
+      }
+    },
+    {
+      name: "render_quiz",
+      description: "Render an interactive quiz UI inside the chat to test the student's knowledge.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          mode: { type: "STRING", description: "'database' to fetch mapped questions from the book, or 'custom' to use your own generated questions." },
+          course_code: { type: "STRING", description: "Required if mode is 'database' (e.g., 'LOCT 1011')." },
+          section_title: { type: "STRING", description: "Optional if mode is 'database'. Used to filter questions to a specific chapter/section." },
+          limit: { type: "INTEGER", description: "Number of questions to display (Max 3)." },
+          custom_questions: {
+            type: "ARRAY",
+            description: "Required if mode is 'custom'. Generate Multiple Choice or True/False questions.",
+            items: {
+              type: "OBJECT",
+              properties: {
+                id: { type: "STRING" },
+                text: { type: "STRING" },
+                question_type: { type: "STRING", description: "'multiple_choice' or 'true_false'" },
+                options: { type: "ARRAY", items: { type: "STRING" } }
+              }
+            }
+          }
+        },
+        required: ["mode"]
       }
     }
   ]
@@ -255,6 +288,7 @@ serve(async (req) => {
     let loopCount = 0;
     let finalText = "";
     let inlineSnapshots: any[] = [];
+    let inlineQuizzes: any[] = [];
 
     // 4. The Agentic Loop with Parallel Execution
     while (isToolCall && loopCount < 5) {
@@ -423,15 +457,64 @@ serve(async (req) => {
                     blocks: blocksToRender
                   });
                   
-                  toolResult = {
-                    status: "success",
-                    instruction: `Snapshot ready. You MUST insert the exact text [SNAPSHOT_${snapId}] in your final response where you want it to appear.`
-                  };
+                  toolResult = { status: "success", instruction: `Snapshot ready. Insert [SNAPSHOT_${snapId}] to render.` };
                 } else {
                   toolResult = { status: "error", message: "Page content not found." };
                 }
               } else {
                 toolResult = { status: "error", message: "Course code not found." };
+              }
+            }
+            else if (name === "render_quiz") {
+              executedTools.push(`Rendering Quiz (Mode: ${args.mode})`);
+              let qList = [];
+              let quizTitle = args.section_title ? `Knowledge Check: ${args.section_title}` : "Interactive Knowledge Check";
+
+              if (args.mode === 'database') {
+                const { data: book } = await supabase.from('books').select('id, toc').eq('course_code', args.course_code.toUpperCase().trim()).single();
+                if (book) {
+                  const flatToc: any[] = [];
+                  const flatten = (nodes: any[]) => { for(const n of nodes) { flatToc.push(n); if(n.children) flatten(n.children); } };
+                  flatten(book.toc || []);
+
+                  let startPage = 0; let endPage = 99999;
+                  if (args.section_title) {
+                    const idx = flatToc.findIndex(n => n.title.toLowerCase().includes(args.section_title.toLowerCase()));
+                    if (idx !== -1) {
+                      startPage = flatToc[idx].page;
+                      for (let i = idx + 1; i < flatToc.length; i++) {
+                        if (flatToc[i].page > startPage) { endPage = flatToc[i].page; break; }
+                      }
+                    }
+                  }
+
+                  const { data: mappings } = await supabase.from('question_book_mappings')
+                    .select('question_id, page_key')
+                    .eq('book_id', book.id)
+                    .eq('is_valid', true);
+
+                  const validQIds = (mappings || [])
+                    .filter(m => {
+                      const p = parseInt(m.page_key.split('-')[1]);
+                      return p >= startPage && p < endPage;
+                    })
+                    .map(m => m.question_id);
+
+                  if (validQIds.length > 0) {
+                    const { data: dbQs } = await supabase.from('questions').select('id, text, question_type, options').in('id', validQIds).limit(args.limit || 3);
+                    qList = dbQs || [];
+                  }
+                }
+              } else {
+                qList = args.custom_questions || [];
+              }
+
+              if (qList.length > 0) {
+                const quizId = inlineQuizzes.length;
+                inlineQuizzes.push({ id: quizId, title: quizTitle, questions: qList });
+                toolResult = { status: "success", instruction: `Quiz generated. You MUST insert [QUIZ_${quizId}] in your response to render it.` };
+              } else {
+                toolResult = { status: "error", message: "No questions found matching criteria." };
               }
             }
           } catch (e) {
@@ -482,7 +565,8 @@ serve(async (req) => {
       response: finalText,
       thoughts: executedTools,
       ui_command: uiCommand,
-      snapshots: inlineSnapshots
+      snapshots: inlineSnapshots,
+      quizzes: inlineQuizzes
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {
