@@ -6,7 +6,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const [messages, setMessages] = useState([]);
     const [otherReadAt, setOtherReadAt] = useState(null);
     const [isOtherTyping, setIsOtherTyping] = useState(false);
-    const [activeMenuId, setActiveMenuId] = useState(null);
+    const [activeMenu, setActiveMenu] = useState(null);
     const [editingMessage, setEditingMessage] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
     const [input, setInput] = useState('');
@@ -179,7 +179,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         if (!window.confirm("Delete this message for everyone?")) return;
         console.group(`🗑️ [UserChat] Deleting Message: ${msgId}`);
         setMessages(prev => prev.filter(m => m.id !== msgId));
-        setActiveMenuId(null);
+        setActiveMenu(null);
         const response = await supabase.from('messages').delete().eq('id', msgId).select();
         console.log("Delete Response:", response);
         console.groupEnd();
@@ -187,18 +187,18 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
 
     const handleCopy = (text) => {
         navigator.clipboard.writeText(text);
-        setActiveMenuId(null);
+        setActiveMenu(null);
     };
 
     const startEditing = (msg) => {
         setEditingMessage(msg);
         setInput(msg.text);
-        setActiveMenuId(null);
+        setActiveMenu(null);
     };
 
     const startReply = (msg) => {
         setReplyingTo(msg);
-        setActiveMenuId(null);
+        setActiveMenu(null);
     };
 
     const getMessageStatusIcon = (m) => {
@@ -266,16 +266,11 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                 </div>
             </header>
 
-            <main className="prism-flow" ref={flowRef} onClick={() => setActiveMenuId(null)}>
+            <main className="prism-flow" ref={flowRef} onClick={() => setActiveMenu(null)} onScroll={() => setActiveMenu(null)}>
                 {messages.map((m, idx) => {
                     const isMine = m.sender_id === currentUser.id;
-                    const isMenuOpen = activeMenuId === m.id;
+                    const isMenuOpen = activeMenu?.msg?.id === m.id;
                     
-                    // Smart pop direction: If it's one of the last 2 messages, pop upwards to avoid bottom screen clipping
-                    const popDirection = idx >= messages.length - 2 ? 'pop-up' : 'pop-down';
-                    
-                    // Logic: If m.reply_to_id exists, try to find the message. 
-                    // If we can't find it, it means it was deleted from the DB.
                     const repliedMsg = m.reply_to_id ? messages.find(msg => msg.id === m.reply_to_id) : null;
                     const isMissingReply = m.reply_to_id && !repliedMsg;
 
@@ -284,7 +279,34 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                             key={m.id} 
                             id={`msg-${m.id}`} 
                             className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} 
-                            onClick={(e) => { e.stopPropagation(); setActiveMenuId(isMenuOpen ? null : m.id); }}
+                            onClick={(e) => { 
+                                e.stopPropagation(); 
+                                if (isMenuOpen) {
+                                    setActiveMenu(null);
+                                    return;
+                                }
+                                
+                                // Capture exact touch/click coordinates
+                                let x = e.clientX || (e.touches && e.touches[0].clientX);
+                                let y = e.clientY || (e.touches && e.touches[0].clientY);
+                                
+                                // Fallback to element center if coordinates fail
+                                if (!x || !y) {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    x = rect.left + rect.width / 2;
+                                    y = rect.top + rect.height / 2;
+                                }
+                                
+                                const menuW = 160;
+                                const menuH = 200;
+                                
+                                // Push the menu inwards if the user tapped too close to the screen edge
+                                if (x + menuW > window.innerWidth - 20) x = window.innerWidth - menuW - 20;
+                                if (y + menuH > window.innerHeight - 80) y = window.innerHeight - menuH - 80;
+                                if (y < 80) y = 80; // Don't let it overlap the header
+                                
+                                setActiveMenu({ msg: m, isMine, x, y });
+                            }}
                             style={{ zIndex: isMenuOpen ? 100 : 1 }}
                         >
                             <div className="prism-bubble">
@@ -312,29 +334,6 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                                 {formatTime(m.created_at)}
                                 {isMine && <span style={{ marginLeft: '6px' }}>{getMessageStatusIcon(m)}</span>}
                             </div>
-                            
-                            {isMenuOpen && (
-                                <div className={`msg-actions-menu ${!isMine ? 'is-received' : ''} ${popDirection}`}>
-                                    {!isMine && (
-                                        <button className="msg-action-btn" onClick={() => startReply(m)}>
-                                            <i className="fa-solid fa-reply"></i> Reply
-                                        </button>
-                                    )}
-                                    <button className="msg-action-btn" onClick={() => handleCopy(m.text)}>
-                                        <i className="fa-solid fa-copy"></i> Copy
-                                    </button>
-                                    {isMine && (
-                                        <button className="msg-action-btn" onClick={() => startEditing(m)}>
-                                            <i className="fa-solid fa-pen"></i> Edit
-                                        </button>
-                                    )}
-                                    {isMine && (
-                                        <button className="msg-action-btn delete" onClick={() => deleteMessage(m.id)}>
-                                            <i className="fa-solid fa-trash"></i> Delete
-                                        </button>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     );
                 })}
@@ -382,6 +381,29 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                     </button>
                 </div>
             </footer>
+
+            {activeMenu && (
+                <div className="msg-actions-menu-fixed" style={{ left: activeMenu.x, top: activeMenu.y }}>
+                    {!activeMenu.isMine && (
+                        <button className="msg-action-btn" onClick={() => startReply(activeMenu.msg)}>
+                            <i className="fa-solid fa-reply"></i> Reply
+                        </button>
+                    )}
+                    <button className="msg-action-btn" onClick={() => handleCopy(activeMenu.msg.text)}>
+                        <i className="fa-solid fa-copy"></i> Copy
+                    </button>
+                    {activeMenu.isMine && (
+                        <button className="msg-action-btn" onClick={() => startEditing(activeMenu.msg)}>
+                            <i className="fa-solid fa-pen"></i> Edit
+                        </button>
+                    )}
+                    {activeMenu.isMine && (
+                        <button className="msg-action-btn delete" onClick={() => deleteMessage(activeMenu.msg.id)}>
+                            <i className="fa-solid fa-trash"></i> Delete
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
