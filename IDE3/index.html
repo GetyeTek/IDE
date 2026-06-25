@@ -3480,19 +3480,14 @@
                 ? allFiles.filter(f => f.path.startsWith(CONFIG.projectPath) || f.path.startsWith('supabase/')) 
                 : allFiles;
 
-            // Initialize selection state for the whole project once
-            if (!window.fileSelectionState) {
-                try {
-                    window.fileSelectionState = JSON.parse(sessionStorage.getItem('conduit_file_selection')) || {};
-                } catch(e) { window.fileSelectionState = {}; }
-            }
+            // Force a hard reset of selection state on every fetch/refresh
+            window.fileSelectionState = {}; 
 
             window.repoFiles.forEach(f => {
-                if (window.fileSelectionState[f.path] === undefined) {
-                    const isExcluded = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/') || isBinaryFile(f.path);
-                    window.fileSelectionState[f.path] = !isExcluded;
-                }
+                const isExcluded = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/') || isBinaryFile(f.path);
+                window.fileSelectionState[f.path] = !isExcluded;
             });
+            
             sessionStorage.setItem('conduit_file_selection', JSON.stringify(window.fileSelectionState));
 
             renderFileList(window.repoFiles);
