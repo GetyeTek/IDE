@@ -267,9 +267,12 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
             </header>
 
             <main className="prism-flow" ref={flowRef} onClick={() => setActiveMenuId(null)}>
-                {messages.map(m => {
+                {messages.map((m, idx) => {
                     const isMine = m.sender_id === currentUser.id;
                     const isMenuOpen = activeMenuId === m.id;
+                    
+                    // Smart pop direction: If it's one of the last 2 messages, pop upwards to avoid bottom screen clipping
+                    const popDirection = idx >= messages.length - 2 ? 'pop-up' : 'pop-down';
                     
                     // Logic: If m.reply_to_id exists, try to find the message. 
                     // If we can't find it, it means it was deleted from the DB.
@@ -277,7 +280,13 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                     const isMissingReply = m.reply_to_id && !repliedMsg;
 
                     return (
-                        <div key={m.id} id={`msg-${m.id}`} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} onClick={(e) => { e.stopPropagation(); setActiveMenuId(isMenuOpen ? null : m.id); }}>
+                        <div 
+                            key={m.id} 
+                            id={`msg-${m.id}`} 
+                            className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} 
+                            onClick={(e) => { e.stopPropagation(); setActiveMenuId(isMenuOpen ? null : m.id); }}
+                            style={{ zIndex: isMenuOpen ? 100 : 1 }}
+                        >
                             <div className="prism-bubble">
                                 {repliedMsg ? (
                                     <div className="reply-quote" onClick={(e) => { e.stopPropagation(); scrollToMessage(m.reply_to_id); }}>
@@ -305,7 +314,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                             </div>
                             
                             {isMenuOpen && (
-                                <div className={`msg-actions-menu ${!isMine ? 'is-received' : ''}`}>
+                                <div className={`msg-actions-menu ${!isMine ? 'is-received' : ''} ${popDirection}`}>
                                     {!isMine && (
                                         <button className="msg-action-btn" onClick={() => startReply(m)}>
                                             <i className="fa-solid fa-reply"></i> Reply
