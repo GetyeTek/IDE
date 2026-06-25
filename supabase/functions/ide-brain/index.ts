@@ -2187,13 +2187,23 @@ serve(async (req) => {
             body: JSON.stringify({ sha: latestSha, force: true })
         });
 
+        // 3. Trigger deployment.yml on the newly synced Main branch
+        let triggerMsg = "Workflow trigger skipped.";
+        try {
+            await triggerWorkflowFile(TARGET_REPO, "deployment.yml", MAIN_BRANCH, {});
+            triggerMsg = "Successfully dispatched deployment.yml";
+        } catch (e: any) {
+            console.error("Auto-deploy trigger failed:", e);
+            triggerMsg = `Workflow dispatch failed: ${e.message}`;
+        }
+
         const logData = { 
             success: true, 
             sha: latestSha, 
-            message: `Shipped current dev state to Main branch.` 
+            message: `Shipped current dev state to Main branch. ${triggerMsg}` 
         };
 
-        // 3. Log to History and Terminal
+        // 4. Log to History and Terminal
         await supabase.from('conduit_history').insert({ 
             repo_name: TARGET_REPO, 
             title: version_name ? `Ship: ${version_name}` : "Shipped to Main", 
