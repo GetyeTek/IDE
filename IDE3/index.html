@@ -1364,9 +1364,13 @@
                     <span style="font-size:13px;">📁 Enable Folder Navigation</span>
                     <input type="checkbox" id="setting-folder-view" onchange="toggleFolderView(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
                 </label>
-                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px;">
                     <span style="font-size:13px;">🛠 Enable Eruda Console</span>
                     <input type="checkbox" id="setting-enable-eruda" onchange="toggleEruda(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
+                </label>
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                    <span style="font-size:13px;">📌 Auto-Select Pinned Files</span>
+                    <input type="checkbox" id="setting-auto-pinned" onchange="toggleAutoPinned(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
                 </label>
                 <p style="font-size:10px; color:#666; margin-top:8px;">Turn on the floating developer console or change file context navigation styles. Eruda requires app reload to fully apply.</p>
             </div>
@@ -2066,6 +2070,7 @@
         omitHeaders: localStorage.getItem('conduit_omitHeaders') === 'true',
         previewFetchMode: initialRepoConfig.previewFetchMode || 'single',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
+        autoSelectPinned: localStorage.getItem('conduit_auto_select_pinned') === 'true',
         folderView: localStorage.getItem('conduit_folder_view') === 'true',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
         consoleHalf: localStorage.getItem('conduit_console_half') === 'true',
@@ -3483,19 +3488,21 @@
             // Force a hard reset of selection state on every fetch/refresh
             window.fileSelectionState = {}; 
             const pinned = JSON.parse(localStorage.getItem('conduit_pinned_files') || '[]');
-            
-            // Pro-tip: Add specific function slugs here if you want them always selected without pinning
-            const efWhitelist = ['auth-hook', 'stripe-webhook']; 
+            const efWhitelist = []; // Add hardcoded slugs here if needed
 
             window.repoFiles.forEach(f => {
                 const isEF = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/');
                 const isPinned = pinned.includes(f.path);
                 const isWhitelisted = efWhitelist.some(slug => f.path.includes(slug));
+                const isBinary = isBinaryFile(f.path);
                 
-                // Rule: Exclude binaries always. Exclude EFs UNLESS they are pinned or whitelisted.
-                const isExcluded = (isEF && !isPinned && !isWhitelisted) || isBinaryFile(f.path);
+                let isSelected = !isBinary; // Default: select all code
+                if (isEF) {
+                    // EFs only get selected if they are whitelisted OR (pinned AND the toggle is active)
+                    isSelected = isWhitelisted || (isPinned && CONFIG.autoSelectPinned);
+                }
                 
-                window.fileSelectionState[f.path] = !isExcluded;
+                window.fileSelectionState[f.path] = isSelected;
             });
             
             sessionStorage.setItem('conduit_file_selection', JSON.stringify(window.fileSelectionState));
@@ -8217,6 +8224,7 @@ async function downloadArtifact(runId) {
         document.getElementById('repo-settings-overlay').classList.add('active');
         document.getElementById('setting-enable-eruda').checked = localStorage.getItem('conduit_enable_eruda') === 'true';
         document.getElementById('setting-folder-view').checked = CONFIG.folderView;
+        document.getElementById('setting-auto-pinned').checked = CONFIG.autoSelectPinned;
         renderBackendManager();
         toggleFab(false);
     }
@@ -8228,6 +8236,12 @@ async function downloadArtifact(runId) {
         } else if (!enabled && typeof eruda !== 'undefined') {
             try { eruda.destroy(); } catch(e) {}
         }
+    }
+
+    function toggleAutoPinned(enabled) {
+        localStorage.setItem('conduit_auto_select_pinned', enabled ? 'true' : 'false');
+        CONFIG.autoSelectPinned = enabled;
+        showGlobalToast(enabled ? "Auto-select Pinned: ON" : "Auto-select Pinned: OFF");
     }
 
     function renderBackendSelector() {
