@@ -206,7 +206,7 @@ body.library-open { overflow: hidden; }
 .message-info .last-message { font-size: 0.9rem; color: var(--text-secondary-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .message-meta { text-align: right; font-size: 0.75rem; color: var(--text-secondary-dark); flex-shrink: 0; }
 .message-meta .pin-icon { font-size: 0.9rem; color: var(--text-secondary-dark); transform: rotate(45deg); }
-.message-meta .unread-dot { width: 10px; height: 10px; background-color: var(--accent-teal); border-radius: 50%; margin: 4px 0 0 auto; }
+.message-meta .unread-badge { background-color: var(--accent-teal); color: var(--bg-dark); font-size: 0.65rem; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 5px; margin: 4px 0 0 auto; box-shadow: 0 0 10px rgba(66, 215, 184, 0.3); }
 .miron-chat-card { background: linear-gradient(135deg, #2a2a2a 0%, var(--surface-dark) 100%); border: 1px solid transparent; position: relative; overflow: hidden; }
 .miron-chat-card::before { content: ""; position: absolute; inset: 0; z-index: 0; border-radius: inherit; padding: 1px; background: linear-gradient(135deg, var(--accent-teal), #2e5a52); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: pulse-glow-border 4s infinite ease-in-out; }
 @keyframes pulse-glow-border { 50% { opacity: 0.6; } }
