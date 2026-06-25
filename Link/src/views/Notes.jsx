@@ -174,23 +174,16 @@ const Notes = ({ currentUser, onClose }) => {
         setActiveMenu(null);
     };
 
-    const handleDownload = async (url, filename) => {
+    const handleDownload = (url, filename) => {
         setActiveMenu(null);
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const blobUrl = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(blobUrl);
-        } catch (err) {
-            console.error("Download failed:", err);
-            window.open(url, '_blank');
-        }
+        const downloadUrl = `${url}${url.includes('?') ? '&' : '?'}download=${encodeURIComponent(filename)}`;
+        
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.target = '_self'; 
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
