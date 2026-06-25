@@ -81,6 +81,17 @@
 
 @keyframes prismPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
+/* Highlight Flash Animation */
+@keyframes highlightMessage {
+    0% { background: transparent; }
+    20% { background: rgba(66, 215, 184, 0.25); filter: drop-shadow(0 0 15px rgba(66, 215, 184, 0.4)); transform: scale(1.03); }
+    100% { background: transparent; transform: scale(1); }
+}
+
+.msg-highlight-flash .prism-bubble {
+    animation: highlightMessage 2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .msg-prism-group.sent { align-self: flex-end; align-items: flex-end; }
 .msg-prism-group.received { align-self: flex-start; align-items: flex-start; }
 
