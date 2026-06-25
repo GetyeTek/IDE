@@ -216,15 +216,27 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     };
     const scrollToMessage = (id) => {
         const el = document.getElementById(`msg-${id}`);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            // Visual Target Lock
-            el.classList.add('msg-highlight-flash');
-            setTimeout(() => {
-                el.classList.remove('msg-highlight-flash');
-            }, 2000);
-        }
+        if (!el) return;
+
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Trigger highlight ONLY when the element actually lands in the viewport
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    console.log("🎯 [UserChat] Target locked in view, flashing...");
+                    el.classList.add('msg-highlight-flash');
+                    
+                    // Clean up: remove class after animation and disconnect observer
+                    setTimeout(() => el.classList.remove('msg-highlight-flash'), 2500);
+                    observer.disconnect();
+                }
+            });
+        }, { 
+            threshold: 0.5 // Trigger when at least 50% of the bubble is visible
+        });
+
+        observer.observe(el);
     };
     return (
         <div className="user-chat-overlay">
