@@ -167,7 +167,13 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
                             <div className="message-info">
                                 <div className="name" style={{ color: '#42d7b8' }}>My Notes</div>
                                 <div className="last-message">
-                                    {conversations.find(c => c.type === 'notes')?.last_message_text || 'Save thoughts, files, or links here...'}
+                                    {(() => {
+                                        const note = conversations.find(c => c.type === 'notes');
+                                        if (!note) return 'Save thoughts, files, or links here...';
+                                        if (note.last_message_text) return note.last_message_text;
+                                        // This is the fallback if text is empty but a file was sent
+                                        return '📎 File Attachment';
+                                    })()}
                                 </div>
                             </div>
                         </div>
