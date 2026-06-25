@@ -15,6 +15,7 @@ import MironChat from './views/MironChat.jsx';
 const App = () => {
   console.log("App Component Rendering...");
   const [session, setSession] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
 
@@ -40,15 +41,26 @@ const App = () => {
       console.warn("Conduit OAuth Interceptor: Could not read parent hash", e);
     }
 
+    const fetchProfile = async (userId) => {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (data) setUserProfile(data);
+    };
+
     // 1. Check active session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) fetchProfile(session.user.id);
       setIsCheckingAuth(false);
     });
 
     // 2. Listen for login/logout events in realtime
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setUserProfile(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -76,12 +88,12 @@ const App = () => {
 
   const renderContent = () => {
     switch(activeTab) {
-      case 'home': return <Home onOpenActivity={() => setIsActivityOpen(true)} />;
-      case 'discover': return <Discover onOpenActivity={() => setIsActivityOpen(true)} />;
-      case 'study': return <Study onOpenActivity={() => setIsActivityOpen(true)} />;
-      case 'connect': return <Connect onOpenActivity={() => setIsActivityOpen(true)} />;
-      case 'profile': return <Profile onOpenActivity={() => setIsActivityOpen(true)} />;
-      default: return <Home onOpenActivity={() => setIsActivityOpen(true)} />;
+      case 'home': return <Home onOpenActivity={() => setIsActivityOpen(true)} userProfile={userProfile} />;
+      case 'discover': return <Discover onOpenActivity={() => setIsActivityOpen(true)} userProfile={userProfile} />;
+      case 'study': return <Study onOpenActivity={() => setIsActivityOpen(true)} userProfile={userProfile} />;
+      case 'connect': return <Connect onOpenActivity={() => setIsActivityOpen(true)} userProfile={userProfile} currentUser={session?.user} />;
+      case 'profile': return <Profile onOpenActivity={() => setIsActivityOpen(true)} userProfile={userProfile} />;
+      default: return <Home onOpenActivity={() => setIsActivityOpen(true)} userProfile={userProfile} />;
     }
   };
 
