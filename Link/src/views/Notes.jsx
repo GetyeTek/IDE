@@ -119,7 +119,7 @@ const Notes = ({ currentUser, onClose }) => {
             await supabase.from('messages').insert({
                 conversation_id: conversationId,
                 sender_id: currentUser.id,
-                text: `Sent a file: ${file.name}`, // Add text so the snippet in the list isn't empty
+                text: '', // No text needed in the bubble
                 attachments: [attachment]
             });
 
@@ -149,6 +149,17 @@ const Notes = ({ currentUser, onClose }) => {
         setActiveMenu(null);
     };
 
+    const handleDownload = (url, filename) => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setActiveMenu(null);
+    };
+
     return (
         <div className="notes-overlay">
             <header className="notes-header">
@@ -168,7 +179,7 @@ const Notes = ({ currentUser, onClose }) => {
                 {isLoading ? (
                     <div className="notes-loader-container">
                         <i className="fas fa-circle-notch fa-spin"></i>
-                        <p>Decrypting Vault...</p>
+                        <p>Opening your notes...</p>
                     </div>
                 ) : messages.length === 0 && !isUploading ? (
                     <div className="notes-empty-state">
@@ -247,6 +258,11 @@ const Notes = ({ currentUser, onClose }) => {
                     {activeMenu.msg.text && (
                         <button className="notes-ctx-btn" onClick={() => handleCopy(activeMenu.msg.text)}>
                             <i className="fa-solid fa-copy"></i> Copy Text
+                        </button>
+                    )}
+                    {activeMenu.msg.attachments?.[0] && (
+                        <button className="notes-ctx-btn" onClick={() => handleDownload(activeMenu.msg.attachments[0].url, activeMenu.msg.attachments[0].name)}>
+                            <i className="fa-solid fa-download"></i> Download File
                         </button>
                     )}
                     <button className="notes-ctx-btn delete" onClick={() => deleteNote(activeMenu.msg.id)}>
