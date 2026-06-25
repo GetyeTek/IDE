@@ -214,7 +214,12 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         if (!isoString) return '';
         return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
-
+    const scrollToMessage = (id) => {
+        const el = document.getElementById(`msg-${id}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    };
     return (
         <div className="user-chat-overlay">
             <div className="ambient-prism-light"></div>
@@ -250,10 +255,10 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                     const repliedMsg = m.reply_to_id ? messages.find(msg => msg.id === m.reply_to_id) : null;
 
                     return (
-                        <div key={m.id} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} onClick={(e) => { e.stopPropagation(); setActiveMenuId(isMenuOpen ? null : m.id); }}>
+                        <div key={m.id} id={`msg-${m.id}`} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} onClick={(e) => { e.stopPropagation(); setActiveMenuId(isMenuOpen ? null : m.id); }}>
                             <div className="prism-bubble">
                                 {repliedMsg && (
-                                    <div className="reply-quote" onClick={(e) => { e.stopPropagation(); scrollToQuestion(m.reply_to_id); }}>
+                                    <div className="reply-quote" onClick={(e) => { e.stopPropagation(); scrollToMessage(m.reply_to_id); }}>
                                         <div className="reply-quote-bar"></div>
                                         <div className="reply-quote-content">
                                             <div className="reply-quote-user">{repliedMsg.sender_id === currentUser.id ? 'You' : chatTitle}</div>
@@ -270,10 +275,12 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                             </div>
                             
                             {isMenuOpen && (
-                                <div className="msg-actions-menu">
-                                    <button className="msg-action-btn" onClick={() => startReply(m)}>
-                                        <i className="fa-solid fa-reply"></i> Reply
-                                    </button>
+                                <div className={`msg-actions-menu ${!isMine ? 'is-received' : ''}`}>
+                                    {!isMine && (
+                                        <button className="msg-action-btn" onClick={() => startReply(m)}>
+                                            <i className="fa-solid fa-reply"></i> Reply
+                                        </button>
+                                    )}
                                     <button className="msg-action-btn" onClick={() => handleCopy(m.text)}>
                                         <i className="fa-solid fa-copy"></i> Copy
                                     </button>
