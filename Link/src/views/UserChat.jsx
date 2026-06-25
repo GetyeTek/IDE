@@ -47,6 +47,8 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
             .on('postgres_changes', { 
                 event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${chat.conversation_id}`
             }, (payload) => {
+                console.log(`⚡ [Realtime] Received ${payload.eventType} event:`, payload);
+                
                 if (payload.eventType === 'INSERT') {
                     setMessages(prev => {
                         if (prev.find(m => m.id === payload.new.id)) return prev;
@@ -135,10 +137,34 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         setInput('');
 
         if (editingMessage) {
-            const { error } = await supabase.from('messages')
+            console.group(`✏️ [UserChat] Editing Message: ${editingMessage.id}`);
+            console.log("Original text:", editingMessage.text);
+            console.log("New text:", msgText);
+            
+            // 1. Optimistic UI Update
+            console.log("Applying optimistic UI update...");
+            setMessages(prev => prev.map(m => 
+                m.id === editingMessage.id ? { ...m, text: msgText, is_edited: true } : m
+            ));
+
+            // 2. Database Update
+            console.log("Sending UPDATE to Supabase...");
+            const response = await supabase.from('messages')
                 .update({ text: msgText, is_edited: true })
-                .eq('id', editingMessage.id);
-            if (error) console.error("Update failed:", error);
+                .eq('id', editingMessage.id)
+                .select(); // Critical for checking if rows were actually affected
+
+            console.log("Supabase Response:", response);
+
+            if (response.error) {
+                console.error("❌ Update failed due to error:", response.error);
+            } else if (response.data && response.data.length === 0) {
+                console.warn("⚠️ Update returned 204 with 0 rows affected! Check RLS policies.");
+            } else {
+                console.log("✅ Message successfully updated in DB.");
+            }
+
+            console.groupEnd();
             setEditingMessage(null);
             return;
         }
@@ -163,9 +189,28 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     };
 
     const deleteMessage = async (msgId) => {
-        const { error } = await supabase.from('messages').delete().eq('id', msgId);
-        if (error) console.error("Delete failed:", error);
+        console.group(`🗑️ [UserChat] Deleting Message: ${msgId}`);
+        
+        // 1. Optimistic UI Update
+        console.log("Applying optimistic UI removal...");
+        setMessages(prev => prev.filter(m => m.id !== msgId));
         setActiveMenuId(null);
+        
+        // 2. Database Deletion
+        console.log("Sending DELETE to Supabase...");
+        const response = await supabase.from('messages').delete().eq('id', msgId).select();
+        
+        console.log("Supabase Response:", response);
+
+        if (response.error) {
+            console.error("❌ Delete failed due to error:", response.error);
+        } else if (response.data && response.data.length === 0) {
+            console.warn("⚠️ Delete returned 204 with 0 rows affected! Check RLS policies.");
+        } else {
+            console.log("✅ Message successfully deleted from DB.");
+        }
+        
+        console.groupEnd();
     };
 
     const startEditing = (msg) => {
