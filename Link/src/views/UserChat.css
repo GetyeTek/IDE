@@ -76,6 +76,7 @@
 .msg-prism-group {
     display: flex; flex-direction: column; max-width: 80%;
     animation: prismPop 0.3s ease-out forwards;
+    position: relative; /* Anchor for the absolute menu */
 }
 
 @keyframes prismPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
@@ -117,7 +118,7 @@
     top: 0;
     right: 100%;
     margin-right: 10px;
-    background: rgba(18, 18, 18, 0.9);
+    background: rgba(18, 18, 18, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -125,12 +126,31 @@
     padding: 6px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    z-index: 10;
-    min-width: 130px;
-    animation: menuPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    gap: 2px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    z-index: 1000; /* Ensure it's above everything */
+    min-width: 140px;
+    animation: menuPopSent 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     transform-origin: right center;
+}
+
+.msg-actions-menu.is-received {
+    right: auto;
+    left: 100%;
+    margin-right: 0;
+    margin-left: 10px;
+    transform-origin: left center;
+    animation: menuPopReceived 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes menuPopSent {
+    from { opacity: 0; transform: scale(0.8) translateX(20px); }
+    to { opacity: 1; transform: scale(1) translateX(0); }
+}
+
+@keyframes menuPopReceived {
+    from { opacity: 0; transform: scale(0.8) translateX(-20px); }
+    to { opacity: 1; transform: scale(1) translateX(0); }
 }
 
 @keyframes menuPop {
