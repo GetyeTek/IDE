@@ -112,6 +112,7 @@ const Notes = ({ currentUser, onClose }) => {
             const attachment = {
                 name: file.name,
                 url: publicUrl,
+                path: filePath, // Store the path so we can delete it later
                 type: file.type,
                 size: file.size
             };
@@ -139,9 +140,33 @@ const Notes = ({ currentUser, onClose }) => {
 
     const deleteNote = async (id) => {
         if(!window.confirm("Delete this note?")) return;
+
+        // 1. Find the message locally to check for attachments
+        const noteToDelete = messages.find(m => m.id === id);
+        
+        // 2. Optimistic UI update
         setMessages(prev => prev.filter(m => m.id !== id));
         setActiveMenu(null);
-        await supabase.from('messages').delete().eq('id', id);
+
+        try {
+            // 3. Cleanup Storage if files exist
+            if (noteToDelete?.attachments && noteToDelete.attachments.length > 0) {
+                const paths = noteToDelete.attachments
+                    .map(att => att.path)
+                    .filter(Boolean); // Only get valid paths
+
+                if (paths.length > 0) {
+                    console.log("🧹 [Notes] Cleaning up storage files:", paths);
+                    await supabase.storage.from('user_notes').remove(paths);
+                }
+            }
+
+            // 4. Delete the database record
+            await supabase.from('messages').delete().eq('id', id);
+            console.log("✅ [Notes] Message and associated files deleted.");
+        } catch (err) {
+            console.error("❌ [Notes] Deletion cleanup failed:", err);
+        }
     };
 
     const handleCopy = (text) => {
