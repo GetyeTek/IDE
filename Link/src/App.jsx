@@ -49,15 +49,26 @@ const App = () => {
       }
     } catch (e) {}
 
+    const fetchProfile = async (userId) => {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (data) setUserProfile(data);
+    };
+
     // 1. Check active session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) fetchProfile(session.user.id);
       setIsCheckingAuth(false);
     });
 
     // 2. Listen for login/logout events in realtime
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setUserProfile(null);
+      }
     });
 
     return () => {
