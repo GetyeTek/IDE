@@ -333,8 +333,15 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
 
             <footer className="prism-input-wrapper">
                 {editingMessage && (
-                    <div className="input-mode-header">
-                        <span><i className="fa-solid fa-pen"></i> Editing message</span>
+                    <div className="input-mode-header edit-mode">
+                        <div className="edit-preview-border"></div>
+                        <div className="input-mode-icon">
+                            <i className="fa-solid fa-pen"></i>
+                        </div>
+                        <div className="reply-preview-info">
+                            <span className="edit-user">Editing message</span>
+                            <span className="reply-text">{editingMessage.text}</span>
+                        </div>
                         <button className="icon-button" onClick={() => { setEditingMessage(null); setInput(''); }}>
                             <i className="fa-solid fa-times"></i>
                         </button>
