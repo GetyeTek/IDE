@@ -8,8 +8,8 @@ const REQUEST_ID = Deno.env.get('REQUEST_ID') ?? 'WORKER';
 const IMAGE_PATHS_RAW = Deno.env.get('IMAGE_PATHS') ?? '[]';
 
 // --- MODELS (USER SPECIFIED ORDER) ---
-const PRIMARY_MODEL = "gemini-3-flash-preview";
-const FALLBACK_MODEL = "gemini-2.5-flash";
+const PRIMARY_MODEL = "gemini-2.5-flash";
+const FALLBACK_MODEL = "gemini-3-flash-preview";
 
 const OCR_PROMPT_TEMPLATE = `
 BATCH OCR & SPATIAL MAPPING TASK:
