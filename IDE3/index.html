@@ -5,6 +5,18 @@
         // --- PREVIEW BOOTSTRAPPER (MUST RUN BEFORE IDE) ---
         (function() {
             const params = new URLSearchParams(window.location.search);
+            
+            // --- OAUTH POPUP CATCHER ---
+            if (params.has('conduit_oauth')) {
+                if (window.opener) {
+                    window.opener.postMessage({ type: 'CONDUIT_OAUTH_TOKEN', hash: window.location.hash }, '*');
+                }
+                window.close();
+                // Failsafe UI in case browser blocks auto-close
+                document.documentElement.innerHTML = '<div style="color:white; font-family:sans-serif; text-align:center; padding:50px; background:#050505; height:100vh;"><h2>Authentication Successful!</h2><p>You can close this window.</p></div>';
+                window.stop();
+            }
+
             if (params.has('conduit_preview')) {
                 window.IS_CONDUIT_PREVIEW = true;
                 document.documentElement.style.display = 'none';
