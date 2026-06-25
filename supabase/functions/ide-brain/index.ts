@@ -2175,24 +2175,39 @@ serve(async (req) => {
     }
 
     if (action === "commit_prod") {
-        const scopePath = project_path || "";
-        const tree = await githubFetch(TARGET_REPO, `/git/trees/${DEV_BRANCH}?recursive=1`);
-        const files = tree.tree.filter((f: any) => f.type === "blob" && f.path.startsWith(scopePath));
-        let copiedCount = 0;
-        for (const file of files) {
-            const { content } = await getFileRaw(TARGET_REPO, file.path, DEV_BRANCH);
-            if (content) {
-                const textContent = base64ToText(content);
-                const relativePath = scopePath ? file.path.substring(scopePath.length) : file.path;
-                const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-                await updateFile(TARGET_REPO, `${version_name}/${cleanPath}`, textContent, "", MAIN_BRANCH, `Snapshot ${version_name}`);
-                copiedCount++;
-            }
-        }
-        const mainRef = await githubFetch(TARGET_REPO, `/git/ref/heads/${MAIN_BRANCH}`);
-        const logData = { success: true, count: copiedCount, message: `Deployed ${version_name}` };
-        await supabase.from('conduit_history').insert({ repo_name: TARGET_REPO, title: `Deployed ${version_name}`, type: "Prod", meta: `Snapshot ${copiedCount} files`, sha: mainRef.object.sha });
-        await supabase.from('conduit_logs').insert({ repo_name: TARGET_REPO, type: 'commit_prod', data: logData });
+        console.log(`[Ship] Syncing ${DEV_BRANCH} -> ${MAIN_BRANCH} for ${TARGET_REPO}`);
+        
+        // 1. Get current state of Dev
+        const devBranch = await githubFetch(TARGET_REPO, `/git/ref/heads/${DEV_BRANCH}`);
+        const latestSha = devBranch.object.sha;
+
+        // 2. Force Main to match Dev (The "Ship" command)
+        await githubFetch(TARGET_REPO, `/git/refs/heads/${MAIN_BRANCH}`, {
+            method: "PATCH",
+            body: JSON.stringify({ sha: latestSha, force: true })
+        });
+
+        const logData = { 
+            success: true, 
+            sha: latestSha, 
+            message: `Shipped current dev state to Main branch.` 
+        };
+
+        // 3. Log to History and Terminal
+        await supabase.from('conduit_history').insert({ 
+            repo_name: TARGET_REPO, 
+            title: version_name ? `Ship: ${version_name}` : "Shipped to Main", 
+            type: "Prod", 
+            meta: `Fast-Forward to ${latestSha.substring(0,7)}`, 
+            sha: latestSha 
+        });
+
+        await supabase.from('conduit_logs').insert({ 
+            repo_name: TARGET_REPO, 
+            type: 'commit_prod', 
+            data: logData 
+        });
+
         return new Response(JSON.stringify(logData), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     
