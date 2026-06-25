@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabaseClient.js';
 import UserChat from './UserChat.jsx';
+import Notes from './Notes.jsx';
 
 const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
     const [activeView, setActiveView] = useState('messages');
     const [activeChat, setActiveChat] = useState(null);
+    const [isNotesOpen, setIsNotesOpen] = useState(false);
     const [conversations, setConversations] = useState([]);
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
     const [showDirectory, setShowDirectory] = useState(false);
@@ -157,6 +159,17 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
                             </div>
                         </div>
 
+                        {/* My Notes Entry */}
+                        <div className="messages-list-item" style={{ background: 'rgba(66, 215, 184, 0.05)', border: '1px solid rgba(66, 215, 184, 0.2)' }} onClick={() => setIsNotesOpen(true)}>
+                            <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: '#42d7b8', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                                <i className="fas fa-bookmark"></i>
+                            </div>
+                            <div className="message-info">
+                                <div className="name" style={{ color: '#42d7b8' }}>My Notes</div>
+                                <div className="last-message">Personal cloud & quick clips</div>
+                            </div>
+                        </div>
+
                         {showDirectory ? (
                             <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
                                 <h3 style={{ fontSize: '0.8rem', color: '#888', marginBottom: '10px', textTransform: 'uppercase' }}>Network Directory</h3>
@@ -200,6 +213,7 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
             </div>
             
             {activeChat && <UserChat chat={activeChat} currentUser={currentUser} isOnline={onlineUsers.has(activeChat.other_user_id)} onClose={() => { setActiveChat(null); fetchConversations(); }} />}
+            {isNotesOpen && <Notes currentUser={currentUser} onClose={() => setIsNotesOpen(false)} />}
         </div>
     );
 };
