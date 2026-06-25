@@ -64,21 +64,21 @@
 }
 
 .note-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 1rem;
+    background: #1e1e2e; /* Soft Deep Indigo */
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px 20px 20px 4px;
+    padding: 0.9rem 1.2rem;
     align-self: flex-start;
-    max-width: 90%;
-    width: 100%;
+    max-width: 85%;
     position: relative;
     cursor: pointer;
     transition: transform 0.2s, background 0.2s;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .note-card:active {
-    transform: scale(0.98);
-    background: rgba(255, 255, 255, 0.08);
+    transform: scale(0.97);
+    background: #252538;
 }
 
 .notes-loader-container {
@@ -98,8 +98,7 @@
 .notes-loader-container p {
     font-size: 0.9rem;
     color: #888;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    font-weight: 500;
 }
 
 .notes-empty-state {
