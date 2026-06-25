@@ -3475,10 +3475,26 @@
             const res = await fetch(CONFIG.funcUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: apiBody({ action: 'fetch' }) });
             const data = await res.json();
             const allFiles = data.files || [];
-            // Expand filter to include the entire supabase tree, not just functions/
+            
             window.repoFiles = CONFIG.projectPath 
                 ? allFiles.filter(f => f.path.startsWith(CONFIG.projectPath) || f.path.startsWith('supabase/')) 
                 : allFiles;
+
+            // Initialize selection state for the whole project once
+            if (!window.fileSelectionState) {
+                try {
+                    window.fileSelectionState = JSON.parse(sessionStorage.getItem('conduit_file_selection')) || {};
+                } catch(e) { window.fileSelectionState = {}; }
+            }
+
+            window.repoFiles.forEach(f => {
+                if (window.fileSelectionState[f.path] === undefined) {
+                    const isExcluded = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/') || isBinaryFile(f.path);
+                    window.fileSelectionState[f.path] = !isExcluded;
+                }
+            });
+            sessionStorage.setItem('conduit_file_selection', JSON.stringify(window.fileSelectionState));
+
             renderFileList(window.repoFiles);
         } catch (e) {
             listContainer.innerHTML = `<div style="color:var(--danger); padding:20px;">Error: ${e.message}</div>`;
@@ -6790,21 +6806,7 @@ async function downloadArtifact(runId) {
             return;
         }
 
-        if (!window.fileSelectionState) {
-            try {
-                window.fileSelectionState = JSON.parse(sessionStorage.getItem('conduit_file_selection')) || {};
-            } catch(e) { window.fileSelectionState = {}; }
-        }
-        
-        let stateChanged = false;
-        files.forEach(f => {
-            if (window.fileSelectionState[f.path] === undefined) {
-                const isExcluded = f.path.endsWith('index.ts') || f.path.includes('supabase/functions/') || isBinaryFile(f.path);
-                window.fileSelectionState[f.path] = !isExcluded;
-                stateChanged = true;
-            }
-        });
-        if (stateChanged) sessionStorage.setItem('conduit_file_selection', JSON.stringify(window.fileSelectionState));
+
 
         const pinned = JSON.parse(localStorage.getItem('conduit_pinned_files') || '[]');
         const searchInput = document.getElementById('file-search-input');
@@ -7347,14 +7349,30 @@ async function downloadArtifact(runId) {
     }
 
     function toggleAllFiles(s) {
-        document.querySelectorAll('.file-check').forEach(cb => {
-            const item = cb.closest('.file-item');
-            // Only toggle if the file is currently visible (matches filter)
-            if (item && item.style.display !== 'none') {
-                cb.checked = s.checked;
-                window.fileSelectionState[cb.value] = s.checked;
-            }
-        });
+        const isChecked = s.checked;
+        const searchInput = document.getElementById('file-search-input');
+        const query = searchInput ? searchInput.value.toLowerCase() : "";
+
+        if (query) {
+            // If filtering via search, only toggle what matches the filter
+            document.querySelectorAll('.file-check').forEach(cb => {
+                const item = cb.closest('.file-item');
+                if (item && item.style.display !== 'none') {
+                    cb.checked = isChecked;
+                    window.fileSelectionState[cb.value] = isChecked;
+                }
+            });
+        } else {
+            // Global toggle for the entire repository scope
+            window.repoFiles.forEach(f => {
+                window.fileSelectionState[f.path] = isChecked;
+            });
+            // Sync current visible checkboxes
+            document.querySelectorAll('.file-check').forEach(cb => {
+                cb.checked = isChecked;
+            });
+        }
+
         sessionStorage.setItem('conduit_file_selection', JSON.stringify(window.fileSelectionState));
         updateChatContextIndicator();
         syncSelectAllState();
