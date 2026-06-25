@@ -16,9 +16,18 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
         
         fetchConversations();
         
-        // 1. Subscribe to Realtime Messages to bump chat list
+        // 1. Subscribe to Realtime Messages and Read Receipt updates
         const msgChannel = supabase.channel('chat_list_updates')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+                fetchConversations();
+            })
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'conversation_members',
+                filter: `user_id=eq.${currentUser.id}` 
+            }, () => {
+                // Refresh list when I mark a chat as read to clear badges instantly
                 fetchConversations();
             })
             .subscribe();
