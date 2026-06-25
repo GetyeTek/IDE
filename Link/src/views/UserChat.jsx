@@ -252,12 +252,16 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                 {messages.map(m => {
                     const isMine = m.sender_id === currentUser.id;
                     const isMenuOpen = activeMenuId === m.id;
+                    
+                    // Logic: If m.reply_to_id exists, try to find the message. 
+                    // If we can't find it, it means it was deleted from the DB.
                     const repliedMsg = m.reply_to_id ? messages.find(msg => msg.id === m.reply_to_id) : null;
+                    const isMissingReply = m.reply_to_id && !repliedMsg;
 
                     return (
                         <div key={m.id} id={`msg-${m.id}`} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} onClick={(e) => { e.stopPropagation(); setActiveMenuId(isMenuOpen ? null : m.id); }}>
                             <div className="prism-bubble">
-                                {repliedMsg && (
+                                {repliedMsg ? (
                                     <div className="reply-quote" onClick={(e) => { e.stopPropagation(); scrollToMessage(m.reply_to_id); }}>
                                         <div className="reply-quote-bar"></div>
                                         <div className="reply-quote-content">
@@ -265,7 +269,15 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                                             <div className="reply-quote-text">{repliedMsg.text}</div>
                                         </div>
                                     </div>
-                                )}
+                                ) : isMissingReply ? (
+                                    <div className="reply-quote is-deleted">
+                                        <div className="reply-quote-bar"></div>
+                                        <div className="reply-quote-content">
+                                            <div className="reply-quote-user">System</div>
+                                            <div className="reply-quote-text"><i>Original message deleted</i></div>
+                                        </div>
+                                    </div>
+                                ) : null}
                                 {m.text}
                             </div>
                             <div className="prism-time">
