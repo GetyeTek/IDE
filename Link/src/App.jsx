@@ -20,12 +20,10 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('home');
 
   useEffect(() => {
-    // 0. Conduit IDE OAuth Interceptor
-    // The App iframe cannot see the parent window's hash automatically.
-    // We manually extract the OAuth token from the parent's URL so login succeeds.
-    try {
-      if (window.IS_CONDUIT_PREVIEW && window.parent && window.parent.location.hash.includes('access_token')) {
-        const hashParams = new URLSearchParams(window.parent.location.hash.substring(1));
+    // 0. Conduit OAuth Popup Interceptor
+    const handleMessage = (e) => {
+      if (e.data?.type === 'CONDUIT_OAUTH_TOKEN' && e.data.hash) {
+        const hashParams = new URLSearchParams(e.data.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         if (accessToken && refreshToken) {
@@ -33,37 +31,39 @@ const App = () => {
             access_token: accessToken,
             refresh_token: refreshToken
           });
-          // Clean the URL so we don't process it twice
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    // Legacy fallback for parent window hash (just in case)
+    try {
+      if (window.IS_CONDUIT_PREVIEW && window.parent && window.parent.location.hash.includes('access_token')) {
+        const hashParams = new URLSearchParams(window.parent.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (accessToken && refreshToken) {
+          supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
           window.parent.history.replaceState(null, '', window.parent.location.pathname + window.parent.location.search);
         }
       }
-    } catch (e) {
-      console.warn("Conduit OAuth Interceptor: Could not read parent hash", e);
-    }
-
-    const fetchProfile = async (userId) => {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (data) setUserProfile(data);
-    };
+    } catch (e) {}
 
     // 1. Check active session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id);
       setIsCheckingAuth(false);
     });
 
     // 2. Listen for login/logout events in realtime
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) {
-        fetchProfile(session.user.id);
-      } else {
-        setUserProfile(null);
-      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('message', handleMessage);
+    };
   }, []);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [mironContext, setMironContext] = useState(null); // null means closed, object holds selection context
