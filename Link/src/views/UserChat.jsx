@@ -5,6 +5,20 @@ import './UserChat.css';
 const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const [messages, setMessages] = useState([]);
     const [otherReadAt, setOtherReadAt] = useState(null);
+
+    const formatLastSeen = (dateStr) => {
+        if (!dateStr) return 'Offline';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffInMs = now - date;
+        const diffInMins = Math.floor(diffInMs / 60000);
+        const diffInHours = Math.floor(diffInMs / 3600000);
+
+        if (diffInMins < 1) return 'last seen just now';
+        if (diffInMins < 60) return `last seen ${diffInMins}m ago`;
+        if (diffInHours < 24) return `last seen ${diffInHours}h ago`;
+        return `last seen ${date.toLocaleDateString()}`;
+    };
     const [isOtherTyping, setIsOtherTyping] = useState(false);
     const [input, setInput] = useState('');
     const flowRef = useRef(null);
@@ -99,7 +113,31 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
             .eq('user_id', currentUser.id);
     };
 
+    const handleInputChange = (val) => {
+        setInput(val);
+
+        // Broadcast "Typing" status
+        if (roomChannelRef.current) {
+            roomChannelRef.current.track({ isTyping: true });
+        }
+
+        // Clear existing timeout
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+        // Set new timeout to stop typing indicator after 2.5s of silence
+        typingTimeoutRef.current = setTimeout(() => {
+            if (roomChannelRef.current) {
+                roomChannelRef.current.track({ isTyping: false });
+            }
+        }, 2500);
+    };
+
     const handleSend = async () => {
+        if (!input.trim()) return;
+
+        // Stop typing immediately on send
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        if (roomChannelRef.current) roomChannelRef.current.track({ isTyping: false });
         if (!input.trim()) return;
         const msgText = input;
         setInput('');
