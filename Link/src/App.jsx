@@ -54,12 +54,27 @@ const App = () => {
       if (data) setUserProfile(data);
     };
 
+    const updateLastSeen = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', session.user.id);
+      }
+    };
+
     // 1. Check active session on load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id);
+      if (session) {
+        fetchProfile(session.user.id);
+        updateLastSeen();
+      }
       setIsCheckingAuth(false);
     });
+
+    // Sync last seen every 2 minutes while active
+    const presenceInterval = setInterval(() => {
+      updateLastSeen();
+    }, 120000);
 
     // 2. Listen for login/logout events in realtime
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -74,6 +89,7 @@ const App = () => {
     return () => {
       subscription.unsubscribe();
       window.removeEventListener('message', handleMessage);
+      clearInterval(presenceInterval);
     };
   }, []);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
