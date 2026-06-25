@@ -272,7 +272,30 @@
 .input-mode-header .reply-preview-border { width: 3px; align-self: stretch; background: var(--accent-teal); border-radius: 3px; }
 .input-mode-header .reply-preview-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 .reply-user { font-weight: 700; color: var(--accent-teal) !important; font-size: 0.75rem !important; }
+.edit-user { font-weight: 700; color: #ffab40 !important; font-size: 0.75rem !important; }
 .reply-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.8rem !important; }
+
+/* --- EDIT MODE SPECIFICS --- */
+.input-mode-header.edit-mode {
+    background: rgba(255, 171, 64, 0.04);
+}
+
+.edit-preview-border {
+    width: 3px;
+    align-self: stretch;
+    background: #ffab40;
+    border-radius: 3px;
+}
+
+.input-mode-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffab40;
+    font-size: 0.9rem;
+    padding: 0 4px;
+    filter: drop-shadow(0 0 5px rgba(255, 171, 64, 0.3));
+}
 
 /* --- INPUT --- */
 .prism-input-wrapper {
