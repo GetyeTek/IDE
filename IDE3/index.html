@@ -3934,7 +3934,7 @@
         let inputVal = document.getElementById('json-input').value;
         let payload = {};
         
-        if (actionType === 'patch' || actionType === 'commit_prod') {
+        if (actionType === 'patch') {
             try {
                 const parsed = smartJSONParse(inputVal);
                 payload = parsed.operations || parsed;
@@ -3945,6 +3945,10 @@
                 btns.forEach(b => { if(b) { b.disabled = false; b.style.opacity = '1'; } });
                 return; 
             }
+        }
+
+        if (actionType === 'commit_prod') {
+            payload = { is_ship_signal: true };
         }
 
         if (actionType === 'commit_prod') {
