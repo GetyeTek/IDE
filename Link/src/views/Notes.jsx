@@ -174,15 +174,23 @@ const Notes = ({ currentUser, onClose }) => {
         setActiveMenu(null);
     };
 
-    const handleDownload = (url, filename) => {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const handleDownload = async (url, filename) => {
         setActiveMenu(null);
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Download failed:", err);
+            window.open(url, '_blank');
+        }
     };
 
     return (
@@ -252,13 +260,13 @@ const Notes = ({ currentUser, onClose }) => {
                                 {att.type.startsWith('image/') ? (
                                     <img src={att.url} alt="Note Attachment" className="note-image" />
                                 ) : (
-                                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="note-file-box">
+                                    <div className="note-file-box" onClick={(e) => { e.stopPropagation(); handleDownload(att.url, att.name); }}>
                                         <div className="note-file-icon"><i className="fas fa-file"></i></div>
                                         <div className="note-file-info">
                                             <span className="note-file-name">{att.name}</span>
                                             <span className="note-file-size">{(att.size / 1024 / 1024).toFixed(2)} MB</span>
                                         </div>
-                                    </a>
+                                    </div>
                                 )}
                             </div>
                         ))}
