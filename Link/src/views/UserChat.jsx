@@ -4,24 +4,12 @@ import './UserChat.css';
 
 const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const [messages, setMessages] = useState([]);
-    
-    const formatLastSeen = (dateStr) => {
-        if (!dateStr) return 'Offline';
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffInMs = now - date;
-        const diffInMins = Math.floor(diffInMs / 60000);
-        const diffInHours = Math.floor(diffInMs / 3600000);
-
-        if (diffInMins < 1) return 'last seen just now';
-        if (diffInMins < 60) return `last seen ${diffInMins}m ago`;
-        if (diffInHours < 24) return `last seen ${diffInHours}h ago`;
-        return `last seen ${date.toLocaleDateString()}`;
-    };
     const [otherReadAt, setOtherReadAt] = useState(null);
+    const [isOtherTyping, setIsOtherTyping] = useState(false);
     const [input, setInput] = useState('');
     const flowRef = useRef(null);
-
+    const typingTimeoutRef = useRef(null);
+    const roomChannelRef = useRef(null);
     const chatTitle = chat.type === 'dm' ? chat.other_user_name : chat.title;
     const chatAvatar = chat.type === 'dm' ? chat.other_user_avatar : chat.avatar_url;
 
@@ -30,21 +18,41 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         fetchOtherReadReceipt();
         markAsRead();
 
-        // 1. Listen for new messages
-        const msgChannel = supabase.channel(`room_${chat.conversation_id}`)
+        // 1. Create a unified Room Channel for Messages AND Presence
+        const channel = supabase.channel(`room_${chat.conversation_id}`, {
+            config: { presence: { key: currentUser.id } }
+        });
+
+        roomChannelRef.current = channel;
+
+        channel
+            // Listen for Messages
             .on('postgres_changes', { 
                 event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${chat.conversation_id}`
             }, (payload) => {
                 setMessages(prev => {
-                    // Ignore if optimistic UI already added it
                     if (prev.find(m => m.id === payload.new.id)) return prev;
                     return [...prev, { ...payload.new, status: 'sent' }];
                 });
                 if (payload.new.sender_id !== currentUser.id) markAsRead();
             })
-            .subscribe();
+            // Presence: Handle "Typing..." and "Online"
+            .on('presence', { event: 'sync' }, () => {
+                const state = channel.presenceState();
+                const otherUserPresence = state[chat.other_user_id];
+                if (otherUserPresence && otherUserPresence[0]?.isTyping) {
+                    setIsOtherTyping(true);
+                } else {
+                    setIsOtherTyping(false);
+                }
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.track({ isTyping: false });
+                }
+            });
 
-        // 2. Listen for the other user opening the chat (Read Receipts)
+        // 2. Listen for Read Receipts (Member Table Updates)
         const memberChannel = supabase.channel(`members_${chat.conversation_id}`)
             .on('postgres_changes', { 
                 event: 'UPDATE', schema: 'public', table: 'conversation_members', filter: `conversation_id=eq.${chat.conversation_id}`
@@ -56,7 +64,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
             .subscribe();
 
         return () => {
-            supabase.removeChannel(msgChannel);
+            supabase.removeChannel(channel);
             supabase.removeChannel(memberChannel);
         };
     }, [chat.conversation_id]);
@@ -151,8 +159,12 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                     </div>
                     <div className="contact-details">
                         <h2>{chatTitle}</h2>
-                        <p style={{ color: isOnline ? '#42d7b8' : '#888' }}>
-                            {isOnline ? 'Online' : formatLastSeen(chat.other_user_last_seen)}
+                        <p style={{ color: (isOnline || isOtherTyping) ? '#42d7b8' : '#888' }}>
+                            {isOtherTyping ? (
+                                <span>typing<span className="blink-cursor">...</span></span>
+                            ) : (
+                                isOnline ? 'Online' : formatLastSeen(chat.other_user_last_seen)
+                            )}
                         </p>
                     </div>
                 </div>
@@ -187,7 +199,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                         type="text" 
                         placeholder="Message..." 
                         value={input}
-                        onChange={(e) => setInput(e.target.value)}
+                        onChange={(e) => handleInputChange(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                     />
                     <button className="prism-send-btn" onClick={handleSend}>
