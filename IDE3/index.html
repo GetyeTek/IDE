@@ -7063,7 +7063,8 @@ async function downloadArtifact(runId) {
         // Check context: Editor or Log View?
         if (document.getElementById('ace-container').style.display !== 'none' && aceEditorInstance) {
             content = aceEditorInstance.getValue();
-            pathHeader = CONFIG.omitHeaders ? "" : `FILE: ${currentViewerPath}\n`;
+            const displayPath = (CONFIG.projectPath && currentViewerPath.startsWith(CONFIG.projectPath)) ? currentViewerPath.substring(CONFIG.projectPath.length) : currentViewerPath;
+            pathHeader = CONFIG.omitHeaders ? "" : `FILE: ${displayPath}\n`;
         } else {
             // Priority: Use raw buffer if available, fallback to DOM for legacy support
             content = window.CURRENT_RAW_LOG || document.getElementById('log-custom-container').innerText;
@@ -7346,7 +7347,8 @@ async function downloadArtifact(runId) {
             if(!data.content) throw new Error("No content found");
             
             const ts = new Date().toLocaleTimeString('en-GB').replace(/:/g, '');
-            const originalName = path.split('/').pop();
+            const cleanPath = (CONFIG.projectPath && path.startsWith(CONFIG.projectPath)) ? path.substring(CONFIG.projectPath.length) : path;
+            const originalName = cleanPath.replace(/\//g, '_'); 
             const parts = originalName.split('.');
             const ext = parts.pop();
             const nameWithoutExt = parts.join('.');
@@ -9043,7 +9045,10 @@ async function downloadArtifact(runId) {
                 fetchedFiles.push(...batchResults.filter(f => f !== null));
             }
 
-            const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
+            const text = fetchedFiles.map(f => {
+                const cleanPath = (CONFIG.projectPath && f.path.startsWith(CONFIG.projectPath)) ? f.path.substring(CONFIG.projectPath.length) : f.path;
+                return `FILE: ${cleanPath}\n${f.content}`;
+            }).join('\n\n');
             const blob = new Blob([text], { type: 'text/plain' });
             const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
 
