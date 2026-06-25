@@ -128,9 +128,6 @@
 /* --- CONTEXT MENU (EDIT / DELETE) --- */
 .msg-actions-menu {
     position: absolute;
-    top: 0;
-    right: 100%;
-    margin-right: 10px;
     background: rgba(18, 18, 18, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -141,29 +138,41 @@
     flex-direction: column;
     gap: 2px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-    z-index: 1000; /* Ensure it's above everything */
+    z-index: 1000;
     min-width: 140px;
-    animation: menuPopSent 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    transform-origin: right center;
 }
 
-.msg-actions-menu.is-received {
-    right: auto;
-    left: 100%;
-    margin-right: 0;
-    margin-left: 10px;
-    transform-origin: left center;
-    animation: menuPopReceived 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* SENT (Anchored Right) */
+.msg-actions-menu:not(.is-received).pop-down {
+    top: 100%; right: 0; margin-top: 8px;
+    transform-origin: top right;
+    animation: menuPopDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.msg-actions-menu:not(.is-received).pop-up {
+    bottom: 100%; right: 0; margin-bottom: 8px;
+    transform-origin: bottom right;
+    animation: menuPopUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes menuPopSent {
-    from { opacity: 0; transform: scale(0.8) translateX(20px); }
-    to { opacity: 1; transform: scale(1) translateX(0); }
+/* RECEIVED (Anchored Left) */
+.msg-actions-menu.is-received.pop-down {
+    top: 100%; left: 0; margin-top: 8px;
+    transform-origin: top left;
+    animation: menuPopDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.msg-actions-menu.is-received.pop-up {
+    bottom: 100%; left: 0; margin-bottom: 8px;
+    transform-origin: bottom left;
+    animation: menuPopUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes menuPopReceived {
-    from { opacity: 0; transform: scale(0.8) translateX(-20px); }
-    to { opacity: 1; transform: scale(1) translateX(0); }
+@keyframes menuPopDown {
+    from { opacity: 0; transform: scale(0.8) translateY(-10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes menuPopUp {
+    from { opacity: 0; transform: scale(0.8) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 @keyframes menuPop {
