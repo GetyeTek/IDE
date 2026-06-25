@@ -8,6 +8,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const [isOtherTyping, setIsOtherTyping] = useState(false);
     const [activeMenuId, setActiveMenuId] = useState(null);
     const [editingMessage, setEditingMessage] = useState(null);
+    const [replyingTo, setReplyingTo] = useState(null);
     const [input, setInput] = useState('');
     const flowRef = useRef(null);
     const typingTimeoutRef = useRef(null);
@@ -138,32 +139,9 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
 
         if (editingMessage) {
             console.group(`✏️ [UserChat] Editing Message: ${editingMessage.id}`);
-            console.log("Original text:", editingMessage.text);
-            console.log("New text:", msgText);
-            
-            // 1. Optimistic UI Update
-            console.log("Applying optimistic UI update...");
-            setMessages(prev => prev.map(m => 
-                m.id === editingMessage.id ? { ...m, text: msgText, is_edited: true } : m
-            ));
-
-            // 2. Database Update
-            console.log("Sending UPDATE to Supabase...");
-            const response = await supabase.from('messages')
-                .update({ text: msgText, is_edited: true })
-                .eq('id', editingMessage.id)
-                .select(); // Critical for checking if rows were actually affected
-
-            console.log("Supabase Response:", response);
-
-            if (response.error) {
-                console.error("❌ Update failed due to error:", response.error);
-            } else if (response.data && response.data.length === 0) {
-                console.warn("⚠️ Update returned 204 with 0 rows affected! Check RLS policies.");
-            } else {
-                console.log("✅ Message successfully updated in DB.");
-            }
-
+            setMessages(prev => prev.map(m => m.id === editingMessage.id ? { ...m, text: msgText, is_edited: true } : m));
+            const response = await supabase.from('messages').update({ text: msgText, is_edited: true }).eq('id', editingMessage.id).select();
+            console.log("Edit Response:", response);
             console.groupEnd();
             setEditingMessage(null);
             return;
@@ -173,14 +151,23 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         const tempMsg = {
             id: tempId, conversation_id: chat.conversation_id,
             sender_id: currentUser.id, text: msgText,
+            reply_to_id: replyingTo?.id || null,
             created_at: new Date().toISOString(), status: 'pending'
         };
+        
         setMessages(prev => [...prev, tempMsg]);
+        const currentReplyId = replyingTo?.id;
+        setReplyingTo(null); // Clear reply state immediately for UX
+
+        console.group(`📤 [UserChat] Sending Message`);
+        console.log("Text:", msgText);
+        console.log("Replying To:", currentReplyId);
 
         const { data, error } = await supabase.from('messages').insert({
             conversation_id: chat.conversation_id,
             sender_id: currentUser.id,
-            text: msgText
+            text: msgText,
+            reply_to_id: currentReplyId
         }).select().single();
         
         if (!error && data) {
@@ -189,33 +176,28 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     };
 
     const deleteMessage = async (msgId) => {
+        if (!window.confirm("Delete this message for everyone?")) return;
         console.group(`🗑️ [UserChat] Deleting Message: ${msgId}`);
-        
-        // 1. Optimistic UI Update
-        console.log("Applying optimistic UI removal...");
         setMessages(prev => prev.filter(m => m.id !== msgId));
         setActiveMenuId(null);
-        
-        // 2. Database Deletion
-        console.log("Sending DELETE to Supabase...");
         const response = await supabase.from('messages').delete().eq('id', msgId).select();
-        
-        console.log("Supabase Response:", response);
-
-        if (response.error) {
-            console.error("❌ Delete failed due to error:", response.error);
-        } else if (response.data && response.data.length === 0) {
-            console.warn("⚠️ Delete returned 204 with 0 rows affected! Check RLS policies.");
-        } else {
-            console.log("✅ Message successfully deleted from DB.");
-        }
-        
+        console.log("Delete Response:", response);
         console.groupEnd();
+    };
+
+    const handleCopy = (text) => {
+        navigator.clipboard.writeText(text);
+        setActiveMenuId(null);
     };
 
     const startEditing = (msg) => {
         setEditingMessage(msg);
         setInput(msg.text);
+        setActiveMenuId(null);
+    };
+
+    const startReply = (msg) => {
+        setReplyingTo(msg);
         setActiveMenuId(null);
     };
 
@@ -265,10 +247,22 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                 {messages.map(m => {
                     const isMine = m.sender_id === currentUser.id;
                     const isMenuOpen = activeMenuId === m.id;
+                    const repliedMsg = m.reply_to_id ? messages.find(msg => msg.id === m.reply_to_id) : null;
 
                     return (
                         <div key={m.id} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} onClick={(e) => { e.stopPropagation(); setActiveMenuId(isMenuOpen ? null : m.id); }}>
-                            <div className="prism-bubble">{m.text}</div>
+                            <div className="prism-bubble">
+                                {repliedMsg && (
+                                    <div className="reply-quote" onClick={(e) => { e.stopPropagation(); scrollToQuestion(m.reply_to_id); }}>
+                                        <div className="reply-quote-bar"></div>
+                                        <div className="reply-quote-content">
+                                            <div className="reply-quote-user">{repliedMsg.sender_id === currentUser.id ? 'You' : chatTitle}</div>
+                                            <div className="reply-quote-text">{repliedMsg.text}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {m.text}
+                            </div>
                             <div className="prism-time">
                                 {m.is_edited && <span className="edited-label">edited</span>}
                                 {formatTime(m.created_at)}
@@ -277,14 +271,22 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                             
                             {isMenuOpen && (
                                 <div className="msg-actions-menu">
+                                    <button className="msg-action-btn" onClick={() => startReply(m)}>
+                                        <i className="fa-solid fa-reply"></i> Reply
+                                    </button>
+                                    <button className="msg-action-btn" onClick={() => handleCopy(m.text)}>
+                                        <i className="fa-solid fa-copy"></i> Copy
+                                    </button>
                                     {isMine && (
                                         <button className="msg-action-btn" onClick={() => startEditing(m)}>
                                             <i className="fa-solid fa-pen"></i> Edit
                                         </button>
                                     )}
-                                    <button className="msg-action-btn delete" onClick={() => deleteMessage(m.id)}>
-                                        <i className="fa-solid fa-trash"></i> Delete
-                                    </button>
+                                    {isMine && (
+                                        <button className="msg-action-btn delete" onClick={() => deleteMessage(m.id)}>
+                                            <i className="fa-solid fa-trash"></i> Delete
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -294,9 +296,21 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
 
             <footer className="prism-input-wrapper">
                 {editingMessage && (
-                    <div className="edit-mode-header">
+                    <div className="input-mode-header">
                         <span><i className="fa-solid fa-pen"></i> Editing message</span>
-                        <button className="icon-button" style={{fontSize: '0.8rem', color: '#888'}} onClick={() => { setEditingMessage(null); setInput(''); }}>
+                        <button className="icon-button" onClick={() => { setEditingMessage(null); setInput(''); }}>
+                            <i className="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                )}
+                {replyingTo && (
+                    <div className="input-mode-header">
+                        <div className="reply-preview-border"></div>
+                        <div className="reply-preview-info">
+                            <span className="reply-user">Replying to {replyingTo.sender_id === currentUser.id ? 'yourself' : chatTitle}</span>
+                            <span className="reply-text">{replyingTo.text}</span>
+                        </div>
+                        <button className="icon-button" onClick={() => setReplyingTo(null)}>
                             <i className="fa-solid fa-times"></i>
                         </button>
                     </div>
