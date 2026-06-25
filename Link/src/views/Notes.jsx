@@ -7,6 +7,9 @@ const Notes = ({ currentUser, onClose }) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [activeMenu, setActiveMenu] = useState(null);
+    
     const fileInputRef = useRef(null);
     const flowRef = useRef(null);
 
@@ -28,6 +31,7 @@ const Notes = ({ currentUser, onClose }) => {
                 .order('created_at', { ascending: true });
             
             if (msgs) setMessages(msgs);
+            setIsLoading(false);
 
             // 3. Realtime Subscription
             const channel = supabase.channel(`room_${data}`)
@@ -84,8 +88,10 @@ const Notes = ({ currentUser, onClose }) => {
         setIsUploading(true);
         try {
             // 1. Upload to Supabase Storage
-            const fileExt = file.name.split('.').pop();
-            const filePath = `${currentUser.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            // Sanitize filename to prevent weird character issues
+            const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+            const fileExt = safeName.split('.').pop();
+            const filePath = `${currentUser.id}/${Date.now()}_${safeName}`;
             
             const { error: uploadError } = await supabase.storage
                 .from('user_notes')
@@ -130,7 +136,13 @@ const Notes = ({ currentUser, onClose }) => {
     const deleteNote = async (id) => {
         if(!window.confirm("Delete this note?")) return;
         setMessages(prev => prev.filter(m => m.id !== id));
+        setActiveMenu(null);
         await supabase.from('messages').delete().eq('id', id);
+    };
+
+    const handleCopy = (text) => {
+        navigator.clipboard.writeText(text);
+        setActiveMenu(null);
     };
 
     return (
@@ -148,25 +160,52 @@ const Notes = ({ currentUser, onClose }) => {
                 </button>
             </header>
 
-            <main className="notes-flow" ref={flowRef}>
-                {messages.length === 0 && !isUploading && (
-                    <div style={{textAlign: 'center', color: '#666', marginTop: '2rem'}}>
-                        <i className="fas fa-cloud-arrow-up" style={{fontSize: '3rem', marginBottom: '1rem', opacity: 0.5}}></i>
+            <main className="notes-flow" ref={flowRef} onClick={() => setActiveMenu(null)} onScroll={() => setActiveMenu(null)}>
+                {isLoading ? (
+                    <div className="notes-loader-container">
+                        <i className="fas fa-circle-notch fa-spin"></i>
+                        <p>Decrypting Vault...</p>
+                    </div>
+                ) : messages.length === 0 && !isUploading ? (
+                    <div className="notes-empty-state">
+                        <i className="fas fa-cloud-arrow-up"></i>
                         <p>Your secure space for links, files, and thoughts.</p>
                     </div>
-                )}
-                
-                {messages.map(m => (
-                    <div key={m.id} className="note-card">
-                        <button 
-                            style={{position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: '#666', cursor: 'pointer'}} 
-                            onClick={() => deleteNote(m.id)}
-                            title="Delete note"
-                        >
-                            <i className="fas fa-trash"></i>
-                        </button>
-
-                        {m.text && <div className="note-text">{m.text}</div>}
+                ) : (
+                    messages.map(m => {
+                        const isMenuOpen = activeMenu?.msg?.id === m.id;
+                        return (
+                            <div 
+                                key={m.id} 
+                                className="note-card"
+                                style={{ zIndex: isMenuOpen ? 100 : 1 }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isMenuOpen) {
+                                        setActiveMenu(null);
+                                        return;
+                                    }
+                                    
+                                    let x = e.clientX || (e.touches && e.touches[0].clientX);
+                                    let y = e.clientY || (e.touches && e.touches[0].clientY);
+                                    
+                                    if (!x || !y) {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        x = rect.left + rect.width / 2;
+                                        y = rect.top + rect.height / 2;
+                                    }
+                                    
+                                    const menuW = 140;
+                                    const menuH = 100;
+                                    
+                                    if (x + menuW > window.innerWidth - 20) x = window.innerWidth - menuW - 20;
+                                    if (y + menuH > window.innerHeight - 80) y = window.innerHeight - menuH - 80;
+                                    if (y < 80) y = 80;
+                                    
+                                    setActiveMenu({ msg: m, x, y });
+                                }}
+                            >
+                                {m.text && <div className="note-text">{m.text}</div>}
                         
                         {m.attachments?.map((att, i) => (
                             <div key={i} className="note-attachment">
@@ -183,9 +222,11 @@ const Notes = ({ currentUser, onClose }) => {
                                 )}
                             </div>
                         ))}
-                        <span className="note-time">{formatTime(m.created_at)}</span>
-                    </div>
-                ))}
+                            <span className="note-time">{formatTime(m.created_at)}</span>
+                        </div>
+                        );
+                    })
+                )}
                 
                 {isUploading && (
                     <div className="note-card" style={{opacity: 0.7}}>
@@ -196,6 +237,19 @@ const Notes = ({ currentUser, onClose }) => {
                     </div>
                 )}
             </main>
+
+            {activeMenu && (
+                <div className="notes-ctx-menu" style={{ left: activeMenu.x, top: activeMenu.y }}>
+                    {activeMenu.msg.text && (
+                        <button className="notes-ctx-btn" onClick={() => handleCopy(activeMenu.msg.text)}>
+                            <i className="fa-solid fa-copy"></i> Copy Text
+                        </button>
+                    )}
+                    <button className="notes-ctx-btn delete" onClick={() => deleteNote(activeMenu.msg.id)}>
+                        <i className="fa-solid fa-trash"></i> Delete Note
+                    </button>
+                </div>
+            )}
 
             <footer className="notes-dock-wrap">
                 <div className="notes-dock">
