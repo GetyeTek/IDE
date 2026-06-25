@@ -9,20 +9,38 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
     const [showDirectory, setShowDirectory] = useState(false);
     const [allUsers, setAllUsers] = useState([]);
+    const [onlineUsers, setOnlineUsers] = useState(new Set());
 
     useEffect(() => {
         if (!currentUser) return;
         
         fetchConversations();
         
-        // Subscribe to real-time message inserts to update the chat list dynamically
-        const channel = supabase.channel('chat_list_updates')
+        // 1. Subscribe to Realtime Messages to bump chat list
+        const msgChannel = supabase.channel('chat_list_updates')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
                 fetchConversations();
             })
             .subscribe();
 
-        return () => supabase.removeChannel(channel);
+        // 2. Global Presence (Who is Online?)
+        const presenceChannel = supabase.channel('global_presence', {
+            config: { presence: { key: currentUser.id } }
+        });
+        
+        presenceChannel.on('presence', { event: 'sync' }, () => {
+            const state = presenceChannel.presenceState();
+            setOnlineUsers(new Set(Object.keys(state)));
+        }).subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await presenceChannel.track({ online_at: new Date().toISOString() });
+            }
+        });
+
+        return () => {
+            supabase.removeChannel(msgChannel);
+            supabase.removeChannel(presenceChannel);
+        };
     }, [currentUser]);
 
     const fetchConversations = async () => {
@@ -150,14 +168,19 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
                                 const avatar = chat.type === 'dm' ? chat.other_user_avatar : chat.avatar_url;
                                 return (
                                     <div className="messages-list-item" key={chat.conversation_id} onClick={() => setActiveChat(chat)}>
-                                        <img src={avatar || 'https://via.placeholder.com/150'} alt="Avatar" />
+                                        <div style={{ position: 'relative' }}>
+                                            <img src={avatar || 'https://via.placeholder.com/150'} alt="Avatar" />
+                                            {onlineUsers.has(chat.other_user_id) && (
+                                                <div style={{ position: 'absolute', bottom: '0', right: '0', width: '12px', height: '12px', background: '#42d7b8', borderRadius: '50%', border: '2px solid #1e1e1e' }}></div>
+                                            )}
+                                        </div>
                                         <div className="message-info">
                                             <div className="name">{title}</div>
                                             <div className="last-message">{chat.last_message_text || 'No messages yet'}</div>
                                         </div>
                                         <div className="message-meta">
                                             <span>{formatTime(chat.last_message_at)}</span>
-                                            {chat.unread_count > 0 && <div className="unread-dot"></div>}
+                                            {chat.unread_count > 0 && <div className="unread-badge">{chat.unread_count}</div>}
                                         </div>
                                     </div>
                                 )
@@ -167,7 +190,7 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
                 </div>
             </div>
             
-            {activeChat && <UserChat chat={activeChat} currentUser={currentUser} onClose={() => { setActiveChat(null); fetchConversations(); }} />}
+            {activeChat && <UserChat chat={activeChat} currentUser={currentUser} isOnline={onlineUsers.has(activeChat.other_user_id)} onClose={() => { setActiveChat(null); fetchConversations(); }} />}
         </div>
     );
 };
