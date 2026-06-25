@@ -99,7 +99,52 @@
 
 .prism-bubble {
     padding: 0.9rem 1.2rem; font-size: 0.92rem; line-height: 1.5;
+    display: flex; flex-direction: column; gap: 8px;
 }
+
+.bubble-text-content {
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+/* Bubble Attachment Styles */
+.bubble-attachment {
+    margin-top: 4px;
+}
+
+.bubble-image {
+    max-width: 100%;
+    max-height: 250px;
+    border-radius: 12px;
+    object-fit: contain;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bubble-file-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    text-decoration: none;
+    color: inherit;
+}
+
+.sent .bubble-file-box { background: rgba(255, 255, 255, 0.15); border-color: rgba(0, 0, 0, 0.1); }
+
+.bubble-file-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; flex-shrink: 0;
+}
+.sent .bubble-file-icon { background: rgba(0, 0, 0, 0.1); }
+
+.bubble-file-info { display: flex; flex-direction: column; overflow: hidden; }
+.bubble-file-name { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .sent .prism-bubble {
     background: linear-gradient(135deg, #42d7b8 0%, #2e5a52 100%);
@@ -279,6 +324,32 @@
     padding: 0 4px;
     filter: drop-shadow(0 0 5px rgba(255, 171, 64, 0.3));
 }
+
+/* --- STAGING MODE SPECIFICS (Attachments) --- */
+.input-mode-header.staging-mode {
+    background: rgba(66, 215, 184, 0.05);
+}
+
+.staging-preview-border {
+    width: 3px; align-self: stretch; background: var(--accent-teal); border-radius: 3px;
+}
+
+.staging-preview-content {
+    display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden;
+}
+
+.staging-thumb {
+    width: 36px; height: 36px; border-radius: 6px; object-fit: cover;
+}
+
+.staging-file-icon {
+    width: 36px; height: 36px; border-radius: 6px; background: rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center; color: var(--accent-teal);
+}
+
+.staging-file-details { display: flex; flex-direction: column; overflow: hidden; }
+.staging-title { font-weight: 700; color: var(--accent-teal); font-size: 0.75rem; }
+.staging-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.8rem; color: #aaa; }
 
 /* --- INPUT --- */
 .prism-input-wrapper {
