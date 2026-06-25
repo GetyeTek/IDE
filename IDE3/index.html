@@ -9072,14 +9072,24 @@ async function downloadArtifact(runId) {
 
             if (type === 'zip') {
                 const zip = new JSZip();
-                fetchedFiles.forEach(f => zip.file(f.path, f.content));
+                fetchedFiles.forEach(f => {
+                    const exportPath = (CONFIG.projectPath && f.path.startsWith(CONFIG.projectPath)) 
+                        ? f.path.substring(CONFIG.projectPath.length) 
+                        : f.path;
+                    zip.file(exportPath, f.content);
+                });
                 const blob = await zip.generateAsync({ type: "blob" });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
                 link.download = `${finalBaseName}.zip`;
                 link.click();
             } else {
-                const text = fetchedFiles.map(f => `FILE: ${f.path}\n${f.content}`).join('\n\n');
+                const text = fetchedFiles.map(f => {
+                    const exportPath = (CONFIG.projectPath && f.path.startsWith(CONFIG.projectPath)) 
+                        ? f.path.substring(CONFIG.projectPath.length) 
+                        : f.path;
+                    return `FILE: ${exportPath}\n${f.content}`;
+                }).join('\n\n');
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
                 link.download = `${finalBaseName}.txt`;
