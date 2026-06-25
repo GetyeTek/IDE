@@ -3,23 +3,12 @@ import { supabase } from '../config/supabaseClient.js';
 import './UserChat.css';
 
 const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
+const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const [messages, setMessages] = useState([]);
     const [otherReadAt, setOtherReadAt] = useState(null);
-
-    const formatLastSeen = (dateStr) => {
-        if (!dateStr) return 'Offline';
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffInMs = now - date;
-        const diffInMins = Math.floor(diffInMs / 60000);
-        const diffInHours = Math.floor(diffInMs / 3600000);
-
-        if (diffInMins < 1) return 'last seen just now';
-        if (diffInMins < 60) return `last seen ${diffInMins}m ago`;
-        if (diffInHours < 24) return `last seen ${diffInHours}h ago`;
-        return `last seen ${date.toLocaleDateString()}`;
-    };
     const [isOtherTyping, setIsOtherTyping] = useState(false);
+    const [activeMenuId, setActiveMenuId] = useState(null);
+    const [editingMessage, setEditingMessage] = useState(null);
     const [input, setInput] = useState('');
     const flowRef = useRef(null);
     const typingTimeoutRef = useRef(null);
@@ -135,26 +124,30 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const handleSend = async () => {
         if (!input.trim()) return;
 
-        // Stop typing immediately on send
+        // Stop typing immediately
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         if (roomChannelRef.current) roomChannelRef.current.track({ isTyping: false });
-        if (!input.trim()) return;
+
         const msgText = input;
         setInput('');
+
+        if (editingMessage) {
+            const { error } = await supabase.from('messages')
+                .update({ text: msgText, is_edited: true })
+                .eq('id', editingMessage.id);
+            if (error) console.error("Update failed:", error);
+            setEditingMessage(null);
+            return;
+        }
         
-        // 1. Optimistic UI insert (instant clock state)
         const tempId = `temp-${Date.now()}`;
         const tempMsg = {
-            id: tempId,
-            conversation_id: chat.conversation_id,
-            sender_id: currentUser.id,
-            text: msgText,
-            created_at: new Date().toISOString(),
-            status: 'pending' // Shows clock
+            id: tempId, conversation_id: chat.conversation_id,
+            sender_id: currentUser.id, text: msgText,
+            created_at: new Date().toISOString(), status: 'pending'
         };
         setMessages(prev => [...prev, tempMsg]);
 
-        // 2. Real Database insert
         const { data, error } = await supabase.from('messages').insert({
             conversation_id: chat.conversation_id,
             sender_id: currentUser.id,
@@ -162,9 +155,20 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         }).select().single();
         
         if (!error && data) {
-            // 3. Update the temporary message with the real DB record (single tick)
             setMessages(prev => prev.map(m => m.id === tempId ? { ...data, status: 'sent' } : m));
         }
+    };
+
+    const deleteMessage = async (msgId) => {
+        const { error } = await supabase.from('messages').delete().eq('id', msgId);
+        if (error) console.error("Delete failed:", error);
+        setActiveMenuId(null);
+    };
+
+    const startEditing = (msg) => {
+        setEditingMessage(msg);
+        setInput(msg.text);
+        setActiveMenuId(null);
     };
 
     const getMessageStatusIcon = (m) => {
@@ -213,24 +217,50 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                 </div>
             </header>
 
-            <main className="prism-flow" ref={flowRef}>
+            <main className="prism-flow" ref={flowRef} onClick={() => setActiveMenuId(null)}>
                 {messages.map(m => {
                     const isMine = m.sender_id === currentUser.id;
+                    const isMenuOpen = activeMenuId === m.id;
+
                     return (
-                        <div key={m.id} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`}>
-                            <div className="prism-bubble">{m.text}</div>
+                        <div key={m.id} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} onClick={(e) => { e.stopPropagation(); setActiveMenuId(isMenuOpen ? null : m.id); }}>
+                            <div className="prism-bubble">
+                                {m.text}
+                            </div>
                             <div className="prism-time">
+                                {m.is_edited && <span className="edited-label">edited</span>}
                                 {formatTime(m.created_at)}
                                 {isMine && (
                                     <span style={{ marginLeft: '6px' }}>{getMessageStatusIcon(m)}</span>
                                 )}
                             </div>
+                            
+                            {isMenuOpen && (
+                                <div className="msg-actions-menu">
+                                    {isMine && (
+                                        <button className="msg-action-btn" onClick={() => startEditing(m)}>
+                                            <i className="fa-solid fa-pen"></i> Edit
+                                        </button>
+                                    )}
+                                    <button className="msg-action-btn delete" onClick={() => deleteMessage(m.id)}>
+                                        <i className="fa-solid fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
             </main>
 
             <footer className="prism-input-wrapper">
+                {editingMessage && (
+                    <div className="edit-mode-header">
+                        <span><i className="fa-solid fa-pen"></i> Editing message</span>
+                        <button className="icon-button" style={{fontSize: '0.8rem', color: '#888'}} onClick={() => { setEditingMessage(null); setInput(''); }}>
+                            <i className="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                )}
                 <div className="prism-dock">
                     <button className="add-btn"><i className="fa-solid fa-plus"></i></button>
                     <input 
@@ -241,7 +271,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                         onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                     />
                     <button className="prism-send-btn" onClick={handleSend}>
-                        <i className="fa-solid fa-arrow-up"></i>
+                        <i className={`fa-solid ${editingMessage ? 'fa-check' : 'fa-arrow-up'}`}></i>
                     </button>
                 </div>
             </footer>
