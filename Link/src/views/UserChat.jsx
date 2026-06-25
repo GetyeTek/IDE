@@ -512,9 +512,6 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                     </button>
                 </div>
             </footer>
-        </div>
-                </div>
-            </footer>
 
             {activeMenu && (
                 <div className="msg-actions-menu-fixed" style={{ left: activeMenu.x, top: activeMenu.y }}>
