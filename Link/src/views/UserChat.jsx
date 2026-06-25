@@ -261,30 +261,22 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         setActiveMenu(null);
     };
 
-    const handleDownload = async (url, filename) => {
+    const handleDownload = (url, filename) => {
         setActiveMenu(null);
-        console.log("📥 [UserChat] Initiating background download for:", filename);
+        // The Pro Move: Append ?download= to force server-side attachment headers
+        // This triggers the native browser download manager (RAM efficient!)
+        const downloadUrl = `${url}${url.includes('?') ? '&' : '?'}download=${encodeURIComponent(filename)}`;
         
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const blobUrl = window.URL.createObjectURL(blob);
-            
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            
-            // Cleanup
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(blobUrl);
-            console.log("✅ [UserChat] Download complete.");
-        } catch (err) {
-            console.error("❌ [UserChat] Download failed:", err);
-            // Fallback for extreme cases
-            window.open(url, '_blank');
-        }
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.style.display = 'none';
+        // We use _self or an invisible iframe approach to prevent the "Empty Tab" syndrome
+        link.target = '_self'; 
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log("🚀 [UserChat] Native download triggered for:", filename);
     };
 
     const startEditing = (msg) => {
