@@ -87,15 +87,19 @@ const Notes = ({ currentUser, onClose }) => {
 
         setIsUploading(true);
         try {
-            // 1. Upload to Supabase Storage
-            // Sanitize filename to prevent weird character issues
+            // 1. Convert File to ArrayBuffer to prevent 'postMessage' cloning errors
+            const arrayBuffer = await file.arrayBuffer();
+
+            // 2. Upload to Supabase Storage
             const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-            const fileExt = safeName.split('.').pop();
             const filePath = `${currentUser.id}/${Date.now()}_${safeName}`;
             
             const { error: uploadError } = await supabase.storage
                 .from('user_notes')
-                .upload(filePath, file);
+                .upload(filePath, arrayBuffer, {
+                    contentType: file.type,
+                    upsert: true
+                });
 
             if (uploadError) throw uploadError;
 
@@ -115,7 +119,7 @@ const Notes = ({ currentUser, onClose }) => {
             await supabase.from('messages').insert({
                 conversation_id: conversationId,
                 sender_id: currentUser.id,
-                text: '', // Empty text if it's just a file upload
+                text: `Sent a file: ${file.name}`, // Add text so the snippet in the list isn't empty
                 attachments: [attachment]
             });
 
