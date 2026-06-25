@@ -4002,11 +4002,19 @@
             updateTerminalCard(termId, data, payload, true);
 
             if(data.success) {
-                const patchedPaths = payload.filter(p => p.file_path).map(p => p.file_path);
+                // Defensive check: only filter if payload is an operations array
+                const patchedPaths = Array.isArray(payload) ? payload.filter(p => p.file_path).map(p => p.file_path) : [];
+                
                 if(actionType === 'patch') setTimeout(() => bundleAndPreview(null), 1500);
+                
                 setTimeout(() => { 
                     fetchState(true, true); 
-                    refreshFileEntries(patchedPaths);
+                    if (patchedPaths.length > 0) {
+                        refreshFileEntries(patchedPaths);
+                    } else {
+                        // If it was a Ship command or global event, refresh the whole list
+                        fetchFileList();
+                    }
                 }, 1000);
             }
         } catch (e) {
