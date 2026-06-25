@@ -38,7 +38,7 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
     };
 
     const startDirectMessage = async (targetUser) => {
-        // 1. Check if DM already exists
+        // 1. Check if DM already exists locally
         const existing = conversations.find(c => c.type === 'dm' && c.other_user_name === targetUser.full_name);
         if (existing) {
             setShowDirectory(false);
@@ -46,21 +46,22 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
             return;
         }
 
-        // 2. Create new conversation
-        const { data: conv, error: convErr } = await supabase.from('conversations').insert({ type: 'dm' }).select().single();
-        if (convErr) return console.error(convErr);
+        // 2. Call the secure RPC to create the DM atomically
+        const { data: newConvId, error } = await supabase.rpc('create_direct_message', { 
+            target_user_id: targetUser.id 
+        });
 
-        // 3. Add both members
-        await supabase.from('conversation_members').insert([
-            { conversation_id: conv.id, user_id: currentUser.id },
-            { conversation_id: conv.id, user_id: targetUser.id }
-        ]);
+        if (error) {
+            console.error("Failed to create DM:", error);
+            return;
+        }
 
         setShowDirectory(false);
         fetchConversations();
+        
         // Construct temporary object to open chat immediately
         setActiveChat({
-            conversation_id: conv.id,
+            conversation_id: newConvId,
             type: 'dm',
             other_user_name: targetUser.full_name,
             other_user_avatar: targetUser.avatar_url
