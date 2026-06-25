@@ -218,6 +218,12 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         const el = document.getElementById(`msg-${id}`);
         if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Visual Target Lock
+            el.classList.add('msg-highlight-flash');
+            setTimeout(() => {
+                el.classList.remove('msg-highlight-flash');
+            }, 2000);
         }
     };
     return (
@@ -325,7 +331,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                 {replyingTo && (
                     <div className="input-mode-header">
                         <div className="reply-preview-border"></div>
-                        <div className="reply-preview-info">
+                        <div className="reply-preview-info" onClick={() => scrollToMessage(replyingTo.id)} style={{ cursor: 'pointer' }}>
                             <span className="reply-user">Replying to {replyingTo.sender_id === currentUser.id ? 'yourself' : chatTitle}</span>
                             <span className="reply-text">{replyingTo.text}</span>
                         </div>
