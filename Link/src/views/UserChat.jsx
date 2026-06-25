@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../config/supabaseClient.js';
 import './UserChat.css';
 
-const UserChat = ({ chat, currentUser, onClose }) => {
+const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const [messages, setMessages] = useState([]);
+    const [otherReadAt, setOtherReadAt] = useState(null);
     const [input, setInput] = useState('');
     const flowRef = useRef(null);
 
@@ -12,22 +13,38 @@ const UserChat = ({ chat, currentUser, onClose }) => {
 
     useEffect(() => {
         fetchMessages();
+        fetchOtherReadReceipt();
         markAsRead();
 
-        // High-Performance Realtime Subscription
-        const channel = supabase.channel(`room_${chat.conversation_id}`)
+        // 1. Listen for new messages
+        const msgChannel = supabase.channel(`room_${chat.conversation_id}`)
             .on('postgres_changes', { 
-                event: 'INSERT', 
-                schema: 'public', 
-                table: 'messages',
-                filter: `conversation_id=eq.${chat.conversation_id}`
+                event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${chat.conversation_id}`
             }, (payload) => {
-                setMessages(prev => [...prev, payload.new]);
-                markAsRead();
+                setMessages(prev => {
+                    // Ignore if optimistic UI already added it
+                    if (prev.find(m => m.id === payload.new.id)) return prev;
+                    return [...prev, { ...payload.new, status: 'sent' }];
+                });
+                if (payload.new.sender_id !== currentUser.id) markAsRead();
             })
             .subscribe();
 
-        return () => supabase.removeChannel(channel);
+        // 2. Listen for the other user opening the chat (Read Receipts)
+        const memberChannel = supabase.channel(`members_${chat.conversation_id}`)
+            .on('postgres_changes', { 
+                event: 'UPDATE', schema: 'public', table: 'conversation_members', filter: `conversation_id=eq.${chat.conversation_id}`
+            }, (payload) => {
+                if (payload.new.user_id !== currentUser.id) {
+                    setOtherReadAt(payload.new.last_read_at);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(msgChannel);
+            supabase.removeChannel(memberChannel);
+        };
     }, [chat.conversation_id]);
 
     useEffect(() => {
@@ -41,7 +58,16 @@ const UserChat = ({ chat, currentUser, onClose }) => {
             .eq('conversation_id', chat.conversation_id)
             .order('created_at', { ascending: true });
         
-        if (data) setMessages(data);
+        if (data) setMessages(data.map(m => ({ ...m, status: 'sent' })));
+    };
+
+    const fetchOtherReadReceipt = async () => {
+        const { data } = await supabase.from('conversation_members')
+            .select('last_read_at')
+            .eq('conversation_id', chat.conversation_id)
+            .neq('user_id', currentUser.id)
+            .single();
+        if (data) setOtherReadAt(data.last_read_at);
     };
 
     const markAsRead = async () => {
@@ -54,29 +80,44 @@ const UserChat = ({ chat, currentUser, onClose }) => {
     const handleSend = async () => {
         if (!input.trim()) return;
         const msgText = input;
-        setInput(''); // Optimistic UI clear
+        setInput('');
         
-        // Optimistic UI insert (instant feel)
+        // 1. Optimistic UI insert (instant clock state)
+        const tempId = `temp-${Date.now()}`;
         const tempMsg = {
-            id: Date.now().toString(),
+            id: tempId,
             conversation_id: chat.conversation_id,
             sender_id: currentUser.id,
             text: msgText,
             created_at: new Date().toISOString(),
-            isTemp: true
+            status: 'pending' // Shows clock
         };
         setMessages(prev => [...prev, tempMsg]);
 
-        // Real Database insert
-        const { error } = await supabase.from('messages').insert({
+        // 2. Real Database insert
+        const { data, error } = await supabase.from('messages').insert({
             conversation_id: chat.conversation_id,
             sender_id: currentUser.id,
             text: msgText
-        });
+        }).select().single();
         
-        if (error) console.error("Send failed:", error);
-        // We do not need to push the successful message to state manually, 
-        // the Realtime socket listener will catch the INSERT and update it.
+        if (!error && data) {
+            // 3. Update the temporary message with the real DB record (single tick)
+            setMessages(prev => prev.map(m => m.id === tempId ? { ...data, status: 'sent' } : m));
+        }
+    };
+
+    const getMessageStatusIcon = (m) => {
+        if (m.sender_id !== currentUser.id) return null;
+        if (m.status === 'pending') return <i className="fa-solid fa-clock" style={{color: '#888'}}></i>;
+        
+        // Check if receiver's read timestamp is newer than this message
+        const isRead = otherReadAt && new Date(m.created_at) <= new Date(otherReadAt);
+        if (isRead) {
+            return <i className="fa-solid fa-check-double" style={{color: '#42d7b8'}}></i>;
+        } else {
+            return <i className="fa-solid fa-check" style={{color: '#a0a0a0'}}></i>;
+        }
     };
 
     const formatTime = (isoString) => {
@@ -92,11 +133,11 @@ const UserChat = ({ chat, currentUser, onClose }) => {
                 <div className="contact-profile">
                     <div className="avatar-ring">
                         <img src={chatAvatar || 'https://via.placeholder.com/150'} alt="Avatar" />
-                        <div className="online-dot"></div>
+                        {isOnline && <div className="online-dot"></div>}
                     </div>
                     <div className="contact-details">
                         <h2>{chatTitle}</h2>
-                        <p>Active</p>
+                        <p style={{ color: isOnline ? '#42d7b8' : '#888' }}>{isOnline ? 'Online' : 'Offline'}</p>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -110,13 +151,12 @@ const UserChat = ({ chat, currentUser, onClose }) => {
                 {messages.map(m => {
                     const isMine = m.sender_id === currentUser.id;
                     return (
-                        <div key={m.id} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`} style={{ opacity: m.isTemp ? 0.7 : 1 }}>
+                        <div key={m.id} className={`msg-prism-group ${isMine ? 'sent' : 'received'}`}>
                             <div className="prism-bubble">{m.text}</div>
                             <div className="prism-time">
                                 {formatTime(m.created_at)}
                                 {isMine && (
-                                    <i className={`fa-solid ${m.isTemp ? 'fa-clock' : 'fa-check-double'}`} 
-                                       style={{ marginLeft: '4px', color: m.isTemp ? '#888' : '#42d7b8' }}></i>
+                                    <span style={{ marginLeft: '6px' }}>{getMessageStatusIcon(m)}</span>
                                 )}
                             </div>
                         </div>
