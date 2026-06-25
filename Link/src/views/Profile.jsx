@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const Profile = () => {
+import { supabase } from '../config/supabaseClient.js';
+
+const Profile = ({ userProfile }) => {
     const [overlays, setOverlays] = useState({ observatory: false, mission: false });
+    
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+    };
     const [activeMissionTab, setActiveMissionTab] = useState('daily');
     
     const plexusRef = useRef(null);
@@ -124,14 +130,14 @@ const Profile = () => {
                     <div className="profile-banner"></div>
                     <div className="hero-content">
                         <div className="profile-avatar-wrapper">
-                            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto-format&fit=crop&w=200&q=80" alt="Profile" className="profile-avatar-large" />
+                            <img src={userProfile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'} alt="Profile" className="profile-avatar-large" />
                         </div>
                         <div className="user-info">
-                            <h1 className="profile-name">Alex Hartman</h1>
-                            <p className="profile-level">Division II</p>
+                            <h1 className="profile-name">{userProfile?.full_name || 'Scholar'}</h1>
+                            <p className="profile-level">{userProfile?.level || 'Division I'}</p>
                             <div className="linkoin-balance-hero">
                                 <i className="fas fa-coins linkoin-icon-sm"></i>
-                                <span>1,280</span>
+                                <span>{userProfile?.linkoin_balance || 0}</span>
                             </div>
                         </div>
                     </div>
@@ -164,6 +170,7 @@ const Profile = () => {
                             <a href="#" className="list-item"><i className="fas fa-palette list-item-icon"></i><span className="list-item-text">Appearance</span><i className="fas fa-chevron-right list-item-chevron"></i></a>
                             <a href="#" className="list-item"><i className="fas fa-shield-halved list-item-icon"></i><span className="list-item-text">Privacy & Security</span><i className="fas fa-chevron-right list-item-chevron"></i></a>
                             <a href="#" className="list-item"><i className="fas fa-info-circle list-item-icon"></i><span className="list-item-text">Support & About</span><i className="fas fa-chevron-right list-item-chevron"></i></a>
+                            <a href="#" className="list-item" onClick={handleLogout} style={{ color: '#ff4757' }}><i className="fas fa-sign-out-alt list-item-icon" style={{ color: '#ff4757' }}></i><span className="list-item-text">Log Out</span></a>
                         </div>
                     </div>
                 </div>
