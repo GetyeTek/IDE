@@ -166,7 +166,9 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
                             </div>
                             <div className="message-info">
                                 <div className="name" style={{ color: '#42d7b8' }}>My Notes</div>
-                                <div className="last-message">Personal cloud & quick clips</div>
+                                <div className="last-message">
+                                    {conversations.find(c => c.type === 'notes')?.last_message_text || 'Personal cloud & quick clips'}
+                                </div>
                             </div>
                         </div>
 
@@ -185,7 +187,7 @@ const Connect = ({ onOpenActivity, userProfile, currentUser }) => {
                                 <button style={{ width: '100%', padding: '10px', marginTop: '10px', background: 'transparent', border: '1px solid #444', color: '#fff', borderRadius: '8px' }} onClick={() => setShowDirectory(false)}>Cancel</button>
                             </div>
                         ) : (
-                            conversations.map(chat => {
+                            conversations.filter(c => c.type !== 'notes').map(chat => {
                                 const title = chat.type === 'dm' ? chat.other_user_name : chat.title;
                                 const avatar = chat.type === 'dm' ? chat.other_user_avatar : chat.avatar_url;
                                 return (
