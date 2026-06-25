@@ -10,6 +10,10 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const [editingMessage, setEditingMessage] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
     const [input, setInput] = useState('');
+    const [pendingAttachment, setPendingAttachment] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    
+    const fileInputRef = useRef(null);
     const flowRef = useRef(null);
     const typingTimeoutRef = useRef(null);
     const roomChannelRef = useRef(null);
@@ -129,13 +133,26 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
         }, 2500);
     };
 
+    const handleFileSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+        setPendingAttachment({ file, previewUrl });
+        e.target.value = null; // Reset input
+    };
+
     const handleSend = async () => {
-        if (!input.trim()) return;
+        if ((!input.trim() && !pendingAttachment) || isUploading) return;
+        
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         if (roomChannelRef.current) roomChannelRef.current.track({ isTyping: false });
 
         const msgText = input;
+        const currentAttachment = pendingAttachment;
+        
         setInput('');
+        setPendingAttachment(null);
 
         if (editingMessage) {
             console.group(`✏️ [UserChat] Editing Message: ${editingMessage.id}`);
@@ -147,46 +164,111 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
             return;
         }
         
-        const tempId = `temp-${Date.now()}`;
-        const tempMsg = {
-            id: tempId, conversation_id: chat.conversation_id,
-            sender_id: currentUser.id, text: msgText,
-            reply_to_id: replyingTo?.id || null,
-            created_at: new Date().toISOString(), status: 'pending'
-        };
-        
-        setMessages(prev => [...prev, tempMsg]);
         const currentReplyId = replyingTo?.id;
         setReplyingTo(null); // Clear reply state immediately for UX
+        
+        // Optimistic UI temp message
+        const tempId = `temp-${Date.now()}`;
+        setMessages(prev => [...prev, {
+            id: tempId, conversation_id: chat.conversation_id,
+            sender_id: currentUser.id, text: msgText,
+            reply_to_id: currentReplyId,
+            attachments: currentAttachment ? [{ name: currentAttachment.file.name, type: currentAttachment.file.type, url: currentAttachment.previewUrl || '' }] : [],
+            created_at: new Date().toISOString(), status: 'pending'
+        }]);
+
+        let finalAttachments = [];
+
+        // Handle File Upload Phase
+        if (currentAttachment) {
+            setIsUploading(true);
+            try {
+                const file = currentAttachment.file;
+                const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                const filePath = `${chat.conversation_id}/${currentUser.id}/${Date.now()}_${safeName}`;
+                
+                const arrayBuffer = await file.arrayBuffer();
+                const { error: uploadError } = await supabase.storage
+                    .from('chat_media')
+                    .upload(filePath, arrayBuffer, { contentType: file.type, upsert: true });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage.from('chat_media').getPublicUrl(filePath);
+                
+                finalAttachments = [{
+                    name: file.name,
+                    url: publicUrl,
+                    path: filePath,
+                    type: file.type,
+                    size: file.size
+                }];
+            } catch (err) {
+                console.error("❌ Media upload failed:", err);
+                setIsUploading(false);
+                return; // Abort send if upload fails
+            }
+            setIsUploading(false);
+        }
 
         console.group(`📤 [UserChat] Sending Message`);
-        console.log("Text:", msgText);
-        console.log("Replying To:", currentReplyId);
+        console.log("Text:", msgText, "Attachments:", finalAttachments);
 
         const { data, error } = await supabase.from('messages').insert({
             conversation_id: chat.conversation_id,
             sender_id: currentUser.id,
             text: msgText,
-            reply_to_id: currentReplyId
+            reply_to_id: currentReplyId,
+            attachments: finalAttachments
         }).select().single();
         
         if (!error && data) {
             setMessages(prev => prev.map(m => m.id === tempId ? { ...data, status: 'sent' } : m));
         }
+        console.groupEnd();
     };
 
     const deleteMessage = async (msgId) => {
         if (!window.confirm("Delete this message for everyone?")) return;
         console.group(`🗑️ [UserChat] Deleting Message: ${msgId}`);
+        
+        const msgToDelete = messages.find(m => m.id === msgId);
+        
+        // 1. Optimistic UI removal
         setMessages(prev => prev.filter(m => m.id !== msgId));
         setActiveMenu(null);
-        const response = await supabase.from('messages').delete().eq('id', msgId).select();
-        console.log("Delete Response:", response);
+        
+        try {
+            // 2. Storage Cleanup
+            if (msgToDelete?.attachments && msgToDelete.attachments.length > 0) {
+                const paths = msgToDelete.attachments.map(att => att.path).filter(Boolean);
+                if (paths.length > 0) {
+                    console.log("🧹 Cleaning up media:", paths);
+                    await supabase.storage.from('chat_media').remove(paths);
+                }
+            }
+            // 3. Database Deletion
+            const response = await supabase.from('messages').delete().eq('id', msgId).select();
+            console.log("Delete Response:", response);
+        } catch (err) {
+            console.error("❌ Deletion cleanup failed:", err);
+        }
         console.groupEnd();
     };
 
     const handleCopy = (text) => {
         navigator.clipboard.writeText(text);
+        setActiveMenu(null);
+    };
+
+    const handleDownload = (url, filename) => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         setActiveMenu(null);
     };
 
@@ -327,7 +409,24 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                                         </div>
                                     </div>
                                 ) : null}
-                                {m.text}
+                                
+                                {/* ATTACHMENTS RENDER */}
+                                {m.attachments && m.attachments.map((att, i) => (
+                                    <div key={i} className="bubble-attachment">
+                                        {att.type.startsWith('image/') ? (
+                                            <img src={att.url} alt="Shared Image" className="bubble-image" />
+                                        ) : (
+                                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="bubble-file-box" onClick={(e) => e.stopPropagation()}>
+                                                <div className="bubble-file-icon"><i className="fas fa-file"></i></div>
+                                                <div className="bubble-file-info">
+                                                    <span className="bubble-file-name">{att.name}</span>
+                                                </div>
+                                            </a>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {m.text && <div className="bubble-text-content">{m.text}</div>}
                             </div>
                             <div className="prism-time">
                                 {m.is_edited && <span className="edited-label">edited</span>}
@@ -367,18 +466,53 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                         </button>
                     </div>
                 )}
+                {pendingAttachment && (
+                    <div className="input-mode-header staging-mode">
+                        <div className="staging-preview-border"></div>
+                        <div className="staging-preview-content">
+                            {pendingAttachment.previewUrl ? (
+                                <img src={pendingAttachment.previewUrl} alt="Preview" className="staging-thumb" />
+                            ) : (
+                                <div className="staging-file-icon"><i className="fas fa-file"></i></div>
+                            )}
+                            <div className="staging-file-details">
+                                <span className="staging-title">Attachment ready</span>
+                                <span className="staging-name">{pendingAttachment.file.name}</span>
+                            </div>
+                        </div>
+                        <button className="icon-button" onClick={() => setPendingAttachment(null)}>
+                            <i className="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                )}
                 <div className="prism-dock">
-                    <button className="add-btn"><i className="fa-solid fa-plus"></i></button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        style={{display: 'none'}} 
+                        onChange={handleFileSelect} 
+                    />
+                    <button className="add-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
+                        <i className="fa-solid fa-plus"></i>
+                    </button>
                     <input 
                         type="text" 
                         placeholder="Message..." 
+                        disabled={isUploading}
                         value={input}
                         onChange={(e) => handleInputChange(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                     />
-                    <button className="prism-send-btn" onClick={handleSend}>
-                        <i className={`fa-solid ${editingMessage ? 'fa-check' : 'fa-arrow-up'}`}></i>
+                    <button className="prism-send-btn" onClick={handleSend} disabled={isUploading || (!input.trim() && !pendingAttachment)}>
+                        {isUploading ? (
+                            <i className="fa-solid fa-circle-notch fa-spin"></i>
+                        ) : (
+                            <i className={`fa-solid ${editingMessage ? 'fa-check' : 'fa-arrow-up'}`}></i>
+                        )}
                     </button>
+                </div>
+            </footer>
+        </div>
                 </div>
             </footer>
 
@@ -389,9 +523,16 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                             <i className="fa-solid fa-reply"></i> Reply
                         </button>
                     )}
-                    <button className="msg-action-btn" onClick={() => handleCopy(activeMenu.msg.text)}>
-                        <i className="fa-solid fa-copy"></i> Copy
-                    </button>
+                    {activeMenu.msg.text && (
+                        <button className="msg-action-btn" onClick={() => handleCopy(activeMenu.msg.text)}>
+                            <i className="fa-solid fa-copy"></i> Copy Text
+                        </button>
+                    )}
+                    {activeMenu.msg.attachments?.[0] && (
+                        <button className="msg-action-btn" onClick={() => handleDownload(activeMenu.msg.attachments[0].url, activeMenu.msg.attachments[0].name)}>
+                            <i className="fa-solid fa-download"></i> Download File
+                        </button>
+                    )}
                     {activeMenu.isMine && (
                         <button className="msg-action-btn" onClick={() => startEditing(activeMenu.msg)}>
                             <i className="fa-solid fa-pen"></i> Edit
