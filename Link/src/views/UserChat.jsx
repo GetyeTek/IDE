@@ -4,6 +4,20 @@ import './UserChat.css';
 
 const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
     const [messages, setMessages] = useState([]);
+    
+    const formatLastSeen = (dateStr) => {
+        if (!dateStr) return 'Offline';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffInMs = now - date;
+        const diffInMins = Math.floor(diffInMs / 60000);
+        const diffInHours = Math.floor(diffInMs / 3600000);
+
+        if (diffInMins < 1) return 'last seen just now';
+        if (diffInMins < 60) return `last seen ${diffInMins}m ago`;
+        if (diffInHours < 24) return `last seen ${diffInHours}h ago`;
+        return `last seen ${date.toLocaleDateString()}`;
+    };
     const [otherReadAt, setOtherReadAt] = useState(null);
     const [input, setInput] = useState('');
     const flowRef = useRef(null);
@@ -137,7 +151,9 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                     </div>
                     <div className="contact-details">
                         <h2>{chatTitle}</h2>
-                        <p style={{ color: isOnline ? '#42d7b8' : '#888' }}>{isOnline ? 'Online' : 'Offline'}</p>
+                        <p style={{ color: isOnline ? '#42d7b8' : '#888' }}>
+                            {isOnline ? 'Online' : formatLastSeen(chat.other_user_last_seen)}
+                        </p>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
