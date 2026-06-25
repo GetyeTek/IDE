@@ -216,7 +216,7 @@ const UserChat = ({ chat, currentUser, isOnline, onClose }) => {
                 </div>
             </header>
 
-            <main className="prism-flow" ref={flowRef} onClick={()gt; setActiveMenuId(null)}>
+            <main className="prism-flow" ref={flowRef} onClick={() => setActiveMenuId(null)}>
                 {messages.map(m => {
                     const isMine = m.sender_id === currentUser.id;
                     const isMenuOpen = activeMenuId === m.id;
