@@ -1,9 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <script>
-        // --- PREVIEW BOOTSTRAPPER (MUST RUN BEFORE IDE) ---
-        (function() {
+      // --- Standalone OAuth Popup Catcher ---
+      // If the app is opened with ?conduit_oauth=true (the redirect), 
+      // send the token to the parent window and kill the popup.
+      (function() {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('conduit_oauth')) {
+          if (window.opener) {
+            window.opener.postMessage({ type: 'CONDUIT_OAUTH_TOKEN', hash: window.location.hash }, '*');
+          }
+          window.close();
+          document.documentElement.style.display = 'none';
+          window.stop();
+        }
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>LinkUp - Complete App</title>
             const params = new URLSearchParams(window.location.search);
             
             // --- OAUTH POPUP CATCHER ---
