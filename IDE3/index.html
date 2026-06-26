@@ -2377,7 +2377,13 @@
 
         if(CONFIG.funcUrl) {
             await fetchState();
-            setTimeout(() => bundleAndPreview(null), 500); 
+            setTimeout(() => {
+                bundleAndPreview(null);
+                // If an auth hash is detected on boot, force open the Preview tab
+                if (window.location.hash.includes('access_token')) {
+                    switchTab('tab-preview', document.getElementById('nav-preview-btn'));
+                }
+            }, 500); 
         } else {
             switchTab('tab-settings', document.querySelectorAll('.nav-item')[5]);
         }
