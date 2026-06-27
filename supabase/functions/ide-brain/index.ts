@@ -1208,29 +1208,24 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     let lastCommitSha = "";
     let anyOpFailed = false;
 
-    // 2. CHRONOLOGICAL EXECUTION PHASE
-    for (const op of actualOps) {
-        if (op.action === 'comment') continue;
+    // 2. GROUP OPERATIONS BY FILE
+    actualOps.forEach((op, index) => {
+        if (op.action === 'comment') return;
         
         const path = op.file_path;
-        let opLog: any = { type: op.action, success: false, score: 0, message: "Unprocessed" };
-
-        // Path Guard: Ensure the operation actually has a target
-        if (!path && op.action !== "comment") {
-            anyOpFailed = true;
-            opLog = { type: op.action, success: false, message: "CRITICAL: No target file path resolved for this operation." };
-            fileResults.push({ file: "INVALID_OP", status: "error", operations: [opLog] });
-            continue;
-        }
-        console.log(`[Backend Debug] Op #${index + 1}: Action='${op.action || op.type}', Resolved File Path='${op.file_path || "UNDEFINED"}'`);
         
-        if (op.file_path) {
-            if (!opsByFile[op.file_path]) opsByFile[op.file_path] = [];
-            opsByFile[op.file_path].push(op);
-        } else {
+        if (!path) {
+            anyOpFailed = true;
+            const opLog = { type: op.action, success: false, message: "CRITICAL: No target file path resolved." };
+            fileResults.push({ file: "INVALID_OP", status: "error", operations: [opLog] });
             console.error(`[Backend Debug] Op #${index + 1} rejected due to missing file path target!`);
-            missingPathOps.push(op);
+            return;
         }
+
+        console.log(`[Backend Debug] Op #${index + 1}: Action='${op.action}', File='${path}'`);
+        
+        if (!opsByFile[path]) opsByFile[path] = [];
+        opsByFile[path].push(op);
     });
 
 
