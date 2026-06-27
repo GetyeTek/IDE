@@ -706,6 +706,7 @@
                 <div class="flex-gap">
                     <button id="btn-context-copy" class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px; color:var(--ai-accent); border-color:var(--ai-accent);" onclick="copySelectedFiles()" title="Copy selected files to clipboard">📋 Copy</button>
                     <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px; color:var(--prod); border-color:var(--prod);" onclick="openSendModal()" title="Send selected files to another repo">📤 Send</button>
+                    <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px; color:var(--dev); border-color:var(--dev);" onclick="copyProjectSkeleton()" title="Copy project folder structure">🌳 Skeleton</button>
                     <button class="btn-outline" style="width:auto; padding:8px 12px; font-size:12px;" onclick="fetchFileList()">Refresh</button>
                 </div>
             </div>
@@ -9059,6 +9060,47 @@ async function downloadArtifact(runId) {
             }
         } catch (e) {
             updateTerminalCard(termId, { error: e.message });
+        }
+    }
+
+    async function copyProjectSkeleton() {
+        if (!window.repoFiles || window.repoFiles.length === 0) return showGlobalToast("No files loaded", true);
+
+        const paths = window.repoFiles.map(f => f.path).sort();
+        const structure = {};
+
+        // 1. Build Object Tree
+        paths.forEach(path => {
+            let parts = path.split('/');
+            let current = structure;
+            parts.forEach(part => {
+                if (!current[part]) current[part] = {};
+                current = current[part];
+            });
+        });
+
+        // 2. Recursive ASCII Generator
+        const buildTree = (obj, prefix = "") => {
+            let result = "";
+            const keys = Object.keys(obj).sort();
+            keys.forEach((key, index) => {
+                const isLast = index === keys.length - 1;
+                const isDir = Object.keys(obj[key]).length > 0;
+                result += `${prefix}${isLast ? "└── " : "├── "}${key}${isDir ? "/" : ""}\n`;
+                if (isDir) {
+                    result += buildTree(obj[key], prefix + (isLast ? "    " : "│   "));
+                }
+            });
+            return result;
+        };
+
+        const treeOutput = `PROJECT SKELETON: ${CONFIG.repoName}\nROOT: ${CONFIG.projectPath || '/'}\n${'='.repeat(30)}\n${buildTree(structure)}`;
+
+        try {
+            await navigator.clipboard.writeText(treeOutput);
+            showGlobalToast("🌳 Skeleton copied to clipboard!");
+        } catch (e) {
+            showGlobalToast("Copy failed", true);
         }
     }
 
