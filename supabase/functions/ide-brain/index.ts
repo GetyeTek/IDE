@@ -1127,7 +1127,7 @@ function applyOperation(content: string, op: any) {
 }
 
 // --- CORE PROCESSING LOGIC ---
-async function processOperations(TARGET_REPO: string, operations: any[], projectPath: string, autoSanity: boolean, config?: AIConfig) {
+async function processOperations(TARGET_REPO: string, operations: any[], projectPath: string, autoSanity: boolean, config?: AIConfig, overwriteConfirmed: boolean = false) {
     console.log("\n=== 📡 [Backend processOperations Execution Start] ===");
     console.log(`[Backend Debug] Raw payload operations array size: ${operations ? operations.length : 0}`);
     console.log("[Backend Debug] Full raw payload dump:", JSON.stringify(operations, null, 2));
@@ -1166,7 +1166,6 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     const renameOps = actualOps.filter((op: any) => op.action === "rename_file");
     if (renameOps.length > 0) {
         const collisions: string[] = [];
-        const overwriteConfirmed = body.overwrite_confirmed === true;
 
         if (!overwriteConfirmed) {
             await Promise.all(renameOps.map(async (op: any) => {
@@ -1778,7 +1777,7 @@ serve(async (req) => {
         if (ops.length === 0) return new Response(JSON.stringify({ success: false, message: "AI could not determine a fix." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
         // 5. Apply Patch
-        const patchResult = await processOperations(TARGET_REPO, ops, "", true, ai_config);
+        const patchResult = await processOperations(TARGET_REPO, ops, "", true, ai_config, true);
 
         // 6. Trigger Re-Build (Explicitly required for bot commits)
         let triggerMsg = "No trigger attempted";
@@ -1801,7 +1800,8 @@ serve(async (req) => {
     }
 
     if (action === "patch" && operations) {
-        const result = await processOperations(TARGET_REPO, operations, project_path, !!auto_sanity, ai_config);
+        const overwriteConfirmed = body.overwrite_confirmed === true;
+        const result = await processOperations(TARGET_REPO, operations, project_path, !!auto_sanity, ai_config, overwriteConfirmed);
         return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
