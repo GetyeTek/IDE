@@ -2449,6 +2449,22 @@
             if (!str) return "";
             return str.replace(/^\r?\n|\r?\n$/g, "");
         };
+
+        // Extract Rename Blocks
+        const renameRegex = /<rename_file([^>]*?)\/>/gi;
+        let rMatch;
+        while ((rMatch = renameRegex.exec(input)) !== null) {
+            const attrs = rMatch[1];
+            const fileMatch = attrs.match(/(?:file|file_path)\s*=\s*['"]([^'"]+)['"]/i);
+            const toMatch = attrs.match(/to\s*=\s*['"]([^'"]+)['"]/i);
+            if (fileMatch && toMatch) {
+                operations.push({
+                    action: 'rename_file',
+                    file_path: fileMatch[1].trim(),
+                    new_path: toMatch[1].trim()
+                });
+            }
+        }
         const unescapeEntities = (str) => {
             if (!str) return "";
             return str
@@ -4016,10 +4032,29 @@
                     operations: payload, 
                     version_name: payload.version_name,
                     project_path: CONFIG.projectPath,
-                    auto_sanity: CONFIG.autoSanity
+                    auto_sanity: CONFIG.autoSanity,
+                    overwrite_confirmed: window.RENAME_OVERWRITE_CONFIRMED || false
                 })
             });
             const data = await res.json();
+
+            // Handle Collision Handshake
+            if (data.status === 'collision') {
+                isPerformingAction = false;
+                btns.forEach(b => { if(b) { b.disabled = false; b.style.opacity = '1'; } });
+                const confirmMsg = `⚠️ COLLISION DETECTED\n\nThe following files already exist at the target destination:\n\n${data.collisions.join('\n')}\n\nHow do you want to proceed?\n\n[OK] = Overwrite existing files\n[CANCEL] = Abort entire operation`;
+                
+                if (confirm(confirmMsg)) {
+                    window.RENAME_OVERWRITE_CONFIRMED = true;
+                    showGlobalToast("🚀 Retrying with Overwrite...");
+                    return runPatch(actionType);
+                } else {
+                    showGlobalToast("Operation Cancelled", true);
+                    return;
+                }
+            }
+            window.RENAME_OVERWRITE_CONFIRMED = false;
+
             window.LAST_PATCH_RESPONSE = data; // Save for Staging UI cross-referencing
             updateTerminalCard(termId, data, payload, true);
 
@@ -5482,11 +5517,19 @@
             document.getElementById('json-input').value = JSON.stringify(ops, null, 2);
             saveState();
             
-            // 3. Switch to Patcher and run it immediately
+            // 3. Switch to Patcher and load the clean Rename XML
+            const renameXml = `<comment>${moveFolder ? 'Bulk Move' : 'Rename file'}</comment>\n` + 
+                             ops.filter(o => o.action === 'create_file').map(o => {
+                                 // Reverse engineer the rename back to XML for the editor
+                                 const oldPath = ops.find(del => del.action === 'delete_file' && del.file_path.endsWith(o.file_path.split('/').pop())).file_path;
+                                 return `<rename_file file="${oldPath}" to="${o.file_path}" />`;
+                             }).join('\n');
+
+            document.getElementById('json-input').value = renameXml;
+            saveState();
             switchTab('tab-patcher', document.querySelectorAll('.nav-item')[1]);
-            showGlobalToast("🚀 Executing Rename/Move...");
+            showGlobalToast("🚀 Executing Rename Operation...");
             
-            // Automatically trigger the patch so it's not "fake"
             await runPatch('patch');
 
             // 4. Prompt for AI Healing after the patch is confirmed
