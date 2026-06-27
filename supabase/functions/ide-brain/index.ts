@@ -1208,14 +1208,20 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     let lastCommitSha = "";
     let anyOpFailed = false;
 
-    actualOps.forEach((op: any, index: number) => {
-        // Skip comments in the code-execution loop
-        if (op.action === 'comment') return;
+    // 2. CHRONOLOGICAL EXECUTION PHASE
+    for (const op of actualOps) {
+        if (op.action === 'comment') continue;
+        
+        const path = op.file_path;
+        let opLog: any = { type: op.action, success: false, score: 0, message: "Unprocessed" };
 
-        // Normalize AI schema hallucinations
-        const originalPath = op.file_path || op.file || op.path;
-        op.file_path = originalPath;
-
+        // Path Guard: Ensure the operation actually has a target
+        if (!path && op.action !== "comment") {
+            anyOpFailed = true;
+            opLog = { type: op.action, success: false, message: "CRITICAL: No target file path resolved for this operation." };
+            fileResults.push({ file: "INVALID_OP", status: "error", operations: [opLog] });
+            continue;
+        }
         console.log(`[Backend Debug] Op #${index + 1}: Action='${op.action || op.type}', Resolved File Path='${op.file_path || "UNDEFINED"}'`);
         
         if (op.file_path) {
@@ -1227,20 +1233,7 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
         }
     });
 
-    if (missingPathOps.length > 0) {
-        anyOpFailed = true;
-        fileResults.push({
-            file: "MISSING_FILE_PATH_ERROR",
-            status: "error",
-            operations: missingPathOps.map((op, idx) => ({
-                type: op.action || op.type || "unknown",
-                success: false,
-                score: 0,
-                message: `CRITICAL: This action was discarded because the backend engine could not resolve a target file path. (Check schema properties)`,
-                data: op
-            }))
-        });
-    }
+
 
     for (const filePath of Object.keys(opsByFile)) {
         const opLogs: any[] = [];
