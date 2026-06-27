@@ -1205,6 +1205,9 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
 
     console.log(`[Backend Debug] Total operations received: ${actualOps.length}`);
 
+    let lastCommitSha = "";
+    let anyOpFailed = false;
+
     actualOps.forEach((op: any, index: number) => {
         // Normalize AI schema hallucinations
         const originalPath = op.file_path || op.file || op.path;
@@ -1235,9 +1238,6 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
             }))
         });
     }
-
-    let lastCommitSha = "";
-    let anyOpFailed = false;
 
     for (const filePath of Object.keys(opsByFile)) {
         const opLogs: any[] = [];
