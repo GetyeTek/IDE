@@ -1209,6 +1209,9 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     let anyOpFailed = false;
 
     actualOps.forEach((op: any, index: number) => {
+        // Skip comments in the code-execution loop
+        if (op.action === 'comment') return;
+
         // Normalize AI schema hallucinations
         const originalPath = op.file_path || op.file || op.path;
         op.file_path = originalPath;
