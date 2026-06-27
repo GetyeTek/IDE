@@ -272,7 +272,7 @@ function parseCXP(input: string): any[] {
   }
 
   // 4. Extract Delete File Blocks (Supports both self-closing or explicit closing forms)
-  const deleteBlockRegex = /<delete_file([^>]*?)(?:\/>|>(?:[\s\S]*?)<\/delete_file>)/gi;
+  const deleteBlockRegex = /<delete_file([^>]*?)(?:\/>|>([\s\S]*?)<\/delete_file>)/gi;
   while ((match = deleteBlockRegex.exec(input)) !== null) {
     const attrArea = match[1];
     const filePath = extractAttribute(attrArea, "file");
@@ -280,6 +280,21 @@ function parseCXP(input: string): any[] {
       operations.push({
         action: 'delete_file',
         file_path: filePath
+      });
+    }
+  }
+
+  // 5. Extract Rename Blocks
+  const renameBlockRegex = /<rename_file([^>]*?)\/>/gi;
+  while ((match = renameBlockRegex.exec(input)) !== null) {
+    const attrArea = match[1];
+    const filePath = extractAttribute(attrArea, "file");
+    const toPath = extractAttribute(attrArea, "to");
+    if (filePath && toPath) {
+      operations.push({
+        action: 'rename_file',
+        file_path: filePath,
+        new_path: toPath
       });
     }
   }
@@ -1147,6 +1162,41 @@ async function processOperations(TARGET_REPO: string, operations: any[], project
     
     const patchTitle = patchNote ? patchNote.split('\n')[0].substring(0, 60) : `Patch: ${actualOps.length} operations`;
     
+    // --- RENAME PRE-PROCESSOR & COLLISION GUARD ---
+    const renameOps = actualOps.filter((op: any) => op.action === "rename_file");
+    if (renameOps.length > 0) {
+        const collisions: string[] = [];
+        const overwriteConfirmed = body.overwrite_confirmed === true;
+
+        if (!overwriteConfirmed) {
+            await Promise.all(renameOps.map(async (op: any) => {
+                try {
+                    await githubFetch(TARGET_REPO, `/contents/${op.new_path}?ref=${DEV_BRANCH}`);
+                    collisions.push(op.new_path);
+                } catch (e) { /* 404 is good, file doesn't exist */ }
+            }));
+
+            if (collisions.length > 0) {
+                return { status: "collision", collisions };
+            }
+        }
+
+        // Expand renames into virtual delete/create ops
+        const expandedOps: any[] = [];
+        for (const op of actualOps) {
+            if (op.action === "rename_file") {
+                const { content } = await getFileRaw(TARGET_REPO, op.file_path, DEV_BRANCH);
+                if (content) {
+                    expandedOps.push({ action: "delete_file", file_path: op.file_path });
+                    expandedOps.push({ action: "create_file", file_path: op.new_path, content: base64ToText(content) });
+                }
+            } else {
+                expandedOps.push(op);
+            }
+        }
+        actualOps = expandedOps;
+    }
+
     const devBranchRef = await githubFetch(TARGET_REPO, `/git/ref/heads/${DEV_BRANCH}`);
     const shaBeforePatch = devBranchRef.object.sha;
 
