@@ -4629,6 +4629,15 @@
             }
 
             const binaryExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'woff', 'woff2', 'ttf', 'webp'];
+            
+            // --- VITE ALIAS SIMULATOR ---
+            const VITE_ALIASES = {
+                '@linkup-platform/sdk-core': 'packages/core-sdk/src',
+                '@linkup/gibi-news': 'packages/gibi-news',
+                '@linkup/heaven-academy': 'packages/heaven-academy',
+                '@linkup/squad': 'packages/squad'
+            };
+
             for (const path in files) {
                 const f = files[path];
                 const ext = path.split('.').pop().toLowerCase();
@@ -4704,15 +4713,34 @@
                         file.content = file.content.replace(/(import|export)([^;\n]*?)(['"])([^'"]+)(['"])/g, (match, keyword, mid, q1, importPath, q2) => {
                             if (importPath.startsWith('http')) return match;
                             
+                            // A. Handle Relative Imports
                             if (importPath.startsWith('.') && (importPath.includes('/') || importPath.includes('.'))) {
                                 const resolvedFull = resolvePath(fullPath, importPath);
-                                if (resolvedFull.startsWith(effectiveRoot)) return `${keyword}${mid}${q1}${resolvedFull.substring(effectiveRoot.length)}${q2}`;
+                                // If the file exists in our project cache, map it to the virtual path
+                                if (fileCache[resolvedFull]) {
+                                     return `${keyword}${mid}${q1}${resolvedFull}${q2}`;
+                                }
                                 return match;
                             }
 
-                            if (importMap.imports[importPath]) return match;
-                            if (Object.keys(importMap.imports).some(k => k === importPath || k === './' + importPath)) return match;
+                            // B. Handle Vite Aliases (Modular Workspaces)
+                            for (const [alias, targetPath] of Object.entries(VITE_ALIASES)) {
+                                if (importPath === alias || importPath.startsWith(alias + '/')) {
+                                    const actualPath = importPath.replace(alias, targetPath);
+                                    // Try to resolve extension-less imports (common in modular code)
+                                    const extensions = ['', '.js', '.jsx', '.ts', '.tsx', '/index.js', '/index.jsx', '/index.ts', '/index.tsx'];
+                                    for (const ext of extensions) {
+                                        if (fileCache[actualPath + ext]) {
+                                            return `${keyword}${mid}${q1}${actualPath + ext}${q2}`;
+                                        }
+                                    }
+                                }
+                            }
 
+                            // C. Handle pre-registered imports (like React)
+                            if (importMap.imports[importPath]) return match;
+
+                            // D. Fallback to CDN for actual node_modules
                             return `${keyword}${mid}${q1}https://esm.sh/${importPath}${q2}`;
                         });
                     }
@@ -4731,17 +4759,29 @@
                     file.needsProcessing = false;
                 }
                 
-                // Register exact path
-                importMap.imports[virtualPath] = file.blobUrl;
-                importMap.imports['./' + virtualPath] = file.blobUrl;
+                // Register exact path in the global import map
+                importMap.imports[fullPath] = file.blobUrl;
+                importMap.imports['/' + fullPath] = file.blobUrl;
 
-                // Register path without extension ONLY for scripts (standard ESM behavior)
+                // Handle extension-less mapping for aliases
                 const scriptExts = ['js', 'jsx', 'ts', 'tsx', 'mjs'];
-                if (virtualPath.includes('.') && scriptExts.includes(file.ext)) {
-                    const noExt = virtualPath.split('.').slice(0, -1).join('.');
-                    if (!importMap.imports[noExt]) {
-                        importMap.imports[noExt] = file.blobUrl;
-                        importMap.imports['./' + noExt] = file.blobUrl;
+                if (scriptExts.includes(file.ext)) {
+                    const noExt = fullPath.split('.').slice(0, -1).join('.');
+                    importMap.imports[noExt] = file.blobUrl;
+                }
+            }
+
+            // --- FINAL ALIAS RESOLUTION ---
+            // Map the Alias Name directly to the entry-point Blob URL
+            for (const [alias, targetPath] of Object.entries(VITE_ALIASES)) {
+                const entryPoints = [
+                    `${targetPath}.js`, `${targetPath}.jsx`, `${targetPath}.ts`, `${targetPath}.tsx`,
+                    `${targetPath}/index.js`, `${targetPath}/index.jsx`, `${targetPath}/index.ts`, `${targetPath}/index.tsx`
+                ];
+                for (const ep of entryPoints) {
+                    if (fileCache[ep]) {
+                        importMap.imports[alias] = fileCache[ep].blobUrl;
+                        break;
                     }
                 }
             }
