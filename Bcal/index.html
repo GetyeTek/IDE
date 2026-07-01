@@ -279,7 +279,10 @@
                             ${optionsHtml}
                         </select>
                     </td>
-                    <td><input type="number" value="${row.qty}" placeholder="0" oninput="updateDraftData('${row.id}', 'qty', this.value)"></td>
+                    <td>
+                        <input type="number" value="${row.qty}" placeholder="0" oninput="updateDraftData('${row.id}', 'qty', this.value)">
+                        ${row.leftoverNote ? `<div id="note-${row.id}" style="font-size:11.5px; color:#ea580c; margin-top:5px; font-weight:600; line-height:1.2;">${row.leftoverNote}</div>` : ''}
+                    </td>
                     <td><input type="number" value="${row.leftover}" placeholder="0" oninput="updateDraftData('${row.id}', 'leftover', this.value)"></td>
                     <td class="readonly-cell" id="rev-${row.id}">-</td>
                     <td class="readonly-cell" id="sup-${row.id}">-</td>
@@ -311,8 +314,56 @@
             const row = draftRows.find(r => r.id === id);
             if (row) {
                 row[field] = value;
+
+                // 🧠 Smart Leftover Carry-over Logic
+                if (field === 'itemId' && value && !currentEditingDateId) {
+                    row.carriedOver = 0;
+                    row.leftoverNote = '';
+
+                    // Check if this same item is already added in today's draft
+                    const alreadyExists = draftRows.some(r => r.id !== id && r.itemId === value);
+                    
+                    if (!alreadyExists) {
+                        let foundItem = null;
+                        let foundHistory = null;
+                        
+                        // Look backwards in history for the most recent match
+                        for (let i = 0; i < history.length; i++) {
+                            const itemInHist = history[i].items.find(hi => hi.itemId === value);
+                            if (itemInHist) {
+                                if (itemInHist.leftover > 0) {
+                                    foundItem = itemInHist;
+                                    foundHistory = history[i];
+                                }
+                                break; // Found the last entry for this item, stop looking
+                            }
+                        }
+
+                        if (foundItem && foundHistory) {
+                            const histDate = new Date(foundHistory.timestamp || Date.now());
+                            const now = new Date();
+                            histDate.setHours(0,0,0,0);
+                            now.setHours(0,0,0,0);
+                            const diffDays = Math.round((now - histDate) / (1000 * 60 * 60 * 24));
+                            
+                            // Fallback if timestamp is missing (assume 1 day if it's the very first item in history)
+                            const actualDiff = foundHistory.timestamp ? diffDays : (history.indexOf(foundHistory) === 0 ? 1 : 2);
+
+                            if (actualDiff === 1) {
+                                row.carriedOver = foundItem.leftover;
+                                row.leftoverNote = `+${foundItem.leftover} ከትናንት ተደምሯል`;
+                            } else if (actualDiff >= 2) {
+                                row.leftoverNote = `⚠️ ከ ${actualDiff} ቀናት በፊት ${foundItem.leftover} የሚያድር አለ፣ እባክዎ አብረው ይደምሩት`;
+                            }
+                        }
+                    }
+                    saveState();
+                    renderDraftTable(); // Re-render to show the note
+                    return;
+                }
+
                 saveState();
-                recalculateRowUI(id); // Updates only text content, cursor won't jump!
+                recalculateRowUI(id);
             }
         }
 
@@ -324,9 +375,18 @@
             const cost = item ? parseFloat(item.cost) || 0 : 0;
             const sell = item ? parseFloat(item.sell) || 0 : 0;
             
-            const qty = parseFloat(row.qty) || 0;
+            const typedQty = parseFloat(row.qty) || 0;
+            const carried = parseFloat(row.carriedOver) || 0;
+            const totalQty = typedQty + carried;
+            
             const left = parseFloat(row.leftover) || 0;
-            const sold = Math.max(0, qty - left); // Cannot sell negative
+            const sold = Math.max(0, totalQty - left); // Cannot sell negative
+            
+            // Dynamically update note with total
+            const noteEl = document.getElementById(`note-${rowId}`);
+            if(noteEl && carried > 0) {
+                noteEl.innerText = `+${carried} ከትናንት (ድምር: ${totalQty})`;
+            }
             
             const rev = sold * sell;
             const sup = sold * cost;
@@ -370,16 +430,20 @@
                 const item = settings.find(s => s.id === r.itemId) || { name: 'የጠፋ እቃ', cost: 0, sell: 0 };
                 const cost = parseFloat(item.cost) || 0;
                 const sell = parseFloat(item.sell) || 0;
-                const qty = parseFloat(r.qty) || 0;
+                
+                const typedQty = parseFloat(r.qty) || 0;
+                const carried = parseFloat(r.carriedOver) || 0;
+                const totalQty = typedQty + carried;
+                
                 const left = parseFloat(r.leftover) || 0;
-                const sold = Math.max(0, qty - left);
+                const sold = Math.max(0, totalQty - left);
                 
                 const prof = (sold * sell) - (sold * cost);
                 dayTotalProfit += prof;
 
                 return { 
                     itemId: r.itemId, name: item.name, 
-                    qty: qty, leftover: left, sold: sold,
+                    qty: totalQty, leftover: left, sold: sold,
                     profit: prof 
                 };
             });
@@ -396,6 +460,7 @@
                 history.unshift({
                     id: generateId(),
                     dateStr: getEthiopianDateStr(),
+                    timestamp: Date.now(),
                     items: savedItems,
                     totalProfit: dayTotalProfit
                 });
