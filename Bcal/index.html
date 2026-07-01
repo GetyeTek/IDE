@@ -178,7 +178,10 @@
     <div id="historyScreen" class="screen">
         <div class="top-bar">
             <h2>የቀን ታሪኮች 🗂️</h2>
-            <button class="btn-primary" onclick="switchScreen('mainScreen')">ተመለስ (Back)</button>
+            <div class="top-bar-actions">
+                <button class="btn-danger" style="padding: 8px 12px; font-size: 12px; background: #be123c;" onclick="clearAllHistory()">ሁሉንም አጥፋ</button>
+                <button class="btn-primary" onclick="switchScreen('mainScreen')">ተመለስ</button>
+            </div>
         </div>
         
         <p style="font-size: 13px; color:#64748b; margin-bottom: 10px;">ለማስተካከል (Edit ለማድረግ) ቀኑን ይጫኑ።</p>
@@ -540,6 +543,17 @@
         function toggleDay(id) {
             const el = document.getElementById(id);
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function clearAllHistory() {
+            if (confirm("⚠️ ማስጠንቀቂያ!\nሁሉንም የተመዘገቡ ታሪኮችን በቋሚነት ማጥፋት ይፈልጋሉ?")) {
+                if (confirm("እርግጠኛ ነዎት? ይህ ድርጊት ወደ ኋላ አይመለስም!")) {
+                    history = [];
+                    saveState();
+                    renderHistoryList();
+                    alert("ሁሉም ታሪኮች ጠፍተዋል።");
+                }
+            }
         }
 
         function editHistory(histId) {
