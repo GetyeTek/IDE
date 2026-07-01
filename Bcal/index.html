@@ -386,7 +386,9 @@
             // Dynamically update note with total
             const noteEl = document.getElementById(`note-${rowId}`);
             if(noteEl && carried > 0) {
-                noteEl.innerText = `+${carried} ከትናንት (ድምር: ${totalQty})`;
+                // Determine label based on existing note content to keep it consistent
+                const label = row.leftoverNote.includes("ዛሬ") ? "ካለፈው የዛሬ ሂሳብ" : "ከትናንት";
+                noteEl.innerText = `+${carried} ${label} (ድምር: ${totalQty})`;
             }
             
             const rev = sold * sell;
