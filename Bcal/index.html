@@ -191,7 +191,7 @@
                 <h3 style="color:#065f46; font-size:16px;">📊 አጠቃላይ ሪፖርት</h3>
                 <button onclick="toggleReport()" style="background:none; border:none; color:#065f46; font-weight:bold;">ዝጋ X</button>
             </div>
-            <div id="reportContent" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div id="reportContent" style="display:block;">
                 <!-- JS will inject stats here -->
             </div>
         </div>
@@ -568,50 +568,106 @@
         }
 
         function generateReport() {
-            const now = Date.now();
-            const oneWeek = 7 * 24 * 60 * 60 * 1000;
-            const oneMonth = 30 * 24 * 60 * 60 * 1000;
+            const now = new Date();
+            now.setHours(0,0,0,0);
+            const dayOfWeek = now.getDay() || 7; // Mon=1 ... Sun=7
+            const dateOfMonth = now.getDate();
+            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
-            const weekHistory = history.filter(h => (now - h.timestamp) <= oneWeek);
-            const monthHistory = history.filter(h => (now - h.timestamp) <= oneMonth);
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - dayOfWeek + 1);
 
-            const calculateStats = (data) => {
-                let totalProf = 0;
-                let itemsMap = {};
-                data.forEach(h => {
-                    totalProf += h.totalProfit;
-                    h.items.forEach(i => {
-                        itemsMap[i.name] = (itemsMap[i.name] || 0) + (i.sold || 0);
-                    });
-                });
+            let currentWeekProfit = 0;
+            let currentMonthProfit = 0;
 
-                let topItem = "የለም";
-                let maxSold = 0;
-                for (let name in itemsMap) {
-                    if (itemsMap[name] > maxSold) {
-                        maxSold = itemsMap[name];
-                        topItem = name;
-                    }
+            const pastWeeks = {};
+            const pastMonths = {};
+
+            history.forEach(h => {
+                const d = new Date(h.timestamp || Date.now());
+                d.setHours(0,0,0,0);
+
+                // Month grouping
+                const isCurrentMonth = (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth());
+                if (isCurrentMonth) {
+                    currentMonthProfit += h.totalProfit;
+                } else {
+                    const mKey = d.getFullYear() + "-" + (d.getMonth() + 1);
+                    if(!pastMonths[mKey]) pastMonths[mKey] = { 
+                        total: 0, items: {}, 
+                        label: d.toLocaleDateString('am-ET', { month: 'long', year: 'numeric' }) 
+                    };
+                    pastMonths[mKey].total += h.totalProfit;
+                    h.items.forEach(i => { pastMonths[mKey].items[i.name] = (pastMonths[mKey].items[i.name]||0) + i.sold; });
                 }
-                return { totalProf, topItem, maxSold };
+
+                // Week grouping
+                const hDay = d.getDay() || 7;
+                const hStart = new Date(d);
+                hStart.setDate(d.getDate() - hDay + 1);
+                
+                const isCurrentWeek = (hStart.getTime() === startOfWeek.getTime());
+                if (isCurrentWeek) {
+                    currentWeekProfit += h.totalProfit;
+                } else {
+                    const wKey = hStart.getTime();
+                    if(!pastWeeks[wKey]) pastWeeks[wKey] = { 
+                        total: 0, items: {}, 
+                        label: "ከ " + hStart.toLocaleDateString('am-ET', { month: 'short', day: 'numeric' }) 
+                    };
+                    pastWeeks[wKey].total += h.totalProfit;
+                    h.items.forEach(i => { pastWeeks[wKey].items[i.name] = (pastWeeks[wKey].items[i.name]||0) + i.sold; });
+                }
+            });
+
+            const getTop = (map) => {
+                let max = 0, top = 'የለም';
+                for(let k in map) { if(map[k] > max) { max = map[k]; top = k; } }
+                return max > 0 ? `${top} (${max} ተሽጧል)` : 'ምንም የለም';
             };
 
-            const weekStats = calculateStats(weekHistory);
-            const monthStats = calculateStats(monthHistory);
+            const weekLabel = (dayOfWeek === 7) ? "የ 1 ሳምንት (የተጠናቀቀ) ሪፖርት" : `የ ${dayOfWeek} ቀን (ከሶኞ ጀምሮ) ሪፖርት`;
+            const monthLabel = (dateOfMonth === daysInMonth) ? "የ 1 ወር (የተጠናቀቀ) ሪፖርት" : `የ ${dateOfMonth} ቀን (የወሩ) ሪፖርት`;
+
+            let pastWeeksHtml = Object.keys(pastWeeks).sort().reverse().map(k => `
+                <div style="background:#f8fafc; padding:10px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:8px; border-left:4px solid #3b82f6;">
+                    <div style="font-size:12px; font-weight:bold; color:#334155;">ሳምንት: ${pastWeeks[k].label}</div>
+                    <div style="font-size:14px; font-weight:bold; color:#15803d; margin:4px 0;">ትርፍ: ${pastWeeks[k].total.toLocaleString()} ብር</div>
+                    <div style="font-size:11px; color:#b45309;">በብዛት የተሸጠ: ${getTop(pastWeeks[k].items)}</div>
+                </div>
+            `).join('') || '<div style="font-size:12px; color:#94a3b8; text-align:center; padding:10px;">ያለፈ ሳምንት ታሪክ የለም</div>';
+
+            let pastMonthsHtml = Object.keys(pastMonths).sort().reverse().map(k => `
+                <div style="background:#f8fafc; padding:10px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:8px; border-left:4px solid #8b5cf6;">
+                    <div style="font-size:12px; font-weight:bold; color:#334155;">ወር: ${pastMonths[k].label}</div>
+                    <div style="font-size:14px; font-weight:bold; color:#15803d; margin:4px 0;">ትርፍ: ${pastMonths[k].total.toLocaleString()} ብር</div>
+                    <div style="font-size:11px; color:#b45309;">በብዛት የተሸጠ: ${getTop(pastMonths[k].items)}</div>
+                </div>
+            `).join('') || '<div style="font-size:12px; color:#94a3b8; text-align:center; padding:10px;">ያለፈ ወር ታሪክ የለም</div>';
 
             const content = document.getElementById('reportContent');
             content.innerHTML = `
-                <div style="background:white; padding:10px; border-radius:6px; border-left:4px solid #10b981;">
-                    <div style="font-size:11px; color:#64748b;">የ7 ቀን ትርፍ</div>
-                    <div style="font-size:15px; font-weight:bold; color:#065f46;">${weekStats.totalProf.toLocaleString()} ብር</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div style="background:white; padding:10px; border-radius:6px; border-left:4px solid #10b981; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                        <div style="font-size:11px; color:#64748b;">${weekLabel}</div>
+                        <div style="font-size:15px; font-weight:bold; color:#065f46;">${currentWeekProfit.toLocaleString()} ብር</div>
+                    </div>
+                    <div style="background:white; padding:10px; border-radius:6px; border-left:4px solid #10b981; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                        <div style="font-size:11px; color:#64748b;">${monthLabel}</div>
+                        <div style="font-size:15px; font-weight:bold; color:#065f46;">${currentMonthProfit.toLocaleString()} ብር</div>
+                    </div>
                 </div>
-                <div style="background:white; padding:10px; border-radius:6px; border-left:4px solid #10b981;">
-                    <div style="font-size:11px; color:#64748b;">የወር ትርፍ</div>
-                    <div style="font-size:15px; font-weight:bold; color:#065f46;">${monthStats.totalProf.toLocaleString()} ብር</div>
+                
+                <div style="margin-top:15px; display:flex; gap:10px; border-bottom: 1px solid #cbd5e1; padding-bottom:10px;">
+                    <button onclick="document.getElementById('archWeeks').style.display='block'; document.getElementById('archMonths').style.display='none';" style="flex:1; padding:8px; font-size:12px; border:1px solid #3b82f6; background:white; color:#3b82f6; border-radius:4px; cursor:pointer; font-weight:bold;">ያለፉት ሳምንታት ማህደር</button>
+                    <button onclick="document.getElementById('archMonths').style.display='block'; document.getElementById('archWeeks').style.display='none';" style="flex:1; padding:8px; font-size:12px; border:1px solid #8b5cf6; background:white; color:#8b5cf6; border-radius:4px; cursor:pointer; font-weight:bold;">ያለፉት ወራት ማህደር</button>
                 </div>
-                <div style="background:white; padding:10px; border-radius:6px; border-left:4px solid #f59e0b; grid-column: span 2;">
-                    <div style="font-size:11px; color:#64748b;">በብዛት የተሸጠ እቃ (ሳምንታዊ)</div>
-                    <div style="font-size:14px; font-weight:bold; color:#92400e;">${weekStats.topItem} (${weekStats.maxSold} ተሽጧል)</div>
+
+                <div id="archWeeks" style="display:none; margin-top:10px; max-height:220px; overflow-y:auto; padding-right:5px;">
+                    ${pastWeeksHtml}
+                </div>
+                <div id="archMonths" style="display:none; margin-top:10px; max-height:220px; overflow-y:auto; padding-right:5px;">
+                    ${pastMonthsHtml}
                 </div>
             `;
         }
