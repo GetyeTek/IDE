@@ -349,9 +349,10 @@
                             // Fallback if timestamp is missing (assume 1 day if it's the very first item in history)
                             const actualDiff = foundHistory.timestamp ? diffDays : (history.indexOf(foundHistory) === 0 ? 1 : 2);
 
-                            if (actualDiff === 1) {
+                            if (actualDiff === 0 || actualDiff === 1) {
                                 row.carriedOver = foundItem.leftover;
-                                row.leftoverNote = `+${foundItem.leftover} ከትናንት ተደምሯል`;
+                                const timeLabel = (actualDiff === 0) ? "ካለፈው የዛሬ ሂሳብ" : "ከትናንት";
+                                row.leftoverNote = `+${foundItem.leftover} ${timeLabel} ተደምሯል`;
                             } else if (actualDiff >= 2) {
                                 row.leftoverNote = `⚠️ ከ ${actualDiff} ቀናት በፊት ${foundItem.leftover} የሚያድር አለ፣ እባክዎ አብረው ይደምሩት`;
                             }
