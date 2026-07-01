@@ -492,22 +492,54 @@
                 return;
             }
 
-            history.forEach(day => {
-                let itemsStr = day.items.map(i => `${i.name} (የተሸጠ: ${i.sold})`).join(' ፣ ');
+            // Grouping logic
+            const groups = {};
+            history.forEach(item => {
+                const key = item.dayOnly || item.dateStr.split(' ')[0]; // Fallback for old records
+                if (!groups[key]) groups[key] = { sessions: [], total: 0 };
+                groups[key].sessions.push(item);
+                groups[key].total += item.totalProfit;
+            });
+
+            Object.keys(groups).forEach(dayKey => {
+                const group = groups[dayKey];
+                const sessionCount = group.sessions.length;
+                
+                let sessionsHtml = group.sessions.map(s => `
+                    <div class="session-item" onclick="event.stopPropagation(); editHistory('${s.id}')" 
+                         style="background: #f1f5f9; padding: 10px; border-radius: 6px; margin-top: 8px; border: 1px solid #e2e8f0;">
+                        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:bold; color:#0f766e; margin-bottom:5px;">
+                            <span>🕒 ${s.timeOnly || 'ያለ ሰዓት'}</span>
+                            <span>ትርፍ: ${s.totalProfit.toLocaleString()} ብር</span>
+                        </div>
+                        <div style="font-size: 11px; color: #64748b;">
+                            ${s.items.map(i => i.name).join(' ፣ ')}
+                        </div>
+                    </div>
+                `).join('');
+
+                const cardId = 'day-' + dayKey.replace(/\s+/g, '-');
                 list.innerHTML += `
-                    <div class="history-card" onclick="editHistory('${day.id}')">
-                        <div class="history-header">
-                            <span>📅 ${day.dateStr}</span>
+                    <div class="history-card" onclick="toggleDay('${cardId}')">
+                        <div class="history-header" style="border:none; margin:0; padding:0;">
+                            <span style="font-size:15px;">📅 ${dayKey}</span>
+                            <span style="background:#0f766e; color:white; padding:2px 8px; border-radius:12px; font-size:11px;">${sessionCount} ሽያጭ</span>
                         </div>
-                        <div style="font-size: 13px; color: #475569; margin-bottom: 8px;">
-                            <b>እቃዎች:</b> ${itemsStr}
+                        <div class="history-total" style="border-top:none; margin-top:5px; padding-top:0; font-size:14px; text-align:left;">
+                            የቀኑ አጠቃላይ ትርፍ: <span style="color:#15803d;">${group.total.toLocaleString()} ብር</span>
                         </div>
-                        <div class="history-total">
-                            የቀኑ አጠቃላይ ትርፍ: ${day.totalProfit.toLocaleString()} ብር
+                        <div id="${cardId}" style="display:none; margin-top:10px; border-top: 1px dashed #cbd5e1; padding-top:5px;">
+                            ${sessionsHtml}
                         </div>
+                        <div style="text-align:center; font-size:10px; color:#94a3b8; margin-top:8px;">ዝርዝር ለማየት ይጫኑ 👇</div>
                     </div>
                 `;
             });
+        }
+
+        function toggleDay(id) {
+            const el = document.getElementById(id);
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
         }
 
         function editHistory(histId) {
