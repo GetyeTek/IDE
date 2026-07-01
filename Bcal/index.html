@@ -298,10 +298,10 @@
                         </select>
                     </td>
                     <td>
-                        <input type="number" value="${row.qty}" placeholder="0" oninput="updateDraftData('${row.id}', 'qty', this.value)">
+                        <input type="number" value="${row.qty}" oninput="updateDraftData('${row.id}', 'qty', this.value)">
                         ${row.leftoverNote ? `<div id="note-${row.id}" style="font-size:11.5px; color:#ea580c; margin-top:5px; font-weight:600; line-height:1.2;">${row.leftoverNote}</div>` : ''}
                     </td>
-                    <td><input type="number" value="${row.leftover}" placeholder="0" oninput="updateDraftData('${row.id}', 'leftover', this.value)"></td>
+                    <td><input type="number" value="${row.leftover}" oninput="updateDraftData('${row.id}', 'leftover', this.value)"></td>
                     <td class="readonly-cell" id="rev-${row.id}">-</td>
                     <td class="readonly-cell" id="sup-${row.id}">-</td>
                     <td class="readonly-cell profit-text" id="pro-${row.id}">-</td>
@@ -394,28 +394,36 @@
             const cost = item ? parseFloat(item.cost) || 0 : 0;
             const sell = item ? parseFloat(item.sell) || 0 : 0;
             
-            const typedQty = parseFloat(row.qty) || 0;
+                        const typedQty = parseFloat(row.qty) || 0;
             const carried = parseFloat(row.carriedOver) || 0;
             const totalQty = typedQty + carried;
-            
-            const left = parseFloat(row.leftover) || 0;
-            const sold = Math.max(0, totalQty - left); // Cannot sell negative
             
             // Dynamically update note with total
             const noteEl = document.getElementById(`note-${rowId}`);
             if(noteEl && carried > 0) {
-                // Determine label based on existing note content to keep it consistent
                 const label = row.leftoverNote.includes("ዛሬ") ? "ካለፈው የዛሬ ሂሳብ" : "ከትናንት";
                 noteEl.innerText = `+${carried} ${label} (ድምር: ${totalQty})`;
             }
-            
+
+            // Stop calculation if qty or leftover is explicitly empty (Draft mode)
+            if (row.qty === '' || row.qty === undefined || row.leftover === '' || row.leftover === undefined || !row.itemId) {
+                document.getElementById(`rev-${rowId}`).innerText = '-';
+                document.getElementById(`sup-${rowId}`).innerText = '-';
+                document.getElementById(`pro-${rowId}`).innerText = '-';
+                return;
+            }
+
+            const left = parseFloat(row.leftover);
+            const sold = Math.max(0, totalQty - left); // Cannot sell negative
+
             const rev = sold * sell;
             const sup = sold * cost;
             const pro = rev - sup;
 
-            document.getElementById(`rev-${rowId}`).innerText = rev > 0 ? rev.toLocaleString() : '-';
-            document.getElementById(`sup-${rowId}`).innerText = sup > 0 ? sup.toLocaleString() : '-';
-            document.getElementById(`pro-${rowId}`).innerText = pro !== 0 ? pro.toLocaleString() : '-';
+            // Show exactly as calculated (even if 0) since inputs are complete
+            document.getElementById(`rev-${rowId}`).innerText = rev.toLocaleString();
+            document.getElementById(`sup-${rowId}`).innerText = sup.toLocaleString();
+            document.getElementById(`pro-${rowId}`).innerText = pro.toLocaleString();
         }
 
         function addDraftRow() {
@@ -441,8 +449,14 @@
         // 5. HISTORY & SAVING
         // -------------------------------------------------------------------
         function saveToHistory() {
-            const validRows = draftRows.filter(r => r.itemId && (parseFloat(r.qty) > 0));
-            if (validRows.length === 0) return alert("እባክዎ የተሟላ መረጃ ያስገቡ (አይነት እና ብዛት)።");
+            // Check for incomplete rows first
+            const incompleteRows = draftRows.filter(r => r.itemId && (r.qty === '' || r.leftover === ''));
+            if (incompleteRows.length > 0) {
+                return alert("⚠️ ማስጠንቀቂያ!\nለተመረጡት እቃዎች 'ብዛት' ወይም 'የሚያድር' ባዶ ነው። ምንም የማያድር ከሆነ 0 ብለው ይፃፉ።");
+            }
+
+            const validRows = draftRows.filter(r => r.itemId && r.qty !== '' && r.leftover !== '');
+            if (validRows.length === 0) return alert("እባክዎ የተሟላ መረጃ ያስገቡ (አይነት፣ ብዛት እና የሚያድር)።");
 
             if(!confirm("የእለቱን ስራ ጨርሰው ይህንን ሂሳብ መዝጋት (Save) ይፈልጋሉ?")) return;
 
