@@ -179,8 +179,20 @@
         <div class="top-bar">
             <h2>የቀን ታሪኮች 🗂️</h2>
             <div class="top-bar-actions">
+                <button class="btn-icon" style="background:#f1f5f9;" onclick="toggleReport()">📊 ሪፖርት</button>
                 <button class="btn-danger" style="padding: 8px 12px; font-size: 12px; background: #be123c;" onclick="clearAllHistory()">ሁሉንም አጥፋ</button>
                 <button class="btn-primary" onclick="switchScreen('mainScreen')">ተመለስ</button>
+            </div>
+        </div>
+
+        <!-- Report Section -->
+        <div id="reportSection" style="display:none; background:#ecfdf5; border:1px solid #10b981; border-radius:8px; padding:15px; margin-bottom:15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="color:#065f46; font-size:16px;">📊 አጠቃላይ ሪፖርት</h3>
+                <button onclick="toggleReport()" style="background:none; border:none; color:#065f46; font-weight:bold;">ዝጋ X</button>
+            </div>
+            <div id="reportContent" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <!-- JS will inject stats here -->
             </div>
         </div>
         
@@ -543,6 +555,65 @@
         function toggleDay(id) {
             const el = document.getElementById(id);
             el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleReport() {
+            const section = document.getElementById('reportSection');
+            if (section.style.display === 'none') {
+                generateReport();
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        function generateReport() {
+            const now = Date.now();
+            const oneWeek = 7 * 24 * 60 * 60 * 1000;
+            const oneMonth = 30 * 24 * 60 * 60 * 1000;
+
+            const weekHistory = history.filter(h => (now - h.timestamp) <= oneWeek);
+            const monthHistory = history.filter(h => (now - h.timestamp) <= oneMonth);
+
+            const calculateStats = (data) => {
+                let totalProf = 0;
+                let itemsMap = {};
+                data.forEach(h => {
+                    totalProf += h.totalProfit;
+                    h.items.forEach(i => {
+                        itemsMap[i.name] = (itemsMap[i.name] || 0) + (i.sold || 0);
+                    });
+                });
+
+                let topItem = "የለም";
+                let maxSold = 0;
+                for (let name in itemsMap) {
+                    if (itemsMap[name] > maxSold) {
+                        maxSold = itemsMap[name];
+                        topItem = name;
+                    }
+                }
+                return { totalProf, topItem, maxSold };
+            };
+
+            const weekStats = calculateStats(weekHistory);
+            const monthStats = calculateStats(monthHistory);
+
+            const content = document.getElementById('reportContent');
+            content.innerHTML = `
+                <div style="background:white; padding:10px; border-radius:6px; border-left:4px solid #10b981;">
+                    <div style="font-size:11px; color:#64748b;">የ7 ቀን ትርፍ</div>
+                    <div style="font-size:15px; font-weight:bold; color:#065f46;">${weekStats.totalProf.toLocaleString()} ብር</div>
+                </div>
+                <div style="background:white; padding:10px; border-radius:6px; border-left:4px solid #10b981;">
+                    <div style="font-size:11px; color:#64748b;">የወር ትርፍ</div>
+                    <div style="font-size:15px; font-weight:bold; color:#065f46;">${monthStats.totalProf.toLocaleString()} ብር</div>
+                </div>
+                <div style="background:white; padding:10px; border-radius:6px; border-left:4px solid #f59e0b; grid-column: span 2;">
+                    <div style="font-size:11px; color:#64748b;">በብዛት የተሸጠ እቃ (ሳምንታዊ)</div>
+                    <div style="font-size:14px; font-weight:bold; color:#92400e;">${weekStats.topItem} (${weekStats.maxSold} ተሽጧል)</div>
+                </div>
+            `;
         }
 
         function clearAllHistory() {
