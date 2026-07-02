@@ -9230,6 +9230,11 @@ async function downloadArtifact(runId) {
                 fetchedFiles.push(...batchResults.filter(f => f !== null));
             }
 
+            // --- INJECT VIRTUAL SCHEMA ---
+            if (injectedSchema) {
+                fetchedFiles.push({ path: 'schema.sql', content: injectedSchema });
+            }
+
             const text = fetchedFiles.map(f => {
                 const cleanPath = (CONFIG.projectPath && f.path.startsWith(CONFIG.projectPath)) ? f.path.substring(CONFIG.projectPath.length) : f.path;
                 return `FILE: ${cleanPath}\n${f.content}`;
@@ -9290,17 +9295,26 @@ async function downloadArtifact(runId) {
                     checked.push('schema.sql');
                 }
             } catch(e) { console.warn("Schema dump failed", e); }
-        }
+    async function processExport(type) {
+        let checked = getSelectedFilePaths();
+        const statusEl = document.getElementById('export-status');
+        
+        if (checked.length === 0) return alert("No files selected.");
 
-        // Parity with Global Copy: Filter binaries for TXT mode
-        if (type === 'txt') {
-            checked = checked.filter(path => !isBinaryFile(path));
-            if (checked.length === 0) return alert("No textual files found in selection to merge.");
+        let injectedSchema = null;
+        if (CONFIG.includeSchema) {
+            statusEl.innerText = "⏳ Generating Schema Dump...";
+            try {
+                const sRes = await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'generate_schema_dump' })
+                });
+                const sData = await sRes.json();
+                if (sData.success) {
+                    injectedSchema = sData.content;
+                }
+            } catch(e) { console.warn("Schema dump failed", e); }
         }
-
-        if (exportController) exportController.abort(); 
-        exportController = new AbortController();
-        const signal = exportController.signal;
 
         try {
             const fetchedFiles = [];
@@ -9331,6 +9345,10 @@ async function downloadArtifact(runId) {
                 }));
 
                 fetchedFiles.push(...batchResults.filter(f => f !== null));
+            }
+
+            if (injectedSchema) {
+                fetchedFiles.push({ path: 'schema.sql', content: injectedSchema });
             }
 
             statusEl.innerText = "📦 Finalizing Bundle...";
