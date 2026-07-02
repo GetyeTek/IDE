@@ -9284,23 +9284,6 @@ async function downloadArtifact(runId) {
         
         if (checked.length === 0) return alert("No files selected.");
 
-        if (CONFIG.includeSchema) {
-            statusEl.innerText = "⏳ Generating Schema Dump...";
-            try {
-                await fetch(CONFIG.funcUrl, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: apiBody({ action: 'generate_schema_dump' })
-                });
-                if (!checked.includes('schema.sql')) {
-                    checked.push('schema.sql');
-                }
-            } catch(e) { console.warn("Schema dump failed", e); }
-    async function processExport(type) {
-        let checked = getSelectedFilePaths();
-        const statusEl = document.getElementById('export-status');
-        
-        if (checked.length === 0) return alert("No files selected.");
-
         let injectedSchema = null;
         if (CONFIG.includeSchema) {
             statusEl.innerText = "⏳ Generating Schema Dump...";
