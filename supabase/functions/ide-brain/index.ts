@@ -1496,6 +1496,7 @@ serve(async (req) => {
         }
 
         if (action === "generate_schema_dump") {
+            console.log("[SchemaDump] Starting generation for repo:", TARGET_REPO);
             const sqlHeaders = {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
@@ -1504,12 +1505,15 @@ serve(async (req) => {
             const projectUrl = Deno.env.get("SUPABASE_URL");
             const execUrl = `${projectUrl}/functions/v1/sql-executor`;
             
-            const runQuery = async (q: string) => {
+            const runQuery = async (q: string, label: string) => {
+                console.log(`[SchemaDump] Executing ${label}...`);
                 const res = await fetch(execUrl, {
                     method: 'POST', headers: sqlHeaders, body: JSON.stringify({ query: q })
                 });
                 const json = await res.json();
-                return json.data || (Array.isArray(json) ? json : []);
+                const data = json.data || (Array.isArray(json) ? json : []);
+                console.log(`[SchemaDump] ${label} returned ${data.length} rows.`);
+                return data;
             };
 
             try {
@@ -1518,21 +1522,25 @@ serve(async (req) => {
                 // 1. Tables & Columns
                 schemaContent += "-- ========================\n-- TABLES & COLUMNS\n-- ========================\n";
                 const qA = `SELECT 'Table: ' || table_name || chr(10) || array_to_string(array_agg(column_name || ' (' || data_type || ')'), ', ') as def FROM information_schema.columns WHERE table_schema = 'public' GROUP BY table_name;`;
-                const tables = await runQuery(qA);
+                const tables = await runQuery(qA, "Tables/Columns");
                 tables.forEach((t: any) => { schemaContent += t.def + "\n\n"; });
 
                 // 2. Policies
                 schemaContent += "-- ========================\n-- RLS POLICIES\n-- ========================\n";
                 const qB = `SELECT 'Table: ' || tablename || ' | Policy: ' || policyname || ' | Cmd: ' || cmd || ' | Using: ' || qual as def FROM pg_policies WHERE schemaname = 'public';`;
-                const pols = await runQuery(qB);
+                const pols = await runQuery(qB, "RLS Policies");
                 pols.forEach((p: any) => { schemaContent += p.def + "\n"; });
                 schemaContent += "\n";
 
                 // 3. Functions
                 schemaContent += "-- ========================\n-- FUNCTIONS & RPCs\n-- ========================\n";
                 const qC = `SELECT routine_name, routine_definition FROM information_schema.routines WHERE routine_schema = 'public';`;
-                const funcs = await runQuery(qC);
-                funcs.forEach((f: any) => { schemaContent += `-- Function: ${f.routine_name}\n${f.routine_definition}\n\n`; });
+                const funcs = await runQuery(qC, "RPC Functions");
+                funcs.forEach((f: any) => { 
+                    if (f.routine_definition) {
+                        schemaContent += `-- Function: ${f.routine_name}\n${f.routine_definition}\n\n`; 
+                    }
+                });
 
                 // Compare and Save
                 const { content: existingB64, sha } = await getFileRaw(TARGET_REPO, "schema.sql", DEV_BRANCH);
@@ -1541,7 +1549,11 @@ serve(async (req) => {
                 const stripDate = (s: string) => s.replace(/-- Date: .*\n/, '');
                 
                 if (stripDate(existingText) !== stripDate(schemaContent)) {
+                    console.log("[SchemaDump] Change detected. Committing to GitHub...");
                     await updateFile(TARGET_REPO, "schema.sql", schemaContent, sha, DEV_BRANCH, "Conduit: Auto-update schema dump");
+                    console.log("[SchemaDump] Commit successful.");
+                } else {
+                    console.log("[SchemaDump] No schema changes detected. Skipping commit.");
                 }
 
                 return new Response(JSON.stringify({ success: true, content: schemaContent }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
