@@ -9198,15 +9198,17 @@ async function downloadArtifact(runId) {
         const originalHtml = btn.innerHTML;
         btn.innerHTML = "⏳ GH Bridge...";
 
+        let injectedSchema = null;
         if (CONFIG.includeSchema) {
             showGlobalToast("⏳ Generating Schema Dump...");
             try {
-                await fetch(CONFIG.funcUrl, {
+                const sRes = await fetch(CONFIG.funcUrl, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: apiBody({ action: 'generate_schema_dump' })
                 });
-                if (!checked.includes('schema.sql')) {
-                    checked.push('schema.sql');
+                const sData = await sRes.json();
+                if (sData.success) {
+                    injectedSchema = sData.content;
                 }
             } catch(e) { console.warn("Schema dump failed", e); }
         }
