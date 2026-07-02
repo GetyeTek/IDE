@@ -1088,6 +1088,7 @@
                 </label>
                 <button id="viewer-save-btn" class="btn btn-prod" style="display:none; width:auto; padding:6px 12px; font-size:12px;" onclick="saveFileEdits()">Save Changes</button>
                 <button id="viewer-edit-btn" class="icon-btn" onclick="toggleEditMode()" title="Edit File">✎ Edit</button>
+                <button id="viewer-refresh-schema-btn" class="icon-btn" style="display:none; color:var(--dev); border-color:var(--dev);" onclick="refreshSchemaFile()" title="Refresh Schema Dump">↻ Sync Schema</button>
                 <button class="icon-btn" id="viewer-action-btn" onclick="copyViewerContent(this)" title="Copy Content">📋</button>
                 <button class="icon-btn" id="ace-search-toggle" onclick="toggleAceSearch()">🔍</button>
                 <button class="btn-outline" style="width: auto; padding: 6px 14px;" onclick="closeFileViewer()">Close</button>
@@ -1385,9 +1386,13 @@
                     <span style="font-size:13px;">🛠 Enable Eruda Console</span>
                     <input type="checkbox" id="setting-enable-eruda" onchange="toggleEruda(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
                 </label>
-                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom: 12px;">
                     <span style="font-size:13px;">📌 Auto-Select Pinned Files</span>
                     <input type="checkbox" id="setting-auto-pinned" onchange="toggleAutoPinned(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
+                </label>
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                    <span style="font-size:13px;">🗄️ Include Schema on Copy/Export</span>
+                    <input type="checkbox" id="setting-include-schema" onchange="toggleIncludeSchema(this.checked)" style="accent-color:var(--ai-accent); transform:scale(1.2);">
                 </label>
                 <p style="font-size:10px; color:#666; margin-top:8px;">Turn on the floating developer console or change file context navigation styles. Eruda requires app reload to fully apply.</p>
             </div>
@@ -2087,7 +2092,8 @@
         omitHeaders: localStorage.getItem('conduit_omitHeaders') === 'true',
         previewFetchMode: initialRepoConfig.previewFetchMode || 'single',
         wasmValidation: localStorage.getItem('conduit_wasm_validation') !== 'false',
-        autoSelectPinned: localStorage.getItem('conduit_auto_select_pinned') === 'true',
+        autoSelectPinned: localStorage.getItem('conduit_auto_select_pinned') !== 'false',
+        includeSchema: localStorage.getItem('conduit_include_schema') !== 'false',
         folderView: localStorage.getItem('conduit_folder_view') === 'true',
         floatingConsole: localStorage.getItem('conduit_floating_console') === 'true',
         consoleHalf: localStorage.getItem('conduit_console_half') === 'true',
@@ -7114,6 +7120,12 @@ async function downloadArtifact(runId) {
         document.getElementById('viewer-edit-btn').innerText = '✎ Edit';
         document.getElementById('viewer-save-btn').style.display = 'none';
 
+        if (path === 'schema.sql') {
+            document.getElementById('viewer-refresh-schema-btn').style.display = 'flex';
+        } else {
+            document.getElementById('viewer-refresh-schema-btn').style.display = 'none';
+        }
+
         // Clear stale content immediately
         aceEditorInstance.setValue("Loading content...", -1);
         
@@ -7232,6 +7244,28 @@ async function downloadArtifact(runId) {
         CONFIG.omitHeaders = checked;
         localStorage.setItem('conduit_omitHeaders', checked);
         showGlobalToast(checked ? "Headers Omitted" : "Headers Enabled");
+    }
+
+    async function refreshSchemaFile() {
+        const btn = document.getElementById('viewer-refresh-schema-btn');
+        const orig = btn.innerText;
+        btn.innerText = '⏳ Syncing...';
+        btn.disabled = true;
+        try {
+            const res = await fetch(CONFIG.funcUrl, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: apiBody({ action: 'generate_schema_dump' })
+            });
+            const data = await res.json();
+            if(data.success) {
+                aceEditorInstance.setValue(data.content, -1);
+                originalViewerContent = data.content;
+                document.getElementById('viewer-save-btn').style.display = 'none';
+                showGlobalToast("Schema Synced");
+                fetchFileList(); // Update cache metadata silently
+            } else { throw new Error(data.error); }
+        } catch(e) { alert("Failed: " + e.message); }
+        finally { btn.innerText = orig; btn.disabled = false; }
     }
 
     function closeFileViewer() {
@@ -8345,6 +8379,7 @@ async function downloadArtifact(runId) {
         document.getElementById('setting-enable-eruda').checked = localStorage.getItem('conduit_enable_eruda') === 'true';
         document.getElementById('setting-folder-view').checked = CONFIG.folderView;
         document.getElementById('setting-auto-pinned').checked = CONFIG.autoSelectPinned;
+        document.getElementById('setting-include-schema').checked = CONFIG.includeSchema;
         renderBackendManager();
         toggleFab(false);
     }
@@ -8362,6 +8397,12 @@ async function downloadArtifact(runId) {
         localStorage.setItem('conduit_auto_select_pinned', enabled ? 'true' : 'false');
         CONFIG.autoSelectPinned = enabled;
         showGlobalToast(enabled ? "Auto-select Pinned: ON" : "Auto-select Pinned: OFF");
+    }
+
+    function toggleIncludeSchema(enabled) {
+        localStorage.setItem('conduit_include_schema', enabled ? 'true' : 'false');
+        CONFIG.includeSchema = enabled;
+        showGlobalToast(enabled ? "Include Schema: ON" : "Include Schema: OFF");
     }
 
     function renderBackendSelector() {
@@ -9156,6 +9197,19 @@ async function downloadArtifact(runId) {
         const btn = document.getElementById('btn-context-copy');
         const originalHtml = btn.innerHTML;
         btn.innerHTML = "⏳ GH Bridge...";
+
+        if (CONFIG.includeSchema) {
+            showGlobalToast("⏳ Generating Schema Dump...");
+            try {
+                await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'generate_schema_dump' })
+                });
+                if (!checked.includes('schema.sql')) {
+                    checked.push('schema.sql');
+                }
+            } catch(e) { console.warn("Schema dump failed", e); }
+        }
         
         try {
             const fetchedFiles = [];
@@ -9224,6 +9278,19 @@ async function downloadArtifact(runId) {
         const statusEl = document.getElementById('export-status');
         
         if (checked.length === 0) return alert("No files selected.");
+
+        if (CONFIG.includeSchema) {
+            statusEl.innerText = "⏳ Generating Schema Dump...";
+            try {
+                await fetch(CONFIG.funcUrl, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: apiBody({ action: 'generate_schema_dump' })
+                });
+                if (!checked.includes('schema.sql')) {
+                    checked.push('schema.sql');
+                }
+            } catch(e) { console.warn("Schema dump failed", e); }
+        }
 
         // Parity with Global Copy: Filter binaries for TXT mode
         if (type === 'txt') {
