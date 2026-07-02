@@ -9286,6 +9286,9 @@ async function downloadArtifact(runId) {
         
         if (checked.length === 0) return alert("No files selected.");
 
+        exportController = new AbortController();
+        const signal = exportController.signal;
+
         let injectedSchema = null;
         if (CONFIG.includeSchema) {
             statusEl.innerText = "⏳ Generating Schema Dump...";
