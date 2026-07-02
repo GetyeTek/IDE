@@ -1495,6 +1495,62 @@ serve(async (req) => {
             return new Response(JSON.stringify({ success: true, count: data?.length || 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
+        if (action === "generate_schema_dump") {
+            const sqlHeaders = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                'apikey': Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+            };
+            const projectUrl = Deno.env.get("SUPABASE_URL");
+            const execUrl = `${projectUrl}/functions/v1/sql-executor`;
+            
+            const runQuery = async (q: string) => {
+                const res = await fetch(execUrl, {
+                    method: 'POST', headers: sqlHeaders, body: JSON.stringify({ query: q })
+                });
+                const json = await res.json();
+                return json.data || (Array.isArray(json) ? json : []);
+            };
+
+            try {
+                let schemaContent = "-- AUTO-GENERATED SCHEMA DUMP\n-- Date: " + new Date().toISOString() + "\n\n";
+
+                // 1. Tables & Columns
+                schemaContent += "-- ========================\n-- TABLES & COLUMNS\n-- ========================\n";
+                const qA = `SELECT 'Table: ' || table_name || chr(10) || array_to_string(array_agg(column_name || ' (' || data_type || ')'), ', ') as def FROM information_schema.columns WHERE table_schema = 'public' GROUP BY table_name;`;
+                const tables = await runQuery(qA);
+                tables.forEach((t: any) => { schemaContent += t.def + "\n\n"; });
+
+                // 2. Policies
+                schemaContent += "-- ========================\n-- RLS POLICIES\n-- ========================\n";
+                const qB = `SELECT 'Table: ' || tablename || ' | Policy: ' || policyname || ' | Cmd: ' || cmd || ' | Using: ' || qual as def FROM pg_policies WHERE schemaname = 'public';`;
+                const pols = await runQuery(qB);
+                pols.forEach((p: any) => { schemaContent += p.def + "\n"; });
+                schemaContent += "\n";
+
+                // 3. Functions
+                schemaContent += "-- ========================\n-- FUNCTIONS & RPCs\n-- ========================\n";
+                const qC = `SELECT routine_name, routine_definition FROM information_schema.routines WHERE routine_schema = 'public';`;
+                const funcs = await runQuery(qC);
+                funcs.forEach((f: any) => { schemaContent += `-- Function: ${f.routine_name}\n${f.routine_definition}\n\n`; });
+
+                // Compare and Save
+                const { content: existingB64, sha } = await getFileRaw(TARGET_REPO, "schema.sql", DEV_BRANCH);
+                const existingText = base64ToText(existingB64);
+                
+                const stripDate = (s: string) => s.replace(/-- Date: .*\n/, '');
+                
+                if (stripDate(existingText) !== stripDate(schemaContent)) {
+                    await updateFile(TARGET_REPO, "schema.sql", schemaContent, sha, DEV_BRANCH, "Conduit: Auto-update schema dump");
+                }
+
+                return new Response(JSON.stringify({ success: true, content: schemaContent }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+            } catch (e: any) {
+                return new Response(JSON.stringify({ success: false, error: e.message }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
+        }
+
         // 1. INIT
         if (action === "init") {
         const scope = project_path || "";
